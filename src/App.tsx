@@ -13,6 +13,7 @@ import { Configuration } from '@/pages/Configuration'
 import MasterTables from '@/pages/MasterTables'
 import QuotesList from '@/pages/QuotesList'
 import Login from '@/pages/Login'
+import SetupPassword from '@/pages/SetupPassword'
 
 function PrivateRoutes() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -32,6 +33,7 @@ export default function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/setup-password/:token" element={<SetupPassword />} />
             <Route element={<PrivateRoutes />}>
               <Route element={<MainLayout />}>
                 <Route path="/" element={<Dashboard />} />

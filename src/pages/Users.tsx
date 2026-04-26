@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Toast } from '@/components/Toast'
 import { ROLE_LABELS } from '@/constants/config'
 import { userService } from '@/services/userService'
+import { useAuth } from '@/context/AuthContext'
 import type { Usuario } from '@/types'
-import { Plus, X } from 'lucide-react'
+import { Plus, Trash2, X } from 'lucide-react'
 
 const AVATAR_COLORS: Record<string, string> = {
   admin: 'bg-slate-900 text-white',
@@ -15,8 +17,8 @@ const AVATAR_COLORS: Record<string, string> = {
 
 type CreateRole = 'ADMIN' | 'ANALYST' | 'READONLY'
 
-const BLANK: { name: string; email: string; password: string; role: CreateRole } = {
-  name: '', email: '', password: '', role: 'ANALYST',
+const BLANK: { name: string; email: string; role: CreateRole } = {
+  name: '', email: '', role: 'ANALYST',
 }
 
 function computeAvatar(name: string): string {
@@ -24,6 +26,9 @@ function computeAvatar(name: string): string {
 }
 
 export function UsersPage() {
+  const { user: currentUser } = useAuth()
+  const currentUserId = currentUser ? String(currentUser.id) : null
+
   const [users, setUsers] = useState<Usuario[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
@@ -31,6 +36,10 @@ export function UsersPage() {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [createdUser, setCreatedUser] = useState<{ id: string; name: string; role: string } | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deletedUser, setDeletedUser] = useState<{ id: string; name: string; email: string } | null>(null)
+  const [confirmTarget, setConfirmTarget] = useState<Usuario | null>(null)
+  const [errorToast, setErrorToast] = useState<{ id: string; title: string; description: string } | null>(null)
 
   useEffect(() => {
     userService.getAll().then((data) => { setUsers(data); setLoading(false) })
@@ -40,6 +49,33 @@ export function UsersPage() {
     const next = current === 'active' ? 'inactive' : 'active'
     await userService.updateStatus(id, next)
     setUsers(prev => prev.map(u => u.id === id ? { ...u, status: next } : u))
+  }
+
+  const confirmDelete = async () => {
+    const u = confirmTarget
+    if (!u) return
+    setDeletingId(u.id)
+    try {
+      await userService.delete(u.id)
+      setUsers(prev => prev.filter(x => x.id !== u.id))
+      setDeletedUser({ id: u.id, name: u.name, email: u.email })
+      setConfirmTarget(null)
+    } catch (err: unknown) {
+      const rawMsg = err instanceof Error ? err.message : String(err ?? '')
+      console.error('Delete user failed:', rawMsg)
+      const friendlyMsg =
+        rawMsg === 'Failed to fetch'
+          ? "Can't reach the server. Please contact the administrator."
+          : rawMsg || 'Please contact the administrator.'
+      setErrorToast({
+        id: `${u.id}-${Date.now()}`,
+        title: 'Failed to delete user',
+        description: friendlyMsg,
+      })
+      setConfirmTarget(null)
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const closeCreate = () => { setShowCreate(false); setForm({ ...BLANK }); setCreateError(null) }
@@ -104,11 +140,6 @@ export function UsersPage() {
                   onChange={e => setForm(f => ({ ...f, email: e.target.value }))} />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-slate-600">Password</label>
-                <input required type="password" placeholder="••••••••" value={form.password} className={inputCls}
-                  onChange={e => setForm(f => ({ ...f, password: e.target.value }))} />
-              </div>
-              <div>
                 <label className="mb-1 block text-xs font-medium text-slate-600">Role</label>
                 <select value={form.role} className={inputCls}
                   onChange={e => setForm(f => ({ ...f, role: e.target.value as CreateRole }))}>
@@ -127,6 +158,10 @@ export function UsersPage() {
                 </span>
               </p>
             )}
+
+            <p className="rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              We'll email an invitation link so the user can set their own password. The link is one-time use and expires in 24 hours.
+            </p>
 
             {createError && <p className="text-xs text-rose-600">{createError}</p>}
 
@@ -161,6 +196,17 @@ export function UsersPage() {
               <Button variant="outline" size="lg" onClick={() => toggleStatus(u.id, u.status)}>
                 {u.status === 'active' ? 'Disable' : 'Enable'}
               </Button>
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => setConfirmTarget(u)}
+                disabled={u.id === currentUserId || deletingId === u.id}
+                title={u.id === currentUserId ? "You can't delete your own account" : 'Delete user'}
+                className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-40"
+              >
+                <Trash2 className="mr-1.5 h-4 w-4" />
+                {deletingId === u.id ? 'Deleting…' : 'Delete'}
+              </Button>
             </div>
           </div>
         ))}
@@ -168,12 +214,53 @@ export function UsersPage() {
 
       {createdUser && (
         <Toast
-          key={createdUser.id}
-          title="User created!"
+          key={`created-${createdUser.id}`}
+          title="User created · invitation sent"
           description={`${createdUser.name} · ${createdUser.role}`}
           onClose={() => setCreatedUser(null)}
         />
       )}
+
+      {deletedUser && (
+        <Toast
+          key={`deleted-${deletedUser.id}`}
+          title="User deleted"
+          description={`${deletedUser.name} · ${deletedUser.email}`}
+          onClose={() => setDeletedUser(null)}
+        />
+      )}
+
+      {errorToast && (
+        <Toast
+          key={`error-${errorToast.id}`}
+          variant="error"
+          title={errorToast.title}
+          description={errorToast.description}
+          onClose={() => setErrorToast(null)}
+        />
+      )}
+
+      <ConfirmDialog
+        open={!!confirmTarget}
+        variant="danger"
+        title="Delete this user?"
+        description={
+          confirmTarget && (
+            <span>
+              You're about to permanently delete{' '}
+              <span className="font-semibold text-slate-800">{confirmTarget.name}</span>{' '}
+              <span className="text-slate-400">({confirmTarget.email})</span>.
+              <br />
+              This action cannot be undone.
+            </span>
+          )
+        }
+        confirmLabel="Delete user"
+        cancelLabel="Cancel"
+        loading={!!deletingId}
+        onConfirm={confirmDelete}
+        onCancel={() => !deletingId && setConfirmTarget(null)}
+      />
     </Card>
   )
 }

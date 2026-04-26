@@ -1,5 +1,7 @@
-import { CheckCircle2, X } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+
+type ToastVariant = 'success' | 'error'
 
 interface ToastProps {
   title: string
@@ -8,6 +10,33 @@ interface ToastProps {
   onAction?: () => void
   onClose: () => void
   duration?: number
+  variant?: ToastVariant
+}
+
+const VARIANT_STYLES: Record<ToastVariant, {
+  border: string; shadow: string; iconBg: string; iconShadow: string;
+  titleColor: string; barBg: string; barFill: string; actionColor: string;
+}> = {
+  success: {
+    border: 'border-emerald-200',
+    shadow: 'shadow-[0_20px_60px_rgba(16,185,129,0.25)]',
+    iconBg: 'bg-emerald-500',
+    iconShadow: 'shadow-emerald-500/30',
+    titleColor: 'text-emerald-900',
+    barBg: 'bg-emerald-100',
+    barFill: 'bg-emerald-500',
+    actionColor: 'text-emerald-700 hover:text-emerald-800',
+  },
+  error: {
+    border: 'border-rose-200',
+    shadow: 'shadow-[0_20px_60px_rgba(244,63,94,0.25)]',
+    iconBg: 'bg-rose-500',
+    iconShadow: 'shadow-rose-500/30',
+    titleColor: 'text-rose-900',
+    barBg: 'bg-rose-100',
+    barFill: 'bg-rose-500',
+    actionColor: 'text-rose-700 hover:text-rose-800',
+  },
 }
 
 export function Toast({
@@ -17,8 +46,10 @@ export function Toast({
   onAction,
   onClose,
   duration = 5500,
+  variant = 'success',
 }: ToastProps) {
   const [visible, setVisible] = useState(false)
+  const styles = VARIANT_STYLES[variant]
 
   useEffect(() => {
     const enter = window.setTimeout(() => setVisible(true), 20)
@@ -31,6 +62,8 @@ export function Toast({
     }
   }, [duration, onClose])
 
+  const Icon = variant === 'error' ? AlertTriangle : CheckCircle2
+
   return (
     <div
       role="status"
@@ -39,15 +72,15 @@ export function Toast({
         visible ? 'translate-x-0 opacity-100' : '-translate-x-4 opacity-0'
       }`}
     >
-      <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-[0_20px_60px_rgba(16,185,129,0.25)]">
+      <div className={`overflow-hidden rounded-2xl border ${styles.border} bg-white ${styles.shadow}`}>
         <div className="flex items-start gap-3 p-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
-            <CheckCircle2 className="h-6 w-6" />
+          <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${styles.iconBg} text-white shadow-lg ${styles.iconShadow}`}>
+            <Icon className="h-6 w-6" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-emerald-900">{title}</p>
+            <p className={`text-sm font-semibold ${styles.titleColor}`}>{title}</p>
             {description && (
-              <p className="mt-0.5 truncate text-xs text-slate-600">{description}</p>
+              <p className="mt-0.5 text-xs text-slate-600">{description}</p>
             )}
             {actionLabel && onAction && (
               <button
@@ -55,7 +88,7 @@ export function Toast({
                   onAction()
                   onClose()
                 }}
-                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                className={`mt-2 inline-flex items-center gap-1 text-xs font-semibold ${styles.actionColor}`}
               >
                 {actionLabel}
               </button>
@@ -69,9 +102,9 @@ export function Toast({
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className="h-1 w-full bg-emerald-100">
+        <div className={`h-1 w-full ${styles.barBg}`}>
           <div
-            className="h-full bg-emerald-500"
+            className={`h-full ${styles.barFill}`}
             style={{
               animation: `toast-progress ${duration}ms linear forwards`,
             }}

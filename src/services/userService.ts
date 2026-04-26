@@ -28,7 +28,7 @@ export const userService = {
   },
 
   async create(payload: {
-    name: string; email: string; password: string
+    name: string; email: string
     role: 'ADMIN' | 'ANALYST' | 'READONLY'; avatar: string
   }): Promise<Usuario> {
     const data = await api.post<ApiUser>('/api/users', {
@@ -40,5 +40,9 @@ export const userService = {
 
   async updateStatus(id: string, _status: 'active' | 'inactive'): Promise<void> {
     await api.patch(`/api/users/${id}/toggle-status`)
+  },
+
+  async delete(id: string): Promise<void> {
+    await api.delete<void>(`/api/users/${id}`)
   },
 }
