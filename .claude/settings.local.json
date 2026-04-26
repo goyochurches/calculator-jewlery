@@ -4,7 +4,12 @@
       "Bash(npx tsc *)",
       "Bash(npx vite *)",
       "Bash(java -version)",
-      "Bash(javac -version)"
+      "Bash(javac -version)",
+      "Bash(where psql *)",
+      "Bash(where python *)",
+      "Bash(where node *)",
+      "Bash(where docker *)",
+      "Bash(python *)"
     ]
   }
 }

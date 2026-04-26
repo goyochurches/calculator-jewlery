@@ -5,7 +5,7 @@ export interface AuthUser {
   id: number
   name: string
   email: string
-  role: 'ADMIN' | 'ANALYST' | 'READONLY'
+  role: 'ADMIN' | 'MANAGER' | 'JEWELER' | 'SALES' | 'VIEWER'
   status: 'ACTIVE' | 'INACTIVE'
   avatar: string
 }
@@ -15,7 +15,7 @@ interface LoginResponse {
   id: number
   name: string
   email: string
-  role: 'ADMIN' | 'ANALYST' | 'READONLY'
+  role: 'ADMIN' | 'MANAGER' | 'JEWELER' | 'SALES' | 'VIEWER'
   status: 'ACTIVE' | 'INACTIVE'
   avatar: string
 }

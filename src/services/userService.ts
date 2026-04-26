@@ -5,7 +5,7 @@ interface ApiUser {
   id: number
   name: string
   email: string
-  role: 'ADMIN' | 'ANALYST' | 'READONLY'
+  role: 'ADMIN' | 'MANAGER' | 'JEWELER' | 'SALES' | 'VIEWER'
   status: 'ACTIVE' | 'INACTIVE'
   avatar: string
 }
@@ -29,7 +29,7 @@ export const userService = {
 
   async create(payload: {
     name: string; email: string
-    role: 'ADMIN' | 'ANALYST' | 'READONLY'; avatar: string
+    role: 'ADMIN' | 'MANAGER' | 'JEWELER' | 'SALES' | 'VIEWER'; avatar: string
   }): Promise<Usuario> {
     const data = await api.post<ApiUser>('/api/users', {
       ...payload,

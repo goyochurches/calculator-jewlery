@@ -19,8 +19,10 @@ export const SIGNAL_LABELS = {
 
 export const ROLE_LABELS = {
   admin: 'Administrator',
-  analyst: 'Analyst',
-  readonly: 'Read only',
+  manager: 'Store Manager',
+  jeweler: 'Jeweler',
+  sales: 'Sales',
+  viewer: 'Viewer',
 } as const
 
 export const COMPLEXITY_LABELS: Record<QuoteComplexity, string> = {

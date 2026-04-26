@@ -30,8 +30,10 @@ const navItems = [
 
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Administrator',
-  ANALYST: 'Analyst',
-  READONLY: 'Read only',
+  MANAGER: 'Store Manager',
+  JEWELER: 'Jeweler',
+  SALES: 'Sales',
+  VIEWER: 'Viewer',
 }
 
 interface SidebarProps {

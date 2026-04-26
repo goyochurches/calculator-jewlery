@@ -11,14 +11,16 @@ import { Plus, Trash2, X } from 'lucide-react'
 
 const AVATAR_COLORS: Record<string, string> = {
   admin: 'bg-slate-900 text-white',
-  analyst: 'bg-emerald-100 text-emerald-700',
-  readonly: 'bg-amber-100 text-amber-700',
+  manager: 'bg-violet-100 text-violet-700',
+  jeweler: 'bg-amber-100 text-amber-700',
+  sales: 'bg-emerald-100 text-emerald-700',
+  viewer: 'bg-sky-100 text-sky-700',
 }
 
-type CreateRole = 'ADMIN' | 'ANALYST' | 'READONLY'
+type CreateRole = 'ADMIN' | 'MANAGER' | 'JEWELER' | 'SALES' | 'VIEWER'
 
 const BLANK: { name: string; email: string; role: CreateRole } = {
-  name: '', email: '', role: 'ANALYST',
+  name: '', email: '', role: 'SALES',
 }
 
 function computeAvatar(name: string): string {
@@ -144,8 +146,10 @@ export function UsersPage() {
                 <select value={form.role} className={inputCls}
                   onChange={e => setForm(f => ({ ...f, role: e.target.value as CreateRole }))}>
                   <option value="ADMIN">Administrator</option>
-                  <option value="ANALYST">Analyst</option>
-                  <option value="READONLY">Read only</option>
+                  <option value="MANAGER">Store Manager</option>
+                  <option value="JEWELER">Jeweler</option>
+                  <option value="SALES">Sales</option>
+                  <option value="VIEWER">Viewer</option>
                 </select>
               </div>
             </div>

@@ -29,7 +29,7 @@ export interface Usuario {
   id: string
   name: string
   email: string
-  role: 'admin' | 'analyst' | 'readonly'
+  role: 'admin' | 'manager' | 'jeweler' | 'sales' | 'viewer'
   status: 'active' | 'inactive'
   avatar: string
 }

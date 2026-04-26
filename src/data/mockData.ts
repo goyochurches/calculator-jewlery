@@ -63,9 +63,9 @@ export const mockHistory: HistorialEntry[] = [
 
 export const mockUsers: Usuario[] = [
   { id: '1', name: 'Anna Martinez', email: 'anna@company.com', role: 'admin', status: 'active', avatar: 'AM' },
-  { id: '2', name: 'Carlos Ruiz', email: 'carlos@company.com', role: 'analyst', status: 'active', avatar: 'CR' },
-  { id: '3', name: 'Laura Garcia', email: 'laura@company.com', role: 'analyst', status: 'inactive', avatar: 'LG' },
-  { id: '4', name: 'Peter Lopez', email: 'peter@company.com', role: 'readonly', status: 'active', avatar: 'PL' },
+  { id: '2', name: 'Carlos Ruiz', email: 'carlos@company.com', role: 'jeweler', status: 'active', avatar: 'CR' },
+  { id: '3', name: 'Laura Garcia', email: 'laura@company.com', role: 'sales', status: 'inactive', avatar: 'LG' },
+  { id: '4', name: 'Peter Lopez', email: 'peter@company.com', role: 'viewer', status: 'active', avatar: 'PL' },
 ]
 
 export const mockSavedQuotes: SavedQuote[] = [
