@@ -34,14 +34,20 @@ function QuotesWidget() {
       .then(([today, yesterday, perDay]) => {
         setTodayCount(today)
         setYesterdayCount(yesterday)
+        const localISO = (offset = 0) => {
+          const d = new Date()
+          d.setDate(d.getDate() + offset)
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+        }
+        const todayKey = localISO(0)
+        const yesterdayKey = localISO(-1)
         const entries = Object.entries(perDay).sort(([a], [b]) => a.localeCompare(b))
-        const lastIdx = entries.length - 1
-        const sorted = entries.map(([date, count], i) => {
-          const isToday = i === lastIdx
+        const sorted = entries.map(([date, count]) => {
+          const isToday = date === todayKey
           const d = new Date(date + 'T12:00:00')
           const label = isToday
             ? 'Today'
-            : i === lastIdx - 1
+            : date === yesterdayKey
             ? 'Yesterday'
             : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
           return { day: label, quotes: Number(count), isToday }
