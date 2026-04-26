@@ -58,6 +58,19 @@ const BLANK_GEM: Omit<GemstonePrice, 'id'> = {
   name: '', category: 'precious', quality: 'standard', unit: 'per ct', price: 0, color: '', note: '',
 }
 
+const BLANK_METAL: Omit<MetalWithId, 'id'> = {
+  symbol: '', name: '', price: 0, change: 0, changePercent: 0, high: 0, low: 0, open: 0,
+}
+
+const BLANK_DS: Omit<DiamondSizeConfig, 'id'> = { sizeKey: '', label: '', basePrice: 0 }
+const BLANK_FS: Omit<FingerSizeConfig, 'id'> = { size: 0, additionalFee: 0 }
+const BLANK_CAD: Omit<PricingTier, 'id'> = {
+  tierType: 'CAD_DESIGN', tierKey: '', label: '', fee: 0, sortOrder: 0,
+}
+const BLANK_RL: Omit<PricingTier, 'id'> = {
+  tierType: 'RING_LABOR', tierKey: '', label: '', fee: 0, sortOrder: 0,
+}
+
 const pf = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
 export function MasterTablesPage() {
@@ -67,6 +80,8 @@ export function MasterTablesPage() {
   const [metals, setMetals] = useState<MetalWithId[]>([])
   const [metalEditId, setMetalEditId] = useState<number | null>(null)
   const [metalDraft, setMetalDraft] = useState<MetalWithId | null>(null)
+  const [showNewMetal, setShowNewMetal] = useState(false)
+  const [newMetalDraft, setNewMetalDraft] = useState<Omit<MetalWithId, 'id'>>({ ...BLANK_METAL })
 
   useEffect(() => {
     metalsService.getAllWithIds().then(setMetals).catch(console.error)
@@ -81,6 +96,20 @@ export function MasterTablesPage() {
     const updated = await metalsService.update(metalDraft.id, metalDraft as any)
     setMetals(prev => prev.map(m => m.id === updated.id ? updated : m))
     cancelMetalEdit()
+  }
+
+  const saveNewMetal = async () => {
+    if (!newMetalDraft.symbol.trim() || !newMetalDraft.name.trim()) return
+    const created = await metalsService.create(newMetalDraft)
+    setMetals(prev => [...prev, created])
+    setShowNewMetal(false)
+    setNewMetalDraft({ ...BLANK_METAL })
+  }
+
+  const deleteMetal = async (id: number) => {
+    if (!confirm('Delete this metal?')) return
+    await metalsService.delete(id)
+    setMetals(prev => prev.filter(m => m.id !== id))
   }
 
   // ── Gemstones ────────────────────────────────────────────────────────────────
@@ -125,6 +154,8 @@ export function MasterTablesPage() {
   const [diamondSizes, setDiamondSizes] = useState<DiamondSizeConfig[]>([])
   const [dsEditId, setDsEditId] = useState<number | null>(null)
   const [dsDraft, setDsDraft] = useState<DiamondSizeConfig | null>(null)
+  const [showNewDs, setShowNewDs] = useState(false)
+  const [newDsDraft, setNewDsDraft] = useState<Omit<DiamondSizeConfig, 'id'>>({ ...BLANK_DS })
 
   useEffect(() => {
     configService.getDiamondSizes().then(setDiamondSizes).catch(console.error)
@@ -137,10 +168,26 @@ export function MasterTablesPage() {
     setDsEditId(null); setDsDraft(null)
   }
 
+  const saveNewDs = async () => {
+    if (!newDsDraft.sizeKey.trim() || !newDsDraft.label.trim()) return
+    const created = await configService.createDiamondSize(newDsDraft)
+    setDiamondSizes(prev => [...prev, created])
+    setShowNewDs(false)
+    setNewDsDraft({ ...BLANK_DS })
+  }
+
+  const deleteDs = async (id: number) => {
+    if (!confirm('Delete this diamond size?')) return
+    await configService.deleteDiamondSize(id)
+    setDiamondSizes(prev => prev.filter(d => d.id !== id))
+  }
+
   // ── Finger Sizes ───────────────────────────────────────────────────────────
   const [fingerSizes, setFingerSizes] = useState<FingerSizeConfig[]>([])
   const [fsEditId, setFsEditId] = useState<number | null>(null)
   const [fsDraft, setFsDraft] = useState<FingerSizeConfig | null>(null)
+  const [showNewFs, setShowNewFs] = useState(false)
+  const [newFsDraft, setNewFsDraft] = useState<Omit<FingerSizeConfig, 'id'>>({ ...BLANK_FS })
 
   useEffect(() => {
     configService.getFingerSizes().then(setFingerSizes).catch(console.error)
@@ -153,10 +200,26 @@ export function MasterTablesPage() {
     setFsEditId(null); setFsDraft(null)
   }
 
+  const saveNewFs = async () => {
+    if (!newFsDraft.size || newFsDraft.size <= 0) return
+    const created = await configService.createFingerSize(newFsDraft)
+    setFingerSizes(prev => [...prev, created].sort((a, b) => a.size - b.size))
+    setShowNewFs(false)
+    setNewFsDraft({ ...BLANK_FS })
+  }
+
+  const deleteFs = async (id: number) => {
+    if (!confirm('Delete this finger size?')) return
+    await configService.deleteFingerSize(id)
+    setFingerSizes(prev => prev.filter(f => f.id !== id))
+  }
+
   // ── CAD Design Tiers ───────────────────────────────────────────────────────
   const [cadTiers, setCadTiers] = useState<PricingTier[]>([])
   const [cadEditId, setCadEditId] = useState<number | null>(null)
   const [cadDraft, setCadDraft] = useState<PricingTier | null>(null)
+  const [showNewCad, setShowNewCad] = useState(false)
+  const [newCadDraft, setNewCadDraft] = useState<Omit<PricingTier, 'id'>>({ ...BLANK_CAD })
 
   useEffect(() => {
     configService.getCadTiers().then(setCadTiers).catch(console.error)
@@ -169,10 +232,26 @@ export function MasterTablesPage() {
     setCadEditId(null); setCadDraft(null)
   }
 
+  const saveNewCad = async () => {
+    if (!newCadDraft.tierKey.trim() || !newCadDraft.label.trim()) return
+    const created = await configService.createPricingTier(newCadDraft)
+    setCadTiers(prev => [...prev, created])
+    setShowNewCad(false)
+    setNewCadDraft({ ...BLANK_CAD })
+  }
+
+  const deleteCad = async (id: number) => {
+    if (!confirm('Delete this CAD tier?')) return
+    await configService.deletePricingTier(id)
+    setCadTiers(prev => prev.filter(t => t.id !== id))
+  }
+
   // ── Ring Labor Tiers ───────────────────────────────────────────────────────
   const [ringLaborTiers, setRingLaborTiers] = useState<PricingTier[]>([])
   const [rlEditId, setRlEditId] = useState<number | null>(null)
   const [rlDraft, setRlDraft] = useState<PricingTier | null>(null)
+  const [showNewRl, setShowNewRl] = useState(false)
+  const [newRlDraft, setNewRlDraft] = useState<Omit<PricingTier, 'id'>>({ ...BLANK_RL })
 
   useEffect(() => {
     configService.getRingLaborTiers().then(setRingLaborTiers).catch(console.error)
@@ -185,6 +264,20 @@ export function MasterTablesPage() {
     setRlEditId(null); setRlDraft(null)
   }
 
+  const saveNewRl = async () => {
+    if (!newRlDraft.tierKey.trim() || !newRlDraft.label.trim()) return
+    const created = await configService.createPricingTier(newRlDraft)
+    setRingLaborTiers(prev => [...prev, created])
+    setShowNewRl(false)
+    setNewRlDraft({ ...BLANK_RL })
+  }
+
+  const deleteRl = async (id: number) => {
+    if (!confirm('Delete this Ring Labor tier?')) return
+    await configService.deletePricingTier(id)
+    setRingLaborTiers(prev => prev.filter(t => t.id !== id))
+  }
+
   return (
     <div className="space-y-8">
       <div>
@@ -195,8 +288,16 @@ export function MasterTablesPage() {
       {/* ── Metals ── */}
       <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
         <CardHeader className="border-b border-slate-100">
-          <CardTitle className="text-base font-semibold text-slate-900">Metals</CardTitle>
-          <p className="text-sm text-slate-500">Current spot prices for tracked metals. Click the edit icon to update values.</p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle className="text-base font-semibold text-slate-900">Metals</CardTitle>
+              <p className="text-sm text-slate-500">Current spot prices for tracked metals. Click the edit icon to update values.</p>
+            </div>
+            <Button size="sm" className="shrink-0 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}
+              onClick={() => { setShowNewMetal(true); setMetalEditId(null); setMetalDraft(null) }}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" /> Add
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -247,12 +348,44 @@ export function MasterTablesPage() {
                       <td className="px-6 py-4 text-slate-500">{pf(m.low)}</td>
                       <td className="px-6 py-4 text-slate-500">{pf(m.open)}</td>
                       <td className="px-6 py-4">
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-violet-600 hover:bg-violet-50"
-                          onClick={() => startMetalEdit(m)}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+                            onClick={() => startMetalEdit(m)}><Pencil className="h-3.5 w-3.5" /></Button>
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                            onClick={() => deleteMetal(m.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
                       </td>
                     </tr>
                   )
                 })}
+
+                {showNewMetal && (
+                  <tr className="border-b border-emerald-100 bg-emerald-50/30">
+                    <td className="px-3 py-2"><TInput placeholder="XAU" value={newMetalDraft.symbol}
+                      onChange={e => setNewMetalDraft(d => ({ ...d, symbol: e.target.value.toUpperCase() }))} /></td>
+                    <td className="px-3 py-2"><TInput placeholder="Gold" value={newMetalDraft.name}
+                      onChange={e => setNewMetalDraft(d => ({ ...d, name: e.target.value }))} /></td>
+                    <td className="px-3 py-2"><TInput type="number" step="0.01" value={newMetalDraft.price}
+                      onChange={e => setNewMetalDraft(d => ({ ...d, price: +e.target.value }))} /></td>
+                    <td className="px-3 py-2"><TInput type="number" step="0.01" value={newMetalDraft.change}
+                      onChange={e => setNewMetalDraft(d => ({ ...d, change: +e.target.value }))} /></td>
+                    <td className="px-3 py-2"><TInput type="number" step="0.01" value={newMetalDraft.changePercent}
+                      onChange={e => setNewMetalDraft(d => ({ ...d, changePercent: +e.target.value }))} /></td>
+                    <td className="px-3 py-2"><TInput type="number" step="0.01" value={newMetalDraft.high}
+                      onChange={e => setNewMetalDraft(d => ({ ...d, high: +e.target.value }))} /></td>
+                    <td className="px-3 py-2"><TInput type="number" step="0.01" value={newMetalDraft.low}
+                      onChange={e => setNewMetalDraft(d => ({ ...d, low: +e.target.value }))} /></td>
+                    <td className="px-3 py-2"><TInput type="number" step="0.01" value={newMetalDraft.open}
+                      onChange={e => setNewMetalDraft(d => ({ ...d, open: +e.target.value }))} /></td>
+                    <td className="px-3 py-2">
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50" onClick={saveNewMetal}><Check className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:bg-slate-100"
+                          onClick={() => { setShowNewMetal(false); setNewMetalDraft({ ...BLANK_METAL }) }}><X className="h-4 w-4" /></Button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -430,8 +563,16 @@ export function MasterTablesPage() {
       {/* ── Diamond Sizes ── */}
       <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
         <CardHeader className="border-b border-slate-100">
-          <CardTitle className="text-base font-semibold text-slate-900">Diamond Sizes</CardTitle>
-          <p className="text-sm text-slate-500">Base price per stone by carat range. Click the pencil to edit.</p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle className="text-base font-semibold text-slate-900">Diamond Sizes</CardTitle>
+              <p className="text-sm text-slate-500">Base price per stone by carat range. Click the pencil to edit.</p>
+            </div>
+            <Button size="sm" className="shrink-0 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}
+              onClick={() => { setShowNewDs(true); setDsEditId(null); setDsDraft(null) }}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" /> Add
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -467,12 +608,40 @@ export function MasterTablesPage() {
                       <td className="px-6 py-4 font-semibold text-slate-900">{d.label}</td>
                       <td className="px-6 py-4 font-semibold text-slate-900">{pf(d.basePrice)}</td>
                       <td className="px-6 py-4">
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-violet-600 hover:bg-violet-50"
-                          onClick={() => { setDsEditId(d.id); setDsDraft({ ...d }) }}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+                            onClick={() => { setDsEditId(d.id); setDsDraft({ ...d }) }}><Pencil className="h-3.5 w-3.5" /></Button>
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                            onClick={() => deleteDs(d.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
                       </td>
                     </tr>
                   )
                 })}
+
+                {showNewDs && (
+                  <tr className="border-b border-emerald-100 bg-emerald-50/30">
+                    <td className="px-3 py-2">
+                      <div className="flex flex-col gap-1">
+                        <TInput placeholder="Key (e.g. 0.05-0.10)" value={newDsDraft.sizeKey}
+                          onChange={e => setNewDsDraft(d => ({ ...d, sizeKey: e.target.value }))} />
+                        <TInput placeholder="Label" value={newDsDraft.label}
+                          onChange={e => setNewDsDraft(d => ({ ...d, label: e.target.value }))} />
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 w-40">
+                      <TInput type="number" step="0.01" placeholder="0.00" value={newDsDraft.basePrice}
+                        onChange={e => setNewDsDraft(d => ({ ...d, basePrice: +e.target.value }))} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50" onClick={saveNewDs}><Check className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:bg-slate-100"
+                          onClick={() => { setShowNewDs(false); setNewDsDraft({ ...BLANK_DS }) }}><X className="h-4 w-4" /></Button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -482,8 +651,16 @@ export function MasterTablesPage() {
       {/* ── Finger Sizes ── */}
       <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
         <CardHeader className="border-b border-slate-100">
-          <CardTitle className="text-base font-semibold text-slate-900">Finger Sizes</CardTitle>
-          <p className="text-sm text-slate-500">Additional fee per ring size. Click the pencil to edit.</p>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <CardTitle className="text-base font-semibold text-slate-900">Finger Sizes</CardTitle>
+              <p className="text-sm text-slate-500">Additional fee per ring size. Click the pencil to edit.</p>
+            </div>
+            <Button size="sm" className="shrink-0 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}
+              onClick={() => { setShowNewFs(true); setFsEditId(null); setFsDraft(null) }}>
+              <Plus className="mr-1.5 h-3.5 w-3.5" /> Add
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -519,12 +696,36 @@ export function MasterTablesPage() {
                       <td className="px-6 py-4 font-semibold text-slate-900">{f.size}</td>
                       <td className="px-6 py-4 font-semibold text-slate-900">{f.additionalFee === 0 ? '—' : `+${pf(f.additionalFee)}`}</td>
                       <td className="px-6 py-4">
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-violet-600 hover:bg-violet-50"
-                          onClick={() => { setFsEditId(f.id); setFsDraft({ ...f }) }}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+                            onClick={() => { setFsEditId(f.id); setFsDraft({ ...f }) }}><Pencil className="h-3.5 w-3.5" /></Button>
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                            onClick={() => deleteFs(f.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
                       </td>
                     </tr>
                   )
                 })}
+
+                {showNewFs && (
+                  <tr className="border-b border-emerald-100 bg-emerald-50/30">
+                    <td className="px-3 py-2 w-32">
+                      <TInput type="number" step="0.5" placeholder="Size" value={newFsDraft.size}
+                        onChange={e => setNewFsDraft(d => ({ ...d, size: +e.target.value }))} />
+                    </td>
+                    <td className="px-3 py-2 w-40">
+                      <TInput type="number" step="0.01" placeholder="Fee" value={newFsDraft.additionalFee}
+                        onChange={e => setNewFsDraft(d => ({ ...d, additionalFee: +e.target.value }))} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50" onClick={saveNewFs}><Check className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:bg-slate-100"
+                          onClick={() => { setShowNewFs(false); setNewFsDraft({ ...BLANK_FS }) }}><X className="h-4 w-4" /></Button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -535,8 +736,16 @@ export function MasterTablesPage() {
       <div className="grid gap-4 xl:grid-cols-2">
         <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
           <CardHeader className="border-b border-slate-100">
-            <CardTitle className="text-base font-semibold text-slate-900">CAD Design</CardTitle>
-            <p className="text-sm text-slate-500">Fee by piece complexity. Click the pencil to edit.</p>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle className="text-base font-semibold text-slate-900">CAD Design</CardTitle>
+                <p className="text-sm text-slate-500">Fee by piece complexity. Click the pencil to edit.</p>
+              </div>
+              <Button size="sm" className="shrink-0 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}
+                onClick={() => { setShowNewCad(true); setCadEditId(null); setCadDraft(null) }}>
+                <Plus className="mr-1.5 h-3.5 w-3.5" /> Add
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <table className="w-full text-sm">
@@ -568,12 +777,34 @@ export function MasterTablesPage() {
                       <td className="px-6 py-4 font-semibold text-slate-900">{t.label}</td>
                       <td className="px-6 py-4 font-semibold text-slate-900">{pf(t.fee)}</td>
                       <td className="px-6 py-4">
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-violet-600 hover:bg-violet-50"
-                          onClick={() => { setCadEditId(t.id); setCadDraft({ ...t }) }}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+                            onClick={() => { setCadEditId(t.id); setCadDraft({ ...t }) }}><Pencil className="h-3.5 w-3.5" /></Button>
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                            onClick={() => deleteCad(t.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
                       </td>
                     </tr>
                   )
                 })}
+
+                {showNewCad && (
+                  <tr className="border-b border-emerald-100 bg-emerald-50/30">
+                    <td className="px-3 py-2 w-28"><TInput placeholder="Key" value={newCadDraft.tierKey}
+                      onChange={e => setNewCadDraft(d => ({ ...d, tierKey: e.target.value }))} /></td>
+                    <td className="px-3 py-2"><TInput placeholder="Label" value={newCadDraft.label}
+                      onChange={e => setNewCadDraft(d => ({ ...d, label: e.target.value }))} /></td>
+                    <td className="px-3 py-2 w-28"><TInput type="number" step="0.01" value={newCadDraft.fee}
+                      onChange={e => setNewCadDraft(d => ({ ...d, fee: +e.target.value }))} /></td>
+                    <td className="px-3 py-2">
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50" onClick={saveNewCad}><Check className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:bg-slate-100"
+                          onClick={() => { setShowNewCad(false); setNewCadDraft({ ...BLANK_CAD }) }}><X className="h-4 w-4" /></Button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </CardContent>
@@ -581,8 +812,16 @@ export function MasterTablesPage() {
 
         <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
           <CardHeader className="border-b border-slate-100">
-            <CardTitle className="text-base font-semibold text-slate-900">Ring Labor</CardTitle>
-            <p className="text-sm text-slate-500">Fee by ring complexity. Click the pencil to edit.</p>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle className="text-base font-semibold text-slate-900">Ring Labor</CardTitle>
+                <p className="text-sm text-slate-500">Fee by ring complexity. Click the pencil to edit.</p>
+              </div>
+              <Button size="sm" className="shrink-0 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}
+                onClick={() => { setShowNewRl(true); setRlEditId(null); setRlDraft(null) }}>
+                <Plus className="mr-1.5 h-3.5 w-3.5" /> Add
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <table className="w-full text-sm">
@@ -614,12 +853,34 @@ export function MasterTablesPage() {
                       <td className="px-6 py-4 font-semibold text-slate-900">{t.label}</td>
                       <td className="px-6 py-4 font-semibold text-slate-900">{pf(t.fee)}</td>
                       <td className="px-6 py-4">
-                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-violet-600 hover:bg-violet-50"
-                          onClick={() => { setRlEditId(t.id); setRlDraft({ ...t }) }}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+                            onClick={() => { setRlEditId(t.id); setRlDraft({ ...t }) }}><Pencil className="h-3.5 w-3.5" /></Button>
+                          <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                            onClick={() => deleteRl(t.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                        </div>
                       </td>
                     </tr>
                   )
                 })}
+
+                {showNewRl && (
+                  <tr className="border-b border-emerald-100 bg-emerald-50/30">
+                    <td className="px-3 py-2 w-28"><TInput placeholder="Key" value={newRlDraft.tierKey}
+                      onChange={e => setNewRlDraft(d => ({ ...d, tierKey: e.target.value }))} /></td>
+                    <td className="px-3 py-2"><TInput placeholder="Label" value={newRlDraft.label}
+                      onChange={e => setNewRlDraft(d => ({ ...d, label: e.target.value }))} /></td>
+                    <td className="px-3 py-2 w-28"><TInput type="number" step="0.01" value={newRlDraft.fee}
+                      onChange={e => setNewRlDraft(d => ({ ...d, fee: +e.target.value }))} /></td>
+                    <td className="px-3 py-2">
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50" onClick={saveNewRl}><Check className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:bg-slate-100"
+                          onClick={() => { setShowNewRl(false); setNewRlDraft({ ...BLANK_RL }) }}><X className="h-4 w-4" /></Button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </CardContent>

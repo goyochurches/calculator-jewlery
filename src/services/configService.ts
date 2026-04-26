@@ -29,11 +29,23 @@ export const configService = {
   updateDiamondSize: (id: number, basePrice: number): Promise<DiamondSizeConfig> =>
     api.put(`/api/config/diamond-sizes/${id}`, { basePrice }),
 
+  createDiamondSize: (input: Omit<DiamondSizeConfig, 'id'>): Promise<DiamondSizeConfig> =>
+    api.post('/api/config/diamond-sizes', input),
+
+  deleteDiamondSize: (id: number): Promise<void> =>
+    api.delete(`/api/config/diamond-sizes/${id}`),
+
   getFingerSizes: (): Promise<FingerSizeConfig[]> =>
     api.get('/api/config/finger-sizes'),
 
   updateFingerSize: (id: number, additionalFee: number): Promise<FingerSizeConfig> =>
     api.put(`/api/config/finger-sizes/${id}`, { additionalFee }),
+
+  createFingerSize: (input: Omit<FingerSizeConfig, 'id'>): Promise<FingerSizeConfig> =>
+    api.post('/api/config/finger-sizes', input),
+
+  deleteFingerSize: (id: number): Promise<void> =>
+    api.delete(`/api/config/finger-sizes/${id}`),
 
   getCadTiers: (): Promise<PricingTier[]> =>
     api.get('/api/config/pricing-tiers/cad'),
@@ -43,4 +55,10 @@ export const configService = {
 
   updatePricingTier: (id: number, update: { fee: number; label: string }): Promise<PricingTier> =>
     api.put(`/api/config/pricing-tiers/${id}`, update),
+
+  createPricingTier: (input: Omit<PricingTier, 'id' | 'sortOrder'> & { sortOrder?: number }): Promise<PricingTier> =>
+    api.post('/api/config/pricing-tiers', input),
+
+  deletePricingTier: (id: number): Promise<void> =>
+    api.delete(`/api/config/pricing-tiers/${id}`),
 }

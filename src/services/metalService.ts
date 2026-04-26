@@ -55,6 +55,15 @@ export const metalsService = {
     return mapMetal(data)
   },
 
+  async create(metal: Omit<ApiMetal, 'id'>): Promise<MetalWithId> {
+    const data = await api.post<ApiMetal>('/api/metals', metal)
+    return mapMetal(data)
+  },
+
+  async delete(id: number): Promise<void> {
+    await api.delete<void>(`/api/metals/${id}`)
+  },
+
   async getHistory(): Promise<HistorialEntry[]> {
     const data = await api.get<ApiHistoryEntry[]>('/api/history')
     return data.map((h) => ({
