@@ -9,7 +9,8 @@
       "Bash(where python *)",
       "Bash(where node *)",
       "Bash(where docker *)",
-      "Bash(python *)"
+      "Bash(python *)",
+      "Bash(docker run *)"
     ]
   }
 }
