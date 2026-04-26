@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   CAD_DESIGN_OPTIONS,
   DIAMOND_SIZE_OPTIONS,
@@ -320,7 +321,7 @@ export function QuotesListPage() {
     { draft: 0, pending: 0, approved: 0, rejected: 0 }
   )
 
-  if (loading) return <p className="text-sm text-slate-500">Loading quotes...</p>
+  if (loading) return <QuotesListSkeleton />
 
   return (
     <div className="space-y-6">
@@ -621,6 +622,66 @@ function PaginationBar({
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
+    </div>
+  )
+}
+
+function QuotesListSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i} className="rounded-[24px] border border-white/80 bg-white/92 shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
+            <CardContent className="p-5 space-y-2">
+              <Skeleton className="h-2.5 w-16 bg-slate-100" />
+              <Skeleton className="h-7 w-12" />
+              <Skeleton className="h-5 w-20 bg-slate-100" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <Card className="rounded-[24px] border border-white/80 bg-white/92 shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
+        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <Skeleton className="h-10 w-full sm:max-w-sm rounded-2xl bg-slate-100" />
+          <div className="flex flex-wrap items-center gap-1.5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-7 w-20 bg-slate-100" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <CardHeader className="border-b border-slate-100 space-y-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3 w-64 bg-slate-100" />
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="border-b border-slate-100 bg-slate-50/70 px-6 py-4 hidden md:flex gap-8">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <Skeleton key={i} className="h-2.5 w-14 bg-slate-200/70" />
+            ))}
+          </div>
+          <div className="divide-y divide-slate-100">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-6 px-6 py-4">
+                <Skeleton className="h-10 w-10 rounded-xl bg-slate-100" />
+                <Skeleton className="h-3.5 w-44" />
+                <Skeleton className="h-3 w-24 bg-slate-100" />
+                <div className="flex items-center gap-2">
+                  <Skeleton className="h-7 w-7 rounded-full" />
+                  <Skeleton className="h-3 w-20 bg-slate-100" />
+                </div>
+                <Skeleton className="h-3 w-16 bg-slate-100" />
+                <Skeleton className="h-6 w-20 bg-slate-100" />
+                <Skeleton className="h-3 w-20 bg-slate-100 ml-auto" />
+                <Skeleton className="h-3.5 w-20" />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

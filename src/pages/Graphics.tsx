@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useHistory } from '@/hooks/useHistorial'
 import {
   Legend,
@@ -56,13 +57,7 @@ export function Charts() {
     return { text: 'Consolidation phase', color: 'text-amber-400' }
   })()
 
-  if (loading) {
-    return (
-      <div className="flex h-64 items-center justify-center text-sm text-slate-400">
-        Loading charts…
-      </div>
-    )
-  }
+  if (loading) return <ChartsSkeleton />
 
   return (
     <div className="space-y-6">
@@ -188,6 +183,60 @@ export function Charts() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
+      </div>
+    </div>
+  )
+}
+
+function ChartsSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 xl:grid-cols-3">
+        <Card className="rounded-[28px] border border-white/80 bg-white/92 shadow-[0_18px_45px_rgba(15,23,42,0.08)] xl:col-span-2">
+          <CardHeader>
+            <div className="flex items-start justify-between">
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-44" />
+                <Skeleton className="h-3 w-56 bg-slate-100" />
+              </div>
+              <Skeleton className="h-7 w-20 rounded-xl bg-amber-100" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-[280px] w-full rounded-2xl bg-slate-100" />
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[28px] border-0 bg-slate-950 shadow-[0_20px_60px_rgba(15,23,42,0.2)]">
+          <CardContent className="p-6 space-y-4">
+            <Skeleton className="h-2.5 w-20 bg-white/15" />
+            <Skeleton className="h-7 w-44 bg-white/25" />
+            <div className="space-y-3 pt-2">
+              <div className="flex justify-between">
+                <Skeleton className="h-3 w-12 bg-white/15" />
+                <Skeleton className="h-3 w-20 bg-white/25" />
+              </div>
+              <div className="flex justify-between">
+                <Skeleton className="h-3 w-14 bg-white/15" />
+                <Skeleton className="h-3 w-20 bg-white/25" />
+              </div>
+            </div>
+            <Skeleton className="h-2.5 w-3/4 bg-white/15" />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Card key={i} className="rounded-[28px] border border-white/80 bg-white/92 shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
+            <CardHeader>
+              <Skeleton className="h-4 w-40" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-[260px] w-full rounded-2xl bg-slate-100" />
+            </CardContent>
+          </Card>
+        ))}
       </div>
     </div>
   )

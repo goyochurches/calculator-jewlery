@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { gemstoneService } from '@/services/gemstoneService'
 import type { GemstonePrice } from '@/types'
 import { Diamond, Gem, Sparkles } from 'lucide-react'
@@ -34,7 +35,7 @@ export function GemstonesPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <p className="text-sm text-slate-500">Loading gemstones...</p>
+  if (loading) return <GemstonesSkeleton />
 
   const highestStone = [...gemstones].sort((a, b) => b.price - a.price)[0]
   const averagePrice = gemstones.length
@@ -169,6 +170,71 @@ export function GemstonesPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function GemstonesSkeleton() {
+  return (
+    <div className="space-y-6">
+      <section className="grid gap-4 xl:grid-cols-[1.45fr_1fr]">
+        <Card className="rounded-[30px] border-0 bg-slate-950 shadow-[0_30px_80px_rgba(15,23,42,0.24)]">
+          <CardContent className="p-8 space-y-6">
+            <Skeleton className="h-3 w-32 bg-white/15" />
+            <Skeleton className="h-9 w-3/4 bg-white/25" />
+            <Skeleton className="h-3 w-2/3 bg-white/15" />
+            <div className="grid gap-4 md:grid-cols-3 pt-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-2">
+                  <Skeleton className="h-2.5 w-20 bg-white/15" />
+                  <Skeleton className="h-7 w-24 bg-white/25" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-4">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <Card key={i} className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+              <CardContent className="p-6 space-y-3">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-2.5 w-24 bg-slate-100" />
+                  <Skeleton className="h-12 w-12 rounded-2xl" />
+                </div>
+                <Skeleton className="h-7 w-32" />
+                <Skeleton className="h-3 w-40 bg-slate-100" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <CardHeader className="border-b border-slate-100 space-y-2">
+          <Skeleton className="h-4 w-44" />
+          <Skeleton className="h-3 w-72 bg-slate-100" />
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="border-b border-slate-100 bg-slate-50/70 px-6 py-4 hidden md:flex gap-10">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <Skeleton key={i} className="h-2.5 w-16 bg-slate-200/70" />
+            ))}
+          </div>
+          <div className="divide-y divide-slate-100">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-10 px-6 py-5">
+                <Skeleton className="h-3.5 w-20" />
+                <Skeleton className="h-3 w-24 bg-slate-100" />
+                <Skeleton className="h-6 w-20 bg-slate-100" />
+                <Skeleton className="h-3 w-16 bg-slate-100" />
+                <Skeleton className="h-3 w-14 bg-slate-100" />
+                <Skeleton className="h-3.5 w-16 ml-auto" />
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>

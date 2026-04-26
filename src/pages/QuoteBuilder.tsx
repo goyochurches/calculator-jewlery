@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   DIAMOND_TYPE_OPTIONS,
   JEWELRY_METAL_OPTIONS,
@@ -178,7 +179,7 @@ export function QuoteBuilderPage() {
   const cadLabel = config.cadMap[cadDesign]?.label ?? cadDesign
   const ringLaborLabel = config.ringLaborMap[ringLabor]?.label ?? ringLabor
 
-  if (metalsLoading || config.loading) return <p className="text-sm text-slate-500">Loading quote references...</p>
+  if (metalsLoading || config.loading) return <QuoteBuilderSkeleton />
   if (error) return <p className="text-sm text-red-500">{error}</p>
 
   return (
@@ -582,5 +583,50 @@ function QuoteToast({
       onAction={() => navigate('/quotes-list')}
       onClose={onClose}
     />
+  )
+}
+
+function QuoteBuilderSkeleton() {
+  return (
+    <div className="space-y-6">
+      <section className="grid gap-4 xl:grid-cols-[1.45fr_1fr]">
+        <Card className="rounded-[30px] border-0 shadow-[0_30px_80px_rgba(15,23,42,0.24)]" style={{ backgroundColor: 'var(--theme-primary)' }}>
+          <CardContent className="p-8 space-y-5">
+            <Skeleton className="h-3 w-32 bg-white/20" />
+            <Skeleton className="h-9 w-3/4 bg-white/30" />
+            <Skeleton className="h-3 w-2/3 bg-white/20" />
+            <Skeleton className="h-3 w-1/2 bg-white/20" />
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <CardContent className="p-6 space-y-4">
+            <Skeleton className="h-2.5 w-24 bg-slate-100" />
+            <Skeleton className="h-12 w-40" />
+            <Skeleton className="h-3 w-32 bg-slate-100" />
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-14 rounded-2xl bg-slate-100" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <CardHeader className="border-b border-slate-100 space-y-2">
+          <Skeleton className="h-4 w-44" />
+          <Skeleton className="h-3 w-72 bg-slate-100" />
+        </CardHeader>
+        <CardContent className="p-6 grid gap-5 md:grid-cols-2">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="space-y-2">
+              <Skeleton className="h-3 w-24 bg-slate-100" />
+              <Skeleton className="h-10 w-full rounded-xl bg-slate-100" />
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
   )
 }

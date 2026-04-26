@@ -10,7 +10,8 @@
       "Bash(where node *)",
       "Bash(where docker *)",
       "Bash(python *)",
-      "Bash(docker run *)"
+      "Bash(docker run *)",
+      "Bash(grep -n \"^export\\\\|^}$\\\\|^function \" D:/wamp64/www/calculator-jewlery/src/pages/QuoteBuilder.tsx)"
     ]
   }
 }

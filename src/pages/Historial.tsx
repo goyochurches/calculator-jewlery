@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { SIGNAL_LABELS } from '@/constants/config'
 import { useHistory } from '@/hooks/useHistorial'
 import type { HistorialEntry } from '@/types'
@@ -20,7 +21,7 @@ function SignalBadge({ signal }: { signal: HistorialEntry['signal'] }) {
 export function HistoryPage() {
   const { historyEntries, loading, error } = useHistory()
 
-  if (loading) return <p className="text-sm text-slate-500">Loading history...</p>
+  if (loading) return <HistorySkeleton />
   if (error) return <p className="text-sm text-red-500">{error}</p>
 
   return (
@@ -68,6 +69,35 @@ export function HistoryPage() {
               })}
             </tbody>
           </table>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function HistorySkeleton() {
+  return (
+    <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+      <CardHeader className="border-b border-slate-100 space-y-2">
+        <Skeleton className="h-4 w-40" />
+        <Skeleton className="h-3 w-72 bg-slate-100" />
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="border-b border-slate-100 bg-slate-50/70 px-6 py-4 hidden md:flex gap-12">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-2.5 w-20 bg-slate-200/70" />
+          ))}
+        </div>
+        <div className="divide-y divide-slate-100">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-12 px-6 py-5">
+              <Skeleton className="h-3 w-24 bg-slate-100" />
+              <Skeleton className="h-3.5 w-16" />
+              <Skeleton className="h-3.5 w-20" />
+              <Skeleton className="h-3 w-14 bg-slate-100" />
+              <Skeleton className="h-6 w-16 bg-slate-100" />
+            </div>
+          ))}
         </div>
       </CardContent>
     </Card>

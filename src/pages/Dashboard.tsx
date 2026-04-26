@@ -3,6 +3,7 @@ import { MetricCard } from '@/components/MetricCard'
 import { PriceTable } from '@/components/PriceTable'
 import { SilverChart } from '@/components/SilverChart'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useHistory } from '@/hooks/useHistorial'
 import { useMetals } from '@/hooks/useMetals'
 import { quotesService, type UserQuoteStats } from '@/services/quotesService'
@@ -33,17 +34,18 @@ function QuotesWidget() {
       .then(([today, yesterday, perDay]) => {
         setTodayCount(today)
         setYesterdayCount(yesterday)
-        const today_str = new Date().toISOString().split('T')[0]
-        const sorted = Object.entries(perDay)
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([date, count]) => {
-            const isToday = date === today_str
-            const d = new Date(date + 'T12:00:00')
-            const label = isToday
-              ? 'Today'
-              : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-            return { day: label, quotes: Number(count), isToday }
-          })
+        const entries = Object.entries(perDay).sort(([a], [b]) => a.localeCompare(b))
+        const lastIdx = entries.length - 1
+        const sorted = entries.map(([date, count], i) => {
+          const isToday = i === lastIdx
+          const d = new Date(date + 'T12:00:00')
+          const label = isToday
+            ? 'Today'
+            : i === lastIdx - 1
+            ? 'Yesterday'
+            : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+          return { day: label, quotes: Number(count), isToday }
+        })
         setChartData(sorted)
       })
       .catch(console.error)
@@ -237,7 +239,7 @@ export function Dashboard() {
     return Array.from(byDate.values()).reverse().slice(-7)
   }, [historyEntries])
 
-  if (loading) return <p className="text-sm text-slate-500">Loading prices...</p>
+  if (loading) return <DashboardSkeleton />
   if (error) return <p className="text-sm text-red-500">{error}</p>
 
   const gold = metals.find((m) => m.symbol === 'XAU')
@@ -305,6 +307,72 @@ export function Dashboard() {
       <TeamQuotesWidget />
 
       <PriceTable metals={metals} />
+    </div>
+  )
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <Card className="overflow-hidden rounded-[32px] border-0 shadow-[0_30px_80px_rgba(15,23,42,0.24)]" style={{ backgroundColor: 'var(--theme-primary)' }}>
+        <CardContent className="p-8 space-y-6">
+          <Skeleton className="h-3 w-40 bg-white/20" />
+          <Skeleton className="h-8 w-3/4 bg-white/30" />
+          <Skeleton className="h-3 w-2/3 bg-white/20" />
+          <div className="grid gap-4 sm:grid-cols-3 pt-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
+                <Skeleton className="h-2.5 w-20 bg-white/20" />
+                <Skeleton className="h-6 w-24 bg-white/30" />
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i} className="rounded-[24px] border border-white/80 bg-white/92 shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
+            <CardContent className="p-5 space-y-3">
+              <Skeleton className="h-2.5 w-16 bg-slate-100" />
+              <Skeleton className="h-7 w-28" />
+              <Skeleton className="h-3 w-20 bg-slate-100" />
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <CardContent className="p-6 space-y-5">
+          <div className="flex items-start justify-between">
+            <div className="space-y-3">
+              <Skeleton className="h-2.5 w-24 bg-slate-100" />
+              <Skeleton className="h-10 w-20" />
+              <Skeleton className="h-3 w-40 bg-slate-100" />
+            </div>
+            <Skeleton className="h-12 w-12 rounded-2xl" />
+          </div>
+          <div className="flex items-end gap-2 h-28">
+            {Array.from({ length: 7 }).map((_, i) => (
+              <Skeleton key={i} className="flex-1 rounded-t-md bg-slate-100" style={{ height: `${30 + ((i * 13) % 70)}%` }} />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        {Array.from({ length: 2 }).map((_, i) => (
+          <Card key={i} className="rounded-[28px] border border-white/80 bg-white/92 shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
+            <CardContent className="p-6 space-y-4">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-7 w-20 rounded-xl bg-slate-100" />
+              </div>
+              <Skeleton className="h-48 w-full rounded-2xl bg-slate-100" />
+            </CardContent>
+          </Card>
+        ))}
+      </section>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Toast } from '@/components/Toast'
 import { ROLE_LABELS } from '@/constants/config'
@@ -101,7 +102,7 @@ export function UsersPage() {
 
   const inputCls = 'w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400'
 
-  if (loading) return <p className="text-sm text-slate-500">Loading users...</p>
+  if (loading) return <UsersSkeleton />
 
   return (
     <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
@@ -265,6 +266,39 @@ export function UsersPage() {
         onConfirm={confirmDelete}
         onCancel={() => !deletingId && setConfirmTarget(null)}
       />
+    </Card>
+  )
+}
+
+function UsersSkeleton() {
+  return (
+    <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+      <CardHeader className="border-b border-slate-100">
+        <div className="flex items-start justify-between gap-4">
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-36" />
+            <Skeleton className="h-3 w-64 bg-slate-100" />
+          </div>
+          <Skeleton className="h-8 w-24 rounded-xl" />
+        </div>
+      </CardHeader>
+      <CardContent className="divide-y divide-slate-100">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="flex flex-col gap-4 py-5 md:flex-row md:items-center">
+            <Skeleton className="h-12 w-12 rounded-2xl" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-3.5 w-40" />
+              <Skeleton className="h-3 w-56 bg-slate-100" />
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Skeleton className="h-6 w-20 bg-slate-100" />
+              <Skeleton className="h-6 w-16 bg-slate-100" />
+              <Skeleton className="h-9 w-20 rounded-xl bg-slate-100" />
+              <Skeleton className="h-9 w-20 rounded-xl bg-slate-100" />
+            </div>
+          </div>
+        ))}
+      </CardContent>
     </Card>
   )
 }

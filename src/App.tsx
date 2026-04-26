@@ -19,7 +19,20 @@ function PrivateRoutes() {
   const { isAuthenticated, isLoading } = useAuth()
   if (isLoading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--theme-tertiary)' }}>
-      <div className="text-slate-500 text-sm">Loading…</div>
+      <div className="flex items-center gap-2">
+        <span
+          className="h-3 w-3 animate-bounce rounded-full"
+          style={{ backgroundColor: 'var(--theme-primary)', animationDelay: '0ms' }}
+        />
+        <span
+          className="h-3 w-3 animate-bounce rounded-full"
+          style={{ backgroundColor: 'var(--theme-primary)', animationDelay: '150ms' }}
+        />
+        <span
+          className="h-3 w-3 animate-bounce rounded-full"
+          style={{ backgroundColor: 'var(--theme-primary)', animationDelay: '300ms' }}
+        />
+      </div>
     </div>
   )
   return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />
