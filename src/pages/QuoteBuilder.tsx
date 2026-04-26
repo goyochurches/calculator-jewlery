@@ -11,9 +11,10 @@ import { useMetals } from '@/hooks/useMetals'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { quotesService } from '@/services/quotesService'
 import type { JewelryMetalOption, MetalPrice } from '@/types'
-import { Calculator, Camera, CheckCircle2, Clock3, Diamond, Gem, Layers3, Ruler, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Toast } from '@/components/Toast'
+import { Calculator, Camera, Clock3, Diamond, Gem, Layers3, Ruler, X } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 const jewelryMetalKeys = Object.keys(JEWELRY_METAL_OPTIONS) as JewelryMetalOption[]
 const diamondTypeKeys = Object.keys(DIAMOND_TYPE_OPTIONS) as Array<keyof typeof DIAMOND_TYPE_OPTIONS>
@@ -560,88 +561,26 @@ export function QuoteBuilderPage() {
         </div>
       </section>
 
-      {savedQuote && (
-        <QuoteCreatedToast
-          key={savedQuote.id}
-          quote={savedQuote}
-          onClose={() => setSavedQuote(null)}
-        />
-      )}
+      {savedQuote && <QuoteToast key={savedQuote.id} quote={savedQuote} onClose={() => setSavedQuote(null)} />}
     </div>
   )
 }
 
-function QuoteCreatedToast({
+function QuoteToast({
   quote,
   onClose,
 }: {
   quote: { id: string; title: string; total: number }
   onClose: () => void
 }) {
-  const [visible, setVisible] = useState(false)
-
-  useEffect(() => {
-    const enter = window.setTimeout(() => setVisible(true), 20)
-    const exit = window.setTimeout(() => setVisible(false), 5500)
-    const remove = window.setTimeout(onClose, 5800)
-    return () => {
-      window.clearTimeout(enter)
-      window.clearTimeout(exit)
-      window.clearTimeout(remove)
-    }
-  }, [onClose])
-
+  const navigate = useNavigate()
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className={`fixed bottom-4 left-4 z-50 w-[min(calc(100vw-2rem),22rem)] transition-all duration-300 ease-out sm:bottom-6 sm:left-6 lg:left-[calc(18rem+1.5rem)] ${
-        visible ? 'translate-x-0 opacity-100' : '-translate-x-4 opacity-0'
-      }`}
-    >
-      <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-[0_20px_60px_rgba(16,185,129,0.25)]">
-        <div className="flex items-start gap-3 p-4">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
-            <CheckCircle2 className="h-6 w-6" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-emerald-900">Quote created!</p>
-            <p className="mt-0.5 truncate text-xs text-slate-600">
-              <span className="font-semibold text-slate-900">{quote.title}</span>
-              {' · '}
-              ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-            </p>
-            <Link
-              to="/quotes-list"
-              onClick={onClose}
-              className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
-            >
-              View quotes →
-            </Link>
-          </div>
-          <button
-            onClick={onClose}
-            aria-label="Dismiss"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="h-1 w-full bg-emerald-100">
-          <div
-            className="h-full bg-emerald-500"
-            style={{
-              animation: 'quote-toast-progress 5.5s linear forwards',
-            }}
-          />
-        </div>
-      </div>
-      <style>{`
-        @keyframes quote-toast-progress {
-          from { width: 100%; }
-          to { width: 0%; }
-        }
-      `}</style>
-    </div>
+    <Toast
+      title="Quote created!"
+      description={`${quote.title} · $${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+      actionLabel="View quotes →"
+      onAction={() => navigate('/quotes-list')}
+      onClose={onClose}
+    />
   )
 }

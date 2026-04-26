@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Toast } from '@/components/Toast'
 import { ROLE_LABELS } from '@/constants/config'
 import { userService } from '@/services/userService'
 import type { Usuario } from '@/types'
@@ -29,6 +30,7 @@ export function UsersPage() {
   const [form, setForm] = useState({ ...BLANK })
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [createdUser, setCreatedUser] = useState<{ id: string; name: string; role: string } | null>(null)
 
   useEffect(() => {
     userService.getAll().then((data) => { setUsers(data); setLoading(false) })
@@ -50,6 +52,7 @@ export function UsersPage() {
       const avatar = computeAvatar(form.name) || '?'
       const newUser = await userService.create({ ...form, avatar })
       setUsers(prev => [...prev, newUser])
+      setCreatedUser({ id: newUser.id, name: newUser.name, role: ROLE_LABELS[newUser.role] ?? newUser.role })
       closeCreate()
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : 'Failed to create user')
@@ -162,6 +165,15 @@ export function UsersPage() {
           </div>
         ))}
       </CardContent>
+
+      {createdUser && (
+        <Toast
+          key={createdUser.id}
+          title="User created!"
+          description={`${createdUser.name} · ${createdUser.role}`}
+          onClose={() => setCreatedUser(null)}
+        />
+      )}
     </Card>
   )
 }
