@@ -1,7 +1,7 @@
 import { NotificationPanel } from '@/components/NotificationPanel'
 import { useNotifications } from '@/hooks/useNotifications'
-import { Bell, Search, Sparkles } from 'lucide-react'
-import { useState } from 'react'
+import { Bell, Menu, Sparkles } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 
@@ -48,38 +48,61 @@ export function MainLayout() {
   const location = useLocation()
   const current = pageCopy[location.pathname] ?? pageCopy['/']
   const [panelOpen, setPanelOpen] = useState(false)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications()
+
+  // Close mobile nav on route change
+  useEffect(() => {
+    setMobileNavOpen(false)
+  }, [location.pathname])
+
+  // Lock body scroll while mobile nav is open
+  useEffect(() => {
+    if (mobileNavOpen) {
+      const original = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = original
+      }
+    }
+  }, [mobileNavOpen])
 
   return (
     <div className="min-h-screen bg-transparent text-slate-900">
       <div className="flex min-h-screen">
-        <Sidebar />
+        <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
 
-        <div className="flex min-h-screen flex-1 flex-col">
+        <div className="flex min-h-screen flex-1 flex-col min-w-0">
           <header className="sticky top-0 z-20 border-b border-white/70 bg-white/75 backdrop-blur-xl">
-            <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-              <div>
-                <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-amber-600">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  Admin workspace
-                </p>
-                <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">
-                  {current.title}
-                </h1>
-                <p className="mt-1 text-sm text-slate-500">{current.subtitle}</p>
+            <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6 sm:py-4 lg:px-8">
+              <div className="flex min-w-0 items-center gap-3">
+                <button
+                  onClick={() => setMobileNavOpen(true)}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:text-slate-900 lg:hidden"
+                  aria-label="Open navigation menu"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
+
+                <div className="min-w-0">
+                  <p className="hidden items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-amber-600 sm:flex">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Admin workspace
+                  </p>
+                  <h1 className="truncate text-lg font-semibold tracking-tight text-slate-950 sm:mt-1 sm:text-2xl">
+                    {current.title}
+                  </h1>
+                  <p className="mt-0.5 hidden text-sm text-slate-500 sm:mt-1 sm:block">
+                    {current.subtitle}
+                  </p>
+                </div>
               </div>
 
-              <div className="hidden items-center gap-3 md:flex">
-                <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 shadow-sm">
-                  <Search className="h-4 w-4" />
-                  Search metals, signals, users
-                </div>
-
-                {/* Bell button */}
+              <div className="flex shrink-0 items-center gap-2 sm:gap-3">
                 <div className="relative">
                   <button
                     onClick={() => setPanelOpen(o => !o)}
-                    className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:-translate-y-0.5 hover:text-slate-900"
+                    className="relative flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:-translate-y-0.5 hover:text-slate-900 sm:h-11 sm:w-11"
                   >
                     <Bell className="h-4 w-4" />
                     {unreadCount > 0 && (
@@ -103,7 +126,7 @@ export function MainLayout() {
           </header>
 
           <main className="flex-1">
-            <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+            <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
               <Outlet />
             </div>
           </main>

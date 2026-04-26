@@ -21,6 +21,7 @@ interface ApiQuote {
   hourlyRate: number
   extraCosts: number
   total: number
+  photo?: string | null   // base64 o URL devuelta por el backend
 }
 
 function mapQuote(q: ApiQuote): SavedQuote {
@@ -44,16 +45,30 @@ function mapQuote(q: ApiQuote): SavedQuote {
     hourlyRate: q.hourlyRate,
     extraCosts: q.extraCosts,
     total: q.total,
+    photo: q.photo ?? null,
   }
+}
+
+interface SpringPage<T> {
+  content: T[]
+  totalElements?: number
+  totalPages?: number
+  number?: number
+  size?: number
 }
 
 export const quotesService = {
   async getAll(): Promise<SavedQuote[]> {
-    const data = await api.get<ApiQuote[]>('/api/quotes')
-    return data.map(mapQuote)
+    const data = await api.get<ApiQuote[] | SpringPage<ApiQuote>>('/api/quotes')
+    const items = Array.isArray(data) ? data : data.content ?? []
+    return items.map(mapQuote)
   },
 
-  async create(payload: Omit<ApiQuote, 'id' | 'createdBy' | 'createdAt'>, userId: number): Promise<SavedQuote> {
+  async create(
+    payload: Omit<ApiQuote, 'id' | 'createdBy' | 'createdAt'>,
+    userId: number,
+  ): Promise<SavedQuote> {
+      console.log(payload)
     const data = await api.post<ApiQuote>(`/api/quotes?userId=${userId}`, payload)
     return mapQuote(data)
   },

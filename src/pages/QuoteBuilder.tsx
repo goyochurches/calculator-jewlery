@@ -11,8 +11,8 @@ import { useMetals } from '@/hooks/useMetals'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { quotesService } from '@/services/quotesService'
 import type { JewelryMetalOption, MetalPrice } from '@/types'
-import { Calculator, CheckCircle2, Clock3, Diamond, Gem, Layers3, Ruler } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { Calculator, Camera, CheckCircle2, Clock3, Diamond, Gem, Layers3, Ruler, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 const jewelryMetalKeys = Object.keys(JEWELRY_METAL_OPTIONS) as JewelryMetalOption[]
@@ -31,7 +31,7 @@ export function QuoteBuilderPage() {
   const [quoteTitle, setQuoteTitle] = useState('')
   const [clientName, setClientName] = useState('')
   const [saving, setSaving] = useState(false)
-  const [savedQuoteId, setSavedQuoteId] = useState<string | null>(null)
+  const [savedQuote, setSavedQuote] = useState<{ id: string; title: string; total: number } | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [selectedMetal, setSelectedMetal] = useState<JewelryMetalOption>('gold-18k')
   const [ringLabor, setRingLabor] = useState('medium')
@@ -45,6 +45,24 @@ export function QuoteBuilderPage() {
   const [laborHours, setLaborHours] = useState(6)
   const [hourlyRate, setHourlyRate] = useState(45)
   const [extraCosts, setExtraCosts] = useState(0)
+
+  // ── Photo state ──────────────────────────────────────────────────────────────
+  const [photo, setPhoto] = useState<string | null>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => setPhoto(reader.result as string)
+    reader.readAsDataURL(file)
+  }
+
+  const handleRemovePhoto = () => {
+    setPhoto(null)
+    if (photoInputRef.current) photoInputRef.current.value = ''
+  }
+  // ─────────────────────────────────────────────────────────────────────────────
 
   const selectedMetalConfig = JEWELRY_METAL_OPTIONS[selectedMetal]
   const spotMetalData = metals.find((metal) => metal.symbol === selectedMetalConfig.spotSymbol)
@@ -129,6 +147,7 @@ export function QuoteBuilderPage() {
         clientName: clientName.trim(),
         status: 'PENDING',
         metal: selectedMetal,
+
         ringLabor: ringLabor,
         cadDesign: cadDesign,
         diamondAmount,
@@ -141,10 +160,13 @@ export function QuoteBuilderPage() {
         hourlyRate,
         extraCosts,
         total: pricing.total,
+        photo: photo ?? undefined,
       }, user.id)
-      setSavedQuoteId(q.id)
+      setSavedQuote({ id: q.id, title: q.title, total: pricing.total })
       setQuoteTitle('')
       setClientName('')
+      setPhoto(null)
+      if (photoInputRef.current) photoInputRef.current.value = ''
     } catch {
       setSaveError('Failed to save quote. Please try again.')
     } finally {
@@ -162,22 +184,22 @@ export function QuoteBuilderPage() {
     <div className="space-y-6">
       <section className="grid gap-4 xl:grid-cols-[1.45fr_1fr]">
         <Card className="rounded-[30px] border-0 text-white shadow-[0_30px_80px_rgba(15,23,42,0.24)]" style={{ backgroundColor: 'var(--theme-primary)' }}>
-          <CardContent className="relative p-8">
+          <CardContent className="relative p-5 sm:p-8">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.24),transparent_25%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.18),transparent_28%)]" />
             <div className="relative">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-amber-300">
                 <Calculator className="h-4 w-4" />
                 Pricing engine
               </div>
-              <h2 className="mt-4 max-w-xl text-4xl font-semibold tracking-tight">
+              <h2 className="mt-4 max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl lg:text-4xl">
                 Build quotes from material, CAD design, ring labor and stone setup.
               </h2>
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:mt-4">
                 This version follows your sheet much more closely: metal, labor gold, CAD design,
                 setting labor, amount of diamonds, type, size range, width and finger size.
               </p>
 
-              <div className="mt-8 grid gap-4 md:grid-cols-4">
+              <div className="mt-6 grid gap-3 sm:mt-8 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Metal price / g</p>
                   <p className="mt-2 text-2xl font-semibold">
@@ -215,7 +237,7 @@ export function QuoteBuilderPage() {
           <CardContent className="space-y-4 pt-6">
             <div className="rounded-2xl p-5 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}>
               <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Quote total</p>
-              <p className="mt-3 text-4xl font-semibold tracking-tight">
+              <p className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
                 ${(pricing.total * 2.5).toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </p>
               <p className="mt-2 text-sm text-slate-300">
@@ -254,23 +276,6 @@ export function QuoteBuilderPage() {
             </p>
           </CardHeader>
           <CardContent className="grid gap-5 pt-6 md:grid-cols-2">
-            {savedQuoteId && (
-              <div className="md:col-span-2 flex items-center justify-between gap-3 rounded-2xl bg-emerald-50 border border-emerald-200 px-5 py-4">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
-                  <div>
-                    <p className="text-sm font-semibold text-emerald-800">Quote #{savedQuoteId} created — pending admin approval</p>
-                    <p className="text-xs text-emerald-600">The form has been reset for a new quote.</p>
-                  </div>
-                </div>
-                <Link
-                  to="/quotes-list"
-                  className="shrink-0 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700"
-                >
-                  View quotes →
-                </Link>
-              </div>
-            )}
             {saveError && (
               <div className="md:col-span-2 rounded-2xl bg-rose-50 border border-rose-200 px-5 py-4 text-sm text-rose-700">
                 {saveError}
@@ -290,6 +295,54 @@ export function QuoteBuilderPage() {
                 placeholder="e.g. María García"
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
             </div>
+
+            {/* ── Photo upload ───────────────────────────────────────────────── */}
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-semibold text-slate-900">Foto de referencia</label>
+
+              {/* Hidden file input — capture="environment" abre la cámara trasera en móvil */}
+              <input
+                ref={photoInputRef}
+                id="photo-upload"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handlePhotoChange}
+                className="hidden"
+              />
+
+              {!photo ? (
+                <label
+                  htmlFor="photo-upload"
+                  className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white"
+                >
+                  <Camera className="h-5 w-5 shrink-0 text-slate-400" />
+                  <span>Subir desde cámara o galería</span>
+                </label>
+              ) : (
+                <div className="relative overflow-hidden rounded-2xl border border-slate-200">
+                  <img src={photo} alt="Referencia" className="w-full object-cover max-h-64" />
+                  <div className="absolute inset-0 flex items-start justify-end p-2">
+                    <button
+                      onClick={handleRemovePhoto}
+                      className="flex items-center gap-1 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-black/80"
+                    >
+                      <X className="h-3 w-3" />
+                      Eliminar
+                    </button>
+                  </div>
+                  {/* Tap to change */}
+                  <label
+                    htmlFor="photo-upload"
+                    className="absolute bottom-2 left-2 flex cursor-pointer items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-black/80"
+                  >
+                    <Camera className="h-3 w-3" />
+                    Cambiar foto
+                  </label>
+                </div>
+              )}
+            </div>
+            {/* ─────────────────────────────────────────────────────────────── */}
 
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-900">Metal</label>
@@ -506,6 +559,89 @@ export function QuoteBuilderPage() {
           </Card>
         </div>
       </section>
+
+      {savedQuote && (
+        <QuoteCreatedToast
+          key={savedQuote.id}
+          quote={savedQuote}
+          onClose={() => setSavedQuote(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function QuoteCreatedToast({
+  quote,
+  onClose,
+}: {
+  quote: { id: string; title: string; total: number }
+  onClose: () => void
+}) {
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const enter = window.setTimeout(() => setVisible(true), 20)
+    const exit = window.setTimeout(() => setVisible(false), 5500)
+    const remove = window.setTimeout(onClose, 5800)
+    return () => {
+      window.clearTimeout(enter)
+      window.clearTimeout(exit)
+      window.clearTimeout(remove)
+    }
+  }, [onClose])
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={`fixed bottom-4 left-4 z-50 w-[min(calc(100vw-2rem),22rem)] transition-all duration-300 ease-out sm:bottom-6 sm:left-6 lg:left-[calc(18rem+1.5rem)] ${
+        visible ? 'translate-x-0 opacity-100' : '-translate-x-4 opacity-0'
+      }`}
+    >
+      <div className="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-[0_20px_60px_rgba(16,185,129,0.25)]">
+        <div className="flex items-start gap-3 p-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-500 text-white shadow-lg shadow-emerald-500/30">
+            <CheckCircle2 className="h-6 w-6" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-emerald-900">Quote created!</p>
+            <p className="mt-0.5 truncate text-xs text-slate-600">
+              <span className="font-semibold text-slate-900">{quote.title}</span>
+              {' · '}
+              ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </p>
+            <Link
+              to="/quotes-list"
+              onClick={onClose}
+              className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+            >
+              View quotes →
+            </Link>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Dismiss"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+        <div className="h-1 w-full bg-emerald-100">
+          <div
+            className="h-full bg-emerald-500"
+            style={{
+              animation: 'quote-toast-progress 5.5s linear forwards',
+            }}
+          />
+        </div>
+      </div>
+      <style>{`
+        @keyframes quote-toast-progress {
+          from { width: 100%; }
+          to { width: 0%; }
+        }
+      `}</style>
     </div>
   )
 }

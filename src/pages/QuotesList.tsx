@@ -11,8 +11,8 @@ import {
 import { useAuth } from '@/context/AuthContext'
 import { quotesService } from '@/services/quotesService'
 import type { QuoteStatus, SavedQuote } from '@/types'
-import { Bell, Check, X, XCircle } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Bell, Check, ChevronLeft, ChevronRight, ImageOff, Search, X, XCircle } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 
 const STATUS_STYLES: Record<QuoteStatus, string> = {
   draft: 'bg-slate-100 text-slate-600',
@@ -51,6 +51,76 @@ function LineItem({ label, value }: { label: string; value: string }) {
   )
 }
 
+// ── Thumbnail shown in the table row ────────────────────────────────────────
+function PhotoThumb({ src }: { src?: string | null }) {
+  if (!src) {
+    return (
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-300">
+        <ImageOff className="h-4 w-4" />
+      </div>
+    )
+  }
+  return (
+    <img
+      src={src}
+      alt="Reference"
+      className="h-10 w-10 shrink-0 rounded-xl object-cover ring-1 ring-slate-200"
+    />
+  )
+}
+
+// ── Full-size photo block shown in the detail panel ──────────────────────────
+function PhotoDetail({ src }: { src?: string | null }) {
+  const [zoomed, setZoomed] = useState(false)
+
+  if (!src) return null
+
+  return (
+    <>
+      <div>
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+          Reference photo
+        </p>
+        <div
+          className="relative cursor-zoom-in overflow-hidden rounded-2xl border border-slate-100"
+          onClick={() => setZoomed(true)}
+        >
+          <img
+            src={src}
+            alt="Reference photo"
+            className="max-h-56 w-full object-cover transition duration-300 hover:scale-105"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
+          <span className="absolute bottom-2 right-3 rounded-full bg-black/50 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+            Tap to enlarge
+          </span>
+        </div>
+      </div>
+
+      {/* Lightbox */}
+      {zoomed && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setZoomed(false)}
+        >
+          <button
+            className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+            onClick={() => setZoomed(false)}
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={src}
+            alt="Reference photo"
+            className="max-h-[90vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+    </>
+  )
+}
+
 function QuoteDetail({
   quote,
   onClose,
@@ -62,10 +132,10 @@ function QuoteDetail({
   onStatusChange: (id: string, status: 'APPROVED' | 'REJECTED' | 'PENDING') => void
   isAdmin: boolean
 }) {
-  const metalCfg    = JEWELRY_METAL_OPTIONS[quote.metal]    ?? { label: quote.metal }
+  const metalCfg    = JEWELRY_METAL_OPTIONS[quote.metal]       ?? { label: quote.metal }
   const settingCfg  = SETTING_LABOR_MASTER[quote.diamondSize]  ?? { feePerStone: 0, minutesPerStone: 0 }
-  const diamondBase = DIAMOND_SIZE_OPTIONS[quote.diamondSize]   ?? { basePrice: 0, label: quote.diamondSize }
-  const diamondMul  = DIAMOND_TYPE_OPTIONS[quote.diamondType]   ?? { multiplier: 1, label: quote.diamondType }
+  const diamondBase = DIAMOND_SIZE_OPTIONS[quote.diamondSize]  ?? { basePrice: 0, label: quote.diamondSize }
+  const diamondMul  = DIAMOND_TYPE_OPTIONS[quote.diamondType]  ?? { multiplier: 1, label: quote.diamondType }
   const diamondUnitPrice = diamondBase.basePrice * diamondMul.multiplier
   const diamondCost = (quote.diamondAmount ?? 0) * diamondUnitPrice
   const settingFee  = (quote.diamondAmount ?? 0) * settingCfg.feePerStone
@@ -97,6 +167,9 @@ function QuoteDetail({
             {metalCfg.label} · {RING_LABOR_OPTIONS[quote.ringLabor]?.label ?? quote.ringLabor} · {CAD_DESIGN_OPTIONS[quote.cadDesign]?.label ?? quote.cadDesign}
           </p>
         </div>
+
+        {/* Reference photo */}
+        <PhotoDetail src={quote.photo} />
 
         {/* Creator, client & status */}
         <div className="flex gap-3">
@@ -177,12 +250,29 @@ function QuoteDetail({
   )
 }
 
+type StatusFilter = QuoteStatus | 'all'
+
+const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'pending', label: 'Pending' },
+  { value: 'approved', label: 'Approved' },
+  { value: 'draft', label: 'Draft' },
+  { value: 'rejected', label: 'Rejected' },
+]
+
+const PAGE_SIZE_OPTIONS = [10, 25, 50]
+const DEFAULT_PAGE_SIZE = 10
+
 export function QuotesListPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
   const [quotes, setQuotes] = useState<SavedQuote[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
   useEffect(() => {
     quotesService.getAll()
@@ -200,7 +290,30 @@ export function QuotesListPage() {
     }
   }
 
-  const selected = quotes.find((q) => q.id === selectedId) ?? null
+  const filteredQuotes = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    return quotes.filter((quote) => {
+      if (statusFilter !== 'all' && quote.status !== statusFilter) return false
+      if (!q) return true
+      return (
+        quote.title.toLowerCase().includes(q) ||
+        (quote.clientName ?? '').toLowerCase().includes(q)
+      )
+    })
+  }, [quotes, statusFilter, searchQuery])
+
+  // Reset to page 1 whenever the filter set changes
+  useEffect(() => {
+    setPage(1)
+  }, [statusFilter, searchQuery, pageSize])
+
+  const totalPages = Math.max(1, Math.ceil(filteredQuotes.length / pageSize))
+  const safePage = Math.min(page, totalPages)
+  const pageStart = (safePage - 1) * pageSize
+  const pageEnd = Math.min(pageStart + pageSize, filteredQuotes.length)
+  const pagedQuotes = filteredQuotes.slice(pageStart, pageEnd)
+
+  const selected = filteredQuotes.find((q) => q.id === selectedId) ?? null
 
   const statusCounts = quotes.reduce<Record<QuoteStatus, number>>(
     (acc, q) => { acc[q.status]++; return acc },
@@ -236,20 +349,76 @@ export function QuotesListPage() {
         ))}
       </div>
 
+      {/* Filters */}
+      <Card className="rounded-[24px] border border-white/80 bg-white/92 shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
+        <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="relative w-full sm:max-w-sm">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by title or client…"
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-9 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                aria-label="Clear search"
+                className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="-mx-1 flex flex-wrap items-center gap-1.5 overflow-x-auto px-1">
+            {STATUS_FILTER_OPTIONS.map((opt) => {
+              const isActive = statusFilter === opt.value
+              const count = opt.value === 'all' ? quotes.length : statusCounts[opt.value]
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => setStatusFilter(opt.value)}
+                  className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                    isActive
+                      ? 'bg-slate-900 text-white shadow-sm'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  {opt.label}
+                  <span
+                    className={`rounded-full px-1.5 text-[10px] ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-white text-slate-500'
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Main content */}
       <div className={selected ? 'grid gap-6 xl:grid-cols-[1fr_420px]' : ''}>
         {/* Table */}
         <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
           <CardHeader className="border-b border-slate-100">
             <CardTitle className="text-base font-semibold text-slate-900">All quotes</CardTitle>
-            <p className="text-sm text-slate-500">Click any row to see the full breakdown.</p>
+            <p className="text-sm text-slate-500">
+              {filteredQuotes.length === quotes.length
+                ? 'Click any row to see the full breakdown.'
+                : `Showing ${filteredQuotes.length} of ${quotes.length} quotes.`}
+            </p>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[700px] text-sm">
+              <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/70">
-                    {['Quote', 'Client', 'Created by', 'Metal', 'Status', 'Date', 'Total'].map((h) => (
+                    {['Photo', 'Quote', 'Client', 'Created by', 'Metal', 'Status', 'Date', 'Total'].map((h) => (
                       <th key={h} className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 last:text-right">
                         {h}
                       </th>
@@ -257,7 +426,14 @@ export function QuotesListPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {quotes.map((quote) => {
+                  {filteredQuotes.length === 0 && (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-12 text-center text-sm text-slate-400">
+                        No quotes match the current filters.
+                      </td>
+                    </tr>
+                  )}
+                  {pagedQuotes.map((quote) => {
                     const isSelected = quote.id === selectedId
                     return (
                       <tr
@@ -268,6 +444,21 @@ export function QuotesListPage() {
                         }`}
                         style={isSelected ? { backgroundColor: 'var(--theme-primary)' } : undefined}
                       >
+                        {/* Photo thumbnail */}
+                        <td className="px-6 py-3">
+                          {quote.photo ? (
+                            <img
+                              src={quote.photo}
+                              alt="ref"
+                              className="h-10 w-10 rounded-xl object-cover ring-2 ring-white shadow-sm"
+                            />
+                          ) : (
+                            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isSelected ? 'bg-white/10' : 'bg-slate-100'}`}>
+                              <ImageOff className={`h-4 w-4 ${isSelected ? 'text-white/40' : 'text-slate-300'}`} />
+                            </div>
+                          )}
+                        </td>
+
                         <td className="px-6 py-4">
                           <span className={`font-semibold ${isSelected ? 'text-white' : 'text-slate-900'}`}>
                             {quote.title}
@@ -306,6 +497,18 @@ export function QuotesListPage() {
                 </tbody>
               </table>
             </div>
+            {filteredQuotes.length > 0 && (
+              <PaginationBar
+                page={safePage}
+                totalPages={totalPages}
+                pageStart={pageStart}
+                pageEnd={pageEnd}
+                total={filteredQuotes.length}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={setPageSize}
+              />
+            )}
           </CardContent>
         </Card>
 
@@ -320,6 +523,103 @@ export function QuotesListPage() {
             />
           </Card>
         )}
+      </div>
+    </div>
+  )
+}
+
+function getPageNumbers(current: number, total: number): (number | 'gap')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const pages = new Set<number>([1, total, current, current - 1, current + 1])
+  const sorted = [...pages].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b)
+  const out: (number | 'gap')[] = []
+  let prev = 0
+  for (const n of sorted) {
+    if (n - prev > 1) out.push('gap')
+    out.push(n)
+    prev = n
+  }
+  return out
+}
+
+function PaginationBar({
+  page,
+  totalPages,
+  pageStart,
+  pageEnd,
+  total,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
+}: {
+  page: number
+  totalPages: number
+  pageStart: number
+  pageEnd: number
+  total: number
+  pageSize: number
+  onPageChange: (p: number) => void
+  onPageSizeChange: (size: number) => void
+}) {
+  const pages = getPageNumbers(page, totalPages)
+  const canPrev = page > 1
+  const canNext = page < totalPages
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div className="flex items-center gap-3 text-xs text-slate-500">
+        <span className="font-medium">
+          {pageStart + 1}–{pageEnd} of {total}
+        </span>
+        <label className="hidden items-center gap-2 sm:flex">
+          <span>Rows</span>
+          <select
+            value={pageSize}
+            onChange={(e) => onPageSizeChange(Number(e.target.value))}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none transition focus:border-slate-400"
+          >
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onPageChange(page - 1)}
+          disabled={!canPrev}
+          aria-label="Previous page"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        {pages.map((p, i) =>
+          p === 'gap' ? (
+            <span key={`gap-${i}`} className="px-1 text-xs text-slate-400">…</span>
+          ) : (
+            <button
+              key={p}
+              onClick={() => onPageChange(p)}
+              aria-current={p === page ? 'page' : undefined}
+              className={`min-w-[2rem] rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${
+                p === page
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {p}
+            </button>
+          )
+        )}
+        <button
+          onClick={() => onPageChange(page + 1)}
+          disabled={!canNext}
+          aria-label="Next page"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
       </div>
     </div>
   )
