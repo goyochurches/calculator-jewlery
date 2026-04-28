@@ -333,10 +333,10 @@ export function QuoteBuilderPage() {
               />
 
               {!photo ? (
-                <div className="grid gap-2 sm:grid-cols-2">
+                <div className="grid gap-2">
                   <label
                     htmlFor="photo-camera"
-                    className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white"
+                    className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white sm:hidden"
                   >
                     <Camera className="h-5 w-5 shrink-0 text-slate-400" />
                     <span>Take photo</span>
@@ -365,7 +365,7 @@ export function QuoteBuilderPage() {
                   <div className="absolute bottom-2 left-2 flex gap-1.5">
                     <label
                       htmlFor="photo-camera"
-                      className="flex cursor-pointer items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-black/80"
+                      className="flex cursor-pointer items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-black/80 sm:hidden"
                     >
                       <Camera className="h-3 w-3" />
                       Take photo
