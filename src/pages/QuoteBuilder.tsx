@@ -249,7 +249,7 @@ export function QuoteBuilderPage() {
             <div className="rounded-2xl p-5 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}>
               <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Quote total</p>
               <p className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                ${(pricing.total * 2.5).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                ${((pricing.total - pricing.engravingFee) * 2.5 + pricing.engravingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </p>
               <p className="mt-2 text-sm text-slate-300">
                 {selectedMetalConfig.label} | {ringLaborLabel} | {cadLabel}
