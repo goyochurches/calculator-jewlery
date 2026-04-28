@@ -196,6 +196,12 @@ function QuoteDetail({
             <p className="mt-1.5 text-sm font-semibold text-slate-900">{quote.clientName}</p>
           </div>
         )}
+        {quote.engraving && (
+          <div className="rounded-2xl bg-slate-50 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Grabado</p>
+            <p className="mt-1.5 text-sm font-semibold text-slate-900 italic">"{quote.engraving}"</p>
+          </div>
+        )}
 
         {/* Admin actions */}
         {isAdmin && (quote.status === 'pending' || quote.status === 'approved' || quote.status === 'rejected') && (

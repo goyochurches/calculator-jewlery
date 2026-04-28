@@ -47,6 +47,7 @@ export function QuoteBuilderPage() {
   const [laborHours, setLaborHours] = useState(6)
   const [hourlyRate, setHourlyRate] = useState(45)
   const [extraCosts, setExtraCosts] = useState(0)
+  const [engraving, setEngraving] = useState('')
 
   // ── Photo state ──────────────────────────────────────────────────────────────
   const [photo, setPhoto] = useState<string | null>(null)
@@ -163,10 +164,12 @@ export function QuoteBuilderPage() {
         extraCosts,
         total: pricing.total,
         photo: photo ?? undefined,
+        engraving: engraving.trim() || null,
       }, user.id)
       setSavedQuote({ id: q.id, title: q.title, total: pricing.total })
       setQuoteTitle('')
       setClientName('')
+      setEngraving('')
       setPhoto(null)
       if (photoInputRef.current) photoInputRef.current.value = ''
     } catch {
@@ -447,6 +450,14 @@ export function QuoteBuilderPage() {
               <label className="text-sm font-semibold text-slate-900">Hourly rate</label>
               <input type="number" min={0} step={1} value={hourlyRate}
                 onChange={e => setHourlyRate(Number(e.target.value))}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
+            </div>
+
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-semibold text-slate-900">Grabado</label>
+              <input type="text" value={engraving} onChange={e => setEngraving(e.target.value)}
+                placeholder="Texto a grabar (opcional)"
+                maxLength={255}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
             </div>
 

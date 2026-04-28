@@ -66,6 +66,8 @@ export interface SavedQuote {
   hourlyRate: number
   extraCosts: number
   total: number
+  photo?: string | null
+  engraving?: string | null
 }
 
 export interface GemstonePrice {
