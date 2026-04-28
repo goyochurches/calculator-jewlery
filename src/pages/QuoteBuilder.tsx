@@ -312,13 +312,11 @@ export function QuoteBuilderPage() {
             <div className="space-y-2 md:col-span-2">
               <label className="text-sm font-semibold text-slate-900">Reference photo</label>
 
-              {/* Hidden file input — capture="environment" abre la cámara trasera en móvil */}
               <input
                 ref={photoInputRef}
                 id="photo-upload"
                 type="file"
                 accept="image/*"
-                capture="environment"
                 onChange={handlePhotoChange}
                 className="hidden"
               />
