@@ -13,7 +13,7 @@ import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { quotesService } from '@/services/quotesService'
 import type { JewelryMetalOption, MetalPrice } from '@/types'
 import { Toast } from '@/components/Toast'
-import { Calculator, Camera, Clock3, Diamond, Gem, Layers3, Ruler, X } from 'lucide-react'
+import { Calculator, Camera, Clock3, Diamond, Gem, ImagePlus, Layers3, Ruler, X } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -54,6 +54,7 @@ export function QuoteBuilderPage() {
   // ── Photo state ──────────────────────────────────────────────────────────────
   const [photo, setPhoto] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -66,6 +67,7 @@ export function QuoteBuilderPage() {
   const handleRemovePhoto = () => {
     setPhoto(null)
     if (photoInputRef.current) photoInputRef.current.value = ''
+    if (cameraInputRef.current) cameraInputRef.current.value = ''
   }
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -320,15 +322,33 @@ export function QuoteBuilderPage() {
                 onChange={handlePhotoChange}
                 className="hidden"
               />
+              <input
+                ref={cameraInputRef}
+                id="photo-camera"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handlePhotoChange}
+                className="hidden"
+              />
 
               {!photo ? (
-                <label
-                  htmlFor="photo-upload"
-                  className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white"
-                >
-                  <Camera className="h-5 w-5 shrink-0 text-slate-400" />
-                  <span>Upload from camera or gallery</span>
-                </label>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label
+                    htmlFor="photo-camera"
+                    className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white"
+                  >
+                    <Camera className="h-5 w-5 shrink-0 text-slate-400" />
+                    <span>Take photo</span>
+                  </label>
+                  <label
+                    htmlFor="photo-upload"
+                    className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white"
+                  >
+                    <ImagePlus className="h-5 w-5 shrink-0 text-slate-400" />
+                    <span>Choose from files</span>
+                  </label>
+                </div>
               ) : (
                 <div className="relative overflow-hidden rounded-2xl border border-slate-200">
                   <img src={photo} alt="Reference" className="w-full object-cover max-h-64" />
@@ -342,13 +362,22 @@ export function QuoteBuilderPage() {
                     </button>
                   </div>
                   {/* Tap to change */}
-                  <label
-                    htmlFor="photo-upload"
-                    className="absolute bottom-2 left-2 flex cursor-pointer items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-black/80"
-                  >
-                    <Camera className="h-3 w-3" />
-                    Change photo
-                  </label>
+                  <div className="absolute bottom-2 left-2 flex gap-1.5">
+                    <label
+                      htmlFor="photo-camera"
+                      className="flex cursor-pointer items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-black/80"
+                    >
+                      <Camera className="h-3 w-3" />
+                      Take photo
+                    </label>
+                    <label
+                      htmlFor="photo-upload"
+                      className="flex cursor-pointer items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-black/80"
+                    >
+                      <ImagePlus className="h-3 w-3" />
+                      Choose file
+                    </label>
+                  </div>
                 </div>
               )}
             </div>
