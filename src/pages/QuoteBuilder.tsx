@@ -266,6 +266,7 @@ export function QuoteBuilderPage() {
                 ['Finger size fee', pricing.fingerSizeFee],
                 ['Ring width fee', pricing.widthFee],
                 ['Bench labor', pricing.laborCost],
+                ['Engraving', pricing.engravingFee],
                 ['Extra costs', extraCosts],
               ].map(([label, value]) => (
                 <div key={label as string} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
@@ -460,11 +461,12 @@ export function QuoteBuilderPage() {
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-semibold text-slate-900">Engraving</label>
-              <input type="text" value={engraving} onChange={e => setEngraving(e.target.value)}
-                placeholder="Text to engrave (optional)"
-                maxLength={255}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
+              <label className="text-sm font-semibold text-slate-900">Engraving (+${ENGRAVING_FEE})</label>
+              <select value={engraving ? 'yes' : 'no'} onChange={e => setEngraving(e.target.value === 'yes')}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
             </div>
 
             <div className="space-y-2 md:col-span-2">

@@ -196,12 +196,12 @@ function QuoteDetail({
             <p className="mt-1.5 text-sm font-semibold text-slate-900">{quote.clientName}</p>
           </div>
         )}
-        {quote.engraving && (
-          <div className="rounded-2xl bg-slate-50 px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Engraving</p>
-            <p className="mt-1.5 text-sm font-semibold text-slate-900 italic">"{quote.engraving}"</p>
-          </div>
-        )}
+        <div className="rounded-2xl bg-slate-50 px-4 py-3">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Engraving</p>
+          <p className="mt-1.5 text-sm font-semibold text-slate-900">
+            {quote.engraving ? 'Yes — $150' : 'No'}
+          </p>
+        </div>
 
         {/* Admin actions */}
         {isAdmin && (quote.status === 'pending' || quote.status === 'approved' || quote.status === 'rejected') && (
@@ -247,6 +247,7 @@ function QuoteDetail({
             <LineItem label="Finger size" value={`Size ${quote.fingerSize ?? '—'} — $${FINGER_SIZE_FEES[quote.fingerSize as keyof typeof FINGER_SIZE_FEES] ?? 0}`} />
             <LineItem label="Ring width" value={`${quote.ringWidth ?? 0} mm — width fee $${widthFee}`} />
             <LineItem label="Bench labor" value={`${quote.laborHours ?? 0} h × $${quote.hourlyRate ?? 0}/h = $${((quote.laborHours ?? 0) * (quote.hourlyRate ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+            <LineItem label="Engraving" value={quote.engraving ? '$150.00' : '$0.00'} />
             {quote.extraCosts > 0 && (
               <LineItem label="Extra costs" value={`$${quote.extraCosts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
             )}
