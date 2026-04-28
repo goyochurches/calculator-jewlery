@@ -22,7 +22,7 @@ interface ApiQuote {
   extraCosts: number
   total: number
   photo?: string | null   // base64 o URL devuelta por el backend
-  engraving?: string | null
+  engraving?: boolean | null
 }
 
 function mapQuote(q: ApiQuote): SavedQuote {
@@ -47,7 +47,7 @@ function mapQuote(q: ApiQuote): SavedQuote {
     extraCosts: q.extraCosts,
     total: q.total,
     photo: q.photo ?? null,
-    engraving: q.engraving ?? null,
+    engraving: q.engraving ?? false,
   }
 }
 

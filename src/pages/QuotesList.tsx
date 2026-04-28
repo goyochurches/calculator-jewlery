@@ -198,7 +198,7 @@ function QuoteDetail({
         )}
         {quote.engraving && (
           <div className="rounded-2xl bg-slate-50 px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Grabado</p>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Engraving</p>
             <p className="mt-1.5 text-sm font-semibold text-slate-900 italic">"{quote.engraving}"</p>
           </div>
         )}

@@ -47,7 +47,9 @@ export function QuoteBuilderPage() {
   const [laborHours, setLaborHours] = useState(6)
   const [hourlyRate, setHourlyRate] = useState(45)
   const [extraCosts, setExtraCosts] = useState(0)
-  const [engraving, setEngraving] = useState('')
+  const [engraving, setEngraving] = useState(false)
+
+  const ENGRAVING_FEE = 150
 
   // ── Photo state ──────────────────────────────────────────────────────────────
   const [photo, setPhoto] = useState<string | null>(null)
@@ -93,6 +95,7 @@ export function QuoteBuilderPage() {
     const diamondUnitPrice =
       (config.diamondSizeMap[diamondSize]?.basePrice ?? 0) * DIAMOND_TYPE_OPTIONS[diamondType].multiplier
     const diamondCost = diamondAmount * diamondUnitPrice
+    const engravingFee = engraving ? ENGRAVING_FEE : 0
 
     const total =
       materialCost +
@@ -103,6 +106,7 @@ export function QuoteBuilderPage() {
       widthFee +
       laborCost +
       diamondCost +
+      engravingFee +
       extraCosts
 
     return {
@@ -120,6 +124,7 @@ export function QuoteBuilderPage() {
       laborCost,
       diamondUnitPrice,
       diamondCost,
+      engravingFee,
       total,
     }
   }, [
@@ -128,6 +133,7 @@ export function QuoteBuilderPage() {
     diamondAmount,
     diamondSize,
     diamondType,
+    engraving,
     extraCosts,
     fingerSize,
     hourlyRate,
@@ -164,12 +170,12 @@ export function QuoteBuilderPage() {
         extraCosts,
         total: pricing.total,
         photo: photo ?? undefined,
-        engraving: engraving.trim() || null,
+        engraving,
       }, user.id)
       setSavedQuote({ id: q.id, title: q.title, total: pricing.total })
       setQuoteTitle('')
       setClientName('')
-      setEngraving('')
+      setEngraving(false)
       setPhoto(null)
       if (photoInputRef.current) photoInputRef.current.value = ''
     } catch {
@@ -303,7 +309,7 @@ export function QuoteBuilderPage() {
 
             {/* ── Photo upload ───────────────────────────────────────────────── */}
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-semibold text-slate-900">Foto de referencia</label>
+              <label className="text-sm font-semibold text-slate-900">Reference photo</label>
 
               {/* Hidden file input — capture="environment" abre la cámara trasera en móvil */}
               <input
@@ -322,18 +328,18 @@ export function QuoteBuilderPage() {
                   className="flex cursor-pointer items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white"
                 >
                   <Camera className="h-5 w-5 shrink-0 text-slate-400" />
-                  <span>Subir desde cámara o galería</span>
+                  <span>Upload from camera or gallery</span>
                 </label>
               ) : (
                 <div className="relative overflow-hidden rounded-2xl border border-slate-200">
-                  <img src={photo} alt="Referencia" className="w-full object-cover max-h-64" />
+                  <img src={photo} alt="Reference" className="w-full object-cover max-h-64" />
                   <div className="absolute inset-0 flex items-start justify-end p-2">
                     <button
                       onClick={handleRemovePhoto}
                       className="flex items-center gap-1 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-black/80"
                     >
                       <X className="h-3 w-3" />
-                      Eliminar
+                      Remove
                     </button>
                   </div>
                   {/* Tap to change */}
@@ -342,7 +348,7 @@ export function QuoteBuilderPage() {
                     className="absolute bottom-2 left-2 flex cursor-pointer items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-black/80"
                   >
                     <Camera className="h-3 w-3" />
-                    Cambiar foto
+                    Change photo
                   </label>
                 </div>
               )}
@@ -454,9 +460,9 @@ export function QuoteBuilderPage() {
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-semibold text-slate-900">Grabado</label>
+              <label className="text-sm font-semibold text-slate-900">Engraving</label>
               <input type="text" value={engraving} onChange={e => setEngraving(e.target.value)}
-                placeholder="Texto a grabar (opcional)"
+                placeholder="Text to engrave (optional)"
                 maxLength={255}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
             </div>
