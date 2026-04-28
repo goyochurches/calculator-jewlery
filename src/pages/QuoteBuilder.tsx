@@ -424,8 +424,8 @@ export function QuoteBuilderPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-900">Amount of diamonds</label>
-              <input type="number" min={0} step={1} value={diamondAmount}
-                onChange={e => setDiamondAmount(Number(e.target.value))}
+              <input type="number" min={0} step={1} value={diamondAmount || ''} placeholder="0"
+                onChange={e => setDiamondAmount(Number(e.target.value) || 0)}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
             </div>
 
@@ -451,8 +451,8 @@ export function QuoteBuilderPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-900">Width of the ring (mm)</label>
-              <input type="number" min={1} step={0.5} value={ringWidth}
-                onChange={e => setRingWidth(Number(e.target.value))}
+              <input type="number" min={1} step={0.5} value={ringWidth || ''} placeholder="0"
+                onChange={e => setRingWidth(Number(e.target.value) || 0)}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
             </div>
 
@@ -468,22 +468,22 @@ export function QuoteBuilderPage() {
 
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-900">Weight (grams)</label>
-              <input type="number" min={0} step={0.1} value={weightGrams}
-                onChange={e => setWeightGrams(Number(e.target.value))}
+              <input type="number" min={0} step={0.1} value={weightGrams || ''} placeholder="0"
+                onChange={e => setWeightGrams(Number(e.target.value) || 0)}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-900">Bench hours</label>
-              <input type="number" min={0} step={0.5} value={laborHours}
-                onChange={e => setLaborHours(Number(e.target.value))}
+              <input type="number" min={0} step={0.5} value={laborHours || ''} placeholder="0"
+                onChange={e => setLaborHours(Number(e.target.value) || 0)}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-semibold text-slate-900">Hourly rate</label>
-              <input type="number" min={0} step={1} value={hourlyRate}
-                onChange={e => setHourlyRate(Number(e.target.value))}
+              <input type="number" min={0} step={1} value={hourlyRate || ''} placeholder="0"
+                onChange={e => setHourlyRate(Number(e.target.value) || 0)}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
             </div>
 
@@ -498,8 +498,8 @@ export function QuoteBuilderPage() {
 
             <div className="space-y-2 md:col-span-2">
               <label className="text-sm font-semibold text-slate-900">Extra costs</label>
-              <input type="number" min={0} step={1} value={extraCosts}
-                onChange={e => setExtraCosts(Number(e.target.value))}
+              <input type="number" min={0} step={1} value={extraCosts || ''} placeholder="0"
+                onChange={e => setExtraCosts(Number(e.target.value) || 0)}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
             </div>
 
