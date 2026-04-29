@@ -41,8 +41,8 @@ export default function Login() {
               <path d="M16 4L16 28M4 10L28 22M28 10L4 22" stroke="white" strokeWidth="1" strokeOpacity="0.5"/>
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900">Price Calculator</h1>
-          <p className="text-sm text-slate-500 mt-1">Jewelry pricing workspace</p>
+          <h1 className="text-2xl font-bold text-slate-900">Simone &amp; Son</h1>
+          <p className="text-sm text-slate-500 mt-1">Jewelry Studio</p>
         </div>
 
         {/* Card */}
@@ -101,7 +101,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-xs text-slate-400 mt-6">
-          Jewelry Price Calculator &copy; {new Date().getFullYear()}
+          Simone &amp; Son Jewelry Studio &copy; {new Date().getFullYear()}
         </p>
       </div>
     </div>
