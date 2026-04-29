@@ -89,17 +89,14 @@ export const CAD_DESIGN_OPTIONS = {
   premium: { label: 'Premium Piece', fee: 260 },
 } as const
 
-// Grunberger es el único proveedor de diamantes. El usuario sólo elige si
-// son naturales o de laboratorio (lab-grown), ambos del mismo proveedor.
-// El precio real ahora vive en diamond_size_config (una fila por stone_type
-// y size), por lo que el multiplicador siempre es 1 — se mantiene en el
-// objeto por compatibilidad con quotes históricas.
+// El usuario elige si los diamantes son naturales o de laboratorio (lab-grown).
+// El precio real vive en diamond_size_config (una fila por stone_type y size),
+// por lo que el multiplicador siempre es 1 — se mantiene en el objeto por
+// compatibilidad con quotes históricas.
 export const DIAMOND_TYPE_OPTIONS = {
-  natural: { label: 'Grunberger Natural', multiplier: 1 },
-  'lab-grown': { label: 'Grunberger Lab', multiplier: 1 },
+  natural: { label: 'Natural', multiplier: 1 },
+  'lab-grown': { label: 'Lab', multiplier: 1 },
 } as const
-
-export const DIAMOND_SUPPLIER = 'Grunberger'
 
 export const DIAMOND_SIZE_OPTIONS = {
   '0.01-0.05': { label: '0.01 - 0.05', basePrice: 45 },

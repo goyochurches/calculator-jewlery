@@ -2,7 +2,6 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
-  DIAMOND_SUPPLIER,
   DIAMOND_TYPE_OPTIONS,
   JEWELRY_METAL_OPTIONS,
   SETTING_LABOR_MASTER,
@@ -45,8 +44,8 @@ const METAL_GROUPS: Array<{ group: string; keys: JewelryMetalOption[] }> = [
 const diamondTypeKeys = Object.keys(DIAMOND_TYPE_OPTIONS) as Array<keyof typeof DIAMOND_TYPE_OPTIONS>
 
 // Mapeo del tipo de diamante elegido en el UI al stoneType que guarda el
-// backend en diamond_size_config. Grunberger Natural → NATURAL, Grunberger
-// Lab → LAB. Si añadimos más tipos en el futuro, mapearlos aquí.
+// backend en diamond_size_config. Natural → NATURAL, Lab → LAB.
+// Si añadimos más tipos en el futuro, mapearlos aquí.
 const DIAMOND_TYPE_TO_STONE: Record<keyof typeof DIAMOND_TYPE_OPTIONS, 'NATURAL' | 'LAB'> = {
   natural: 'NATURAL',
   'lab-grown': 'LAB',
@@ -246,7 +245,7 @@ export function QuoteBuilderPage() {
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:mt-4">
                 Two main sections: <strong>CAD Design &amp; Jeweler's Time</strong> for the body of the
-                piece and <strong>Stone Setting</strong> for the diamonds (only {DIAMOND_SUPPLIER}).
+                piece and <strong>Stone Setting</strong> for the diamonds.
               </p>
 
               <div className="mt-6 grid gap-3 sm:mt-8 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -499,8 +498,7 @@ export function QuoteBuilderPage() {
                 <CardTitle className="text-base font-semibold text-slate-900">Stone Setting</CardTitle>
               </div>
               <p className="text-sm text-slate-500">
-                Diamonds from <strong>{DIAMOND_SUPPLIER}</strong> only. Setter types and full natural/lab
-                price tables will be filled in once we have the complete data.
+                Pick the type (Natural or Lab), the stone size, the setter type and the quantity.
               </p>
             </CardHeader>
             <CardContent className="grid gap-5 pt-6 md:grid-cols-2">
