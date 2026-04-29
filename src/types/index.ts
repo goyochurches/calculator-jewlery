@@ -82,6 +82,8 @@ export interface SavedQuote {
   setterType?: string | null
   client?: Client | null
   clientId?: number | null
+  publicToken?: string | null
+  publicTokenExpiresAt?: string | null
 }
 
 export interface GemstonePrice {

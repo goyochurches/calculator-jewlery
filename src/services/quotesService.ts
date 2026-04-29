@@ -28,6 +28,8 @@ interface ApiQuote {
   // Sent up by the frontend so the backend can resolve the FK; on responses
   // the backend echoes the full `client` object instead.
   clientId?: number | null
+  publicToken?: string | null
+  publicTokenExpiresAt?: string | null
 }
 
 function mapQuote(q: ApiQuote): SavedQuote {
@@ -56,6 +58,8 @@ function mapQuote(q: ApiQuote): SavedQuote {
     setterType: q.setterType ?? null,
     client: q.client ?? null,
     clientId: q.client?.id ?? q.clientId ?? null,
+    publicToken: q.publicToken ?? null,
+    publicTokenExpiresAt: q.publicTokenExpiresAt ?? null,
   }
 }
 
@@ -91,6 +95,12 @@ export const quotesService = {
 
   async updateStatus(id: string, status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED'): Promise<SavedQuote> {
     const data = await api.patch<ApiQuote>(`/api/quotes/${id}/status?status=${status}`)
+    return mapQuote(data)
+  },
+
+  /** Admin-only. Returns the quote with a fresh publicToken + expiration. */
+  async refreshPublicToken(id: string): Promise<SavedQuote> {
+    const data = await api.post<ApiQuote>(`/api/quotes/${id}/refresh-token`, {})
     return mapQuote(data)
   },
 
