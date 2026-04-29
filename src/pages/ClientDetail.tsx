@@ -1,3 +1,4 @@
+import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { QuoteDetailPanel } from '@/components/QuoteDetailPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -186,6 +187,7 @@ export function ClientDetailPage() {
                       <Th>Date</Th>
                       <Th>Status</Th>
                       <Th className="text-right">Total</Th>
+                      <Th></Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -206,6 +208,9 @@ export function ClientDetailPage() {
                           </td>
                           <td className="px-6 py-4 text-right font-semibold text-slate-900">
                             ${(q.total ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-3 py-4">
+                            <CopyShareLinkButton token={q.publicToken} />
                           </td>
                         </tr>
                       )

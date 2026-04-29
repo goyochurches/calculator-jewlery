@@ -305,6 +305,15 @@ export function QuotesListPage() {
     }
   }
 
+  const handleRefreshToken = async (id: string) => {
+    try {
+      const updated = await quotesService.refreshPublicToken(id)
+      setQuotes((prev) => prev.map((q) => (q.id === id ? updated : q)))
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   const filteredQuotes = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
     return quotes.filter((quote) => {
@@ -537,6 +546,7 @@ export function QuotesListPage() {
               quote={selected}
               onClose={() => setSelectedId(null)}
               onStatusChange={handleStatusChange}
+              onRefreshToken={isAdmin ? handleRefreshToken : undefined}
               isAdmin={isAdmin}
             />
           </Card>

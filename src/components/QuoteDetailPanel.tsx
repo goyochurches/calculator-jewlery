@@ -7,8 +7,9 @@ import {
   RING_LABOR_OPTIONS,
   SETTING_LABOR_MASTER,
 } from '@/constants/config'
+import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import type { QuoteStatus, SavedQuote } from '@/types'
-import { Check, X, XCircle } from 'lucide-react'
+import { Check, RefreshCw, X, XCircle } from 'lucide-react'
 import { useState } from 'react'
 
 const STATUS_STYLES: Record<QuoteStatus, string> = {
@@ -100,7 +101,21 @@ interface QuoteDetailPanelProps {
   onClose: () => void
   /** Optional: only needed when admin actions are allowed in this context */
   onStatusChange?: (id: string, status: 'APPROVED' | 'REJECTED' | 'PENDING') => void
+  /** Admin-only callback to rotate the share token + reset 3-month expiration. */
+  onRefreshToken?: (id: string) => Promise<void> | void
   isAdmin?: boolean
+}
+
+function formatExpiration(iso: string | null | undefined): { label: string; expired: boolean } {
+  if (!iso) return { label: 'No expiration', expired: false }
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return { label: 'No expiration', expired: false }
+  const now = new Date()
+  const expired = date.getTime() < now.getTime()
+  if (expired) return { label: `Expired ${date.toLocaleDateString()}`, expired: true }
+  const diffDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays <= 14) return { label: `Expires in ${diffDays} day${diffDays === 1 ? '' : 's'}`, expired: false }
+  return { label: `Expires ${date.toLocaleDateString()}`, expired: false }
 }
 
 /**
@@ -112,7 +127,17 @@ interface QuoteDetailPanelProps {
  * even when their stored keys (small/medium/etc.) no longer match the
  * current spec.
  */
-export function QuoteDetailPanel({ quote, onClose, onStatusChange, isAdmin = false }: QuoteDetailPanelProps) {
+export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToken, isAdmin = false }: QuoteDetailPanelProps) {
+  const [refreshing, setRefreshing] = useState(false)
+  const expiration = formatExpiration(quote.publicTokenExpiresAt)
+
+  const handleRefresh = async () => {
+    if (!onRefreshToken) return
+    setRefreshing(true)
+    try { await onRefreshToken(quote.id) }
+    finally { setRefreshing(false) }
+  }
+
   const metalCfg    = JEWELRY_METAL_OPTIONS[quote.metal]                                                        ?? { label: quote.metal }
   const settingCfg  = SETTING_LABOR_MASTER[quote.diamondSize as keyof typeof SETTING_LABOR_MASTER]               ?? { feePerStone: 0, minutesPerStone: 0 }
   const diamondBase = DIAMOND_SIZE_OPTIONS[quote.diamondSize as keyof typeof DIAMOND_SIZE_OPTIONS]               ?? { basePrice: 0, label: quote.diamondSize }
@@ -155,6 +180,38 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, isAdmin = fal
             {metalCfg.label} · {ringLaborCfg?.label ?? quote.ringLabor} · {cadCfg?.label ?? quote.cadDesign}
           </p>
         </div>
+
+        {/* Share link */}
+        {quote.publicToken && (
+          <div className={`rounded-2xl border p-4 ${expiration.expired ? 'border-rose-200 bg-rose-50/60' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                  Share link
+                </p>
+                <p className={`mt-1 text-xs ${expiration.expired ? 'text-rose-700' : 'text-slate-500'}`}>
+                  {expiration.expired
+                    ? 'This share link is expired — refresh it to generate a new one.'
+                    : `Send the link to the client. ${expiration.label}.`}
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <CopyShareLinkButton token={quote.publicToken} iconOnly={false} />
+              {isAdmin && onRefreshToken && (
+                <button
+                  type="button"
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                  {refreshing ? 'Refreshing…' : 'Refresh link'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         <PhotoDetail src={quote.photo} />
 
