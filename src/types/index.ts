@@ -79,6 +79,7 @@ export interface SavedQuote {
   total: number
   photo?: string | null
   engraving?: boolean | null
+  setterType?: string | null
 }
 
 export interface GemstonePrice {

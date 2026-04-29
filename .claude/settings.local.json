@@ -11,7 +11,9 @@
       "Bash(where docker *)",
       "Bash(python *)",
       "Bash(docker run *)",
-      "Bash(grep -n \"^export\\\\|^}$\\\\|^function \" D:/wamp64/www/calculator-jewlery/src/pages/QuoteBuilder.tsx)"
+      "Bash(grep -n \"^export\\\\|^}$\\\\|^function \" D:/wamp64/www/calculator-jewlery/src/pages/QuoteBuilder.tsx)",
+      "Read(//d/wamp64/www/price-calculator/src/main/java/**)",
+      "Read(//d/wamp64/www/price-calculator/src/main/resources/db/migration/**)"
     ]
   }
 }

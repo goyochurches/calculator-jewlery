@@ -1,7 +1,10 @@
 import { api } from '@/api/apiClient'
 
+export type StoneType = 'NATURAL' | 'LAB'
+
 export interface DiamondSizeConfig {
   id: number
+  stoneType: StoneType
   sizeKey: string
   label: string
   basePrice: number
@@ -22,12 +25,20 @@ export interface PricingTier {
   sortOrder: number
 }
 
+export interface SetterConfig {
+  id: number
+  typeKey: string
+  label: string
+  fee: number
+  sortOrder: number
+}
+
 export const configService = {
   getDiamondSizes: (): Promise<DiamondSizeConfig[]> =>
     api.get('/api/config/diamond-sizes'),
 
-  updateDiamondSize: (id: number, basePrice: number): Promise<DiamondSizeConfig> =>
-    api.put(`/api/config/diamond-sizes/${id}`, { basePrice }),
+  updateDiamondSize: (id: number, update: { basePrice: number; label?: string }): Promise<DiamondSizeConfig> =>
+    api.put(`/api/config/diamond-sizes/${id}`, update),
 
   createDiamondSize: (input: Omit<DiamondSizeConfig, 'id'>): Promise<DiamondSizeConfig> =>
     api.post('/api/config/diamond-sizes', input),
@@ -61,4 +72,16 @@ export const configService = {
 
   deletePricingTier: (id: number): Promise<void> =>
     api.delete(`/api/config/pricing-tiers/${id}`),
+
+  getSetters: (): Promise<SetterConfig[]> =>
+    api.get('/api/config/setters'),
+
+  updateSetter: (id: number, update: { label: string; fee: number; sortOrder?: number }): Promise<SetterConfig> =>
+    api.put(`/api/config/setters/${id}`, update),
+
+  createSetter: (input: Omit<SetterConfig, 'id' | 'sortOrder'> & { sortOrder?: number }): Promise<SetterConfig> =>
+    api.post('/api/config/setters', input),
+
+  deleteSetter: (id: number): Promise<void> =>
+    api.delete(`/api/config/setters/${id}`),
 }

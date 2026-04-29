@@ -61,6 +61,7 @@ export function QuoteBuilderPage() {
   const [fingerSize, setFingerSize] = useState(7)
   const [extraCosts, setExtraCosts] = useState(0)
   const [engraving, setEngraving] = useState(false)
+  const [setterType, setSetterType] = useState<string>('ss_melee')
 
   const [photo, setPhoto] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
@@ -87,7 +88,9 @@ export function QuoteBuilderPage() {
     const materialCost = metalPricePerGram * weightGrams
     const ringLaborFee = config.ringLaborMap[ringLabor]?.fee ?? 0
     const cadFee = config.cadMap[cadDesign]?.fee ?? 0
-    const settingFeePerStone = SETTING_LABOR_MASTER[diamondSize as keyof typeof SETTING_LABOR_MASTER]?.feePerStone ?? 0
+    const setterCfg = config.setterMap[setterType]
+    // Si hay un setter elegido, usamos su fee. Si no, caemos al master legacy.
+    const settingFeePerStone = setterCfg?.fee ?? SETTING_LABOR_MASTER[diamondSize as keyof typeof SETTING_LABOR_MASTER]?.feePerStone ?? 0
     const settingMinutesPerStone = SETTING_LABOR_MASTER[diamondSize as keyof typeof SETTING_LABOR_MASTER]?.minutesPerStone ?? 0
     const settingFee = diamondAmount * settingFeePerStone
     const settingTimeHours = (diamondAmount * settingMinutesPerStone) / 60
@@ -124,7 +127,7 @@ export function QuoteBuilderPage() {
     }
   }, [
     cadDesign, config, diamondAmount, diamondSize, diamondType, engraving,
-    extraCosts, ringLabor, ringWidth, selectedMetalConfig, weightGrams,
+    extraCosts, ringLabor, ringWidth, selectedMetalConfig, setterType, weightGrams,
   ])
 
   const handleQuoteReady = async () => {
@@ -154,6 +157,7 @@ export function QuoteBuilderPage() {
         total: pricing.total,
         photo: photo ?? undefined,
         engraving,
+        setterType,
       }, user.id)
       setSavedQuote({ id: q.id, title: q.title, total: pricing.total })
       setQuoteTitle('')
@@ -472,11 +476,21 @@ export function QuoteBuilderPage() {
               </div>
 
               <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-900">Setter type</label>
+                <select value={setterType} onChange={e => setSetterType(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
+                  {config.setters.map(s => (
+                    <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-semibold text-slate-900">Setting labor</label>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900">
-                  ${pricing.settingFeePerStone.toLocaleString('en-US', { minimumFractionDigits: 2 })} per diamond
-                  {' | '}
-                  {pricing.settingMinutesPerStone} min each
+                  ${pricing.settingFeePerStone.toLocaleString('en-US', { minimumFractionDigits: 2 })} per diamond × {diamondAmount}
+                  {' = '}
+                  <strong>${pricing.settingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
                 </div>
               </div>
             </CardContent>
