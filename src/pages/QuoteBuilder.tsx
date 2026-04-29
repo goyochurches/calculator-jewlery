@@ -13,6 +13,7 @@ import { quotesService } from '@/services/quotesService'
 import type { Client, JewelryMetalOption } from '@/types'
 import { ClientPicker } from '@/components/ClientPicker'
 import { Toast } from '@/components/Toast'
+import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
 import { Calculator, Camera, Diamond, Gem, ImagePlus, Layers3, Ruler, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -57,7 +58,7 @@ export function QuoteBuilderPage() {
   const [quoteTitle, setQuoteTitle] = useState('')
   const [client, setClient] = useState<Client | null>(null)
   const [saving, setSaving] = useState(false)
-  const [savedQuote, setSavedQuote] = useState<{ id: string; title: string; total: number } | null>(null)
+  const [savedQuote, setSavedQuote] = useState<{ id: string; title: string; total: number; publicToken: string | null } | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [selectedMetal, setSelectedMetal] = useState<JewelryMetalOption>('gold-18k-white')
   const [ringLabor, setRingLabor] = useState('medium')
@@ -183,7 +184,7 @@ export function QuoteBuilderPage() {
         engraving,
         setterType,
       }, user.id)
-      setSavedQuote({ id: q.id, title: q.title, total: pricing.total })
+      setSavedQuote({ id: q.id, title: q.title, total: pricing.total, publicToken: q.publicToken ?? null })
       setQuoteTitle('')
       setClient(null)
       setEngraving(false)
@@ -644,16 +645,23 @@ function QuoteToast({
   quote,
   onClose,
 }: {
-  quote: { id: string; title: string; total: number }
+  quote: { id: string; title: string; total: number; publicToken: string | null }
   onClose: () => void
 }) {
   const navigate = useNavigate()
+  const hasLink = !!quote.publicToken
   return (
     <Toast
       title="Quote created!"
-      description={`${quote.title} · $${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-      actionLabel="View quotes →"
-      onAction={() => navigate('/quotes-list')}
+      description={`${quote.title} · $${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}${hasLink ? ' · share link ready' : ''}`}
+      actionLabel={hasLink ? 'Copy share link' : 'View quotes →'}
+      onAction={async () => {
+        if (hasLink && quote.publicToken) {
+          await copyToClipboard(publicQuoteUrl(quote.publicToken))
+        } else {
+          navigate('/quotes-list')
+        }
+      }}
       onClose={onClose}
     />
   )
