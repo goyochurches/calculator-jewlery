@@ -170,7 +170,9 @@ export function QuoteBuilderPage() {
         status: 'PENDING',
         metal: selectedMetal,
         ringLabor,
-        cadDesign,
+        // Combined "CAD Design & Jeweler's Time" → persist the same key on
+        // both fields so legacy queries that index by cadDesign keep working.
+        cadDesign: ringLabor,
         diamondAmount,
         diamondType,
         diamondSize,
@@ -287,7 +289,7 @@ export function QuoteBuilderPage() {
                 ${((pricing.total - pricing.engravingFee) * 2.5 + pricing.engravingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </p>
               <p className="mt-2 text-sm text-slate-300">
-                {selectedMetalConfig.label} | {ringLaborLabel} | {cadLabel}
+                {selectedMetalConfig.label} | {ringLaborLabel}
               </p>
             </div>
 
@@ -578,28 +580,13 @@ export function QuoteBuilderPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">CAD design</p>
-                  <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{cadLabel}</p>
-                </div>
-                <div className="rounded-2xl bg-sky-50 p-3 text-sky-600"><Layers3 className="h-5 w-5" /></div>
-              </div>
-              <p className="mt-3 text-sm text-slate-500">
-                ${pricing.cadFee.toLocaleString('en-US', { minimumFractionDigits: 2 })} added for CAD design.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Jeweler's time</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">CAD &amp; Jeweler's time</p>
                   <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{ringLaborLabel}</p>
                 </div>
                 <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-600"><Layers3 className="h-5 w-5" /></div>
               </div>
               <p className="mt-3 text-sm text-slate-500">
-                ${pricing.ringLaborFee.toLocaleString('en-US', { minimumFractionDigits: 2 })} for the jeweler's time.
+                ${pricing.ringLaborFee.toLocaleString('en-US', { minimumFractionDigits: 2 })} covers CAD design and the jeweler's time.
               </p>
             </CardContent>
           </Card>
