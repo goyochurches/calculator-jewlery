@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useHistory } from '@/hooks/useHistorial'
+import { clientService } from '@/services/clientService'
 import { gemstoneService } from '@/services/gemstoneService'
 import { metalsService, type MetalWithId } from '@/services/metalService'
 import {
@@ -11,7 +12,7 @@ import {
   type SetterConfig,
   type StoneType,
 } from '@/services/configService'
-import type { GemstonePrice, HistorialEntry } from '../types'
+import type { Client, GemstonePrice, HistorialEntry } from '../types'
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -64,6 +65,7 @@ const BLANK_METAL: Omit<MetalWithId, 'id'> = {
   symbol: '', name: '', price: 0, change: 0, changePercent: 0, high: 0, low: 0, open: 0,
 }
 
+const BLANK_CLIENT: Omit<Client, 'id' | 'createdAt'> = { name: '', surname: '', phone: '', email: '' }
 const BLANK_DS: Omit<DiamondSizeConfig, 'id'> = { stoneType: 'NATURAL', sizeKey: '', label: '', basePrice: 0 }
 const BLANK_SETTER: Omit<SetterConfig, 'id' | 'sortOrder'> = { typeKey: '', label: '', fee: 0 }
 
@@ -255,6 +257,49 @@ export function MasterTablesPage() {
     if (!confirm('Delete this CAD tier?')) return
     await configService.deletePricingTier(id)
     setCadTiers(prev => prev.filter(t => t.id !== id))
+  }
+
+  // ── Clients ────────────────────────────────────────────────────────────────
+  const [clients, setClients] = useState<Client[]>([])
+  const [clientEditId, setClientEditId] = useState<number | null>(null)
+  const [clientDraft, setClientDraft] = useState<Client | null>(null)
+  const [showNewClient, setShowNewClient] = useState(false)
+  const [newClientDraft, setNewClientDraft] = useState<Omit<Client, 'id' | 'createdAt'>>({ ...BLANK_CLIENT })
+
+  useEffect(() => {
+    clientService.list().then(setClients).catch(console.error)
+  }, [])
+
+  const saveClientEdit = async () => {
+    if (!clientDraft) return
+    if (!clientDraft.name?.trim()) return
+    const updated = await clientService.update(clientDraft.id, {
+      name: clientDraft.name.trim(),
+      surname: clientDraft.surname?.trim() || null,
+      phone: clientDraft.phone?.trim() || null,
+      email: clientDraft.email?.trim() || null,
+    })
+    setClients(prev => prev.map(c => c.id === updated.id ? updated : c))
+    setClientEditId(null); setClientDraft(null)
+  }
+
+  const saveNewClient = async () => {
+    if (!newClientDraft.name.trim()) return
+    const created = await clientService.create({
+      name: newClientDraft.name.trim(),
+      surname: newClientDraft.surname?.trim() || null,
+      phone: newClientDraft.phone?.trim() || null,
+      email: newClientDraft.email?.trim() || null,
+    })
+    setClients(prev => [...prev, created])
+    setShowNewClient(false)
+    setNewClientDraft({ ...BLANK_CLIENT })
+  }
+
+  const deleteClient = async (id: number) => {
+    if (!confirm('Delete this client? Existing quotes will keep their saved client name.')) return
+    await clientService.delete(id)
+    setClients(prev => prev.filter(c => c.id !== id))
   }
 
   // ── Setters ────────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { api } from '@/api/apiClient'
-import type { SavedQuote } from '../types'
+import type { Client, SavedQuote } from '../types'
 
 interface ApiQuote {
   id: number
@@ -24,6 +24,10 @@ interface ApiQuote {
   photo?: string | null   // base64 o URL devuelta por el backend
   engraving?: boolean | null
   setterType?: string | null
+  client?: Client | null
+  // Sent up by the frontend so the backend can resolve the FK; on responses
+  // the backend echoes the full `client` object instead.
+  clientId?: number | null
 }
 
 function mapQuote(q: ApiQuote): SavedQuote {
@@ -50,6 +54,8 @@ function mapQuote(q: ApiQuote): SavedQuote {
     photo: q.photo ?? null,
     engraving: q.engraving ?? false,
     setterType: q.setterType ?? null,
+    client: q.client ?? null,
+    clientId: q.client?.id ?? q.clientId ?? null,
   }
 }
 

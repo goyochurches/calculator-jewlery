@@ -10,7 +10,8 @@ import {
 import { useAuth } from '@/context/AuthContext'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { quotesService } from '@/services/quotesService'
-import type { JewelryMetalOption } from '@/types'
+import type { Client, JewelryMetalOption } from '@/types'
+import { ClientPicker } from '@/components/ClientPicker'
 import { Toast } from '@/components/Toast'
 import { Calculator, Camera, Diamond, Gem, ImagePlus, Layers3, Ruler, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -54,7 +55,7 @@ export function QuoteBuilderPage() {
   const config = useQuoteConfig()
 
   const [quoteTitle, setQuoteTitle] = useState('')
-  const [clientName, setClientName] = useState('')
+  const [client, setClient] = useState<Client | null>(null)
   const [saving, setSaving] = useState(false)
   const [savedQuote, setSavedQuote] = useState<{ id: string; title: string; total: number } | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -160,7 +161,8 @@ export function QuoteBuilderPage() {
     try {
       const q = await quotesService.create({
         title: quoteTitle.trim(),
-        clientName: clientName.trim(),
+        clientName: client ? `${client.name}${client.surname ? ' ' + client.surname : ''}` : '',
+        client: client ?? undefined,
         status: 'PENDING',
         metal: selectedMetal,
         ringLabor,
@@ -183,7 +185,7 @@ export function QuoteBuilderPage() {
       }, user.id)
       setSavedQuote({ id: q.id, title: q.title, total: pricing.total })
       setQuoteTitle('')
-      setClientName('')
+      setClient(null)
       setEngraving(false)
       setPhoto(null)
       if (photoInputRef.current) photoInputRef.current.value = ''
@@ -310,10 +312,13 @@ export function QuoteBuilderPage() {
               </div>
 
               <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-semibold text-slate-900">Client name</label>
-                <input type="text" value={clientName} onChange={e => setClientName(e.target.value)}
-                  placeholder="e.g. María García"
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
+                <label className="text-sm font-semibold text-slate-900">Client</label>
+                <ClientPicker value={client} onChange={setClient} />
+                {client && (
+                  <p className="text-xs text-slate-500">
+                    {[client.email, client.phone].filter(Boolean).join(' · ') || 'No contact info on file'}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2 md:col-span-2">

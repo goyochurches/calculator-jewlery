@@ -80,6 +80,8 @@ export interface SavedQuote {
   photo?: string | null
   engraving?: boolean | null
   setterType?: string | null
+  client?: Client | null
+  clientId?: number | null
 }
 
 export interface GemstonePrice {
@@ -91,4 +93,13 @@ export interface GemstonePrice {
   price: number
   color: string
   note: string
+}
+
+export interface Client {
+  id: number
+  name: string
+  surname: string | null
+  phone: string | null
+  email: string | null
+  createdAt?: string | null
 }
