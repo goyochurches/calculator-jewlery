@@ -12,6 +12,7 @@ import {
 import { useAuth } from '@/context/AuthContext'
 import { quotesService } from '@/services/quotesService'
 import type { QuoteStatus, SavedQuote } from '@/types'
+import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { Bell, Check, ChevronLeft, ChevronRight, ImageOff, Search, X, XCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -432,7 +433,7 @@ export function QuotesListPage() {
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/70">
-                    {['Photo', 'Quote', 'Client', 'Created by', 'Metal', 'Status', 'Date', 'Total'].map((h) => (
+                    {['Photo', 'Quote', 'Client', 'Created by', 'Metal', 'Status', 'Date', 'Total', ''].map((h) => (
                       <th key={h} className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 last:text-right">
                         {h}
                       </th>
@@ -504,6 +505,9 @@ export function QuotesListPage() {
                         </td>
                         <td className={`px-6 py-4 text-right font-semibold ${isSelected ? 'text-amber-300' : 'text-slate-900'}`}>
                           ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="px-3 py-4">
+                          <CopyShareLinkButton token={quote.publicToken} />
                         </td>
                       </tr>
                     )
