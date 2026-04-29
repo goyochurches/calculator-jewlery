@@ -110,8 +110,11 @@ export function QuoteBuilderPage() {
   const pricing = useMemo(() => {
     const metalPricePerGram = selectedMetalConfig.pricePerGram
     const materialCost = metalPricePerGram * weightGrams
+    // Single combined "CAD Design & Jeweler's Time" level → uses Jeweler's
+    // time fee only. CAD design as a separate cost was removed; we still
+    // persist cadDesign = ringLabor on the quote for backwards compatibility.
     const ringLaborFee = config.ringLaborMap[ringLabor]?.fee ?? 0
-    const cadFee = config.cadMap[cadDesign]?.fee ?? 0
+    const cadFee = 0
     const setterCfg = config.setterMap[setterType]
     // Si hay un setter elegido, usamos su fee. Si no, caemos al master legacy.
     const settingFeePerStone = setterCfg?.fee ?? SETTING_LABOR_MASTER[diamondSize as keyof typeof SETTING_LABOR_MASTER]?.feePerStone ?? 0
@@ -255,14 +258,8 @@ export function QuoteBuilderPage() {
                     ${pricing.metalPricePerGram.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </p>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">CAD fee</p>
-                  <p className="mt-2 text-2xl font-semibold">
-                    ${pricing.cadFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Jeweler's time</p>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm sm:col-span-2">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">CAD &amp; Jeweler's time</p>
                   <p className="mt-2 text-2xl font-semibold">
                     ${pricing.ringLaborFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </p>
@@ -297,8 +294,7 @@ export function QuoteBuilderPage() {
             <div className="space-y-3 text-sm">
               {[
                 ['Material reference', pricing.materialCost],
-                ['Jeweler\'s time', pricing.ringLaborFee],
-                ['CAD design', pricing.cadFee],
+                ['CAD design & Jeweler\'s time', pricing.ringLaborFee],
                 ['Setting labor', pricing.settingFee],
                 ['Diamonds', pricing.diamondCost],
                 ['Ring width fee', pricing.widthFee],
@@ -435,24 +431,19 @@ export function QuoteBuilderPage() {
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-900">CAD design</label>
-                <select value={cadDesign} onChange={e => setCadDesign(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
-                  {config.cadTiers.map(t => (
-                    <option key={t.tierKey} value={t.tierKey}>{t.label} — ${t.fee}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-900">Jeweler's time</label>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-semibold text-slate-900">
+                  CAD design &amp; Jeweler's time
+                </label>
                 <select value={ringLabor} onChange={e => setRingLabor(e.target.value)}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
                   {config.ringLaborTiers.map(t => (
                     <option key={t.tierKey} value={t.tierKey}>{t.label} — ${t.fee}</option>
                   ))}
                 </select>
+                <p className="text-xs text-slate-400">
+                  One difficulty level covers both CAD design and the jeweler's time on this quote.
+                </p>
               </div>
 
               <div className="space-y-2">
