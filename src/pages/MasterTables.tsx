@@ -257,6 +257,42 @@ export function MasterTablesPage() {
     setCadTiers(prev => prev.filter(t => t.id !== id))
   }
 
+  // ── Setters ────────────────────────────────────────────────────────────────
+  const [setters, setSetters] = useState<SetterConfig[]>([])
+  const [setterEditId, setSetterEditId] = useState<number | null>(null)
+  const [setterDraft, setSetterDraft] = useState<SetterConfig | null>(null)
+  const [showNewSetter, setShowNewSetter] = useState(false)
+  const [newSetterDraft, setNewSetterDraft] = useState<Omit<SetterConfig, 'id' | 'sortOrder'>>({ ...BLANK_SETTER })
+
+  useEffect(() => {
+    configService.getSetters().then(setSetters).catch(console.error)
+  }, [])
+
+  const saveSetterEdit = async () => {
+    if (!setterDraft) return
+    const updated = await configService.updateSetter(setterDraft.id, {
+      label: setterDraft.label,
+      fee: setterDraft.fee,
+      sortOrder: setterDraft.sortOrder,
+    })
+    setSetters(prev => prev.map(s => s.id === updated.id ? updated : s))
+    setSetterEditId(null); setSetterDraft(null)
+  }
+
+  const saveNewSetter = async () => {
+    if (!newSetterDraft.typeKey.trim() || !newSetterDraft.label.trim()) return
+    const created = await configService.createSetter(newSetterDraft)
+    setSetters(prev => [...prev, created])
+    setShowNewSetter(false)
+    setNewSetterDraft({ ...BLANK_SETTER })
+  }
+
+  const deleteSetter = async (id: number) => {
+    if (!confirm('Delete this setter type?')) return
+    await configService.deleteSetter(id)
+    setSetters(prev => prev.filter(s => s.id !== id))
+  }
+
   // ── Ring Labor Tiers ───────────────────────────────────────────────────────
   const [ringLaborTiers, setRingLaborTiers] = useState<PricingTier[]>([])
   const [rlEditId, setRlEditId] = useState<number | null>(null)
@@ -577,7 +613,9 @@ export function MasterTablesPage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <CardTitle className="text-base font-semibold text-slate-900">Diamond Sizes</CardTitle>
-              <p className="text-sm text-slate-500">Base price per stone by carat range. Click the pencil to edit.</p>
+              <p className="text-sm text-slate-500">
+                Price per stone by mm range, split by stone type (Natural / Lab). Click the pencil to edit.
+              </p>
             </div>
             <Button size="sm" className="shrink-0 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}
               onClick={() => { setShowNewDs(true); setDsEditId(null); setDsDraft(null) }}>
@@ -587,20 +625,30 @@ export function MasterTablesPage() {
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[400px] text-sm">
+            <table className="w-full min-w-[560px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/70">
-                  <TH>Size range (ct)</TH>
+                  <TH>Stone type</TH>
+                  <TH>Size key</TH>
+                  <TH>Label</TH>
                   <TH>Base price / stone</TH>
                   <TH></TH>
                 </tr>
               </thead>
               <tbody>
-                {diamondSizes.map(d => {
+                {[...diamondSizes]
+                  .sort((a, b) => (a.stoneType.localeCompare(b.stoneType)) || a.sizeKey.localeCompare(b.sizeKey, undefined, { numeric: true }))
+                  .map(d => {
                   if (dsEditId === d.id && dsDraft) {
                     return (
                       <tr key={d.id} className="border-b border-violet-100 bg-violet-50/30">
-                        <td className="px-6 py-4 font-semibold text-slate-900">{d.label}</td>
+                        <td className="px-6 py-4">
+                          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STONE_TYPE_STYLES[d.stoneType]}`}>{d.stoneType}</span>
+                        </td>
+                        <td className="px-6 py-4 text-slate-500 text-xs">{d.sizeKey}</td>
+                        <td className="px-3 py-2">
+                          <TInput value={dsDraft.label} onChange={e => setDsDraft(p => p && { ...p, label: e.target.value })} />
+                        </td>
                         <td className="px-3 py-2 w-40">
                           <TInput type="number" step="0.01" value={dsDraft.basePrice}
                             onChange={e => setDsDraft(p => p && { ...p, basePrice: +e.target.value })} />
@@ -616,6 +664,10 @@ export function MasterTablesPage() {
                   }
                   return (
                     <tr key={d.id} className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/80">
+                      <td className="px-6 py-4">
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STONE_TYPE_STYLES[d.stoneType]}`}>{d.stoneType}</span>
+                      </td>
+                      <td className="px-6 py-4 text-slate-500 text-xs">{d.sizeKey}</td>
                       <td className="px-6 py-4 font-semibold text-slate-900">{d.label}</td>
                       <td className="px-6 py-4 font-semibold text-slate-900">{pf(d.basePrice)}</td>
                       <td className="px-6 py-4">
@@ -632,13 +684,20 @@ export function MasterTablesPage() {
 
                 {showNewDs && (
                   <tr className="border-b border-emerald-100 bg-emerald-50/30">
+                    <td className="px-3 py-2 w-32">
+                      <TSelect value={newDsDraft.stoneType}
+                        onChange={e => setNewDsDraft(d => ({ ...d, stoneType: e.target.value as StoneType }))}>
+                        <option value="NATURAL">NATURAL</option>
+                        <option value="LAB">LAB</option>
+                      </TSelect>
+                    </td>
+                    <td className="px-3 py-2 w-32">
+                      <TInput placeholder="0.7-0.74" value={newDsDraft.sizeKey}
+                        onChange={e => setNewDsDraft(d => ({ ...d, sizeKey: e.target.value }))} />
+                    </td>
                     <td className="px-3 py-2">
-                      <div className="flex flex-col gap-1">
-                        <TInput placeholder="Key (e.g. 0.05-0.10)" value={newDsDraft.sizeKey}
-                          onChange={e => setNewDsDraft(d => ({ ...d, sizeKey: e.target.value }))} />
-                        <TInput placeholder="Label" value={newDsDraft.label}
-                          onChange={e => setNewDsDraft(d => ({ ...d, label: e.target.value }))} />
-                      </div>
+                      <TInput placeholder="0.70 - 0.74 mm" value={newDsDraft.label}
+                        onChange={e => setNewDsDraft(d => ({ ...d, label: e.target.value }))} />
                     </td>
                     <td className="px-3 py-2 w-40">
                       <TInput type="number" step="0.01" placeholder="0.00" value={newDsDraft.basePrice}
