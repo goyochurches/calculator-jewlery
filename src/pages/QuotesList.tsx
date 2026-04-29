@@ -133,10 +133,14 @@ function QuoteDetail({
   onStatusChange: (id: string, status: 'APPROVED' | 'REJECTED' | 'PENDING') => void
   isAdmin: boolean
 }) {
-  const metalCfg    = JEWELRY_METAL_OPTIONS[quote.metal]       ?? { label: quote.metal }
-  const settingCfg  = SETTING_LABOR_MASTER[quote.diamondSize]  ?? { feePerStone: 0, minutesPerStone: 0 }
-  const diamondBase = DIAMOND_SIZE_OPTIONS[quote.diamondSize]  ?? { basePrice: 0, label: quote.diamondSize }
-  const diamondMul  = DIAMOND_TYPE_OPTIONS[quote.diamondType]  ?? { multiplier: 1, label: quote.diamondType }
+  const metalCfg    = JEWELRY_METAL_OPTIONS[quote.metal]                                                        ?? { label: quote.metal }
+  const settingCfg  = SETTING_LABOR_MASTER[quote.diamondSize as keyof typeof SETTING_LABOR_MASTER]               ?? { feePerStone: 0, minutesPerStone: 0 }
+  const diamondBase = DIAMOND_SIZE_OPTIONS[quote.diamondSize as keyof typeof DIAMOND_SIZE_OPTIONS]               ?? { basePrice: 0, label: quote.diamondSize }
+  const diamondMul  = DIAMOND_TYPE_OPTIONS[quote.diamondType as keyof typeof DIAMOND_TYPE_OPTIONS]               ?? { multiplier: 1, label: quote.diamondType }
+  const ringLaborCfg = RING_LABOR_OPTIONS[quote.ringLabor as keyof typeof RING_LABOR_OPTIONS]
+  const cadCfg       = CAD_DESIGN_OPTIONS[quote.cadDesign as keyof typeof CAD_DESIGN_OPTIONS]
+  const fingerFee    = FINGER_SIZE_FEES[quote.fingerSize as keyof typeof FINGER_SIZE_FEES] ?? 0
+  const benchCost    = (quote.laborHours ?? 0) * (quote.hourlyRate ?? 0)
   const diamondUnitPrice = diamondBase.basePrice * diamondMul.multiplier
   const diamondCost = (quote.diamondAmount ?? 0) * diamondUnitPrice
   const settingFee  = (quote.diamondAmount ?? 0) * settingCfg.feePerStone
@@ -165,7 +169,7 @@ function QuoteDetail({
             ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </p>
           <p className="mt-1.5 text-sm text-white/70">
-            {metalCfg.label} · {RING_LABOR_OPTIONS[quote.ringLabor]?.label ?? quote.ringLabor} · {CAD_DESIGN_OPTIONS[quote.cadDesign]?.label ?? quote.cadDesign}
+            {metalCfg.label} · {ringLaborCfg?.label ?? quote.ringLabor} · {cadCfg?.label ?? quote.cadDesign}
           </p>
         </div>
 
@@ -239,15 +243,17 @@ function QuoteDetail({
           <div className="space-y-2">
             <LineItem label="Metal" value={metalCfg.label} />
             <LineItem label="Weight" value={`${quote.weightGrams ?? 0} g`} />
-            <LineItem label="Ring labor" value={RING_LABOR_OPTIONS[quote.ringLabor] ? `${RING_LABOR_OPTIONS[quote.ringLabor].label} — $${RING_LABOR_OPTIONS[quote.ringLabor].fee}` : (quote.ringLabor ?? '—')} />
-            <LineItem label="CAD design" value={CAD_DESIGN_OPTIONS[quote.cadDesign] ? `${CAD_DESIGN_OPTIONS[quote.cadDesign].label} — $${CAD_DESIGN_OPTIONS[quote.cadDesign].fee}` : (quote.cadDesign ?? '—')} />
+            <LineItem label="Jeweler's time" value={ringLaborCfg ? `${ringLaborCfg.label} — $${ringLaborCfg.fee}` : (quote.ringLabor ?? '—')} />
+            <LineItem label="CAD design" value={cadCfg ? `${cadCfg.label} — $${cadCfg.fee}` : (quote.cadDesign ?? '—')} />
             <LineItem label="Diamonds" value={`${quote.diamondAmount ?? 0} × ${diamondMul.label} ${diamondBase.label} ct`} />
             <LineItem label="Diamond cost" value={`$${diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
             <LineItem label="Setting labor" value={`$${settingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${settingCfg.minutesPerStone} min/stone)`} />
-            <LineItem label="Finger size" value={`Size ${quote.fingerSize ?? '—'} — $${FINGER_SIZE_FEES[quote.fingerSize as keyof typeof FINGER_SIZE_FEES] ?? 0}`} />
+            <LineItem label="Finger size" value={`Size ${quote.fingerSize ?? '—'}${fingerFee ? ` — $${fingerFee}` : ''}`} />
             <LineItem label="Ring width" value={`${quote.ringWidth ?? 0} mm — width fee $${widthFee}`} />
-            <LineItem label="Bench labor" value={`${quote.laborHours ?? 0} h × $${quote.hourlyRate ?? 0}/h = $${((quote.laborHours ?? 0) * (quote.hourlyRate ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
-            <LineItem label="Engraving" value={quote.engraving ? '$150.00' : '$0.00'} />
+            {benchCost > 0 && (
+              <LineItem label="Bench labor (legacy)" value={`${quote.laborHours ?? 0} h × $${quote.hourlyRate ?? 0}/h = $${benchCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+            )}
+            <LineItem label="Hand engraving (milgrain)" value={quote.engraving ? '$150.00' : '$0.00'} />
             {quote.extraCosts > 0 && (
               <LineItem label="Extra costs" value={`$${quote.extraCosts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
             )}
