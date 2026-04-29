@@ -3,12 +3,14 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { clientService } from '@/services/clientService'
 import type { Client } from '@/types'
-import { ChevronRight, Check, Loader2, Mail, Pencil, Phone, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
+import {
+  Check, ChevronRight, Loader2, Mail, Pencil, Phone,
+  Plus, Search, Trash2, UserPlus, X,
+} from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 type Draft = Omit<Client, 'id' | 'createdAt'>
-
 const BLANK: Draft = { name: '', surname: '', phone: '', email: '' }
 
 export function ClientsPage() {
@@ -24,23 +26,21 @@ export function ClientsPage() {
   const [saving, setSaving] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
-  // Per-card edit
+  // Per-row edit
   const [editId, setEditId] = useState<number | null>(null)
   const [editDraft, setEditDraft] = useState<Client | null>(null)
 
   const reqIdRef = useRef(0)
 
-  const refresh = () => {
+  useEffect(() => {
     setLoading(true)
     clientService.list()
       .then(setClients)
       .catch(console.error)
       .finally(() => setLoading(false))
-  }
+  }, [])
 
-  useEffect(() => { refresh() }, [])
-
-  // Debounced search
+  // Debounced server-side search (name, surname, email, phone)
   useEffect(() => {
     const handle = window.setTimeout(() => {
       const id = ++reqIdRef.current
@@ -49,14 +49,9 @@ export function ClientsPage() {
         ? clientService.search(query.trim())
         : clientService.list()
       promise
-        .then(rows => {
-          // ignore stale responses
-          if (id === reqIdRef.current) setClients(rows)
-        })
+        .then(rows => { if (id === reqIdRef.current) setClients(rows) })
         .catch(console.error)
-        .finally(() => {
-          if (id === reqIdRef.current) setSearching(false)
-        })
+        .finally(() => { if (id === reqIdRef.current) setSearching(false) })
     }, 200)
     return () => window.clearTimeout(handle)
   }, [query])
@@ -109,7 +104,7 @@ export function ClientsPage() {
 
   return (
     <div className="space-y-6">
-      {/* ── Header ───────────────────────────────────────────────────────── */}
+      {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Clients</h1>
@@ -117,7 +112,6 @@ export function ClientsPage() {
             Browse, search, and manage the customers used by the Quote Builder.
           </p>
         </div>
-
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -127,8 +121,8 @@ export function ClientsPage() {
             <input
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Search by name, surname or email…"
-              className="w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-9 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-400 sm:w-80"
+              placeholder="Search by name, surname, email or phone…"
+              className="w-full rounded-2xl border border-slate-200 bg-white pl-10 pr-9 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-400 sm:w-96"
             />
           </div>
           <Button
@@ -142,7 +136,7 @@ export function ClientsPage() {
         </div>
       </div>
 
-      {/* ── Stats ───────────────────────────────────────────────────────── */}
+      {/* ── Stats ──────────────────────────────────────────────────────── */}
       <section className="grid gap-3 sm:grid-cols-3">
         <StatCard label="Total clients" value={stats.total} />
         <StatCard label="With email" value={stats.withEmail} hint={pct(stats.withEmail, stats.total)} />
@@ -183,91 +177,163 @@ export function ClientsPage() {
         </Card>
       )}
 
-      {/* ── List / grid ─────────────────────────────────────────────────── */}
-      {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-40 rounded-[24px] bg-slate-100" />
-          ))}
-        </div>
-      ) : clients.length === 0 ? (
-        <EmptyState query={query} onAdd={() => setShowCreate(true)} />
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {clients.map(c => {
-            const isEditing = editId === c.id && editDraft
-            if (isEditing) {
-              return (
-                <Card key={c.id} className="rounded-[24px] border border-violet-200 bg-violet-50/40">
-                  <CardContent className="space-y-3 p-5">
-                    <Field label="Name *" value={editDraft.name ?? ''} onChange={v => setEditDraft(p => p && { ...p, name: v })} />
-                    <Field label="Surname" value={editDraft.surname ?? ''} onChange={v => setEditDraft(p => p && { ...p, surname: v })} />
-                    <Field label="Phone" value={editDraft.phone ?? ''} onChange={v => setEditDraft(p => p && { ...p, phone: v })} />
-                    <Field label="Email" value={editDraft.email ?? ''} onChange={v => setEditDraft(p => p && { ...p, email: v })} type="email" />
-                    <div className="flex gap-2 pt-1">
-                      <Button size="sm" className="rounded-xl text-white" style={{ backgroundColor: 'var(--theme-primary)' }} onClick={saveEdit}>
-                        <Check className="mr-1.5 h-3.5 w-3.5" /> Save
-                      </Button>
-                      <Button size="sm" variant="ghost" className="rounded-xl text-slate-500" onClick={() => { setEditId(null); setEditDraft(null) }}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            }
-            return (
-              <Card
-                key={c.id}
-                className="group cursor-pointer rounded-[24px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_70px_rgba(15,23,42,0.12)]"
-                onClick={() => navigate(`/clients/${c.id}`)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/clients/${c.id}`) }}
-              >
-                <CardContent className="p-5">
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-base font-semibold uppercase text-violet-700">
-                      {(c.name?.[0] ?? '?')}{(c.surname?.[0] ?? '')}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-base font-semibold text-slate-900">
-                        {c.name}{c.surname ? ` ${c.surname}` : ''}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {c.createdAt ? `Added ${new Date(c.createdAt).toLocaleDateString()}` : 'Client #' + c.id}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setEditId(c.id); setEditDraft({ ...c }) }}
-                          className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:bg-violet-50 hover:text-violet-600"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); remove(c.id) }}
-                          className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500" />
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-1.5 text-sm">
-                    <ContactLine icon={Mail} value={c.email} href={c.email ? `mailto:${c.email}` : undefined} />
-                    <ContactLine icon={Phone} value={c.phone} href={c.phone ? `tel:${c.phone}` : undefined} />
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
-      )}
+      {/* ── Table ──────────────────────────────────────────────────────── */}
+      <Card className="rounded-[24px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="space-y-2 p-5">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full rounded-xl bg-slate-100" />
+              ))}
+            </div>
+          ) : clients.length === 0 ? (
+            <EmptyState query={query} onAdd={() => setShowCreate(true)} />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/70">
+                    <Th>Client</Th>
+                    <Th>Phone</Th>
+                    <Th>Email</Th>
+                    <Th>Added</Th>
+                    <Th className="text-right pr-6">Actions</Th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {clients.map(c => {
+                    const isEditing = editId === c.id && editDraft
+                    if (isEditing) {
+                      return (
+                        <tr key={c.id} className="border-b border-violet-100 bg-violet-50/30">
+                          <td className="px-3 py-2">
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <input
+                                value={editDraft.name ?? ''}
+                                onChange={e => setEditDraft(p => p && { ...p, name: e.target.value })}
+                                placeholder="Name"
+                                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                              />
+                              <input
+                                value={editDraft.surname ?? ''}
+                                onChange={e => setEditDraft(p => p && { ...p, surname: e.target.value })}
+                                placeholder="Surname"
+                                className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                              />
+                            </div>
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              value={editDraft.phone ?? ''}
+                              onChange={e => setEditDraft(p => p && { ...p, phone: e.target.value })}
+                              placeholder="+34…"
+                              className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="email"
+                              value={editDraft.email ?? ''}
+                              onChange={e => setEditDraft(p => p && { ...p, email: e.target.value })}
+                              placeholder="email@…"
+                              className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-slate-400"
+                            />
+                          </td>
+                          <td className="px-6 py-2 text-slate-400 text-xs">
+                            {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '—'}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <div className="flex justify-end gap-1">
+                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50" onClick={saveEdit}><Check className="h-4 w-4" /></Button>
+                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:bg-slate-100" onClick={() => { setEditId(null); setEditDraft(null) }}><X className="h-4 w-4" /></Button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    }
+                    return (
+                      <tr
+                        key={c.id}
+                        onClick={() => navigate(`/clients/${c.id}`)}
+                        className="group cursor-pointer border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/80"
+                      >
+                        <td className="px-6 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-xs font-semibold uppercase text-violet-700">
+                              {(c.name?.[0] ?? '?')}{(c.surname?.[0] ?? '')}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-slate-900">
+                                {c.name}{c.surname ? ` ${c.surname}` : ''}
+                              </p>
+                              <p className="text-xs text-slate-400">Client #{c.id}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3.5 text-slate-700">
+                          {c.phone ? (
+                            <a
+                              href={`tel:${c.phone}`}
+                              onClick={e => e.stopPropagation()}
+                              className="inline-flex items-center gap-1.5 hover:text-violet-700"
+                            >
+                              <Phone className="h-3.5 w-3.5 text-slate-400" />
+                              {c.phone}
+                            </a>
+                          ) : <span className="text-slate-300">—</span>}
+                        </td>
+                        <td className="px-6 py-3.5 text-slate-700">
+                          {c.email ? (
+                            <a
+                              href={`mailto:${c.email}`}
+                              onClick={e => e.stopPropagation()}
+                              className="inline-flex items-center gap-1.5 hover:text-violet-700"
+                            >
+                              <Mail className="h-3.5 w-3.5 text-slate-400" />
+                              {c.email}
+                            </a>
+                          ) : <span className="text-slate-300">—</span>}
+                        </td>
+                        <td className="px-6 py-3.5 text-slate-500 text-xs">
+                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '—'}
+                        </td>
+                        <td className="px-3 py-3.5 text-right">
+                          <div className="flex justify-end gap-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setEditId(c.id); setEditDraft({ ...c }) }}
+                              className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:bg-violet-50 hover:text-violet-600"
+                              title="Edit"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); remove(c.id) }}
+                              className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                            <ChevronRight className="ml-1 h-4 w-4 self-center text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500" />
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
+  )
+}
+
+function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
+  return (
+    <th className={`px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 ${className ?? ''}`}>
+      {children}
+    </th>
   )
 }
 
@@ -283,48 +349,27 @@ function StatCard({ label, value, hint }: { label: string; value: number; hint?:
   )
 }
 
-function ContactLine({ icon: Icon, value, href }: { icon: React.ElementType; value: string | null | undefined; href?: string }) {
-  const Inner = (
-    <div className="flex items-center gap-2 text-sm">
-      <Icon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-      <span className={`truncate ${value ? 'text-slate-700' : 'text-slate-300'}`}>
-        {value || '—'}
-      </span>
-    </div>
-  )
-  if (href && value) {
-    return (
-      <a href={href} className="block hover:text-slate-900" onClick={(e) => e.stopPropagation()}>
-        {Inner}
-      </a>
-    )
-  }
-  return <div onClick={(e) => e.stopPropagation()}>{Inner}</div>
-}
-
 function EmptyState({ query, onAdd }: { query: string; onAdd: () => void }) {
   return (
-    <Card className="rounded-[30px] border border-dashed border-slate-300 bg-slate-50/50">
-      <CardContent className="flex flex-col items-center gap-3 px-6 py-16 text-center">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
-          <UserPlus className="h-5 w-5" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-slate-700">
-            {query ? `No clients match “${query}”` : 'No clients yet'}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            {query ? 'Try a different name, surname or email.' : 'Add your first client to start linking quotes.'}
-          </p>
-        </div>
-        {!query && (
-          <Button onClick={onAdd} className="rounded-2xl text-white" style={{ backgroundColor: 'var(--theme-primary)' }}>
-            <UserPlus className="mr-1.5 h-4 w-4" />
-            Add client
-          </Button>
-        )}
-      </CardContent>
-    </Card>
+    <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
+        <UserPlus className="h-5 w-5" />
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-slate-700">
+          {query ? `No clients match “${query}”` : 'No clients yet'}
+        </p>
+        <p className="mt-1 text-xs text-slate-500">
+          {query ? 'Try a different name, surname, email or phone.' : 'Add your first client to start linking quotes.'}
+        </p>
+      </div>
+      {!query && (
+        <Button onClick={onAdd} className="rounded-2xl text-white" style={{ backgroundColor: 'var(--theme-primary)' }}>
+          <UserPlus className="mr-1.5 h-4 w-4" />
+          Add client
+        </Button>
+      )}
+    </div>
   )
 }
 
