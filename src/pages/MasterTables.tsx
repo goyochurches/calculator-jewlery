@@ -785,6 +785,11 @@ export function MasterTablesPage() {
                         <td className="px-3 py-2">
                           <TInput value={dsDraft.label} onChange={e => setDsDraft(p => p && { ...p, label: e.target.value })} />
                         </td>
+                        <td className="px-3 py-2 w-32">
+                          <TInput type="number" step="0.0001" placeholder="0.000"
+                            value={dsDraft.ctPerStone ?? ''}
+                            onChange={e => setDsDraft(p => p && { ...p, ctPerStone: e.target.value === '' ? null : +e.target.value })} />
+                        </td>
                         <td className="px-3 py-2 w-40">
                           <TInput type="number" step="0.01" value={dsDraft.basePrice}
                             onChange={e => setDsDraft(p => p && { ...p, basePrice: +e.target.value })} />
@@ -805,6 +810,9 @@ export function MasterTablesPage() {
                       </td>
                       <td className="px-6 py-4 text-slate-500 text-xs">{d.sizeKey}</td>
                       <td className="px-6 py-4 font-semibold text-slate-900">{d.label}</td>
+                      <td className="px-6 py-4 text-slate-700">
+                        {d.ctPerStone != null ? `${d.ctPerStone} ct` : <span className="text-slate-300">—</span>}
+                      </td>
                       <td className="px-6 py-4 font-semibold text-slate-900">{pf(d.basePrice)}</td>
                       <td className="px-6 py-4">
                         <div className="flex gap-1">
@@ -828,12 +836,17 @@ export function MasterTablesPage() {
                       </TSelect>
                     </td>
                     <td className="px-3 py-2 w-32">
-                      <TInput placeholder="0.7-0.74" value={newDsDraft.sizeKey}
+                      <TInput placeholder="1.5" value={newDsDraft.sizeKey}
                         onChange={e => setNewDsDraft(d => ({ ...d, sizeKey: e.target.value }))} />
                     </td>
                     <td className="px-3 py-2">
-                      <TInput placeholder="0.70 - 0.74 mm" value={newDsDraft.label}
+                      <TInput placeholder="Ø 1.50 mm" value={newDsDraft.label}
                         onChange={e => setNewDsDraft(d => ({ ...d, label: e.target.value }))} />
+                    </td>
+                    <td className="px-3 py-2 w-32">
+                      <TInput type="number" step="0.0001" placeholder="0.014"
+                        value={newDsDraft.ctPerStone ?? ''}
+                        onChange={e => setNewDsDraft(d => ({ ...d, ctPerStone: e.target.value === '' ? null : +e.target.value }))} />
                     </td>
                     <td className="px-3 py-2 w-40">
                       <TInput type="number" step="0.01" placeholder="0.00" value={newDsDraft.basePrice}
