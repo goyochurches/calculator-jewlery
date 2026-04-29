@@ -196,7 +196,7 @@ export function ClientDetailPage() {
                       <Th>Date</Th>
                       <Th>Status</Th>
                       <Th className="text-right">Total</Th>
-                      <Th></Th>
+                      <Th>Share link</Th>
                     </tr>
                   </thead>
                   <tbody>
@@ -219,7 +219,7 @@ export function ClientDetailPage() {
                             ${(q.total ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           </td>
                           <td className="px-3 py-4">
-                            <CopyShareLinkButton token={q.publicToken} />
+                            <CopyShareLinkButton token={q.publicToken} iconOnly={false} />
                           </td>
                         </tr>
                       )
