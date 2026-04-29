@@ -31,10 +31,15 @@ export class PublicQuoteNotFoundError extends Error {
   constructor() { super('Quote not found') }
 }
 
+export class PublicQuoteExpiredError extends Error {
+  constructor() { super('Share link has expired') }
+}
+
 export const publicQuoteService = {
   async getByToken(token: string): Promise<PublicQuote> {
     const res = await fetch(`${BASE_URL}/api/public/quotes/${encodeURIComponent(token)}`)
     if (res.status === 404) throw new PublicQuoteNotFoundError()
+    if (res.status === 410) throw new PublicQuoteExpiredError()
     if (!res.ok) throw new Error(`Failed to load quote (HTTP ${res.status})`)
     return res.json() as Promise<PublicQuote>
   },

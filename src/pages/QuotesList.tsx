@@ -13,6 +13,7 @@ import { useAuth } from '@/context/AuthContext'
 import { quotesService } from '@/services/quotesService'
 import type { QuoteStatus, SavedQuote } from '@/types'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
+import { QuoteDetailPanel } from '@/components/QuoteDetailPanel'
 import { Bell, Check, ChevronLeft, ChevronRight, ImageOff, Search, X, XCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
@@ -542,7 +543,7 @@ export function QuotesListPage() {
         {/* Detail panel */}
         {selected && (
           <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)] overflow-hidden">
-            <QuoteDetail
+            <QuoteDetailPanel
               quote={selected}
               onClose={() => setSelectedId(null)}
               onStatusChange={handleStatusChange}

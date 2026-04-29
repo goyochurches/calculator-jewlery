@@ -72,6 +72,15 @@ export function ClientDetailPage() {
     }
   }
 
+  const handleRefreshToken = async (id: string) => {
+    try {
+      const updated = await quotesService.refreshPublicToken(id)
+      setQuotes(prev => prev.map(q => q.id === id ? updated : q))
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -228,6 +237,7 @@ export function ClientDetailPage() {
               quote={selectedQuote}
               isAdmin={isAdmin}
               onStatusChange={handleStatusChange}
+              onRefreshToken={isAdmin ? handleRefreshToken : undefined}
               onClose={() => setSelectedId(null)}
             />
           </Card>

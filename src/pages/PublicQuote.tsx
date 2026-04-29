@@ -9,10 +9,11 @@ import {
 } from '@/constants/config'
 import {
   publicQuoteService,
+  PublicQuoteExpiredError,
   PublicQuoteNotFoundError,
   type PublicQuote,
 } from '@/services/publicQuoteService'
-import { AlertCircle, Diamond, Gem, Ruler, Sparkles, Wrench } from 'lucide-react'
+import { AlertCircle, Clock, Diamond, Gem, Ruler, Sparkles, Wrench } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
@@ -21,6 +22,7 @@ export function PublicQuotePage() {
   const [quote, setQuote] = useState<PublicQuote | null>(null)
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
+  const [expired, setExpired] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -30,17 +32,36 @@ export function PublicQuotePage() {
       .then(setQuote)
       .catch(err => {
         if (err instanceof PublicQuoteNotFoundError) setNotFound(true)
+        else if (err instanceof PublicQuoteExpiredError) setExpired(true)
         else setError(err instanceof Error ? err.message : 'Failed to load quote')
       })
       .finally(() => setLoading(false))
   }, [token])
 
   if (loading) return <PublicShell><LoadingState /></PublicShell>
+  if (expired)  return <PublicShell><ExpiredState /></PublicShell>
   if (notFound) return <PublicShell><NotFoundState /></PublicShell>
   if (error)    return <PublicShell><ErrorState message={error} /></PublicShell>
   if (!quote)   return <PublicShell><NotFoundState /></PublicShell>
 
   return <PublicShell companyName={quote.companyName}><QuoteView quote={quote} /></PublicShell>
+}
+
+function ExpiredState() {
+  return (
+    <Card className="rounded-[28px] border border-amber-200 bg-amber-50/40 shadow-[0_30px_80px_rgba(15,23,42,0.10)]">
+      <CardContent className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+          <Clock className="h-6 w-6" />
+        </div>
+        <h1 className="text-xl font-semibold text-slate-900">This share link has expired</h1>
+        <p className="max-w-md text-sm text-slate-600">
+          Quote share links are valid for 3 months. Please contact the person who sent it
+          and ask them to refresh the link.
+        </p>
+      </CardContent>
+    </Card>
+  )
 }
 
 function PublicShell({ children, companyName }: { children: React.ReactNode; companyName?: string | null }) {

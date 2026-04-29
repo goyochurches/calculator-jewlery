@@ -14,6 +14,7 @@ import MasterTables from '@/pages/MasterTables'
 import QuotesList from '@/pages/QuotesList'
 import { ClientsPage } from '@/pages/Clients'
 import { ClientDetailPage } from '@/pages/ClientDetail'
+import { PublicQuotePage } from '@/pages/PublicQuote'
 import Login from '@/pages/Login'
 import SetupPassword from '@/pages/SetupPassword'
 
@@ -49,6 +50,8 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/setup-password/:token" element={<SetupPassword />} />
+            {/* Public, unauthenticated quote viewer for shareable links */}
+            <Route path="/q/:token" element={<PublicQuotePage />} />
             <Route element={<PrivateRoutes />}>
               <Route element={<MainLayout />}>
                 <Route path="/" element={<Dashboard />} />
