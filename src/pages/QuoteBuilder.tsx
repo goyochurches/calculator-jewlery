@@ -12,6 +12,7 @@ import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { quotesService } from '@/services/quotesService'
 import type { Client, JewelryMetalOption } from '@/types'
 import { ClientPicker } from '@/components/ClientPicker'
+import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { Toast } from '@/components/Toast'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
 import { Calculator, Camera, Diamond, Gem, ImagePlus, Layers3, Ruler, X } from 'lucide-react'
@@ -204,6 +205,33 @@ export function QuoteBuilderPage() {
 
   return (
     <div className="space-y-6">
+      {/* ── Persistent share-link card after creating a quote ─────────────── */}
+      {savedQuote?.publicToken && (
+        <Card className="rounded-[24px] border border-emerald-200 bg-emerald-50/60 shadow-[0_20px_60px_rgba(16,185,129,0.16)]">
+          <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">Share link ready</p>
+              <p className="mt-1 truncate font-mono text-sm text-slate-900">
+                {publicQuoteUrl(savedQuote.publicToken)}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Send this URL to <strong>{savedQuote.title}</strong>'s client — no login required. Valid for 3 months.
+              </p>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <CopyShareLinkButton token={savedQuote.publicToken} iconOnly={false} />
+              <button
+                type="button"
+                onClick={() => setSavedQuote(null)}
+                className="rounded-full px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-white hover:text-slate-700"
+              >
+                Dismiss
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <section className="grid gap-4 xl:grid-cols-[1.45fr_1fr]">
         <Card className="rounded-[30px] border-0 text-white shadow-[0_30px_80px_rgba(15,23,42,0.24)]" style={{ backgroundColor: 'var(--theme-primary)' }}>
           <CardContent className="relative p-5 sm:p-8">

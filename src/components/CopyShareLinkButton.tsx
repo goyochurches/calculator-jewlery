@@ -51,12 +51,12 @@ export function CopyShareLinkButton({ token, className, iconOnly = true }: CopyS
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold transition hover:border-slate-300 hover:bg-slate-50 ${
+      className={`inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold transition hover:border-slate-300 hover:bg-slate-50 ${
         copied ? 'text-emerald-700' : 'text-slate-700'
       } ${className ?? ''}`}
     >
-      {copied ? <Check className="h-3.5 w-3.5" /> : <LinkIcon className="h-3.5 w-3.5" />}
-      {copied ? 'Link copied' : 'Copy share link'}
+      {copied ? <Check className="h-3 w-3" /> : <LinkIcon className="h-3 w-3" />}
+      {copied ? 'Copied' : 'Copy link'}
     </button>
   )
 }
