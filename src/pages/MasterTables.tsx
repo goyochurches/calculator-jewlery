@@ -8,6 +8,8 @@ import {
   type DiamondSizeConfig,
   type FingerSizeConfig,
   type PricingTier,
+  type SetterConfig,
+  type StoneType,
 } from '@/services/configService'
 import type { GemstonePrice, HistorialEntry } from '../types'
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-react'
@@ -62,7 +64,13 @@ const BLANK_METAL: Omit<MetalWithId, 'id'> = {
   symbol: '', name: '', price: 0, change: 0, changePercent: 0, high: 0, low: 0, open: 0,
 }
 
-const BLANK_DS: Omit<DiamondSizeConfig, 'id'> = { sizeKey: '', label: '', basePrice: 0 }
+const BLANK_DS: Omit<DiamondSizeConfig, 'id'> = { stoneType: 'NATURAL', sizeKey: '', label: '', basePrice: 0 }
+const BLANK_SETTER: Omit<SetterConfig, 'id' | 'sortOrder'> = { typeKey: '', label: '', fee: 0 }
+
+const STONE_TYPE_STYLES: Record<StoneType, string> = {
+  NATURAL: 'bg-amber-50 text-amber-700',
+  LAB:     'bg-sky-50 text-sky-700',
+}
 const BLANK_FS: Omit<FingerSizeConfig, 'id'> = { size: 0, additionalFee: 0 }
 const BLANK_CAD: Omit<PricingTier, 'id'> = {
   tierType: 'CAD_DESIGN', tierKey: '', label: '', fee: 0, sortOrder: 0,
@@ -163,7 +171,10 @@ export function MasterTablesPage() {
 
   const saveDsEdit = async () => {
     if (!dsDraft) return
-    const updated = await configService.updateDiamondSize(dsDraft.id, dsDraft.basePrice)
+    const updated = await configService.updateDiamondSize(dsDraft.id, {
+      basePrice: dsDraft.basePrice,
+      label: dsDraft.label,
+    })
     setDiamondSizes(prev => prev.map(d => d.id === updated.id ? updated : d))
     setDsEditId(null); setDsDraft(null)
   }
