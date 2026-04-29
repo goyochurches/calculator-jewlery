@@ -42,7 +42,18 @@ export interface AppConfig {
 
 export type QuoteComplexity = 'low' | 'medium' | 'high'
 
-export type JewelryMetalOption = 'gold-14k' | 'gold-18k' | 'platinum' | 'silver'
+export type JewelryMetalOption =
+  | 'gold-14k-white'
+  | 'gold-14k-yellow'
+  | 'gold-14k-rose'
+  | 'gold-18k-white'
+  | 'gold-18k-yellow'
+  | 'gold-18k-rose'
+  | 'platinum'
+  // legacy values kept so historical quotes still load
+  | 'gold-14k'
+  | 'gold-18k'
+  | 'silver'
 
 export type QuoteStatus = 'draft' | 'pending' | 'approved' | 'rejected'
 
@@ -54,11 +65,11 @@ export interface SavedQuote {
   createdAt: string
   status: QuoteStatus
   metal: JewelryMetalOption
-  ringLabor: 'small' | 'medium' | 'big' | 'premium'
-  cadDesign: 'small' | 'medium' | 'big' | 'premium'
+  ringLabor: string
+  cadDesign: string
   diamondAmount: number
   diamondType: 'natural' | 'lab-grown' | 'grunberger'
-  diamondSize: '0.01-0.05' | '0.05-0.10' | '0.10-0.15' | '0.15-0.20' | '0.25-0.50' | '0.50-1.00'
+  diamondSize: string
   weightGrams: number
   ringWidth: number
   fingerSize: number

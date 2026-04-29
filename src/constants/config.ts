@@ -58,35 +58,21 @@ export const JEWELRY_METAL_OPTIONS: Record<
   JewelryMetalOption,
   {
     label: string
-    spotSymbol: 'XAU' | 'XAG' | 'XPT'
-    multiplier: number
-    makingFeePerGram: number
+    group: '14K Gold' | '18K Gold' | 'Platinum' | 'Silver'
+    pricePerGram: number
   }
 > = {
-  'gold-14k': {
-    label: '14K Gold',
-    spotSymbol: 'XAU',
-    multiplier: 0.585,
-    makingFeePerGram: 7,
-  },
-  'gold-18k': {
-    label: '18K Gold',
-    spotSymbol: 'XAU',
-    multiplier: 0.75,
-    makingFeePerGram: 10,
-  },
-  platinum: {
-    label: 'Platinum',
-    spotSymbol: 'XPT',
-    multiplier: 1,
-    makingFeePerGram: 14,
-  },
-  silver: {
-    label: 'Silver',
-    spotSymbol: 'XAG',
-    multiplier: 0.925,
-    makingFeePerGram: 2,
-  },
+  'gold-14k-white':  { label: '14K White Gold',  group: '14K Gold', pricePerGram: 105 },
+  'gold-14k-yellow': { label: '14K Yellow Gold', group: '14K Gold', pricePerGram: 105 },
+  'gold-14k-rose':   { label: '14K Rose Gold',   group: '14K Gold', pricePerGram: 105 },
+  'gold-18k-white':  { label: '18K White Gold',  group: '18K Gold', pricePerGram: 130 },
+  'gold-18k-yellow': { label: '18K Yellow Gold', group: '18K Gold', pricePerGram: 130 },
+  'gold-18k-rose':   { label: '18K Rose Gold',   group: '18K Gold', pricePerGram: 130 },
+  platinum:          { label: 'Platinum',        group: 'Platinum', pricePerGram: 75  },
+  // Legacy keys mapped to current pricing so historical quotes still render
+  'gold-14k':        { label: '14K Gold',        group: '14K Gold', pricePerGram: 105 },
+  'gold-18k':        { label: '18K Gold',        group: '18K Gold', pricePerGram: 130 },
+  silver:            { label: 'Silver',          group: 'Silver',   pricePerGram: 0   },
 }
 
 export const RING_LABOR_OPTIONS = {
@@ -103,11 +89,14 @@ export const CAD_DESIGN_OPTIONS = {
   premium: { label: 'Premium Piece', fee: 260 },
 } as const
 
+// Grunberger es el único proveedor de diamantes. El usuario sólo elige si
+// son naturales o de laboratorio (lab-grown), ambos del mismo proveedor.
 export const DIAMOND_TYPE_OPTIONS = {
-  natural: { label: 'Natural', multiplier: 1 },
-  'lab-grown': { label: 'Lab-grown', multiplier: 0.58 },
-  grunberger: { label: 'Grunberger', multiplier: 1.18 },
+  natural: { label: 'Grunberger Natural', multiplier: 1 },
+  'lab-grown': { label: 'Grunberger Lab', multiplier: 0.58 },
 } as const
+
+export const DIAMOND_SUPPLIER = 'Grunberger'
 
 export const DIAMOND_SIZE_OPTIONS = {
   '0.01-0.05': { label: '0.01 - 0.05', basePrice: 45 },

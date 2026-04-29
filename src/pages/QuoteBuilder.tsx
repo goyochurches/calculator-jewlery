@@ -2,32 +2,47 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
+  DIAMOND_SUPPLIER,
   DIAMOND_TYPE_OPTIONS,
   JEWELRY_METAL_OPTIONS,
   SETTING_LABOR_MASTER,
-  TROY_OUNCE_TO_GRAMS,
 } from '@/constants/config'
 import { useAuth } from '@/context/AuthContext'
-import { useMetals } from '@/hooks/useMetals'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { quotesService } from '@/services/quotesService'
-import type { JewelryMetalOption, MetalPrice } from '@/types'
+import type { JewelryMetalOption } from '@/types'
 import { Toast } from '@/components/Toast'
-import { Calculator, Camera, Clock3, Diamond, Gem, ImagePlus, Layers3, Ruler, X } from 'lucide-react'
+import { Calculator, Camera, Diamond, Gem, ImagePlus, Layers3, Ruler, X } from 'lucide-react'
 import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-const jewelryMetalKeys = Object.keys(JEWELRY_METAL_OPTIONS) as JewelryMetalOption[]
-const diamondTypeKeys = Object.keys(DIAMOND_TYPE_OPTIONS) as Array<keyof typeof DIAMOND_TYPE_OPTIONS>
+const HAND_ENGRAVING_FEE = 150
 
-function getSpotPricePerGram(metal: MetalPrice | undefined) {
-  if (!metal) return 0
-  return metal.price / TROY_OUNCE_TO_GRAMS
-}
+// Tallas disponibles: de 3 a 20 en incrementos de 0.25 (sin coste adicional).
+const FINGER_SIZE_OPTIONS: number[] = (() => {
+  const out: number[] = []
+  for (let s = 3; s <= 20; s += 0.25) out.push(Math.round(s * 100) / 100)
+  return out
+})()
+
+// Selectables: solo las opciones nuevas (las claves legacy se ocultan del selector
+// pero siguen siendo válidas para cargar quotes históricas).
+const SELECTABLE_METAL_KEYS: JewelryMetalOption[] = [
+  'gold-14k-white', 'gold-14k-yellow', 'gold-14k-rose',
+  'gold-18k-white', 'gold-18k-yellow', 'gold-18k-rose',
+  'platinum',
+]
+
+const METAL_GROUPS: Array<{ group: string; keys: JewelryMetalOption[] }> = [
+  { group: '14K Gold', keys: ['gold-14k-white', 'gold-14k-yellow', 'gold-14k-rose'] },
+  { group: '18K Gold', keys: ['gold-18k-white', 'gold-18k-yellow', 'gold-18k-rose'] },
+  { group: 'Platinum', keys: ['platinum'] },
+]
+
+const diamondTypeKeys = Object.keys(DIAMOND_TYPE_OPTIONS) as Array<keyof typeof DIAMOND_TYPE_OPTIONS>
 
 export function QuoteBuilderPage() {
   const { user } = useAuth()
-  const { metals, loading: metalsLoading, error } = useMetals()
   const config = useQuoteConfig()
 
   const [quoteTitle, setQuoteTitle] = useState('')
@@ -35,7 +50,7 @@ export function QuoteBuilderPage() {
   const [saving, setSaving] = useState(false)
   const [savedQuote, setSavedQuote] = useState<{ id: string; title: string; total: number } | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [selectedMetal, setSelectedMetal] = useState<JewelryMetalOption>('gold-18k')
+  const [selectedMetal, setSelectedMetal] = useState<JewelryMetalOption>('gold-18k-white')
   const [ringLabor, setRingLabor] = useState('medium')
   const [cadDesign, setCadDesign] = useState('medium')
   const [diamondAmount, setDiamondAmount] = useState(0)
@@ -44,14 +59,9 @@ export function QuoteBuilderPage() {
   const [weightGrams, setWeightGrams] = useState(12)
   const [ringWidth, setRingWidth] = useState(2.5)
   const [fingerSize, setFingerSize] = useState(7)
-  const [laborHours, setLaborHours] = useState(6)
-  const [hourlyRate, setHourlyRate] = useState(45)
   const [extraCosts, setExtraCosts] = useState(0)
   const [engraving, setEngraving] = useState(false)
 
-  const ENGRAVING_FEE = 150
-
-  // ── Photo state ──────────────────────────────────────────────────────────────
   const [photo, setPhoto] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -69,21 +79,11 @@ export function QuoteBuilderPage() {
     if (photoInputRef.current) photoInputRef.current.value = ''
     if (cameraInputRef.current) cameraInputRef.current.value = ''
   }
-  // ─────────────────────────────────────────────────────────────────────────────
 
   const selectedMetalConfig = JEWELRY_METAL_OPTIONS[selectedMetal]
-  const spotMetalData = metals.find((metal) => metal.symbol === selectedMetalConfig.spotSymbol)
 
   const pricing = useMemo(() => {
-    const fallbackPlatinumSpotPerGram = 41
-    const spotPricePerGram =
-      selectedMetalConfig.spotSymbol === 'XPT'
-        ? fallbackPlatinumSpotPerGram
-        : getSpotPricePerGram(spotMetalData)
-
-    const metalPricePerGram =
-      spotPricePerGram * selectedMetalConfig.multiplier + selectedMetalConfig.makingFeePerGram
-
+    const metalPricePerGram = selectedMetalConfig.pricePerGram
     const materialCost = metalPricePerGram * weightGrams
     const ringLaborFee = config.ringLaborMap[ringLabor]?.fee ?? 0
     const cadFee = config.cadMap[cadDesign]?.fee ?? 0
@@ -91,28 +91,23 @@ export function QuoteBuilderPage() {
     const settingMinutesPerStone = SETTING_LABOR_MASTER[diamondSize as keyof typeof SETTING_LABOR_MASTER]?.minutesPerStone ?? 0
     const settingFee = diamondAmount * settingFeePerStone
     const settingTimeHours = (diamondAmount * settingMinutesPerStone) / 60
-    const fingerSizeFee = config.fingerSizeMap[fingerSize]?.additionalFee ?? 0
     const widthFee = Math.max(0, ringWidth - 2) * 18
-    const laborCost = laborHours * hourlyRate
     const diamondUnitPrice =
       (config.diamondSizeMap[diamondSize]?.basePrice ?? 0) * DIAMOND_TYPE_OPTIONS[diamondType].multiplier
     const diamondCost = diamondAmount * diamondUnitPrice
-    const engravingFee = engraving ? ENGRAVING_FEE : 0
+    const engravingFee = engraving ? HAND_ENGRAVING_FEE : 0
 
     const total =
       materialCost +
       ringLaborFee +
       cadFee +
       settingFee +
-      fingerSizeFee +
       widthFee +
-      laborCost +
       diamondCost +
       engravingFee +
       extraCosts
 
     return {
-      spotPricePerGram,
       metalPricePerGram,
       materialCost,
       ringLaborFee,
@@ -121,30 +116,15 @@ export function QuoteBuilderPage() {
       settingFee,
       settingMinutesPerStone,
       settingTimeHours,
-      fingerSizeFee,
       widthFee,
-      laborCost,
       diamondUnitPrice,
       diamondCost,
       engravingFee,
       total,
     }
   }, [
-    cadDesign,
-    config,
-    diamondAmount,
-    diamondSize,
-    diamondType,
-    engraving,
-    extraCosts,
-    fingerSize,
-    hourlyRate,
-    laborHours,
-    ringLabor,
-    ringWidth,
-    selectedMetalConfig,
-    spotMetalData,
-    weightGrams,
+    cadDesign, config, diamondAmount, diamondSize, diamondType, engraving,
+    extraCosts, ringLabor, ringWidth, selectedMetalConfig, weightGrams,
   ])
 
   const handleQuoteReady = async () => {
@@ -158,17 +138,18 @@ export function QuoteBuilderPage() {
         clientName: clientName.trim(),
         status: 'PENDING',
         metal: selectedMetal,
-
-        ringLabor: ringLabor,
-        cadDesign: cadDesign,
+        ringLabor,
+        cadDesign,
         diamondAmount,
         diamondType,
         diamondSize,
         weightGrams,
         ringWidth,
         fingerSize,
-        laborHours,
-        hourlyRate,
+        // Campos legacy: seguimos enviándolos en 0 para mantener compatibilidad
+        // con el modelo del backend hasta que se elimine la columna.
+        laborHours: 0,
+        hourlyRate: 0,
         extraCosts,
         total: pricing.total,
         photo: photo ?? undefined,
@@ -190,8 +171,7 @@ export function QuoteBuilderPage() {
   const cadLabel = config.cadMap[cadDesign]?.label ?? cadDesign
   const ringLaborLabel = config.ringLaborMap[ringLabor]?.label ?? ringLabor
 
-  if (metalsLoading || config.loading) return <QuoteBuilderSkeleton />
-  if (error) return <p className="text-sm text-red-500">{error}</p>
+  if (config.loading) return <QuoteBuilderSkeleton />
 
   return (
     <div className="space-y-6">
@@ -205,11 +185,11 @@ export function QuoteBuilderPage() {
                 Pricing engine
               </div>
               <h2 className="mt-4 max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl lg:text-4xl">
-                Build quotes from material, CAD design, ring labor and stone setup.
+                Build quotes from CAD design, jeweler's time and stone setting.
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:mt-4">
-                This version follows your sheet much more closely: metal, labor gold, CAD design,
-                setting labor, amount of diamonds, type, size range, width and finger size.
+                Two main sections: <strong>CAD Design &amp; Jeweler's Time</strong> for the body of the
+                piece and <strong>Stone Setting</strong> for the diamonds (only {DIAMOND_SUPPLIER}).
               </p>
 
               <div className="mt-6 grid gap-3 sm:mt-8 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -226,7 +206,7 @@ export function QuoteBuilderPage() {
                   </p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Ring labor</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Jeweler's time</p>
                   <p className="mt-2 text-2xl font-semibold">
                     ${pricing.ringLaborFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </p>
@@ -261,14 +241,12 @@ export function QuoteBuilderPage() {
             <div className="space-y-3 text-sm">
               {[
                 ['Material reference', pricing.materialCost],
-                ['Ring labor', pricing.ringLaborFee],
+                ['Jeweler\'s time', pricing.ringLaborFee],
                 ['CAD design', pricing.cadFee],
                 ['Setting labor', pricing.settingFee],
                 ['Diamonds', pricing.diamondCost],
-                ['Finger size fee', pricing.fingerSizeFee],
                 ['Ring width fee', pricing.widthFee],
-                ['Bench labor', pricing.laborCost],
-                ['Engraving', pricing.engravingFee],
+                ['Hand engraving (milgrain)', pricing.engravingFee],
                 ['Extra costs', extraCosts],
               ].map(([label, value]) => (
                 <div key={label as string} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
@@ -281,331 +259,294 @@ export function QuoteBuilderPage() {
         </Card>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-        <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-          <CardHeader className="border-b border-slate-100">
-            <CardTitle className="text-base font-semibold text-slate-900">Quote inputs</CardTitle>
-            <p className="text-sm text-slate-500">
-              Structured around your sheet: metal, labor gold, CAD design, setting labor, diamonds and sizing.
-            </p>
-          </CardHeader>
-          <CardContent className="grid gap-5 pt-6 md:grid-cols-2">
-            {saveError && (
-              <div className="md:col-span-2 rounded-2xl bg-rose-50 border border-rose-200 px-5 py-4 text-sm text-rose-700">
-                {saveError}
+      {/* ── Cabecera del quote ─────────────────────────────────────────────── */}
+      <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <CardHeader className="border-b border-slate-100">
+          <CardTitle className="text-base font-semibold text-slate-900">Quote details</CardTitle>
+          <p className="text-sm text-slate-500">Title, client and reference photo.</p>
+        </CardHeader>
+        <CardContent className="grid gap-5 pt-6 md:grid-cols-2">
+          {saveError && (
+            <div className="md:col-span-2 rounded-2xl bg-rose-50 border border-rose-200 px-5 py-4 text-sm text-rose-700">
+              {saveError}
+            </div>
+          )}
+
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-sm font-semibold text-slate-900">Quote title</label>
+            <input type="text" value={quoteTitle} onChange={e => setQuoteTitle(e.target.value)}
+              placeholder="e.g. Solitaire engagement ring"
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-sm font-semibold text-slate-900">Client name</label>
+            <input type="text" value={clientName} onChange={e => setClientName(e.target.value)}
+              placeholder="e.g. María García"
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-sm font-semibold text-slate-900">Reference photo</label>
+
+            <input ref={photoInputRef} id="photo-upload" type="file" accept="image/*"
+              onChange={handlePhotoChange} className="hidden" />
+            <input ref={cameraInputRef} id="photo-camera" type="file" accept="image/*"
+              capture="environment" onChange={handlePhotoChange} className="hidden" />
+
+            {!photo ? (
+              <div className="grid gap-2">
+                <label htmlFor="photo-camera"
+                  className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white sm:hidden">
+                  <Camera className="h-5 w-5 shrink-0 text-slate-400" />
+                  <span>Take photo</span>
+                </label>
+                <label htmlFor="photo-upload"
+                  className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white">
+                  <ImagePlus className="h-5 w-5 shrink-0 text-slate-400" />
+                  <span>Choose from files</span>
+                </label>
+              </div>
+            ) : (
+              <div className="relative overflow-hidden rounded-2xl border border-slate-200">
+                <img src={photo} alt="Reference" className="w-full object-cover max-h-64" />
+                <div className="absolute inset-0 flex items-start justify-end p-2">
+                  <button onClick={handleRemovePhoto}
+                    className="flex items-center gap-1 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-black/80">
+                    <X className="h-3 w-3" />
+                    Remove
+                  </button>
+                </div>
+                <div className="absolute bottom-2 left-2 flex gap-1.5">
+                  <label htmlFor="photo-camera"
+                    className="flex cursor-pointer items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-black/80 sm:hidden">
+                    <Camera className="h-3 w-3" />
+                    Take photo
+                  </label>
+                  <label htmlFor="photo-upload"
+                    className="flex cursor-pointer items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-black/80">
+                    <ImagePlus className="h-3 w-3" />
+                    Choose file
+                  </label>
+                </div>
               </div>
             )}
+          </div>
+        </CardContent>
+      </Card>
 
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-semibold text-slate-900">Quote title</label>
-              <input type="text" value={quoteTitle} onChange={e => setQuoteTitle(e.target.value)}
-                placeholder="e.g. Solitaire engagement ring"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
+      {/* ── Sección 1: CAD Design & Jeweler's Time ─────────────────────────── */}
+      <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <CardHeader className="border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Layers3 className="h-4 w-4 text-slate-500" />
+            <CardTitle className="text-base font-semibold text-slate-900">
+              CAD Design &amp; Jeweler's Time
+            </CardTitle>
+          </div>
+          <p className="text-sm text-slate-500">
+            Metal, weight, ring dimensions, CAD complexity and jeweler's time.
+          </p>
+        </CardHeader>
+        <CardContent className="grid gap-5 pt-6 md:grid-cols-2">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">Metal</label>
+            <select value={selectedMetal} onChange={e => setSelectedMetal(e.target.value as JewelryMetalOption)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
+              {METAL_GROUPS.map(g => (
+                <optgroup key={g.group} label={g.group}>
+                  {g.keys.map(key => (
+                    <option key={key} value={key}>
+                      {JEWELRY_METAL_OPTIONS[key].label} — ${JEWELRY_METAL_OPTIONS[key].pricePerGram}/g
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">Weight (grams)</label>
+            <input type="number" min={0} step={0.1} value={weightGrams || ''} placeholder="0"
+              onChange={e => setWeightGrams(Number(e.target.value) || 0)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">CAD design</label>
+            <select value={cadDesign} onChange={e => setCadDesign(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
+              {config.cadTiers.map(t => (
+                <option key={t.tierKey} value={t.tierKey}>{t.label} — ${t.fee}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">Jeweler's time</label>
+            <select value={ringLabor} onChange={e => setRingLabor(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
+              {config.ringLaborTiers.map(t => (
+                <option key={t.tierKey} value={t.tierKey}>{t.label} — ${t.fee}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">Width of the ring (mm)</label>
+            <input type="number" min={1} step={0.5} value={ringWidth || ''} placeholder="0"
+              onChange={e => setRingWidth(Number(e.target.value) || 0)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">Finger size</label>
+            <select value={fingerSize} onChange={e => setFingerSize(Number(e.target.value))}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
+              {FINGER_SIZE_OPTIONS.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-sm font-semibold text-slate-900">Hand Engraving (milgrain) — ${HAND_ENGRAVING_FEE}</label>
+            <select value={engraving ? 'yes' : 'no'} onChange={e => setEngraving(e.target.value === 'yes')}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+
+          <div className="space-y-2 md:col-span-2">
+            <label className="text-sm font-semibold text-slate-900">Extra costs</label>
+            <input type="number" min={0} step={1} value={extraCosts || ''} placeholder="0"
+              onChange={e => setExtraCosts(Number(e.target.value) || 0)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Sección 2: STONE SETTING ───────────────────────────────────────── */}
+      <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <CardHeader className="border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Diamond className="h-4 w-4 text-slate-500" />
+            <CardTitle className="text-base font-semibold text-slate-900">Stone Setting</CardTitle>
+          </div>
+          <p className="text-sm text-slate-500">
+            Diamonds from <strong>{DIAMOND_SUPPLIER}</strong> only. Setter types and full natural/lab
+            price tables will be filled in once we have the complete data.
+          </p>
+        </CardHeader>
+        <CardContent className="grid gap-5 pt-6 md:grid-cols-2">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">Type of diamond</label>
+            <select value={diamondType} onChange={e => setDiamondType(e.target.value as keyof typeof DIAMOND_TYPE_OPTIONS)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
+              {diamondTypeKeys.map(key => (
+                <option key={key} value={key}>{DIAMOND_TYPE_OPTIONS[key].label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">Amount of diamonds</label>
+            <input type="number" min={0} step={1} value={diamondAmount || ''} placeholder="0"
+              onChange={e => setDiamondAmount(Number(e.target.value) || 0)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">Sizes of diamonds</label>
+            <select value={diamondSize} onChange={e => setDiamondSize(e.target.value)}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
+              {config.diamondSizes.map(d => (
+                <option key={d.sizeKey} value={d.sizeKey}>{d.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">Setting labor</label>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900">
+              ${pricing.settingFeePerStone.toLocaleString('en-US', { minimumFractionDigits: 2 })} per diamond
+              {' | '}
+              {pricing.settingMinutesPerStone} min each
             </div>
+          </div>
+        </CardContent>
+      </Card>
 
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-semibold text-slate-900">Client name</label>
-              <input type="text" value={clientName} onChange={e => setClientName(e.target.value)}
-                placeholder="e.g. María García"
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
-            </div>
+      <div>
+        <Button size="lg" className="rounded-2xl px-5 text-white"
+          style={{ backgroundColor: 'var(--theme-primary)' }}
+          onClick={handleQuoteReady} disabled={saving}>
+          {saving ? 'Saving…' : 'Quote ready'}
+        </Button>
+      </div>
 
-            {/* ── Photo upload ───────────────────────────────────────────────── */}
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-semibold text-slate-900">Reference photo</label>
-
-              <input
-                ref={photoInputRef}
-                id="photo-upload"
-                type="file"
-                accept="image/*"
-                onChange={handlePhotoChange}
-                className="hidden"
-              />
-              <input
-                ref={cameraInputRef}
-                id="photo-camera"
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handlePhotoChange}
-                className="hidden"
-              />
-
-              {!photo ? (
-                <div className="grid gap-2">
-                  <label
-                    htmlFor="photo-camera"
-                    className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white sm:hidden"
-                  >
-                    <Camera className="h-5 w-5 shrink-0 text-slate-400" />
-                    <span>Take photo</span>
-                  </label>
-                  <label
-                    htmlFor="photo-upload"
-                    className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white"
-                  >
-                    <ImagePlus className="h-5 w-5 shrink-0 text-slate-400" />
-                    <span>Choose from files</span>
-                  </label>
-                </div>
-              ) : (
-                <div className="relative overflow-hidden rounded-2xl border border-slate-200">
-                  <img src={photo} alt="Reference" className="w-full object-cover max-h-64" />
-                  <div className="absolute inset-0 flex items-start justify-end p-2">
-                    <button
-                      onClick={handleRemovePhoto}
-                      className="flex items-center gap-1 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-black/80"
-                    >
-                      <X className="h-3 w-3" />
-                      Remove
-                    </button>
-                  </div>
-                  {/* Tap to change */}
-                  <div className="absolute bottom-2 left-2 flex gap-1.5">
-                    <label
-                      htmlFor="photo-camera"
-                      className="flex cursor-pointer items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-black/80 sm:hidden"
-                    >
-                      <Camera className="h-3 w-3" />
-                      Take photo
-                    </label>
-                    <label
-                      htmlFor="photo-upload"
-                      className="flex cursor-pointer items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm transition hover:bg-black/80"
-                    >
-                      <ImagePlus className="h-3 w-3" />
-                      Choose file
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
-            {/* ─────────────────────────────────────────────────────────────── */}
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">Metal</label>
-              <select value={selectedMetal} onChange={e => setSelectedMetal(e.target.value as JewelryMetalOption)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
-                {jewelryMetalKeys.map(key => (
-                  <option key={key} value={key}>{JEWELRY_METAL_OPTIONS[key].label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">Labor Gold</label>
-              <select value={ringLabor} onChange={e => setRingLabor(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
-                {config.ringLaborTiers.map(t => (
-                  <option key={t.tierKey} value={t.tierKey}>{t.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">CAD design</label>
-              <select value={cadDesign} onChange={e => setCadDesign(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
-                {config.cadTiers.map(t => (
-                  <option key={t.tierKey} value={t.tierKey}>{t.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">Setting labor</label>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900">
-                ${pricing.settingFeePerStone.toLocaleString('en-US', { minimumFractionDigits: 2 })} per diamond
-                {' | '}
-                {pricing.settingMinutesPerStone} min each
+      {/* ── Mini cards de resumen ──────────────────────────────────────────── */}
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Metal price / g</p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+                  ${pricing.metalPricePerGram.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
               </div>
+              <div className="rounded-2xl bg-yellow-50 p-3 text-yellow-700"><Gem className="h-5 w-5" /></div>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">Amount of diamonds</label>
-              <input type="number" min={0} step={1} value={diamondAmount || ''} placeholder="0"
-                onChange={e => setDiamondAmount(Number(e.target.value) || 0)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">Type of diamond</label>
-              <select value={diamondType} onChange={e => setDiamondType(e.target.value as keyof typeof DIAMOND_TYPE_OPTIONS)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
-                {diamondTypeKeys.map(key => (
-                  <option key={key} value={key}>{DIAMOND_TYPE_OPTIONS[key].label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">Sizes of diamonds</label>
-              <select value={diamondSize} onChange={e => setDiamondSize(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
-                {config.diamondSizes.map(d => (
-                  <option key={d.sizeKey} value={d.sizeKey}>{d.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">Width of the ring (mm)</label>
-              <input type="number" min={1} step={0.5} value={ringWidth || ''} placeholder="0"
-                onChange={e => setRingWidth(Number(e.target.value) || 0)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">Finger size</label>
-              <select value={fingerSize} onChange={e => setFingerSize(Number(e.target.value))}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
-                {config.fingerSizes.map(f => (
-                  <option key={f.size} value={f.size}>Size {f.size} — ${f.additionalFee.toFixed(2)}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">Weight (grams)</label>
-              <input type="number" min={0} step={0.1} value={weightGrams || ''} placeholder="0"
-                onChange={e => setWeightGrams(Number(e.target.value) || 0)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">Bench hours</label>
-              <input type="number" min={0} step={0.5} value={laborHours || ''} placeholder="0"
-                onChange={e => setLaborHours(Number(e.target.value) || 0)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">Hourly rate</label>
-              <input type="number" min={0} step={1} value={hourlyRate || ''} placeholder="0"
-                onChange={e => setHourlyRate(Number(e.target.value) || 0)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-semibold text-slate-900">Engraving (+${ENGRAVING_FEE})</label>
-              <select value={engraving ? 'yes' : 'no'} onChange={e => setEngraving(e.target.value === 'yes')}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
-            </div>
-
-            <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-semibold text-slate-900">Extra costs</label>
-              <input type="number" min={0} step={1} value={extraCosts || ''} placeholder="0"
-                onChange={e => setExtraCosts(Number(e.target.value) || 0)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
-            </div>
-
-            <div className="md:col-span-2">
-              <Button size="lg" className="rounded-2xl px-5 text-white"
-                style={{ backgroundColor: 'var(--theme-primary)' }}
-                onClick={handleQuoteReady} disabled={saving}>
-                {saving ? 'Saving…' : 'Quote ready'}
-              </Button>
-            </div>
+            <p className="mt-3 text-sm text-slate-500">{selectedMetalConfig.label} — fixed price.</p>
           </CardContent>
         </Card>
 
-        <div className="grid gap-4">
-          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Metal price / g</p>
-                  <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-                    ${pricing.metalPricePerGram.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-yellow-50 p-3 text-yellow-700"><Gem className="h-5 w-5" /></div>
+        <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">CAD design</p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{cadLabel}</p>
               </div>
-              <p className="mt-3 text-sm text-slate-500">{selectedMetalConfig.label} based on spot plus material handling.</p>
-            </CardContent>
-          </Card>
+              <div className="rounded-2xl bg-sky-50 p-3 text-sky-600"><Layers3 className="h-5 w-5" /></div>
+            </div>
+            <p className="mt-3 text-sm text-slate-500">
+              ${pricing.cadFee.toLocaleString('en-US', { minimumFractionDigits: 2 })} added for CAD design.
+            </p>
+          </CardContent>
+        </Card>
 
-          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">CAD design</p>
-                  <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{cadLabel}</p>
-                </div>
-                <div className="rounded-2xl bg-sky-50 p-3 text-sky-600"><Layers3 className="h-5 w-5" /></div>
+        <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Diamonds</p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{diamondAmount}</p>
               </div>
-              <p className="mt-3 text-sm text-slate-500">
-                ${pricing.cadFee.toLocaleString('en-US', { minimumFractionDigits: 2 })} added for CAD design.
-              </p>
-            </CardContent>
-          </Card>
+              <div className="rounded-2xl bg-fuchsia-50 p-3 text-fuchsia-600"><Diamond className="h-5 w-5" /></div>
+            </div>
+            <p className="mt-3 text-sm text-slate-500">
+              {DIAMOND_TYPE_OPTIONS[diamondType].label} | {config.diamondSizeMap[diamondSize]?.label ?? diamondSize} | ${pricing.diamondUnitPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+            </p>
+          </CardContent>
+        </Card>
 
-          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Diamonds</p>
-                  <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{diamondAmount}</p>
-                </div>
-                <div className="rounded-2xl bg-fuchsia-50 p-3 text-fuchsia-600"><Diamond className="h-5 w-5" /></div>
+        <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Finger size</p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{fingerSize}</p>
               </div>
-              <p className="mt-3 text-sm text-slate-500">
-                {DIAMOND_TYPE_OPTIONS[diamondType].label} | {config.diamondSizeMap[diamondSize]?.label ?? diamondSize} | ${pricing.diamondUnitPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Setting labor</p>
-                  <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-                    ${pricing.settingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-rose-50 p-3 text-rose-600"><Diamond className="h-5 w-5" /></div>
-              </div>
-              <p className="mt-3 text-sm text-slate-500">
-                {pricing.settingMinutesPerStone} min each | total {pricing.settingTimeHours.toFixed(2)} h
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Finger size</p>
-                  <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{fingerSize}</p>
-                </div>
-                <div className="rounded-2xl bg-violet-50 p-3 text-violet-600"><Ruler className="h-5 w-5" /></div>
-              </div>
-              <p className="mt-3 text-sm text-slate-500">
-                Size fee ${pricing.fingerSizeFee.toLocaleString('en-US', { minimumFractionDigits: 2 })} | Width fee ${pricing.widthFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Bench time</p>
-                  <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{laborHours.toFixed(1)} h</p>
-                </div>
-                <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-600"><Clock3 className="h-5 w-5" /></div>
-              </div>
-              <p className="mt-3 text-sm text-slate-500">
-                ${pricing.laborCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} at ${hourlyRate.toLocaleString('en-US', { minimumFractionDigits: 2 })}/h
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+              <div className="rounded-2xl bg-violet-50 p-3 text-violet-600"><Ruler className="h-5 w-5" /></div>
+            </div>
+            <p className="mt-3 text-sm text-slate-500">
+              Width fee ${pricing.widthFee.toLocaleString('en-US', { minimumFractionDigits: 2 })} | Setting ${pricing.settingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </p>
+          </CardContent>
+        </Card>
       </section>
 
       {savedQuote && <QuoteToast key={savedQuote.id} quote={savedQuote} onClose={() => setSavedQuote(null)} />}
