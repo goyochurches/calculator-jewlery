@@ -68,8 +68,8 @@ export function Toast({
     <div
       role="status"
       aria-live="polite"
-      className={`fixed bottom-4 left-4 z-50 w-[min(calc(100vw-2rem),22rem)] transition-all duration-300 ease-out sm:bottom-6 sm:left-6 lg:left-[calc(18rem+1.5rem)] ${
-        visible ? 'translate-x-0 opacity-100' : '-translate-x-4 opacity-0'
+      className={`fixed bottom-4 right-4 z-50 w-[min(calc(100vw-2rem),22rem)] transition-all duration-300 ease-out sm:bottom-6 sm:right-6 ${
+        visible ? 'translate-x-0 opacity-100' : 'translate-x-4 opacity-0'
       }`}
     >
       <div className={`overflow-hidden rounded-2xl border ${styles.border} bg-white ${styles.shadow}`}>
