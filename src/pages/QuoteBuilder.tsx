@@ -13,7 +13,7 @@ import { quotesService } from '@/services/quotesService'
 import type { JewelryMetalOption } from '@/types'
 import { Toast } from '@/components/Toast'
 import { Calculator, Camera, Diamond, Gem, ImagePlus, Layers3, Ruler, X } from 'lucide-react'
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 const HAND_ENGRAVING_FEE = 150
@@ -41,6 +41,14 @@ const METAL_GROUPS: Array<{ group: string; keys: JewelryMetalOption[] }> = [
 
 const diamondTypeKeys = Object.keys(DIAMOND_TYPE_OPTIONS) as Array<keyof typeof DIAMOND_TYPE_OPTIONS>
 
+// Mapeo del tipo de diamante elegido en el UI al stoneType que guarda el
+// backend en diamond_size_config. Grunberger Natural → NATURAL, Grunberger
+// Lab → LAB. Si añadimos más tipos en el futuro, mapearlos aquí.
+const DIAMOND_TYPE_TO_STONE: Record<keyof typeof DIAMOND_TYPE_OPTIONS, 'NATURAL' | 'LAB'> = {
+  natural: 'NATURAL',
+  'lab-grown': 'LAB',
+}
+
 export function QuoteBuilderPage() {
   const { user } = useAuth()
   const config = useQuoteConfig()
@@ -55,7 +63,7 @@ export function QuoteBuilderPage() {
   const [cadDesign, setCadDesign] = useState('medium')
   const [diamondAmount, setDiamondAmount] = useState(0)
   const [diamondType, setDiamondType] = useState<keyof typeof DIAMOND_TYPE_OPTIONS>('natural')
-  const [diamondSize, setDiamondSize] = useState('0.05-0.10')
+  const [diamondSize, setDiamondSize] = useState('1-1.04')
   const [weightGrams, setWeightGrams] = useState(12)
   const [ringWidth, setRingWidth] = useState(2.5)
   const [fingerSize, setFingerSize] = useState(7)
@@ -82,6 +90,20 @@ export function QuoteBuilderPage() {
   }
 
   const selectedMetalConfig = JEWELRY_METAL_OPTIONS[selectedMetal]
+
+  // Tamaños de diamante filtrados por el tipo seleccionado (Natural / Lab).
+  const filteredDiamondSizes = useMemo(() => {
+    const stoneType = DIAMOND_TYPE_TO_STONE[diamondType]
+    return config.diamondSizes.filter(d => d.stoneType === stoneType)
+  }, [config.diamondSizes, diamondType])
+
+  // Si el size actual ya no pertenece al tipo elegido, saltamos al primero
+  // disponible — así nunca queda un valor inválido en el formulario.
+  useEffect(() => {
+    if (filteredDiamondSizes.length === 0) return
+    const exists = filteredDiamondSizes.some(d => d.sizeKey === diamondSize)
+    if (!exists) setDiamondSize(filteredDiamondSizes[0].sizeKey)
+  }, [filteredDiamondSizes, diamondSize])
 
   const pricing = useMemo(() => {
     const metalPricePerGram = selectedMetalConfig.pricePerGram
@@ -466,11 +488,18 @@ export function QuoteBuilderPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-900">Sizes of diamonds</label>
+                <label className="text-sm font-semibold text-slate-900">
+                  Sizes of diamonds ({DIAMOND_TYPE_OPTIONS[diamondType].label})
+                </label>
                 <select value={diamondSize} onChange={e => setDiamondSize(e.target.value)}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
-                  {config.diamondSizes.map(d => (
-                    <option key={d.sizeKey} value={d.sizeKey}>{d.label}</option>
+                  {filteredDiamondSizes.length === 0 && (
+                    <option value="">No sizes for this type</option>
+                  )}
+                  {filteredDiamondSizes.map(d => (
+                    <option key={d.id} value={d.sizeKey}>
+                      {d.label} — ${d.basePrice}
+                    </option>
                   ))}
                 </select>
               </div>
