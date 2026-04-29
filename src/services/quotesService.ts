@@ -74,6 +74,12 @@ export const quotesService = {
     return items.map(mapQuote)
   },
 
+  async getByClient(clientId: number): Promise<SavedQuote[]> {
+    // Pull a generous page; in practice a single client rarely has hundreds of quotes.
+    const data = await api.get<SpringPage<ApiQuote>>(`/api/quotes?clientId=${clientId}&size=200&sort=createdAt,desc`)
+    return (data.content ?? []).map(mapQuote)
+  },
+
   async create(
     payload: Omit<ApiQuote, 'id' | 'createdBy' | 'createdAt'>,
     userId: number,
