@@ -12,6 +12,8 @@ import { UsersPage } from '@/pages/Users'
 import { Configuration } from '@/pages/Configuration'
 import MasterTables from '@/pages/MasterTables'
 import QuotesList from '@/pages/QuotesList'
+import { ClientsPage } from '@/pages/Clients'
+import { ClientDetailPage } from '@/pages/ClientDetail'
 import Login from '@/pages/Login'
 import SetupPassword from '@/pages/SetupPassword'
 
@@ -52,6 +54,8 @@ export default function App() {
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/quotes" element={<QuoteBuilderPage />} />
                 <Route path="/quotes-list" element={<QuotesList />} />
+                <Route path="/clients" element={<ClientsPage />} />
+                <Route path="/clients/:id" element={<ClientDetailPage />} />
                 <Route path="/gemstones" element={<GemstonesPage />} />
                 <Route path="/charts" element={<Charts />} />
                 <Route path="/history" element={<HistoryPage />} />

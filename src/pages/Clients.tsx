@@ -3,14 +3,16 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { clientService } from '@/services/clientService'
 import type { Client } from '@/types'
-import { Check, Loader2, Mail, Pencil, Phone, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
+import { ChevronRight, Check, Loader2, Mail, Pencil, Phone, Plus, Search, Trash2, UserPlus, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 type Draft = Omit<Client, 'id' | 'createdAt'>
 
 const BLANK: Draft = { name: '', surname: '', phone: '', email: '' }
 
 export function ClientsPage() {
+  const navigate = useNavigate()
   const [clients, setClients] = useState<Client[]>([])
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
@@ -215,7 +217,14 @@ export function ClientsPage() {
               )
             }
             return (
-              <Card key={c.id} className="group rounded-[24px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.06)] transition hover:shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
+              <Card
+                key={c.id}
+                className="group cursor-pointer rounded-[24px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_70px_rgba(15,23,42,0.12)]"
+                onClick={() => navigate(`/clients/${c.id}`)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/clients/${c.id}`) }}
+              >
                 <CardContent className="p-5">
                   <div className="flex items-start gap-4">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-100 text-base font-semibold uppercase text-violet-700">
@@ -229,19 +238,22 @@ export function ClientsPage() {
                         {c.createdAt ? `Added ${new Date(c.createdAt).toLocaleDateString()}` : 'Client #' + c.id}
                       </p>
                     </div>
-                    <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
-                      <button
-                        onClick={() => { setEditId(c.id); setEditDraft({ ...c }) }}
-                        className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:bg-violet-50 hover:text-violet-600"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => remove(c.id)}
-                        className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                    <div className="flex items-center gap-1">
+                      <div className="flex gap-1 opacity-0 transition group-hover:opacity-100">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditId(c.id); setEditDraft({ ...c }) }}
+                          className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:bg-violet-50 hover:text-violet-600"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); remove(c.id) }}
+                          className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-slate-500" />
                     </div>
                   </div>
 
@@ -282,12 +294,12 @@ function ContactLine({ icon: Icon, value, href }: { icon: React.ElementType; val
   )
   if (href && value) {
     return (
-      <a href={href} className="block hover:text-slate-900" onClick={e => e.stopPropagation()}>
+      <a href={href} className="block hover:text-slate-900" onClick={(e) => e.stopPropagation()}>
         {Inner}
       </a>
     )
   }
-  return Inner
+  return <div onClick={(e) => e.stopPropagation()}>{Inner}</div>
 }
 
 function EmptyState({ query, onAdd }: { query: string; onAdd: () => void }) {

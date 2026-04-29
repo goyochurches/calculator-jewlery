@@ -4,6 +4,7 @@ import { useBrand } from '@/context/BrandContext'
 import {
   Calculator,
   ClipboardList,
+  Contact,
   Diamond,
   FileText,
   LayoutDashboard,
@@ -20,6 +21,7 @@ const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/quotes', label: 'Quote Builder', icon: Calculator },
   { to: '/quotes-list', label: 'Quotes', icon: FileText },
+  { to: '/clients', label: 'Clients', icon: Contact },
   { to: '/gemstones', label: 'Gemstones', icon: Diamond },
   { to: '/charts', label: 'Charts', icon: LineChart },
   { to: '/history', label: 'History', icon: ClipboardList },
