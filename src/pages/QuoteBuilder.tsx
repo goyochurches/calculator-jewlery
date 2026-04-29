@@ -521,11 +521,14 @@ export function QuoteBuilderPage() {
                   {filteredDiamondSizes.length === 0 && (
                     <option value="">No sizes for this type</option>
                   )}
-                  {filteredDiamondSizes.map(d => (
-                    <option key={d.id} value={d.sizeKey}>
-                      {d.label} — ${d.basePrice}
-                    </option>
-                  ))}
+                  {filteredDiamondSizes.map(d => {
+                    const ct = d.ctPerStone != null ? ` · ${d.ctPerStone} ct` : ''
+                    return (
+                      <option key={d.id} value={d.sizeKey}>
+                        {d.label}{ct} — ${d.basePrice}
+                      </option>
+                    )
+                  })}
                 </select>
               </div>
 

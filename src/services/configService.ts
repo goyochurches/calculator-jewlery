@@ -8,6 +8,8 @@ export interface DiamondSizeConfig {
   sizeKey: string
   label: string
   basePrice: number
+  /** Optional carat weight per stone (set on per-diameter rows). */
+  ctPerStone?: number | null
 }
 
 export interface FingerSizeConfig {
@@ -37,7 +39,7 @@ export const configService = {
   getDiamondSizes: (): Promise<DiamondSizeConfig[]> =>
     api.get('/api/config/diamond-sizes'),
 
-  updateDiamondSize: (id: number, update: { basePrice: number; label?: string }): Promise<DiamondSizeConfig> =>
+  updateDiamondSize: (id: number, update: { basePrice?: number; label?: string; ctPerStone?: number | null }): Promise<DiamondSizeConfig> =>
     api.put(`/api/config/diamond-sizes/${id}`, update),
 
   createDiamondSize: (input: Omit<DiamondSizeConfig, 'id'>): Promise<DiamondSizeConfig> =>

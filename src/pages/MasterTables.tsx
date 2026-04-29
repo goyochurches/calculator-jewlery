@@ -66,7 +66,7 @@ const BLANK_METAL: Omit<MetalWithId, 'id'> = {
 }
 
 const BLANK_CLIENT: Omit<Client, 'id' | 'createdAt'> = { name: '', surname: '', phone: '', email: '' }
-const BLANK_DS: Omit<DiamondSizeConfig, 'id'> = { stoneType: 'NATURAL', sizeKey: '', label: '', basePrice: 0 }
+const BLANK_DS: Omit<DiamondSizeConfig, 'id'> = { stoneType: 'NATURAL', sizeKey: '', label: '', basePrice: 0, ctPerStone: null }
 const BLANK_SETTER: Omit<SetterConfig, 'id' | 'sortOrder'> = { typeKey: '', label: '', fee: 0 }
 
 const STONE_TYPE_STYLES: Record<StoneType, string> = {
@@ -176,6 +176,7 @@ export function MasterTablesPage() {
     const updated = await configService.updateDiamondSize(dsDraft.id, {
       basePrice: dsDraft.basePrice,
       label: dsDraft.label,
+      ctPerStone: dsDraft.ctPerStone ?? null,
     })
     setDiamondSizes(prev => prev.map(d => d.id === updated.id ? updated : d))
     setDsEditId(null); setDsDraft(null)
@@ -765,7 +766,8 @@ export function MasterTablesPage() {
                   <TH>Stone type</TH>
                   <TH>Size key</TH>
                   <TH>Label</TH>
-                  <TH>Base price / stone</TH>
+                  <TH>CT / stone</TH>
+                  <TH>Price / stone</TH>
                   <TH></TH>
                 </tr>
               </thead>
