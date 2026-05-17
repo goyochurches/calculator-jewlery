@@ -42,17 +42,34 @@ const ROLE_LABELS: Record<string, string> = {
 interface SidebarProps {
   mobileOpen?: boolean
   onMobileClose?: () => void
+  collapsed?: boolean
 }
 
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarContent({
+  onNavigate,
+  collapsed = false,
+}: {
+  onNavigate?: () => void
+  collapsed?: boolean
+}) {
   const { user, logout } = useAuth()
   const { companyName, logo } = useBrand()
   const visibleNavItems = navItems.filter((item) => canAccess(user?.role, item.key))
 
   return (
     <div className="flex min-h-full flex-col">
-      <div className="border-b border-white/10 px-6 py-7">
-        <div className="flex items-center gap-3">
+      <div
+        className={cn(
+          'border-b border-white/10 py-7',
+          collapsed ? 'px-3' : 'px-6'
+        )}
+      >
+        <div
+          className={cn(
+            'flex items-center gap-3',
+            collapsed && 'justify-center'
+          )}
+        >
           {logo ? (
             <img
               src={logo}
@@ -64,43 +81,49 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               <ShieldCheck className="h-5 w-5" />
             </div>
           )}
-          <div>
-            <p className="text-sm font-semibold tracking-wide text-white">{companyName}</p>
-          </div>
+          {!collapsed && (
+            <div>
+              <p className="text-sm font-semibold tracking-wide text-white">{companyName}</p>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="px-4 py-6">
-        <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
-          Navigation
-        </p>
-        <nav className="mt-4 flex flex-col gap-1.5">
+      <div className={cn('py-6', collapsed ? 'px-2' : 'px-4')}>
+        {!collapsed && (
+          <p className="px-3 text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">
+            Navigation
+          </p>
+        )}
+        <nav className={cn('flex flex-col gap-1.5', !collapsed && 'mt-4')}>
           {visibleNavItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
               end={to === '/'}
               onClick={onNavigate}
+              title={collapsed ? label : undefined}
               className={({ isActive }) =>
                 cn(
-                  'group flex items-center gap-3 rounded-2xl px-3.5 py-3 text-sm transition',
+                  'group flex items-center rounded-2xl text-sm transition',
+                  collapsed ? 'justify-center px-2 py-2' : 'gap-3 px-3.5 py-3',
                   isActive
                     ? 'bg-white text-slate-950 shadow-lg shadow-black/20'
                     : 'text-slate-400 hover:bg-white/5 hover:text-white'
                 )
               }
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 transition group-hover:bg-white/10 group-[.active]:bg-slate-100">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5 transition group-hover:bg-white/10 group-[.active]:bg-slate-100">
                 <Icon className="h-4 w-4" />
               </span>
-              <span className="font-medium">{label}</span>
+              {!collapsed && <span className="font-medium">{label}</span>}
             </NavLink>
           ))}
         </nav>
       </div>
 
-      <div className="mt-auto p-4 space-y-3">
-        {user && (
+      <div className={cn('mt-auto space-y-3', collapsed ? 'p-2' : 'p-4')}>
+        {user && !collapsed && (
           <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-xs font-bold text-white">
@@ -114,33 +137,49 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           </div>
         )}
 
+        {user && collapsed && (
+          <div
+            className="flex h-9 w-9 mx-auto items-center justify-center rounded-2xl bg-white/10 text-xs font-bold text-white"
+            title={`${user.name} · ${ROLE_LABELS[user.role] ?? user.role}`}
+          >
+            {user.avatar}
+          </div>
+        )}
+
         <button
           onClick={() => {
             onNavigate?.()
             logout()
           }}
-          className="flex w-full items-center gap-3 rounded-2xl px-3.5 py-3 text-sm text-slate-400 transition hover:bg-white/5 hover:text-white"
+          title={collapsed ? 'Sign out' : undefined}
+          className={cn(
+            'flex w-full items-center rounded-2xl text-sm text-slate-400 transition hover:bg-white/5 hover:text-white',
+            collapsed ? 'justify-center px-2 py-2' : 'gap-3 px-3.5 py-3'
+          )}
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5">
             <LogOut className="h-4 w-4" />
           </span>
-          <span className="font-medium">Sign out</span>
+          {!collapsed && <span className="font-medium">Sign out</span>}
         </button>
       </div>
     </div>
   )
 }
 
-export function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
+export function Sidebar({ mobileOpen = false, onMobileClose, collapsed = false }: SidebarProps) {
   return (
     <>
       {/* Desktop sidebar */}
       <aside
-        className="hidden w-72 shrink-0 border-r border-white/10 text-slate-100 lg:block"
+        className={cn(
+          'hidden shrink-0 border-r border-white/10 text-slate-100 transition-[width] duration-200 ease-out lg:block',
+          collapsed ? 'w-20' : 'w-72'
+        )}
         style={{ backgroundColor: 'var(--theme-primary)' }}
       >
         <div className="sticky top-0 min-h-screen">
-          <SidebarContent />
+          <SidebarContent collapsed={collapsed} />
         </div>
       </aside>
 

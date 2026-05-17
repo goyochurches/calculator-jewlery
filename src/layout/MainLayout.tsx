@@ -44,12 +44,21 @@ const pageCopy: Record<string, { title: string; subtitle: string }> = {
   },
 }
 
+const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
+
 export function MainLayout() {
   const location = useLocation()
   const current = pageCopy[location.pathname] ?? pageCopy['/']
   const [panelOpen, setPanelOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'
+  })
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications()
+
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed))
+  }, [sidebarCollapsed])
 
   // Close mobile nav on route change
   useEffect(() => {
@@ -70,7 +79,11 @@ export function MainLayout() {
   return (
     <div className="min-h-screen bg-transparent text-slate-900">
       <div className="flex min-h-screen">
-        <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
+        <Sidebar
+          mobileOpen={mobileNavOpen}
+          onMobileClose={() => setMobileNavOpen(false)}
+          collapsed={sidebarCollapsed}
+        />
 
         <div className="flex min-h-screen flex-1 flex-col min-w-0">
           <header className="sticky top-0 z-20 border-b border-white/70 bg-white/75 backdrop-blur-xl">
@@ -80,6 +93,15 @@ export function MainLayout() {
                   onClick={() => setMobileNavOpen(true)}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:text-slate-900 lg:hidden"
                   aria-label="Open navigation menu"
+                >
+                  <Menu className="h-5 w-5" />
+                </button>
+
+                <button
+                  onClick={() => setSidebarCollapsed((v) => !v)}
+                  className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:text-slate-900 lg:flex"
+                  aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                  title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 >
                   <Menu className="h-5 w-5" />
                 </button>
