@@ -60,6 +60,7 @@ export function QuoteBuilderPage() {
   const [saving, setSaving] = useState(false)
   const [savedQuote, setSavedQuote] = useState<{ id: string; title: string; total: number; publicToken: string | null } | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<{ title?: string }>({})
   const [selectedMetal, setSelectedMetal] = useState<JewelryMetalOption>('gold-18k-white')
   const [ringLabor, setRingLabor] = useState('medium')
   const [cadDesign, setCadDesign] = useState('medium')
@@ -159,7 +160,10 @@ export function QuoteBuilderPage() {
 
   const handleQuoteReady = async () => {
     if (!user) return
-    if (!quoteTitle.trim()) { setSaveError('Please enter a quote title.'); return }
+    const errors: { title?: string } = {}
+    if (!quoteTitle.trim()) errors.title = 'Please enter a quote title.'
+    setFieldErrors(errors)
+    if (Object.keys(errors).length > 0) return
     setSaving(true)
     setSaveError(null)
     try {
@@ -324,17 +328,24 @@ export function QuoteBuilderPage() {
               <p className="text-sm text-slate-500">Title, client and reference photo.</p>
             </CardHeader>
             <CardContent className="grid gap-5 pt-6 md:grid-cols-2">
-              {saveError && (
-                <div className="md:col-span-2 rounded-2xl bg-rose-50 border border-rose-200 px-5 py-4 text-sm text-rose-700">
-                  {saveError}
-                </div>
-              )}
-
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-semibold text-slate-900">Quote title</label>
-                <input type="text" value={quoteTitle} onChange={e => setQuoteTitle(e.target.value)}
+                <input
+                  type="text"
+                  value={quoteTitle}
+                  onChange={e => {
+                    setQuoteTitle(e.target.value)
+                    if (fieldErrors.title) setFieldErrors(prev => ({ ...prev, title: undefined }))
+                  }}
                   placeholder="e.g. Solitaire engagement ring"
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
+                  aria-invalid={!!fieldErrors.title}
+                  className={`w-full rounded-2xl border bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:bg-white ${
+                    fieldErrors.title ? 'border-rose-300 focus:border-rose-400' : 'border-slate-200 focus:border-slate-400'
+                  }`}
+                />
+                {fieldErrors.title && (
+                  <p className="text-xs font-medium text-rose-600">{fieldErrors.title}</p>
+                )}
               </div>
 
               <div className="space-y-2 md:col-span-2">
@@ -553,12 +564,15 @@ export function QuoteBuilderPage() {
             </CardContent>
           </Card>
 
-          <div>
+          <div className="space-y-2">
             <Button size="lg" className="w-full rounded-2xl px-5 text-white sm:w-auto"
               style={{ backgroundColor: 'var(--theme-primary)' }}
               onClick={handleQuoteReady} disabled={saving}>
               {saving ? 'Saving…' : 'Quote ready'}
             </Button>
+            {saveError && (
+              <p className="text-xs font-medium text-rose-600">{saveError}</p>
+            )}
           </div>
         </div>
 
