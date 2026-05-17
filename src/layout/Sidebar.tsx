@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   LineChart,
   LogOut,
+  Menu,
   Settings,
   ShieldCheck,
   Users,
@@ -43,14 +44,17 @@ interface SidebarProps {
   mobileOpen?: boolean
   onMobileClose?: () => void
   collapsed?: boolean
+  onToggleCollapsed?: () => void
 }
 
 function SidebarContent({
   onNavigate,
   collapsed = false,
+  onToggleCollapsed,
 }: {
   onNavigate?: () => void
   collapsed?: boolean
+  onToggleCollapsed?: () => void
 }) {
   const { user, logout } = useAuth()
   const { companyName, logo } = useBrand()
@@ -64,6 +68,18 @@ function SidebarContent({
           collapsed ? 'px-3' : 'px-6'
         )}
       >
+        {onToggleCollapsed && (
+          <div className={cn('mb-4 hidden lg:flex', collapsed ? 'justify-center' : 'justify-end')}>
+            <button
+              onClick={onToggleCollapsed}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white"
+            >
+              <Menu className="h-4 w-4" />
+            </button>
+          </div>
+        )}
         <div
           className={cn(
             'flex items-center gap-3',
@@ -167,7 +183,12 @@ function SidebarContent({
   )
 }
 
-export function Sidebar({ mobileOpen = false, onMobileClose, collapsed = false }: SidebarProps) {
+export function Sidebar({
+  mobileOpen = false,
+  onMobileClose,
+  collapsed = false,
+  onToggleCollapsed,
+}: SidebarProps) {
   return (
     <>
       {/* Desktop sidebar */}
@@ -179,7 +200,7 @@ export function Sidebar({ mobileOpen = false, onMobileClose, collapsed = false }
         style={{ backgroundColor: 'var(--theme-primary)' }}
       >
         <div className="sticky top-0 min-h-screen">
-          <SidebarContent collapsed={collapsed} />
+          <SidebarContent collapsed={collapsed} onToggleCollapsed={onToggleCollapsed} />
         </div>
       </aside>
 

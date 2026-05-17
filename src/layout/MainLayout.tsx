@@ -83,6 +83,7 @@ export function MainLayout() {
           mobileOpen={mobileNavOpen}
           onMobileClose={() => setMobileNavOpen(false)}
           collapsed={sidebarCollapsed}
+          onToggleCollapsed={() => setSidebarCollapsed((v) => !v)}
         />
 
         <div className="flex min-h-screen flex-1 flex-col min-w-0">
@@ -93,15 +94,6 @@ export function MainLayout() {
                   onClick={() => setMobileNavOpen(true)}
                   className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:text-slate-900 lg:hidden"
                   aria-label="Open navigation menu"
-                >
-                  <Menu className="h-5 w-5" />
-                </button>
-
-                <button
-                  onClick={() => setSidebarCollapsed((v) => !v)}
-                  className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:text-slate-900 lg:flex"
-                  aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                  title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 >
                   <Menu className="h-5 w-5" />
                 </button>
