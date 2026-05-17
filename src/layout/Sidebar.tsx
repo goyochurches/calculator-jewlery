@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/context/AuthContext'
 import { useBrand } from '@/context/BrandContext'
+import { canAccess, type NavKey } from '@/constants/permissions'
 import {
   Calculator,
   ClipboardList,
@@ -17,17 +18,17 @@ import {
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 
-const navItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/quotes', label: 'Quote Builder', icon: Calculator },
-  { to: '/quotes-list', label: 'Quotes', icon: FileText },
-  { to: '/clients', label: 'Clients', icon: Contact },
-  { to: '/gemstones', label: 'Gemstones', icon: Diamond },
-  { to: '/charts', label: 'Charts', icon: LineChart },
-  { to: '/history', label: 'History', icon: ClipboardList },
-  { to: '/users', label: 'Users', icon: Users },
-  { to: '/configuration', label: 'Configuration', icon: Settings },
-  { to: '/master-tables', label: 'Master Tables', icon: ClipboardList },
+const navItems: { to: string; label: string; icon: typeof LayoutDashboard; key: NavKey }[] = [
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' },
+  { to: '/quotes', label: 'Quote Builder', icon: Calculator, key: 'quotes' },
+  { to: '/quotes-list', label: 'Quotes', icon: FileText, key: 'quotes-list' },
+  { to: '/clients', label: 'Clients', icon: Contact, key: 'clients' },
+  { to: '/gemstones', label: 'Gemstones', icon: Diamond, key: 'gemstones' },
+  { to: '/charts', label: 'Charts', icon: LineChart, key: 'charts' },
+  { to: '/history', label: 'History', icon: ClipboardList, key: 'history' },
+  { to: '/users', label: 'Users', icon: Users, key: 'users' },
+  { to: '/configuration', label: 'Configuration', icon: Settings, key: 'configuration' },
+  { to: '/master-tables', label: 'Master Tables', icon: ClipboardList, key: 'master-tables' },
 ]
 
 const ROLE_LABELS: Record<string, string> = {
@@ -46,6 +47,7 @@ interface SidebarProps {
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const { user, logout } = useAuth()
   const { companyName, logo } = useBrand()
+  const visibleNavItems = navItems.filter((item) => canAccess(user?.role, item.key))
 
   return (
     <div className="flex min-h-full flex-col">
@@ -73,7 +75,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           Navigation
         </p>
         <nav className="mt-4 flex flex-col gap-1.5">
-          {navItems.map(({ to, label, icon: Icon }) => (
+          {visibleNavItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}

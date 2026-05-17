@@ -17,6 +17,7 @@ import { ClientDetailPage } from '@/pages/ClientDetail'
 import { PublicQuotePage } from '@/pages/PublicQuote'
 import Login from '@/pages/Login'
 import SetupPassword from '@/pages/SetupPassword'
+import { canAccess, defaultRouteFor, type NavKey } from '@/constants/permissions'
 
 function PrivateRoutes() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -41,6 +42,18 @@ function PrivateRoutes() {
   return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />
 }
 
+function RequirePermission({ permission }: { permission: NavKey }) {
+  const { user } = useAuth()
+  if (!canAccess(user?.role, permission)) return <Navigate to={defaultRouteFor(user?.role)} replace />
+  return <Outlet />
+}
+
+function HomeRedirect() {
+  const { user } = useAuth()
+  if (!canAccess(user?.role, 'dashboard')) return <Navigate to={defaultRouteFor(user?.role)} replace />
+  return <Dashboard />
+}
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -54,17 +67,35 @@ export default function App() {
             <Route path="/q/:token" element={<PublicQuotePage />} />
             <Route element={<PrivateRoutes />}>
               <Route element={<MainLayout />}>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/quotes" element={<QuoteBuilderPage />} />
-                <Route path="/quotes-list" element={<QuotesList />} />
-                <Route path="/clients" element={<ClientsPage />} />
-                <Route path="/clients/:id" element={<ClientDetailPage />} />
-                <Route path="/gemstones" element={<GemstonesPage />} />
-                <Route path="/charts" element={<Charts />} />
-                <Route path="/history" element={<HistoryPage />} />
-                <Route path="/users" element={<UsersPage />} />
-                <Route path="/configuration" element={<Configuration />} />
-                <Route path="/master-tables" element={<MasterTables />} />
+                <Route path="/" element={<HomeRedirect />} />
+                <Route element={<RequirePermission permission="quotes" />}>
+                  <Route path="/quotes" element={<QuoteBuilderPage />} />
+                </Route>
+                <Route element={<RequirePermission permission="quotes-list" />}>
+                  <Route path="/quotes-list" element={<QuotesList />} />
+                </Route>
+                <Route element={<RequirePermission permission="gemstones" />}>
+                  <Route path="/gemstones" element={<GemstonesPage />} />
+                </Route>
+                <Route element={<RequirePermission permission="clients" />}>
+                  <Route path="/clients" element={<ClientsPage />} />
+                  <Route path="/clients/:id" element={<ClientDetailPage />} />
+                </Route>
+                <Route element={<RequirePermission permission="charts" />}>
+                  <Route path="/charts" element={<Charts />} />
+                </Route>
+                <Route element={<RequirePermission permission="history" />}>
+                  <Route path="/history" element={<HistoryPage />} />
+                </Route>
+                <Route element={<RequirePermission permission="users" />}>
+                  <Route path="/users" element={<UsersPage />} />
+                </Route>
+                <Route element={<RequirePermission permission="configuration" />}>
+                  <Route path="/configuration" element={<Configuration />} />
+                </Route>
+                <Route element={<RequirePermission permission="master-tables" />}>
+                  <Route path="/master-tables" element={<MasterTables />} />
+                </Route>
               </Route>
             </Route>
           </Routes>
