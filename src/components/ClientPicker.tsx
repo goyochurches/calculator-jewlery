@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 interface ClientPickerProps {
   value: Client | null
   onChange: (client: Client | null) => void
+  hasError?: boolean
 }
 
 /**
@@ -16,7 +17,7 @@ interface ClientPickerProps {
  *   - "+ Add new client" opens an inline form (name / surname / phone / email)
  *     that POSTs to /api/clients and selects the newly-created row
  */
-export function ClientPicker({ value, onChange }: ClientPickerProps) {
+export function ClientPicker({ value, onChange, hasError = false }: ClientPickerProps) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Client[]>([])
@@ -89,7 +90,10 @@ export function ClientPicker({ value, onChange }: ClientPickerProps) {
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+        aria-invalid={hasError}
+        className={`flex w-full items-center justify-between rounded-2xl border bg-slate-50 px-4 py-3 text-left text-sm text-slate-900 outline-none transition focus:bg-white ${
+          hasError ? 'border-rose-300 focus:border-rose-400' : 'border-slate-200 focus:border-slate-400'
+        }`}
       >
         {value ? (
           <span className="flex items-center gap-2 truncate">

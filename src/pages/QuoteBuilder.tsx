@@ -60,7 +60,7 @@ export function QuoteBuilderPage() {
   const [saving, setSaving] = useState(false)
   const [savedQuote, setSavedQuote] = useState<{ id: string; title: string; total: number; publicToken: string | null } | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [fieldErrors, setFieldErrors] = useState<{ title?: string }>({})
+  const [fieldErrors, setFieldErrors] = useState<{ title?: string; client?: string }>({})
   const [selectedMetal, setSelectedMetal] = useState<JewelryMetalOption>('gold-18k-white')
   const [ringLabor, setRingLabor] = useState('medium')
   const [cadDesign, setCadDesign] = useState('medium')
@@ -160,8 +160,9 @@ export function QuoteBuilderPage() {
 
   const handleQuoteReady = async () => {
     if (!user) return
-    const errors: { title?: string } = {}
+    const errors: { title?: string; client?: string } = {}
     if (!quoteTitle.trim()) errors.title = 'Please enter a quote title.'
+    if (!client) errors.client = 'Please select or create a client.'
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
     setSaving(true)
@@ -350,8 +351,18 @@ export function QuoteBuilderPage() {
 
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-semibold text-slate-900">Client</label>
-                <ClientPicker value={client} onChange={setClient} />
-                {client && (
+                <ClientPicker
+                  value={client}
+                  onChange={(c) => {
+                    setClient(c)
+                    if (c && fieldErrors.client) setFieldErrors(prev => ({ ...prev, client: undefined }))
+                  }}
+                  hasError={!!fieldErrors.client}
+                />
+                {fieldErrors.client && (
+                  <p className="text-xs font-medium text-rose-600">{fieldErrors.client}</p>
+                )}
+                {client && !fieldErrors.client && (
                   <p className="text-xs text-slate-500">
                     {[client.email, client.phone].filter(Boolean).join(' · ') || 'No contact info on file'}
                   </p>
