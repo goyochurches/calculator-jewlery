@@ -4,6 +4,8 @@ import { useBrand } from '@/context/BrandContext'
 import { canAccess, type NavKey } from '@/constants/permissions'
 import {
   Calculator,
+  ChevronsLeft,
+  ChevronsRight,
   ClipboardList,
   Contact,
   Diamond,
@@ -11,7 +13,6 @@ import {
   LayoutDashboard,
   LineChart,
   LogOut,
-  Menu,
   Settings,
   ShieldCheck,
   Users,
@@ -68,39 +69,43 @@ function SidebarContent({
           collapsed ? 'px-3' : 'px-6'
         )}
       >
-        {onToggleCollapsed && (
-          <div className={cn('mb-4 hidden lg:flex', collapsed ? 'justify-center' : 'justify-end')}>
-            <button
-              onClick={onToggleCollapsed}
-              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white"
-            >
-              <Menu className="h-4 w-4" />
-            </button>
-          </div>
-        )}
         <div
           className={cn(
             'flex items-center gap-3',
             collapsed && 'justify-center'
           )}
         >
-          {logo ? (
-            <img
-              src={logo}
-              alt="Company logo"
-              className="h-11 w-11 rounded-2xl object-contain bg-white/10 p-1"
-            />
-          ) : (
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 via-yellow-300 to-orange-500 text-slate-950 shadow-lg shadow-amber-500/20">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
+          {onToggleCollapsed && (
+            <button
+              onClick={onToggleCollapsed}
+              aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white lg:flex"
+            >
+              {collapsed ? (
+                <ChevronsRight className="h-4 w-4" />
+              ) : (
+                <ChevronsLeft className="h-4 w-4" />
+              )}
+            </button>
           )}
           {!collapsed && (
-            <div>
-              <p className="text-sm font-semibold tracking-wide text-white">{companyName}</p>
-            </div>
+            <>
+              {logo ? (
+                <img
+                  src={logo}
+                  alt="Company logo"
+                  className="h-11 w-11 rounded-2xl object-contain bg-white/10 p-1"
+                />
+              ) : (
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 via-yellow-300 to-orange-500 text-slate-950 shadow-lg shadow-amber-500/20">
+                  <ShieldCheck className="h-5 w-5" />
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold tracking-wide text-white">{companyName}</p>
+              </div>
+            </>
           )}
         </div>
       </div>
