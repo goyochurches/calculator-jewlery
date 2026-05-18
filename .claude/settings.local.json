@@ -13,7 +13,11 @@
       "Bash(docker run *)",
       "Bash(grep -n \"^export\\\\|^}$\\\\|^function \" D:/wamp64/www/calculator-jewlery/src/pages/QuoteBuilder.tsx)",
       "Read(//d/wamp64/www/price-calculator/src/main/java/**)",
-      "Read(//d/wamp64/www/price-calculator/src/main/resources/db/migration/**)"
+      "Read(//d/wamp64/www/price-calculator/src/main/resources/db/migration/**)",
+      "Bash(git -C D:/wamp64/www/calculator-jewlery status)",
+      "Bash(git -C D:/wamp64/www/price-calculator status)",
+      "Bash(git -C D:/wamp64/www/calculator-jewlery diff -- src/pages/QuoteBuilder.tsx)",
+      "Bash(git *)"
     ]
   }
 }
