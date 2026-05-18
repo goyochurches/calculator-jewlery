@@ -4,7 +4,6 @@ import { Skeleton } from '@/components/ui/skeleton'
 import {
   DIAMOND_TYPE_OPTIONS,
   JEWELRY_METAL_OPTIONS,
-  SETTING_LABOR_MASTER,
 } from '@/constants/config'
 import { useAuth } from '@/context/AuthContext'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
@@ -43,13 +42,6 @@ const METAL_GROUPS: Array<{ group: string; keys: JewelryMetalOption[] }> = [
 
 const diamondTypeKeys = Object.keys(DIAMOND_TYPE_OPTIONS) as Array<keyof typeof DIAMOND_TYPE_OPTIONS>
 
-// Mapeo del tipo de diamante elegido en el UI al stoneType que guarda el
-// backend en diamond_size_config. Natural → NATURAL, Lab → LAB.
-// Si añadimos más tipos en el futuro, mapearlos aquí.
-const DIAMOND_TYPE_TO_STONE: Record<keyof typeof DIAMOND_TYPE_OPTIONS, 'NATURAL' | 'LAB'> = {
-  natural: 'NATURAL',
-  'lab-grown': 'LAB',
-}
 
 export function QuoteBuilderPage() {
   const { user } = useAuth()
@@ -63,7 +55,6 @@ export function QuoteBuilderPage() {
   const [fieldErrors, setFieldErrors] = useState<{ title?: string; client?: string }>({})
   const [selectedMetal, setSelectedMetal] = useState<JewelryMetalOption>('gold-18k-white')
   const [ringLabor, setRingLabor] = useState('medium')
-  const [cadDesign, setCadDesign] = useState('medium')
   const [weightGrams, setWeightGrams] = useState(12)
   const [ringWidth, setRingWidth] = useState(2.5)
   const [fingerSize, setFingerSize] = useState(7)
