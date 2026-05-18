@@ -557,65 +557,35 @@ export function QuoteBuilderPage() {
                 Pick the type (Natural or Lab), the stone size, the setter type and the quantity.
               </p>
             </CardHeader>
-            <CardContent className="grid gap-5 pt-6 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-900">Type of diamond</label>
-                <select value={diamondType} onChange={e => setDiamondType(e.target.value as keyof typeof DIAMOND_TYPE_OPTIONS)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
-                  {diamondTypeKeys.map(key => (
-                    <option key={key} value={key}>{DIAMOND_TYPE_OPTIONS[key].label}</option>
-                  ))}
-                </select>
-              </div>
+            <CardContent className="space-y-6 pt-6">
+              {renderStoneSection({
+                title: 'Main stone',
+                hint: '0 or 1 center stone.',
+                items: mainStone ? [mainStone] : [],
+                canAdd: !mainStone,
+                addLabel: 'Add main stone',
+                onAdd: () => addStone('MAIN'),
+              })}
+              {renderStoneSection({
+                title: 'Side stones',
+                hint: '0..N accent stones. Add as many as you need.',
+                items: sideStones,
+                canAdd: true,
+                addLabel: 'Add side stone',
+                onAdd: () => addStone('SIDE'),
+              })}
+              {renderStoneSection({
+                title: 'Melee stones',
+                hint: '0..N pavé / melee. Add as many as you need.',
+                items: meleeStones,
+                canAdd: true,
+                addLabel: 'Add melee stone',
+                onAdd: () => addStone('MELEE'),
+              })}
 
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-900">Amount of diamonds</label>
-                <input type="number" min={0} step={1} value={diamondAmount || ''} placeholder="0"
-                  onChange={e => handleAmountChange(Number(e.target.value) || 0)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-900">Carats</label>
-                <input type="number" min={0} step={0.0001} value={diamondCarats || ''} placeholder="0.0000"
-                  onChange={e => handleCaratsChange(Number(e.target.value) || 0)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-900">
-                  Sizes of diamonds ({DIAMOND_TYPE_OPTIONS[diamondType].label})
-                </label>
-                <select value={diamondSize} onChange={e => setDiamondSize(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
-                  {filteredDiamondSizes.length === 0 && (
-                    <option value="">No sizes for this type</option>
-                  )}
-                  {filteredDiamondSizes.map(d => (
-                    <option key={d.id} value={d.sizeKey}>
-                      {d.label} — ${d.basePrice}{d.ctPerStone != null ? '/ct' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-900">Setter type</label>
-                <select value={setterType} onChange={e => setSetterType(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
-                  {config.setters.map(s => (
-                    <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-semibold text-slate-900">Setting labor</label>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900">
-                  ${pricing.settingFeePerStone.toLocaleString('en-US', { minimumFractionDigits: 2 })} per diamond × {diamondAmount}
-                  {' = '}
-                  <strong>${pricing.settingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
-                </div>
+              <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm">
+                <span className="font-semibold text-slate-900">Setting labor (all stones)</span>
+                <strong className="text-slate-900">${pricing.settingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
               </div>
             </CardContent>
           </Card>
