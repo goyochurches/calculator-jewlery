@@ -236,6 +236,9 @@ export function QuoteBuilderPage() {
     setSaving(true)
     setSaveError(null)
     try {
+      // Legacy fields are populated with aggregates so older list views keep
+      // rendering until they're rewritten to consume `stones` directly.
+      const firstStone = mainStone ?? sideStones[0] ?? meleeStones[0] ?? null
       const q = await quotesService.create({
         title: quoteTitle.trim(),
         clientName: client ? `${client.name}${client.surname ? ' ' + client.surname : ''}` : '',
@@ -243,25 +246,29 @@ export function QuoteBuilderPage() {
         status: 'PENDING',
         metal: selectedMetal,
         ringLabor,
-        // Combined "CAD Design & Jeweler's Time" → persist the same key on
-        // both fields so legacy queries that index by cadDesign keep working.
         cadDesign: ringLabor,
-        diamondAmount,
-        diamondCarats,
-        diamondType,
-        diamondSize,
+        diamondAmount: pricing.totalAmount,
+        diamondCarats: pricing.totalCarats,
+        diamondType: firstStone?.stoneType ?? 'natural',
+        diamondSize: firstStone?.sizeKey ?? '',
         weightGrams,
         ringWidth,
         fingerSize,
-        // Campos legacy: seguimos enviándolos en 0 para mantener compatibilidad
-        // con el modelo del backend hasta que se elimine la columna.
         laborHours: 0,
         hourlyRate: 0,
         extraCosts,
         total: pricing.total,
         photo: photo ?? undefined,
         engraving,
-        setterType,
+        setterType: firstStone?.setterType ?? '',
+        stones: stones.map((s, idx) => ({
+          role: s.role,
+          stoneType: s.stoneType,
+          sizeKey: s.sizeKey,
+          carats: s.carats,
+          setterType: s.setterType,
+          sortOrder: idx,
+        })),
       }, user.id)
       setSavedQuote({ id: q.id, title: q.title, total: pricing.total, publicToken: q.publicToken ?? null })
       setQuoteTitle('')
