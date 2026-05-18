@@ -247,7 +247,7 @@ export function QuoteBuilderPage() {
         </Card>
       )}
 
-      <section className="grid gap-4 xl:grid-cols-[1.45fr_1fr]">
+      <section>
         <Card className="rounded-[30px] border-0 text-white shadow-[0_30px_80px_rgba(15,23,42,0.24)]" style={{ backgroundColor: 'var(--theme-primary)' }}>
           <CardContent className="relative p-5 sm:p-8">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.24),transparent_25%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.18),transparent_28%)]" />
@@ -284,41 +284,6 @@ export function QuoteBuilderPage() {
                   </p>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-          <CardHeader className="border-b border-slate-100">
-            <CardTitle className="text-base font-semibold text-slate-900">Estimated total</CardTitle>
-            <p className="text-sm text-slate-500">Live breakdown for the current quote.</p>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-6">
-            <div className="rounded-2xl p-5 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}>
-              <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Quote total</p>
-              <p className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                ${((pricing.total - pricing.engravingFee) * 2.5 + pricing.engravingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </p>
-              <p className="mt-2 text-sm text-slate-300">
-                {selectedMetalConfig.label} | {ringLaborLabel}
-              </p>
-            </div>
-
-            <div className="space-y-3 text-sm">
-              {[
-                ['Material reference', pricing.materialCost],
-                ['CAD design & Jeweler\'s time', pricing.ringLaborFee],
-                ['Setting labor', pricing.settingFee],
-                [`Diamonds (${diamondCarats} ct × $${pricing.diamondUnitPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct)`, pricing.diamondCost],
-                ['Ring width fee', pricing.widthFee],
-                ['Hand engraving (milgrain)', pricing.engravingFee],
-                ['Extra costs', extraCosts],
-              ].map(([label, value]) => (
-                <div key={label as string} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-                  <span className="text-slate-500">{label}</span>
-                  <span className="font-semibold text-slate-900">${(value as number).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                </div>
-              ))}
             </div>
           </CardContent>
         </Card>
@@ -597,8 +562,43 @@ export function QuoteBuilderPage() {
           </div>
         </div>
 
-        {/* ── Columna derecha: mini-cards de resumen ─────────────────────── */}
-        <div className="grid gap-4 content-start">
+        {/* ── Columna derecha: estimated total (sticky) + mini-cards ─────── */}
+        <div className="space-y-4">
+          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)] xl:sticky xl:top-4 xl:z-10">
+            <CardHeader className="border-b border-slate-100">
+              <CardTitle className="text-base font-semibold text-slate-900">Estimated total</CardTitle>
+              <p className="text-sm text-slate-500">Live breakdown for the current quote.</p>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-6">
+              <div className="rounded-2xl p-5 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}>
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Quote total</p>
+                <p className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+                  ${((pricing.total - pricing.engravingFee) * 2.5 + pricing.engravingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="mt-2 text-sm text-slate-300">
+                  {selectedMetalConfig.label} | {ringLaborLabel}
+                </p>
+              </div>
+
+              <div className="space-y-3 text-sm">
+                {[
+                  ['Material reference', pricing.materialCost],
+                  ['CAD design & Jeweler\'s time', pricing.ringLaborFee],
+                  ['Setting labor', pricing.settingFee],
+                  [`Diamonds (${diamondCarats} ct × $${pricing.diamondUnitPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct)`, pricing.diamondCost],
+                  ['Ring width fee', pricing.widthFee],
+                  ['Hand engraving (milgrain)', pricing.engravingFee],
+                  ['Extra costs', extraCosts],
+                ].map(([label, value]) => (
+                  <div key={label as string} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
+                    <span className="text-slate-500">{label}</span>
+                    <span className="font-semibold text-slate-900">${(value as number).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
