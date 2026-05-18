@@ -415,6 +415,7 @@ export function QuoteBuilderPage() {
           sizeKey: s.sizeKey,
           carats: parseNum(s.carats),
           setterType: s.setterType,
+          labReport: s.role === 'MELEE' ? null : (s.labReport || null),
           sortOrder: idx,
         })),
       }, user.id)

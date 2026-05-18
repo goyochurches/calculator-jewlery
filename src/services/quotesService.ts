@@ -8,6 +8,7 @@ interface ApiStone {
   sizeKey: string
   carats: number
   setterType: string
+  labReport?: string | null
   sortOrder?: number | null
 }
 
@@ -85,6 +86,7 @@ function mapStone(s: ApiStone): QuoteStone {
     sizeKey: s.sizeKey,
     carats: s.carats,
     setterType: s.setterType,
+    labReport: s.labReport ?? null,
     sortOrder: s.sortOrder ?? null,
   }
 }
