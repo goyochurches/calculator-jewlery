@@ -123,8 +123,17 @@ function formatExpiration(iso: string | null | undefined): { label: string; expi
  * even when their stored keys (small/medium/etc.) no longer match the
  * current spec.
  */
+type StoneRole = 'MAIN' | 'SIDE' | 'MELEE'
+
+const ROLE_THEME: Record<StoneRole, { label: string; dot: string; ring: string; tint: string; chip: string }> = {
+  MAIN:  { label: 'Main',  dot: 'bg-amber-500',   ring: 'border-amber-200',   tint: 'bg-amber-50/40',   chip: 'bg-amber-100 text-amber-800' },
+  SIDE:  { label: 'Side',  dot: 'bg-sky-500',     ring: 'border-sky-200',     tint: 'bg-sky-50/40',     chip: 'bg-sky-100 text-sky-800' },
+  MELEE: { label: 'Melee', dot: 'bg-emerald-500', ring: 'border-emerald-200', tint: 'bg-emerald-50/40', chip: 'bg-emerald-100 text-emerald-800' },
+}
+
 export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToken, isAdmin = false }: QuoteDetailPanelProps) {
   const [refreshing, setRefreshing] = useState(false)
+  const config = useQuoteConfig()
   const expiration = formatExpiration(quote.publicTokenExpiresAt)
 
   const handleRefresh = async () => {
@@ -134,18 +143,31 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
     finally { setRefreshing(false) }
   }
 
-  const metalCfg    = JEWELRY_METAL_OPTIONS[quote.metal]                                                        ?? { label: quote.metal }
-  const settingCfg  = SETTING_LABOR_MASTER[quote.diamondSize as keyof typeof SETTING_LABOR_MASTER]               ?? { feePerStone: 0, minutesPerStone: 0 }
-  const diamondBase = DIAMOND_SIZE_OPTIONS[quote.diamondSize as keyof typeof DIAMOND_SIZE_OPTIONS]               ?? { basePrice: 0, label: quote.diamondSize }
-  const diamondMul  = DIAMOND_TYPE_OPTIONS[quote.diamondType as keyof typeof DIAMOND_TYPE_OPTIONS]               ?? { multiplier: 1, label: quote.diamondType }
-  const ringLaborCfg = RING_LABOR_OPTIONS[quote.ringLabor as keyof typeof RING_LABOR_OPTIONS]
-  const cadCfg       = CAD_DESIGN_OPTIONS[quote.cadDesign as keyof typeof CAD_DESIGN_OPTIONS]
-  const fingerFee    = FINGER_SIZE_FEES[quote.fingerSize as keyof typeof FINGER_SIZE_FEES] ?? 0
-  const benchCost    = (quote.laborHours ?? 0) * (quote.hourlyRate ?? 0)
-  const diamondUnitPrice = diamondBase.basePrice * diamondMul.multiplier
-  const diamondCost = (quote.diamondAmount ?? 0) * diamondUnitPrice
-  const settingFee  = (quote.diamondAmount ?? 0) * settingCfg.feePerStone
-  const widthFee    = Math.max(0, (quote.ringWidth ?? 2) - 2) * 18
+  const metalCfg = JEWELRY_METAL_OPTIONS[quote.metal] ?? { label: quote.metal }
+  const ringLaborCfg = config.ringLaborMap[quote.ringLabor]
+  const stones: QuoteStone[] = quote.stones ?? []
+  const stoneByRole: Record<StoneRole, QuoteStone[]> = {
+    MAIN:  stones.filter(s => s.role === 'MAIN'),
+    SIDE:  stones.filter(s => s.role === 'SIDE'),
+    MELEE: stones.filter(s => s.role === 'MELEE'),
+  }
+
+  // Aggregate cost + setting labor from the persisted stones[]. Falls back to
+  // the legacy diamondCarats/diamondType/diamondSize fields if a quote was
+  // saved before the multi-stone refactor.
+  const stoneTotals = stones.reduce((acc, s) => {
+    const sizeCfg = config.diamondSizeMap[s.sizeKey]
+    const mult = DIAMOND_TYPE_OPTIONS[s.stoneType as keyof typeof DIAMOND_TYPE_OPTIONS]?.multiplier ?? 1
+    const pricePerCarat = (sizeCfg?.basePrice ?? 0) * mult
+    const setterFee = config.setterMap[s.setterType]?.fee ?? 0
+    const ct = sizeCfg?.ctPerStone ?? 0
+    const amount = ct > 0 ? Math.round((s.carats ?? 0) / ct) : 0
+    acc.cost += (s.carats ?? 0) * pricePerCarat
+    acc.labor += amount * setterFee
+    acc.carats += s.carats ?? 0
+    acc.amount += amount
+    return acc
+  }, { cost: 0, labor: 0, carats: 0, amount: 0 })
 
   const showAdminActions = isAdmin
     && onStatusChange
@@ -173,7 +195,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </p>
           <p className="mt-1.5 text-sm text-white/70">
-            {metalCfg.label} · {ringLaborCfg?.label ?? quote.ringLabor} · {cadCfg?.label ?? quote.cadDesign}
+            {metalCfg.label} · {ringLaborCfg?.label ?? quote.ringLabor}
           </p>
         </div>
 
