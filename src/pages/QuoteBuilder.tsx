@@ -65,6 +65,7 @@ export function QuoteBuilderPage() {
   const [ringLabor, setRingLabor] = useState('medium')
   const [cadDesign, setCadDesign] = useState('medium')
   const [diamondAmount, setDiamondAmount] = useState(0)
+  const [diamondCarats, setDiamondCarats] = useState(0)
   const [diamondType, setDiamondType] = useState<keyof typeof DIAMOND_TYPE_OPTIONS>('natural')
   const [diamondSize, setDiamondSize] = useState('1-1.04')
   const [weightGrams, setWeightGrams] = useState(12)
@@ -123,16 +124,13 @@ export function QuoteBuilderPage() {
     const settingFee = diamondAmount * settingFeePerStone
     const settingTimeHours = (diamondAmount * settingMinutesPerStone) / 60
     const widthFee = Math.max(0, ringWidth - 2) * 18
-    // basePrice for NATURAL rows is USD per carat (supplier sheet, V11).
-    // ctPerStone holds the carat weight of one stone of this diameter, so
-    // per-stone cost is basePrice × ctPerStone. LAB rows keep per-stone
-    // prices and have ctPerStone = null → multiplier falls back to 1.
+    // basePrice is USD per carat → user enters total carats directly.
+    // diamondAmount stays for the setting labor fee (per-stone).
     const sizeCfg = config.diamondSizeMap[diamondSize]
-    const diamondUnitPrice =
-      (sizeCfg?.basePrice ?? 0) *
-      (sizeCfg?.ctPerStone ?? 1) *
-      DIAMOND_TYPE_OPTIONS[diamondType].multiplier
-    const diamondCost = diamondAmount * diamondUnitPrice
+    const pricePerCarat =
+      (sizeCfg?.basePrice ?? 0) * DIAMOND_TYPE_OPTIONS[diamondType].multiplier
+    const diamondCost = diamondCarats * pricePerCarat
+    const diamondUnitPrice = pricePerCarat
     const engravingFee = engraving ? HAND_ENGRAVING_FEE : 0
 
     const total =
