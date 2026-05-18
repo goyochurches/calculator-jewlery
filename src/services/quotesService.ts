@@ -12,6 +12,7 @@ interface ApiQuote {
   ringLabor: string
   cadDesign: string
   diamondAmount: number
+  diamondCarats?: number | null
   diamondType: string
   diamondSize: string
   weightGrams: number
@@ -44,6 +45,7 @@ function mapQuote(q: ApiQuote): SavedQuote {
     ringLabor: q.ringLabor as SavedQuote['ringLabor'],
     cadDesign: q.cadDesign as SavedQuote['cadDesign'],
     diamondAmount: q.diamondAmount,
+    diamondCarats: q.diamondCarats ?? 0,
     diamondType: q.diamondType as SavedQuote['diamondType'],
     diamondSize: q.diamondSize as SavedQuote['diamondSize'],
     weightGrams: q.weightGrams,
