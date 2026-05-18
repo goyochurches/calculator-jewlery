@@ -176,7 +176,15 @@ export function QuoteBuilderPage() {
   const sideStones  = stones.filter(s => s.role === 'SIDE')
   const meleeStones = stones.filter(s => s.role === 'MELEE')
 
-  const renderStoneRow = (stone: StoneRow) => {
+  const themeForRole = (role: StoneRole) => {
+    switch (role) {
+      case 'MAIN':  return { label: 'Main',  dot: 'bg-amber-500',   ring: 'border-amber-200',   tint: 'bg-amber-50/40',   chip: 'bg-amber-100 text-amber-800',  btn: 'bg-amber-600 hover:bg-amber-500' }
+      case 'SIDE':  return { label: 'Side',  dot: 'bg-sky-500',     ring: 'border-sky-200',     tint: 'bg-sky-50/40',     chip: 'bg-sky-100 text-sky-800',      btn: 'bg-sky-600 hover:bg-sky-500' }
+      case 'MELEE': return { label: 'Melee', dot: 'bg-emerald-500', ring: 'border-emerald-200', tint: 'bg-emerald-50/40', chip: 'bg-emerald-100 text-emerald-800', btn: 'bg-emerald-600 hover:bg-emerald-500' }
+    }
+  }
+
+  const renderStoneRow = (stone: StoneRow, index: number) => {
     const sizes = stone.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
     const sizeCfg = config.diamondSizeMap[stone.sizeKey]
     const pricePerCarat = (sizeCfg?.basePrice ?? 0) * DIAMOND_TYPE_OPTIONS[stone.stoneType].multiplier
@@ -185,9 +193,24 @@ export function QuoteBuilderPage() {
     const stoneCost = caratsNum * pricePerCarat
     const stoneSetterFee = config.setterMap[stone.setterType]?.fee ?? 0
     const stoneLabor = amountNum * stoneSetterFee
+    const theme = themeForRole(stone.role)
     return (
-      <div key={stone.uid} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
-        <div className="grid gap-3 md:grid-cols-2">
+      <div key={stone.uid} className={`relative rounded-2xl border ${theme.ring} ${theme.tint} p-4 space-y-3 overflow-hidden`}>
+        <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${theme.dot}`} aria-hidden />
+
+        <div className="flex items-center justify-between gap-2 pl-2">
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.chip}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${theme.dot}`} aria-hidden />
+            {theme.label} stone #{index + 1}
+          </span>
+          <button type="button" onClick={() => removeStone(stone.uid)}
+            aria-label="Remove stone"
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/70 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 pl-2">
           <div className="space-y-1">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type</label>
             <select value={stone.stoneType}
@@ -248,48 +271,50 @@ export function QuoteBuilderPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-          <span>
-            Stone: <strong className="text-slate-900">${stoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
-            {' · '}
-            Setting: <strong className="text-slate-900">${stoneLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
-          </span>
-          <button type="button" onClick={() => removeStone(stone.uid)}
-            className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">
-            Remove
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 pl-2 pt-2 border-t border-white/60 text-xs text-slate-500">
+          <span>Stone <strong className="text-slate-900">${stoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+          <span>Setting <strong className="text-slate-900">${stoneLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
         </div>
       </div>
     )
   }
 
   const renderStoneSection = (opts: {
+    role: StoneRole
     title: string
     hint: string
     items: StoneRow[]
     canAdd: boolean
     addLabel: string
     onAdd: () => void
-  }) => (
-    <div className="space-y-3">
-      <div className="flex items-baseline justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-900">{opts.title}</h3>
-          <p className="text-xs text-slate-500">{opts.hint}</p>
+  }) => {
+    const theme = themeForRole(opts.role)
+    return (
+    <div className="space-y-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className={`h-8 w-8 rounded-xl ${theme.chip} flex items-center justify-center`}>
+            <Diamond className="h-4 w-4" />
+          </span>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">{opts.title} <span className="ml-1 text-xs font-medium text-slate-400">· {opts.items.length}</span></h3>
+            <p className="text-xs text-slate-500">{opts.hint}</p>
+          </div>
         </div>
         {opts.canAdd && (
           <button type="button" onClick={opts.onAdd}
-            className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700">
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold text-white transition ${theme.btn}`}>
             + {opts.addLabel}
           </button>
         )}
       </div>
       {opts.items.length === 0
-        ? <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-xs text-slate-400">None.</p>
-        : opts.items.map(renderStoneRow)
+        ? <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-xs text-slate-400">None yet.</p>
+        : <div className="space-y-3">{opts.items.map((s, i) => renderStoneRow(s, i))}</div>
       }
     </div>
-  )
+    )
+  }
 
   const pricing = useMemo(() => {
     const metalPricePerGram = selectedMetalConfig.pricePerGram
@@ -674,38 +699,44 @@ export function QuoteBuilderPage() {
                 <CardTitle className="text-base font-semibold text-slate-900">Stone Setting</CardTitle>
               </div>
               <p className="text-sm text-slate-500">
-                Pick the type (Natural or Lab), the stone size, the setter type and the quantity.
+                Break the piece down into a main stone, side stones and melee — each with its own size, carats and setting type.
               </p>
             </CardHeader>
-            <CardContent className="space-y-6 pt-6">
+            <CardContent className="space-y-4 pt-6">
               {renderStoneSection({
+                role: 'MAIN',
                 title: 'Main stone',
-                hint: '0 or 1 center stone.',
+                hint: 'The center stone. Pick one or skip.',
                 items: mainStone ? [mainStone] : [],
                 canAdd: !mainStone,
-                addLabel: 'Add main stone',
+                addLabel: 'Add main',
                 onAdd: () => addStone('MAIN'),
               })}
               {renderStoneSection({
+                role: 'SIDE',
                 title: 'Side stones',
-                hint: '0..N accent stones. Add as many as you need.',
+                hint: 'Accent stones. Add as many as you need.',
                 items: sideStones,
                 canAdd: true,
-                addLabel: 'Add side stone',
+                addLabel: 'Add side',
                 onAdd: () => addStone('SIDE'),
               })}
               {renderStoneSection({
+                role: 'MELEE',
                 title: 'Melee stones',
-                hint: '0..N pavé / melee. Add as many as you need.',
+                hint: 'Pavé / melee. Add as many as you need.',
                 items: meleeStones,
                 canAdd: true,
-                addLabel: 'Add melee stone',
+                addLabel: 'Add melee',
                 onAdd: () => addStone('MELEE'),
               })}
 
-              <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm">
-                <span className="font-semibold text-slate-900">Setting labor (all stones)</span>
-                <strong className="text-slate-900">${pricing.settingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-900 px-5 py-4 text-sm text-white">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Setting labor — all stones</p>
+                  <p className="text-xs text-slate-500">{pricing.totalAmount} stone{pricing.totalAmount === 1 ? '' : 's'} · {pricing.totalCarats} ct total</p>
+                </div>
+                <strong className="text-xl">${pricing.settingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
               </div>
             </CardContent>
           </Card>
