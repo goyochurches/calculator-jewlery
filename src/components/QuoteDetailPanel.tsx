@@ -1,14 +1,10 @@
 import {
-  CAD_DESIGN_OPTIONS,
-  DIAMOND_SIZE_OPTIONS,
   DIAMOND_TYPE_OPTIONS,
-  FINGER_SIZE_FEES,
   JEWELRY_METAL_OPTIONS,
-  RING_LABOR_OPTIONS,
-  SETTING_LABOR_MASTER,
 } from '@/constants/config'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
-import type { QuoteStatus, SavedQuote } from '@/types'
+import { useQuoteConfig } from '@/hooks/useQuoteConfig'
+import type { QuoteStatus, QuoteStone, SavedQuote } from '@/types'
 import { Check, RefreshCw, X, XCircle } from 'lucide-react'
 import { useState } from 'react'
 
