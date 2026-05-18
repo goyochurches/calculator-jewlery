@@ -64,16 +64,26 @@ export function QuoteBuilderPage() {
   const [selectedMetal, setSelectedMetal] = useState<JewelryMetalOption>('gold-18k-white')
   const [ringLabor, setRingLabor] = useState('medium')
   const [cadDesign, setCadDesign] = useState('medium')
-  const [diamondAmount, setDiamondAmount] = useState(0)
-  const [diamondCarats, setDiamondCarats] = useState(0)
-  const [diamondType, setDiamondType] = useState<keyof typeof DIAMOND_TYPE_OPTIONS>('natural')
-  const [diamondSize, setDiamondSize] = useState('1-1.04')
   const [weightGrams, setWeightGrams] = useState(12)
   const [ringWidth, setRingWidth] = useState(2.5)
   const [fingerSize, setFingerSize] = useState(7)
   const [extraCosts, setExtraCosts] = useState(0)
   const [engraving, setEngraving] = useState(false)
-  const [setterType, setSetterType] = useState<string>('ss_melee')
+
+  // Multi-stone breakdown: 0 or 1 MAIN, plus 0..N SIDE and 0..N MELEE.
+  // amount lives in UI state so the user can override it independently of
+  // carats (Case 3); only `carats` is persisted to the backend.
+  type StoneRole = 'MAIN' | 'SIDE' | 'MELEE'
+  interface StoneRow {
+    uid: string
+    role: StoneRole
+    stoneType: 'natural' | 'lab-grown'
+    sizeKey: string
+    carats: number
+    amount: number
+    setterType: string
+  }
+  const [stones, setStones] = useState<StoneRow[]>([])
 
   const [photo, setPhoto] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
@@ -95,60 +105,97 @@ export function QuoteBuilderPage() {
 
   const selectedMetalConfig = JEWELRY_METAL_OPTIONS[selectedMetal]
 
-  // Tamaños de diamante filtrados por el tipo seleccionado (Natural / Lab).
-  const filteredDiamondSizes = useMemo(() => {
-    const stoneType = DIAMOND_TYPE_TO_STONE[diamondType]
-    return config.diamondSizes.filter(d => d.stoneType === stoneType)
-  }, [config.diamondSizes, diamondType])
+  const sizesByStoneType = useMemo(() => ({
+    NATURAL: config.diamondSizes.filter(d => d.stoneType === 'NATURAL'),
+    LAB: config.diamondSizes.filter(d => d.stoneType === 'LAB'),
+  }), [config.diamondSizes])
 
-  // Si el size actual ya no pertenece al tipo elegido, saltamos al primero
-  // disponible — así nunca queda un valor inválido en el formulario.
-  useEffect(() => {
-    if (filteredDiamondSizes.length === 0) return
-    const exists = filteredDiamondSizes.some(d => d.sizeKey === diamondSize)
-    if (!exists) setDiamondSize(filteredDiamondSizes[0].sizeKey)
-  }, [filteredDiamondSizes, diamondSize])
-
-  // Carats ↔ Amount stay in sync via the selected diameter's ct-per-stone.
-  // Either field can drive the other; the user can still override either side
-  // after the auto-derived value lands (last edit wins).
-  const ctPerStone = config.diamondSizeMap[diamondSize]?.ctPerStone ?? 0
-  const handleAmountChange = (amount: number) => {
-    setDiamondAmount(amount)
-    if (ctPerStone > 0) {
-      setDiamondCarats(Number((amount * ctPerStone).toFixed(4)))
+  const defaultStoneFor = (role: StoneRole): StoneRow => {
+    const sizes = sizesByStoneType.NATURAL
+    const firstSetter = config.setters[0]?.typeKey ?? ''
+    return {
+      uid: crypto.randomUUID(),
+      role,
+      stoneType: 'natural',
+      sizeKey: sizes[0]?.sizeKey ?? '',
+      carats: 0,
+      amount: 0,
+      setterType: firstSetter,
     }
   }
-  const handleCaratsChange = (carats: number) => {
-    setDiamondCarats(carats)
-    if (ctPerStone > 0) {
-      setDiamondAmount(Math.round(carats / ctPerStone))
-    }
+
+  const addStone = (role: StoneRole) => {
+    if (role === 'MAIN' && stones.some(s => s.role === 'MAIN')) return
+    setStones(prev => [...prev, defaultStoneFor(role)])
   }
+  const removeStone = (uid: string) => {
+    setStones(prev => prev.filter(s => s.uid !== uid))
+  }
+  const patchStone = (uid: string, patch: Partial<StoneRow>) => {
+    setStones(prev => prev.map(s => {
+      if (s.uid !== uid) return s
+      const next = { ...s, ...patch }
+      // If the size or type changed, jump to a valid size for that stoneType.
+      if (patch.stoneType && !patch.sizeKey) {
+        const list = patch.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
+        if (!list.some(d => d.sizeKey === next.sizeKey)) {
+          next.sizeKey = list[0]?.sizeKey ?? ''
+        }
+      }
+      return next
+    }))
+  }
+
+  // Two-way sync between carats and amount for a single stone via ctPerStone.
+  // Either field can drive the other; user can still override (last edit wins).
+  const onStoneCaratsChange = (uid: string, carats: number) => {
+    setStones(prev => prev.map(s => {
+      if (s.uid !== uid) return s
+      const ct = config.diamondSizeMap[s.sizeKey]?.ctPerStone ?? 0
+      const amount = ct > 0 ? Math.round(carats / ct) : s.amount
+      return { ...s, carats, amount }
+    }))
+  }
+  const onStoneAmountChange = (uid: string, amount: number) => {
+    setStones(prev => prev.map(s => {
+      if (s.uid !== uid) return s
+      const ct = config.diamondSizeMap[s.sizeKey]?.ctPerStone ?? 0
+      const carats = ct > 0 ? Number((amount * ct).toFixed(4)) : s.carats
+      return { ...s, carats, amount }
+    }))
+  }
+
+  const mainStone   = stones.find(s => s.role === 'MAIN') ?? null
+  const sideStones  = stones.filter(s => s.role === 'SIDE')
+  const meleeStones = stones.filter(s => s.role === 'MELEE')
 
   const pricing = useMemo(() => {
     const metalPricePerGram = selectedMetalConfig.pricePerGram
     const materialCost = metalPricePerGram * weightGrams
-    // Single combined "CAD Design & Jeweler's Time" level → uses Jeweler's
-    // time fee only. CAD design as a separate cost was removed; we still
-    // persist cadDesign = ringLabor on the quote for backwards compatibility.
     const ringLaborFee = config.ringLaborMap[ringLabor]?.fee ?? 0
     const cadFee = 0
-    const setterCfg = config.setterMap[setterType]
-    // Si hay un setter elegido, usamos su fee. Si no, caemos al master legacy.
-    const settingFeePerStone = setterCfg?.fee ?? SETTING_LABOR_MASTER[diamondSize as keyof typeof SETTING_LABOR_MASTER]?.feePerStone ?? 0
-    const settingMinutesPerStone = SETTING_LABOR_MASTER[diamondSize as keyof typeof SETTING_LABOR_MASTER]?.minutesPerStone ?? 0
-    const settingFee = diamondAmount * settingFeePerStone
-    const settingTimeHours = (diamondAmount * settingMinutesPerStone) / 60
     const widthFee = Math.max(0, ringWidth - 2) * 18
-    // basePrice is USD per carat → user enters total carats directly.
-    // diamondAmount stays for the setting labor fee (per-stone).
-    const sizeCfg = config.diamondSizeMap[diamondSize]
-    const pricePerCarat =
-      (sizeCfg?.basePrice ?? 0) * DIAMOND_TYPE_OPTIONS[diamondType].multiplier
-    const diamondCost = diamondCarats * pricePerCarat
-    const diamondUnitPrice = pricePerCarat
     const engravingFee = engraving ? HAND_ENGRAVING_FEE : 0
+
+    // Per-stone cost = carats × pricePerCarat (× type multiplier).
+    // Per-stone setting labor = amount × setter fee.
+    let diamondCost = 0
+    let settingFee = 0
+    let totalCarats = 0
+    let totalAmount = 0
+    const stoneBreakdown = stones.map(s => {
+      const sizeCfg = config.diamondSizeMap[s.sizeKey]
+      const mult = DIAMOND_TYPE_OPTIONS[s.stoneType].multiplier
+      const pricePerCarat = (sizeCfg?.basePrice ?? 0) * mult
+      const cost = s.carats * pricePerCarat
+      const setterFee = config.setterMap[s.setterType]?.fee ?? 0
+      const labor = s.amount * setterFee
+      diamondCost += cost
+      settingFee += labor
+      totalCarats += s.carats
+      totalAmount += s.amount
+      return { uid: s.uid, cost, labor, pricePerCarat, setterFee }
+    })
 
     const total =
       materialCost +
@@ -165,19 +212,18 @@ export function QuoteBuilderPage() {
       materialCost,
       ringLaborFee,
       cadFee,
-      settingFeePerStone,
       settingFee,
-      settingMinutesPerStone,
-      settingTimeHours,
       widthFee,
-      diamondUnitPrice,
       diamondCost,
       engravingFee,
+      totalCarats: Number(totalCarats.toFixed(4)),
+      totalAmount,
+      stoneBreakdown,
       total,
     }
   }, [
-    cadDesign, config, diamondAmount, diamondCarats, diamondSize, diamondType, engraving,
-    extraCosts, ringLabor, ringWidth, selectedMetalConfig, setterType, weightGrams,
+    config, engraving, extraCosts, ringLabor, ringWidth, selectedMetalConfig,
+    stones, weightGrams,
   ])
 
   const handleQuoteReady = async () => {
