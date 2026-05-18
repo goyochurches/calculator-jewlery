@@ -76,6 +76,7 @@ export function QuoteBuilderPage() {
     carats: string
     amount: string
     setterType: string
+    labReport: string
   }
   const [stones, setStones] = useState<StoneRow[]>([])
   const parseNum = (s: string) => {
@@ -119,6 +120,7 @@ export function QuoteBuilderPage() {
       carats: '',
       amount: '',
       setterType: firstSetter,
+      labReport: '',
     }
   }
 
@@ -176,9 +178,11 @@ export function QuoteBuilderPage() {
     const sizes = stone.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
     const sizeCfg = config.diamondSizeMap[stone.sizeKey]
     const pricePerCarat = (sizeCfg?.basePrice ?? 0) * DIAMOND_TYPE_OPTIONS[stone.stoneType].multiplier
-    const stoneCost = stone.carats * pricePerCarat
+    const caratsNum = parseNum(stone.carats)
+    const amountNum = parseNum(stone.amount)
+    const stoneCost = caratsNum * pricePerCarat
     const stoneSetterFee = config.setterMap[stone.setterType]?.fee ?? 0
-    const stoneLabor = stone.amount * stoneSetterFee
+    const stoneLabor = amountNum * stoneSetterFee
     return (
       <div key={stone.uid} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
         <div className="grid gap-3 md:grid-cols-2">
@@ -209,20 +213,20 @@ export function QuoteBuilderPage() {
 
           <div className="space-y-1">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Carats</label>
-            <input type="number" min={0} step={0.0001} value={stone.carats || ''} placeholder="0.0000"
-              onChange={e => onStoneCaratsChange(stone.uid, Number(e.target.value) || 0)}
+            <input type="text" inputMode="decimal" value={stone.carats} placeholder="0.0000"
+              onChange={e => onStoneCaratsChange(stone.uid, e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
           </div>
 
           <div className="space-y-1">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Amount</label>
-            <input type="number" min={0} step={1} value={stone.amount || ''} placeholder="0"
-              onChange={e => onStoneAmountChange(stone.uid, Number(e.target.value) || 0)}
+            <input type="text" inputMode="numeric" value={stone.amount} placeholder="0"
+              onChange={e => onStoneAmountChange(stone.uid, e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
           </div>
 
           <div className="space-y-1 md:col-span-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Setter</label>
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type of setting</label>
             <select value={stone.setterType}
               onChange={e => patchStone(stone.uid, { setterType: e.target.value })}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
@@ -230,6 +234,15 @@ export function QuoteBuilderPage() {
                 <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>
               ))}
             </select>
+          </div>
+
+          <div className="space-y-1 md:col-span-2">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Lab report <span className="font-normal normal-case text-slate-400">(optional)</span>
+            </label>
+            <input type="text" value={stone.labReport} placeholder="e.g. GIA 1234567890"
+              onChange={e => patchStone(stone.uid, { labReport: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
           </div>
         </div>
 
@@ -293,13 +306,15 @@ export function QuoteBuilderPage() {
       const sizeCfg = config.diamondSizeMap[s.sizeKey]
       const mult = DIAMOND_TYPE_OPTIONS[s.stoneType].multiplier
       const pricePerCarat = (sizeCfg?.basePrice ?? 0) * mult
-      const cost = s.carats * pricePerCarat
+      const carats = parseNum(s.carats)
+      const amount = parseNum(s.amount)
+      const cost = carats * pricePerCarat
       const setterFee = config.setterMap[s.setterType]?.fee ?? 0
-      const labor = s.amount * setterFee
+      const labor = amount * setterFee
       diamondCost += cost
       settingFee += labor
-      totalCarats += s.carats
-      totalAmount += s.amount
+      totalCarats += carats
+      totalAmount += amount
       return { uid: s.uid, cost, labor, pricePerCarat, setterFee }
     })
 
@@ -369,7 +384,7 @@ export function QuoteBuilderPage() {
           role: s.role,
           stoneType: s.stoneType,
           sizeKey: s.sizeKey,
-          carats: s.carats,
+          carats: parseNum(s.carats),
           setterType: s.setterType,
           sortOrder: idx,
         })),
