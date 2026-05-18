@@ -159,7 +159,7 @@ export function QuoteBuilderPage() {
       total,
     }
   }, [
-    cadDesign, config, diamondAmount, diamondSize, diamondType, engraving,
+    cadDesign, config, diamondAmount, diamondCarats, diamondSize, diamondType, engraving,
     extraCosts, ringLabor, ringWidth, selectedMetalConfig, setterType, weightGrams,
   ])
 
@@ -308,7 +308,7 @@ export function QuoteBuilderPage() {
                 ['Material reference', pricing.materialCost],
                 ['CAD design & Jeweler\'s time', pricing.ringLaborFee],
                 ['Setting labor', pricing.settingFee],
-                ['Diamonds', pricing.diamondCost],
+                [`Diamonds (${diamondCarats} ct × $${pricing.diamondUnitPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct)`, pricing.diamondCost],
                 ['Ring width fee', pricing.widthFee],
                 ['Hand engraving (milgrain)', pricing.engravingFee],
                 ['Extra costs', extraCosts],
@@ -540,6 +540,13 @@ export function QuoteBuilderPage() {
               </div>
 
               <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-900">Carats</label>
+                <input type="number" min={0} step={0.01} value={diamondCarats || ''} placeholder="0.00"
+                  onChange={e => setDiamondCarats(Number(e.target.value) || 0)}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
+              </div>
+
+              <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-900">
                   Sizes of diamonds ({DIAMOND_TYPE_OPTIONS[diamondType].label})
                 </label>
@@ -631,7 +638,7 @@ export function QuoteBuilderPage() {
                 <div className="rounded-2xl bg-fuchsia-50 p-3 text-fuchsia-600"><Diamond className="h-5 w-5" /></div>
               </div>
               <p className="mt-3 text-sm text-slate-500">
-                {DIAMOND_TYPE_OPTIONS[diamondType].label} | {config.diamondSizeMap[diamondSize]?.label ?? diamondSize} | ${pricing.diamondUnitPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })} each
+                {DIAMOND_TYPE_OPTIONS[diamondType].label} | {config.diamondSizeMap[diamondSize]?.label ?? diamondSize} | ${pricing.diamondUnitPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct × {diamondCarats} ct
               </p>
             </CardContent>
           </Card>
