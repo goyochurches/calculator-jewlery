@@ -311,12 +311,29 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                 const items = stoneByRole[role]
                 if (items.length === 0) return null
                 const theme = ROLE_THEME[role]
+                // Per-section subtotals so the customer sees cost rolled up by role.
+                const sectionTotal = items.reduce((acc, s) => {
+                  const sizeCfg = config.diamondSizeMap[s.sizeKey]
+                  const mult = DIAMOND_TYPE_OPTIONS[s.stoneType as keyof typeof DIAMOND_TYPE_OPTIONS]?.multiplier ?? 1
+                  const ppc = (sizeCfg?.basePrice ?? 0) * mult
+                  const ct = sizeCfg?.ctPerStone ?? 0
+                  const amount = ct > 0 ? Math.round((s.carats ?? 0) / ct) : 0
+                  acc.cost += (s.carats ?? 0) * ppc
+                  acc.labor += amount * (config.setterMap[s.setterType]?.fee ?? 0)
+                  acc.carats += s.carats ?? 0
+                  acc.amount += amount
+                  return acc
+                }, { cost: 0, labor: 0, carats: 0, amount: 0 })
                 return (
                   <div key={role} className="space-y-2">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.chip}`}>
                         <span className={`h-1.5 w-1.5 rounded-full ${theme.dot}`} aria-hidden />
                         {theme.label} · {items.length}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {sectionTotal.amount} stone{sectionTotal.amount === 1 ? '' : 's'} · {Math.round(sectionTotal.carats * 10000) / 10000} ct ·
+                        {' '}<strong className="text-slate-900">${(sectionTotal.cost + sectionTotal.labor).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
                       </span>
                     </div>
                     {items.map((s, idx) => {
@@ -343,9 +360,9 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                             <div className="text-xs text-slate-600">
                               Setting: {setter?.label ?? s.setterType ?? '—'}
                             </div>
-                            {s.role !== 'MELEE' && (s as QuoteStone & { labReport?: string }).labReport && (
+                            {s.role !== 'MELEE' && s.labReport && (
                               <div className="text-xs text-slate-600">
-                                Lab report: <span className="font-mono">{(s as QuoteStone & { labReport?: string }).labReport}</span>
+                                Lab report: <span className="font-mono">{s.labReport}</span>
                               </div>
                             )}
                             <div className="flex justify-between pt-1 text-xs">
