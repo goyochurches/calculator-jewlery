@@ -123,8 +123,15 @@ export function QuoteBuilderPage() {
     const settingFee = diamondAmount * settingFeePerStone
     const settingTimeHours = (diamondAmount * settingMinutesPerStone) / 60
     const widthFee = Math.max(0, ringWidth - 2) * 18
+    // basePrice for NATURAL rows is USD per carat (supplier sheet, V11).
+    // ctPerStone holds the carat weight of one stone of this diameter, so
+    // per-stone cost is basePrice × ctPerStone. LAB rows keep per-stone
+    // prices and have ctPerStone = null → multiplier falls back to 1.
+    const sizeCfg = config.diamondSizeMap[diamondSize]
     const diamondUnitPrice =
-      (config.diamondSizeMap[diamondSize]?.basePrice ?? 0) * DIAMOND_TYPE_OPTIONS[diamondType].multiplier
+      (sizeCfg?.basePrice ?? 0) *
+      (sizeCfg?.ctPerStone ?? 1) *
+      DIAMOND_TYPE_OPTIONS[diamondType].multiplier
     const diamondCost = diamondAmount * diamondUnitPrice
     const engravingFee = engraving ? HAND_ENGRAVING_FEE : 0
 
@@ -543,14 +550,11 @@ export function QuoteBuilderPage() {
                   {filteredDiamondSizes.length === 0 && (
                     <option value="">No sizes for this type</option>
                   )}
-                  {filteredDiamondSizes.map(d => {
-                    const ct = d.ctPerStone != null ? ` · ${d.ctPerStone} ct` : ''
-                    return (
-                      <option key={d.id} value={d.sizeKey}>
-                        {d.label}{ct} — ${d.basePrice}
-                      </option>
-                    )
-                  })}
+                  {filteredDiamondSizes.map(d => (
+                    <option key={d.id} value={d.sizeKey}>
+                      {d.label} — ${d.basePrice}{d.ctPerStone != null ? '/ct' : ''}
+                    </option>
+                  ))}
                 </select>
               </div>
 
