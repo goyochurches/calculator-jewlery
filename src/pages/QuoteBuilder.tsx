@@ -269,7 +269,6 @@ export function QuoteBuilderPage() {
     const materialCost = metalPricePerGram * weightGrams
     const ringLaborFee = config.ringLaborMap[ringLabor]?.fee ?? 0
     const cadFee = 0
-    const widthFee = Math.max(0, ringWidth - 2) * 18
     const engravingFee = engraving ? HAND_ENGRAVING_FEE : 0
 
     // Per-stone cost = carats × pricePerCarat (× type multiplier).
@@ -297,7 +296,6 @@ export function QuoteBuilderPage() {
       ringLaborFee +
       cadFee +
       settingFee +
-      widthFee +
       diamondCost +
       engravingFee +
       extraCosts
@@ -308,7 +306,6 @@ export function QuoteBuilderPage() {
       ringLaborFee,
       cadFee,
       settingFee,
-      widthFee,
       diamondCost,
       engravingFee,
       totalCarats: Number(totalCarats.toFixed(4)),
@@ -720,7 +717,6 @@ export function QuoteBuilderPage() {
                   ['CAD design & Jeweler\'s time', pricing.ringLaborFee],
                   ['Setting labor', pricing.settingFee],
                   [`Diamonds (${pricing.totalAmount} stones · ${pricing.totalCarats} ct)`, pricing.diamondCost],
-                  ['Ring width fee', pricing.widthFee],
                   ['Hand engraving (milgrain)', pricing.engravingFee],
                   ['Extra costs', extraCosts],
                 ].map(([label, value]) => (
@@ -805,7 +801,7 @@ export function QuoteBuilderPage() {
                 <div className="rounded-2xl bg-violet-50 p-3 text-violet-600"><Ruler className="h-5 w-5" /></div>
               </div>
               <p className="mt-3 text-sm text-slate-500">
-                Width fee ${pricing.widthFee.toLocaleString('en-US', { minimumFractionDigits: 2 })} | no size fee.
+                Width {ringWidth} mm.
               </p>
             </CardContent>
           </Card>
