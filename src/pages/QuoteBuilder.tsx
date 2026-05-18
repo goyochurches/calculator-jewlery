@@ -387,7 +387,6 @@ export function QuoteBuilderPage() {
     }
   }
 
-  const cadLabel = config.cadMap[cadDesign]?.label ?? cadDesign
   const ringLaborLabel = config.ringLaborMap[ringLabor]?.label ?? ringLabor
 
   if (config.loading) return <QuoteBuilderSkeleton />
@@ -778,12 +777,12 @@ export function QuoteBuilderPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Diamonds</p>
-                  <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{diamondAmount}</p>
+                  <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{pricing.totalAmount}</p>
                 </div>
                 <div className="rounded-2xl bg-fuchsia-50 p-3 text-fuchsia-600"><Diamond className="h-5 w-5" /></div>
               </div>
               <p className="mt-3 text-sm text-slate-500">
-                {DIAMOND_TYPE_OPTIONS[diamondType].label} | {config.diamondSizeMap[diamondSize]?.label ?? diamondSize} | ${pricing.diamondUnitPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct × {diamondCarats} ct
+                {stones.length} stone{stones.length === 1 ? '' : 's'} · {pricing.totalCarats} ct total · ${pricing.diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </p>
             </CardContent>
           </Card>
