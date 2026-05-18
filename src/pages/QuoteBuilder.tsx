@@ -261,14 +261,16 @@ export function QuoteBuilderPage() {
             </select>
           </div>
 
-          <div className="space-y-1 md:col-span-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Lab report <span className="font-normal normal-case text-slate-400">(optional)</span>
-            </label>
-            <input type="text" value={stone.labReport} placeholder="e.g. GIA 1234567890"
-              onChange={e => patchStone(stone.uid, { labReport: e.target.value })}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
-          </div>
+          {stone.role !== 'MELEE' && (
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Lab report <span className="font-normal normal-case text-slate-400">(optional)</span>
+              </label>
+              <input type="text" value={stone.labReport} placeholder="e.g. GIA 1234567890"
+                onChange={e => patchStone(stone.uid, { labReport: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 pl-2 pt-2 border-t border-white/60 text-xs text-slate-500">
