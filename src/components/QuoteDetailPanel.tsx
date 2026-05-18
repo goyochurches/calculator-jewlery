@@ -295,20 +295,80 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
         )}
 
         <div>
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Cost breakdown</p>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Spec</p>
           <div className="space-y-2">
             <LineItem label="Metal" value={metalCfg.label} />
             <LineItem label="Weight" value={`${quote.weightGrams ?? 0} g`} />
-            <LineItem label="Jeweler's time" value={ringLaborCfg ? `${ringLaborCfg.label} — $${ringLaborCfg.fee}` : (quote.ringLabor ?? '—')} />
-            <LineItem label="CAD design" value={cadCfg ? `${cadCfg.label} — $${cadCfg.fee}` : (quote.cadDesign ?? '—')} />
-            <LineItem label="Diamonds" value={`${quote.diamondAmount ?? 0} × ${diamondMul.label} ${diamondBase.label} ct`} />
-            <LineItem label="Diamond cost" value={`$${diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
-            <LineItem label="Setting labor" value={`$${settingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${settingCfg.minutesPerStone} min/stone)`} />
-            <LineItem label="Finger size" value={`Size ${quote.fingerSize ?? '—'}${fingerFee ? ` — $${fingerFee}` : ''}`} />
-            <LineItem label="Ring width" value={`${quote.ringWidth ?? 0} mm — width fee $${widthFee}`} />
-            {benchCost > 0 && (
-              <LineItem label="Bench labor (legacy)" value={`${quote.laborHours ?? 0} h × $${quote.hourlyRate ?? 0}/h = $${benchCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
-            )}
+            <LineItem label="CAD & Jeweler's time" value={ringLaborCfg ? `${ringLaborCfg.label} — $${ringLaborCfg.fee}` : (quote.ringLabor ?? '—')} />
+          </div>
+        </div>
+
+        {stones.length > 0 && (
+          <div>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Stones</p>
+            <div className="space-y-3">
+              {(['MAIN', 'SIDE', 'MELEE'] as StoneRole[]).map(role => {
+                const items = stoneByRole[role]
+                if (items.length === 0) return null
+                const theme = ROLE_THEME[role]
+                return (
+                  <div key={role} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.chip}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${theme.dot}`} aria-hidden />
+                        {theme.label} · {items.length}
+                      </span>
+                    </div>
+                    {items.map((s, idx) => {
+                      const sizeCfg = config.diamondSizeMap[s.sizeKey]
+                      const setter = config.setterMap[s.setterType]
+                      const mult = DIAMOND_TYPE_OPTIONS[s.stoneType as keyof typeof DIAMOND_TYPE_OPTIONS]?.multiplier ?? 1
+                      const ppc = (sizeCfg?.basePrice ?? 0) * mult
+                      const ct = sizeCfg?.ctPerStone ?? 0
+                      const amount = ct > 0 ? Math.round((s.carats ?? 0) / ct) : 0
+                      const cost = (s.carats ?? 0) * ppc
+                      const labor = amount * (setter?.fee ?? 0)
+                      const typeLabel = DIAMOND_TYPE_OPTIONS[s.stoneType as keyof typeof DIAMOND_TYPE_OPTIONS]?.label ?? s.stoneType
+                      return (
+                        <div key={s.id ?? idx} className={`relative overflow-hidden rounded-2xl border ${theme.ring} ${theme.tint} px-4 py-3 text-sm`}>
+                          <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${theme.dot}`} aria-hidden />
+                          <div className="pl-2 space-y-1">
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-slate-900">{theme.label} stone #{idx + 1}</span>
+                              <span className="text-xs text-slate-500">{typeLabel}</span>
+                            </div>
+                            <div className="text-xs text-slate-600">
+                              {sizeCfg?.label ?? s.sizeKey} · {s.carats ?? 0} ct · {amount} stone{amount === 1 ? '' : 's'}
+                            </div>
+                            <div className="text-xs text-slate-600">
+                              Setting: {setter?.label ?? s.setterType ?? '—'}
+                            </div>
+                            {s.role !== 'MELEE' && (s as QuoteStone & { labReport?: string }).labReport && (
+                              <div className="text-xs text-slate-600">
+                                Lab report: <span className="font-mono">{(s as QuoteStone & { labReport?: string }).labReport}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between pt-1 text-xs">
+                              <span className="text-slate-500">Stone <strong className="text-slate-900">${cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+                              <span className="text-slate-500">Setting <strong className="text-slate-900">${labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Cost breakdown</p>
+          <div className="space-y-2">
+            <LineItem label="Diamonds total"
+              value={`${stoneTotals.amount} stone${stoneTotals.amount === 1 ? '' : 's'} · ${Math.round(stoneTotals.carats * 10000) / 10000} ct · $${stoneTotals.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+            <LineItem label="Setting labor (all stones)" value={`$${stoneTotals.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
             <LineItem label="Hand engraving (milgrain)" value={quote.engraving ? '$150.00' : '$0.00'} />
             {quote.extraCosts > 0 && (
               <LineItem label="Extra costs" value={`$${quote.extraCosts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
