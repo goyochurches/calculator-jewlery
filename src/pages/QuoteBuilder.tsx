@@ -165,7 +165,9 @@ export function QuoteBuilderPage() {
       const ct = config.diamondSizeMap[s.sizeKey]?.ctPerStone ?? 0
       if (amountText === '') return { ...s, amount: '', carats: '' }
       const amount = parseNum(amountText)
-      const carats = ct > 0 ? (amount * ct).toFixed(4) : s.carats
+      const carats = ct > 0
+        ? String(Math.round(amount * ct * 10000) / 10000)
+        : s.carats
       return { ...s, amount: amountText, carats }
     }))
   }
@@ -335,7 +337,7 @@ export function QuoteBuilderPage() {
       settingFee,
       diamondCost,
       engravingFee,
-      totalCarats: Number(totalCarats.toFixed(4)),
+      totalCarats: Math.round((Number(totalCarats) || 0) * 10000) / 10000,
       totalAmount,
       stoneBreakdown,
       total,
