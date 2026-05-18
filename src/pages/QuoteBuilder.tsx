@@ -109,6 +109,23 @@ export function QuoteBuilderPage() {
     if (!exists) setDiamondSize(filteredDiamondSizes[0].sizeKey)
   }, [filteredDiamondSizes, diamondSize])
 
+  // Carats ↔ Amount stay in sync via the selected diameter's ct-per-stone.
+  // Either field can drive the other; the user can still override either side
+  // after the auto-derived value lands (last edit wins).
+  const ctPerStone = config.diamondSizeMap[diamondSize]?.ctPerStone ?? 0
+  const handleAmountChange = (amount: number) => {
+    setDiamondAmount(amount)
+    if (ctPerStone > 0) {
+      setDiamondCarats(Number((amount * ctPerStone).toFixed(4)))
+    }
+  }
+  const handleCaratsChange = (carats: number) => {
+    setDiamondCarats(carats)
+    if (ctPerStone > 0) {
+      setDiamondAmount(Math.round(carats / ctPerStone))
+    }
+  }
+
   const pricing = useMemo(() => {
     const metalPricePerGram = selectedMetalConfig.pricePerGram
     const materialCost = metalPricePerGram * weightGrams
@@ -501,14 +518,14 @@ export function QuoteBuilderPage() {
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-900">Amount of diamonds</label>
                 <input type="number" min={0} step={1} value={diamondAmount || ''} placeholder="0"
-                  onChange={e => setDiamondAmount(Number(e.target.value) || 0)}
+                  onChange={e => handleAmountChange(Number(e.target.value) || 0)}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-900">Carats</label>
-                <input type="number" min={0} step={0.01} value={diamondCarats || ''} placeholder="0.00"
-                  onChange={e => setDiamondCarats(Number(e.target.value) || 0)}
+                <input type="number" min={0} step={0.0001} value={diamondCarats || ''} placeholder="0.0000"
+                  onChange={e => handleCaratsChange(Number(e.target.value) || 0)}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
               </div>
 
