@@ -65,16 +65,23 @@ export function QuoteBuilderPage() {
   // amount lives in UI state so the user can override it independently of
   // carats (Case 3); only `carats` is persisted to the backend.
   type StoneRole = 'MAIN' | 'SIDE' | 'MELEE'
+  // Carats and amount stay as raw input strings so the user can type
+  // intermediate values like "0." or "0.0045" without the controlled input
+  // collapsing them back to "0". Parsed lazily in pricing/save.
   interface StoneRow {
     uid: string
     role: StoneRole
     stoneType: 'natural' | 'lab-grown'
     sizeKey: string
-    carats: number
-    amount: number
+    carats: string
+    amount: string
     setterType: string
   }
   const [stones, setStones] = useState<StoneRow[]>([])
+  const parseNum = (s: string) => {
+    const n = Number(s)
+    return Number.isFinite(n) ? n : 0
+  }
 
   const [photo, setPhoto] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
@@ -109,8 +116,8 @@ export function QuoteBuilderPage() {
       role,
       stoneType: 'natural',
       sizeKey: sizes[0]?.sizeKey ?? '',
-      carats: 0,
-      amount: 0,
+      carats: '',
+      amount: '',
       setterType: firstSetter,
     }
   }
@@ -138,21 +145,26 @@ export function QuoteBuilderPage() {
   }
 
   // Two-way sync between carats and amount for a single stone via ctPerStone.
-  // Either field can drive the other; user can still override (last edit wins).
-  const onStoneCaratsChange = (uid: string, carats: number) => {
+  // The typed field keeps the raw string (so "0." stays "0."); the derived
+  // field is overwritten with a formatted number string.
+  const onStoneCaratsChange = (uid: string, caratsText: string) => {
     setStones(prev => prev.map(s => {
       if (s.uid !== uid) return s
       const ct = config.diamondSizeMap[s.sizeKey]?.ctPerStone ?? 0
-      const amount = ct > 0 ? Math.round(carats / ct) : s.amount
-      return { ...s, carats, amount }
+      if (caratsText === '') return { ...s, carats: '', amount: '' }
+      const carats = parseNum(caratsText)
+      const amount = ct > 0 ? String(Math.round(carats / ct)) : s.amount
+      return { ...s, carats: caratsText, amount }
     }))
   }
-  const onStoneAmountChange = (uid: string, amount: number) => {
+  const onStoneAmountChange = (uid: string, amountText: string) => {
     setStones(prev => prev.map(s => {
       if (s.uid !== uid) return s
       const ct = config.diamondSizeMap[s.sizeKey]?.ctPerStone ?? 0
-      const carats = ct > 0 ? Number((amount * ct).toFixed(4)) : s.carats
-      return { ...s, carats, amount }
+      if (amountText === '') return { ...s, amount: '', carats: '' }
+      const amount = parseNum(amountText)
+      const carats = ct > 0 ? (amount * ct).toFixed(4) : s.carats
+      return { ...s, amount: amountText, carats }
     }))
   }
 
