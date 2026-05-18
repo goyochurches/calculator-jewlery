@@ -790,7 +790,7 @@ export function QuoteBuilderPage() {
                 <div className="rounded-2xl bg-rose-50 p-3 text-rose-600"><Diamond className="h-5 w-5" /></div>
               </div>
               <p className="mt-3 text-sm text-slate-500">
-                {pricing.settingMinutesPerStone} min each | total {pricing.settingTimeHours.toFixed(2)} h
+                Aggregated across {pricing.totalAmount} stone{pricing.totalAmount === 1 ? '' : 's'}.
               </p>
             </CardContent>
           </Card>
