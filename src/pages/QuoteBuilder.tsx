@@ -169,6 +169,110 @@ export function QuoteBuilderPage() {
   const sideStones  = stones.filter(s => s.role === 'SIDE')
   const meleeStones = stones.filter(s => s.role === 'MELEE')
 
+  const renderStoneRow = (stone: StoneRow) => {
+    const sizes = stone.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
+    const sizeCfg = config.diamondSizeMap[stone.sizeKey]
+    const pricePerCarat = (sizeCfg?.basePrice ?? 0) * DIAMOND_TYPE_OPTIONS[stone.stoneType].multiplier
+    const stoneCost = stone.carats * pricePerCarat
+    const stoneSetterFee = config.setterMap[stone.setterType]?.fee ?? 0
+    const stoneLabor = stone.amount * stoneSetterFee
+    return (
+      <div key={stone.uid} className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type</label>
+            <select value={stone.stoneType}
+              onChange={e => patchStone(stone.uid, { stoneType: e.target.value as StoneRow['stoneType'] })}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+              {diamondTypeKeys.map(key => (
+                <option key={key} value={key}>{DIAMOND_TYPE_OPTIONS[key].label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Size</label>
+            <select value={stone.sizeKey}
+              onChange={e => patchStone(stone.uid, { sizeKey: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+              {sizes.length === 0 && <option value="">No sizes for this type</option>}
+              {sizes.map(d => (
+                <option key={d.id} value={d.sizeKey}>
+                  {d.label} — ${d.basePrice}{d.ctPerStone != null ? '/ct' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Carats</label>
+            <input type="number" min={0} step={0.0001} value={stone.carats || ''} placeholder="0.0000"
+              onChange={e => onStoneCaratsChange(stone.uid, Number(e.target.value) || 0)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Amount</label>
+            <input type="number" min={0} step={1} value={stone.amount || ''} placeholder="0"
+              onChange={e => onStoneAmountChange(stone.uid, Number(e.target.value) || 0)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+          </div>
+
+          <div className="space-y-1 md:col-span-2">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Setter</label>
+            <select value={stone.setterType}
+              onChange={e => patchStone(stone.uid, { setterType: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+              {config.setters.map(s => (
+                <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+          <span>
+            Stone: <strong className="text-slate-900">${stoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+            {' · '}
+            Setting: <strong className="text-slate-900">${stoneLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+          </span>
+          <button type="button" onClick={() => removeStone(stone.uid)}
+            className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-rose-600 transition hover:bg-rose-50">
+            Remove
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const renderStoneSection = (opts: {
+    title: string
+    hint: string
+    items: StoneRow[]
+    canAdd: boolean
+    addLabel: string
+    onAdd: () => void
+  }) => (
+    <div className="space-y-3">
+      <div className="flex items-baseline justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900">{opts.title}</h3>
+          <p className="text-xs text-slate-500">{opts.hint}</p>
+        </div>
+        {opts.canAdd && (
+          <button type="button" onClick={opts.onAdd}
+            className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-700">
+            + {opts.addLabel}
+          </button>
+        )}
+      </div>
+      {opts.items.length === 0
+        ? <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-xs text-slate-400">None.</p>
+        : opts.items.map(renderStoneRow)
+      }
+    </div>
+  )
+
   const pricing = useMemo(() => {
     const metalPricePerGram = selectedMetalConfig.pricePerGram
     const materialCost = metalPricePerGram * weightGrams
@@ -625,7 +729,7 @@ export function QuoteBuilderPage() {
                   ['Material reference', pricing.materialCost],
                   ['CAD design & Jeweler\'s time', pricing.ringLaborFee],
                   ['Setting labor', pricing.settingFee],
-                  [`Diamonds (${diamondCarats} ct × $${pricing.diamondUnitPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct)`, pricing.diamondCost],
+                  [`Diamonds (${pricing.totalAmount} stones · ${pricing.totalCarats} ct)`, pricing.diamondCost],
                   ['Ring width fee', pricing.widthFee],
                   ['Hand engraving (milgrain)', pricing.engravingFee],
                   ['Extra costs', extraCosts],
