@@ -581,7 +581,7 @@ export function QuoteBuilderPage() {
 
         {/* ── Columna derecha: estimated total (sticky) + mini-cards ─────── */}
         <div className="space-y-4">
-          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)] xl:sticky xl:top-4 xl:z-10">
+          <Card className="rounded-[30px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] xl:sticky xl:top-4 xl:z-20">
             <CardHeader className="border-b border-slate-100">
               <CardTitle className="text-base font-semibold text-slate-900">Estimated total</CardTitle>
               <p className="text-sm text-slate-500">Live breakdown for the current quote.</p>
