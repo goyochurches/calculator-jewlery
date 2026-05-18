@@ -114,7 +114,6 @@ export const quotesService = {
     payload: Omit<ApiQuote, 'id' | 'createdBy' | 'createdAt'>,
     userId: number,
   ): Promise<SavedQuote> {
-      console.log(payload)
     const data = await api.post<ApiQuote>(`/api/quotes?userId=${userId}`, payload)
     return mapQuote(data)
   },
