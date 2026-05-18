@@ -57,6 +57,18 @@ export type JewelryMetalOption =
 
 export type QuoteStatus = 'draft' | 'pending' | 'approved' | 'rejected'
 
+export type StoneRole = 'MAIN' | 'SIDE' | 'MELEE'
+
+export interface QuoteStone {
+  id?: number | null
+  role: StoneRole
+  stoneType: 'natural' | 'lab-grown'
+  sizeKey: string
+  carats: number
+  setterType: string
+  sortOrder?: number | null
+}
+
 export interface SavedQuote {
   id: string
   title: string
@@ -71,6 +83,7 @@ export interface SavedQuote {
   diamondCarats?: number | null
   diamondType: 'natural' | 'lab-grown' | 'grunberger'
   diamondSize: string
+  stones?: QuoteStone[]
   weightGrams: number
   ringWidth: number
   fingerSize: number

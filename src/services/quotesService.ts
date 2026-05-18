@@ -1,5 +1,15 @@
 import { api } from '@/api/apiClient'
-import type { Client, SavedQuote } from '../types'
+import type { Client, QuoteStone, SavedQuote } from '../types'
+
+interface ApiStone {
+  id?: number | null
+  role: 'MAIN' | 'SIDE' | 'MELEE'
+  stoneType: string
+  sizeKey: string
+  carats: number
+  setterType: string
+  sortOrder?: number | null
+}
 
 interface ApiQuote {
   id: number
@@ -26,6 +36,7 @@ interface ApiQuote {
   engraving?: boolean | null
   setterType?: string | null
   client?: Client | null
+  stones?: ApiStone[]
   // Sent up by the frontend so the backend can resolve the FK; on responses
   // the backend echoes the full `client` object instead.
   clientId?: number | null
@@ -60,8 +71,21 @@ function mapQuote(q: ApiQuote): SavedQuote {
     setterType: q.setterType ?? null,
     client: q.client ?? null,
     clientId: q.client?.id ?? q.clientId ?? null,
+    stones: (q.stones ?? []).map(mapStone),
     publicToken: q.publicToken ?? null,
     publicTokenExpiresAt: q.publicTokenExpiresAt ?? null,
+  }
+}
+
+function mapStone(s: ApiStone): QuoteStone {
+  return {
+    id: s.id ?? null,
+    role: s.role,
+    stoneType: s.stoneType as QuoteStone['stoneType'],
+    sizeKey: s.sizeKey,
+    carats: s.carats,
+    setterType: s.setterType,
+    sortOrder: s.sortOrder ?? null,
   }
 }
 
