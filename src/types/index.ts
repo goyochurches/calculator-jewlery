@@ -68,6 +68,7 @@ export interface SavedQuote {
   ringLabor: string
   cadDesign: string
   diamondAmount: number
+  diamondCarats?: number | null
   diamondType: 'natural' | 'lab-grown' | 'grunberger'
   diamondSize: string
   weightGrams: number

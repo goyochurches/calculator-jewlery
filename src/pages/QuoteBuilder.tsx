@@ -184,6 +184,7 @@ export function QuoteBuilderPage() {
         // both fields so legacy queries that index by cadDesign keep working.
         cadDesign: ringLabor,
         diamondAmount,
+        diamondCarats,
         diamondType,
         diamondSize,
         weightGrams,
