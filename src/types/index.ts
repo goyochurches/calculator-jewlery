@@ -66,6 +66,7 @@ export interface QuoteStone {
   sizeKey: string
   carats: number
   setterType: string
+  labReport?: string | null
   sortOrder?: number | null
 }
 
