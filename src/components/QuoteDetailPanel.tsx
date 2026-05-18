@@ -349,25 +349,49 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                       return (
                         <div key={s.id ?? idx} className={`relative overflow-hidden rounded-2xl border ${theme.ring} ${theme.tint} px-4 py-3 text-sm`}>
                           <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${theme.dot}`} aria-hidden />
-                          <div className="pl-2 space-y-1">
+                          <div className="pl-2 space-y-3">
                             <div className="flex items-center justify-between">
                               <span className="font-semibold text-slate-900">{theme.label} stone #{idx + 1}</span>
-                              <span className="text-xs text-slate-500">{typeLabel}</span>
                             </div>
-                            <div className="text-xs text-slate-600">
-                              {sizeCfg?.label ?? s.sizeKey} · {s.carats ?? 0} ct · {amount} stone{amount === 1 ? '' : 's'}
-                            </div>
-                            <div className="text-xs text-slate-600">
-                              Setting: {setter?.label ?? s.setterType ?? '—'}
-                            </div>
-                            {s.role !== 'MELEE' && s.labReport && (
-                              <div className="text-xs text-slate-600">
-                                Lab report: <span className="font-mono">{s.labReport}</span>
+
+                            <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                              <div>
+                                <dt className="font-semibold uppercase tracking-wide text-slate-400">Type</dt>
+                                <dd className="text-slate-900">{typeLabel}</dd>
                               </div>
-                            )}
-                            <div className="flex justify-between pt-1 text-xs">
-                              <span className="text-slate-500">Stone <strong className="text-slate-900">${cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
-                              <span className="text-slate-500">Setting <strong className="text-slate-900">${labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+                              <div>
+                                <dt className="font-semibold uppercase tracking-wide text-slate-400">Size</dt>
+                                <dd className="text-slate-900">{sizeCfg?.label ?? s.sizeKey}</dd>
+                              </div>
+                              <div>
+                                <dt className="font-semibold uppercase tracking-wide text-slate-400">Carats</dt>
+                                <dd className="text-slate-900">{s.carats ?? 0} ct</dd>
+                              </div>
+                              <div>
+                                <dt className="font-semibold uppercase tracking-wide text-slate-400">Amount</dt>
+                                <dd className="text-slate-900">{amount} stone{amount === 1 ? '' : 's'}</dd>
+                              </div>
+                              <div className="col-span-2">
+                                <dt className="font-semibold uppercase tracking-wide text-slate-400">Type of setting</dt>
+                                <dd className="text-slate-900">{setter?.label ?? s.setterType ?? '—'}{setter ? ` — $${setter.fee.toLocaleString('en-US', { minimumFractionDigits: 2 })}/stone` : ''}</dd>
+                              </div>
+                              {s.role !== 'MELEE' && (
+                                <div className="col-span-2">
+                                  <dt className="font-semibold uppercase tracking-wide text-slate-400">Lab report</dt>
+                                  <dd className={s.labReport ? 'text-slate-900 font-mono' : 'text-slate-400'}>{s.labReport || '— not provided'}</dd>
+                                </div>
+                              )}
+                            </dl>
+
+                            <div className="grid grid-cols-2 gap-2 border-t border-white/70 pt-2 text-xs">
+                              <div className="rounded-xl bg-white/70 px-3 py-2">
+                                <p className="font-semibold uppercase tracking-wide text-slate-400">Stone cost</p>
+                                <p className="text-sm font-semibold text-slate-900">${cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                              </div>
+                              <div className="rounded-xl bg-white/70 px-3 py-2">
+                                <p className="font-semibold uppercase tracking-wide text-slate-400">Setting labor</p>
+                                <p className="text-sm font-semibold text-slate-900">${labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                              </div>
                             </div>
                           </div>
                         </div>
