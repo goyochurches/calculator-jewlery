@@ -5,7 +5,7 @@ import {
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import type { QuoteStatus, QuoteStone, SavedQuote } from '@/types'
-import { Check, Eye, RefreshCw, X, XCircle } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, Eye, RefreshCw, X, XCircle } from 'lucide-react'
 import { useState } from 'react'
 
 const STATUS_STYLES: Record<QuoteStatus, string> = {
@@ -152,6 +152,14 @@ const ROLE_THEME: Record<StoneRole, { label: string; dot: string; ring: string; 
 
 export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToken, isAdmin = false }: QuoteDetailPanelProps) {
   const [refreshing, setRefreshing] = useState(false)
+  // Per-stone expand/collapse state. Keys are `${role}-${index}`. Empty by
+  // default → every stone starts collapsed as a compact summary card.
+  const [expandedStones, setExpandedStones] = useState<Set<string>>(new Set())
+  const toggleStone = (key: string) => setExpandedStones(prev => {
+    const next = new Set(prev)
+    if (next.has(key)) next.delete(key); else next.add(key)
+    return next
+  })
   const config = useQuoteConfig()
   const expiration = formatExpiration(quote.publicTokenExpiresAt)
 
@@ -423,13 +431,77 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                       const hasManualPrice = s.manualPrice != null
                       const cost = hasManualPrice ? (s.manualPrice ?? 0) : (s.carats ?? 0) * ppc
                       const labor = amount * (setter?.fee ?? 0)
+                      const stoneTotal = cost + labor
                       const typeLabel = DIAMOND_TYPE_OPTIONS[s.stoneType as keyof typeof DIAMOND_TYPE_OPTIONS]?.label ?? s.stoneType
+                      const stoneKey = `${role}-${idx}`
+                      const isExpanded = expandedStones.has(stoneKey)
+                      const summaryParts = [
+                        s.shape || typeLabel,
+                        s.color ? `color ${s.color}` : null,
+                        (s.carats ?? 0) > 0 ? `${s.carats} ct` : null,
+                        amount > 0 ? `${amount} stone${amount === 1 ? '' : 's'}` : null,
+                      ].filter(Boolean)
+
+                      // Collapsed: compact summary card. Clicking expands.
+                      if (!isExpanded) {
+                        return (
+                          <button
+                            key={s.id ?? idx}
+                            type="button"
+                            onClick={() => toggleStone(stoneKey)}
+                            className={`group relative w-full overflow-hidden rounded-2xl border ${theme.ring} bg-white text-left shadow-sm transition hover:shadow-md`}
+                          >
+                            <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${theme.dot}`} aria-hidden />
+                            <div className="flex items-center justify-between gap-3 pl-5 pr-3 py-3">
+                              <div className="min-w-0 flex-1">
+                                <p className="flex items-center gap-2">
+                                  <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${theme.chip}`}>
+                                    {theme.label} #{idx + 1}
+                                  </span>
+                                  <span className="truncate text-sm font-semibold text-slate-900">
+                                    {summaryParts.length > 0 ? summaryParts.join(' · ') : typeLabel}
+                                  </span>
+                                </p>
+                                <p className="mt-0.5 truncate text-xs text-slate-500">
+                                  {sizeCfg?.label ?? s.sizeKey} · {setter?.label ?? s.setterType ?? 'no setter'}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="text-right">
+                                  <p className="text-sm font-semibold text-slate-900 tabular-nums">
+                                    ${stoneTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                  </p>
+                                  {hasManualPrice && (
+                                    <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">custom</span>
+                                  )}
+                                </div>
+                                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition group-hover:bg-slate-200 group-hover:text-slate-700">
+                                  <ChevronDown className="h-3.5 w-3.5" />
+                                </span>
+                              </div>
+                            </div>
+                          </button>
+                        )
+                      }
+
+                      // Expanded: full detail card.
                       return (
-                        <div key={s.id ?? idx} className={`relative overflow-hidden rounded-2xl border ${theme.ring} ${theme.tint} px-4 py-3 text-sm`}>
+                        <div key={s.id ?? idx} className={`relative overflow-hidden rounded-2xl border ${theme.ring} ${theme.tint} px-4 py-3 text-sm shadow-sm`}>
                           <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${theme.dot}`} aria-hidden />
                           <div className="pl-2 space-y-3">
                             <div className="flex items-center justify-between">
-                              <span className="font-semibold text-slate-900">{theme.label} stone #{idx + 1}</span>
+                              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.chip}`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${theme.dot}`} aria-hidden />
+                                {theme.label} stone #{idx + 1}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => toggleStone(stoneKey)}
+                                aria-label="Collapse"
+                                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/70 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                              >
+                                <ChevronUp className="h-4 w-4" />
+                              </button>
                             </div>
 
                             <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">

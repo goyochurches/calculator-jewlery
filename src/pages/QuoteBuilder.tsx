@@ -13,7 +13,7 @@ import { ClientPicker } from '@/components/ClientPicker'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { Toast } from '@/components/Toast'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
-import { Calculator, Camera, Diamond, Gem, ImagePlus, Layers3, Ruler, X } from 'lucide-react'
+import { Calculator, Camera, Check, ChevronDown, ChevronUp, Diamond, Gem, ImagePlus, Layers3, Ruler, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -91,6 +91,9 @@ export function QuoteBuilderPage() {
     // Raw input. When non-empty, overrides carats × pricePerCarat for this
     // stone's cost. Setting labor is unaffected.
     manualPrice: string
+    /** Whether the form for this stone is folded into a compact summary card.
+     *  New stones start expanded; clicking "Done" collapses; chevron toggles. */
+    collapsed: boolean
   }
   const [stones, setStones] = useState<StoneRow[]>([])
   const parseNum = (s: string) => {
@@ -138,7 +141,15 @@ export function QuoteBuilderPage() {
       shape: '',
       color: '',
       manualPrice: '',
+      collapsed: false,
     }
+  }
+
+  const toggleCollapsed = (uid: string) => {
+    setStones(prev => prev.map(s => s.uid === uid ? { ...s, collapsed: !s.collapsed } : s))
+  }
+  const collapseStone = (uid: string) => {
+    setStones(prev => prev.map(s => s.uid === uid ? { ...s, collapsed: true } : s))
   }
 
   const addStone = (role: StoneRole) => {
@@ -224,9 +235,73 @@ export function QuoteBuilderPage() {
     const stoneCost = hasManualPrice ? parseNum(stone.manualPrice) : caratsNum * pricePerCarat
     const stoneSetterFee = config.setterMap[stone.setterType]?.fee ?? 0
     const stoneLabor = amountNum * stoneSetterFee
+    const stoneTotal = stoneCost + stoneLabor
     const theme = themeForRole(stone.role)
+    const typeLabel = DIAMOND_TYPE_OPTIONS[stone.stoneType].label
+    const sizeLabel = sizeCfg?.label ?? stone.sizeKey
+    const setterLabel = config.setterMap[stone.setterType]?.label ?? stone.setterType
+
+    // ── Collapsed (summary) view ────────────────────────────────────────
+    if (stone.collapsed) {
+      const summaryParts = [
+        stone.shape || typeLabel,
+        stone.color ? `color ${stone.color}` : null,
+        caratsNum > 0 ? `${caratsNum} ct` : null,
+        amountNum > 0 ? `${amountNum} stone${amountNum === 1 ? '' : 's'}` : null,
+      ].filter(Boolean)
+      return (
+        <div key={stone.uid}
+          className={`group relative overflow-hidden rounded-2xl border ${theme.ring} bg-white shadow-sm transition hover:shadow-md`}>
+          <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${theme.dot}`} aria-hidden />
+          <button
+            type="button"
+            onClick={() => toggleCollapsed(stone.uid)}
+            className="flex w-full items-center justify-between gap-3 pl-5 pr-3 py-3 text-left"
+          >
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.chip}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${theme.dot}`} aria-hidden />
+                {theme.label} #{index + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-slate-900">
+                  {summaryParts.length > 0 ? summaryParts.join(' · ') : 'Not configured yet'}
+                </p>
+                <p className="truncate text-xs text-slate-500">
+                  {sizeLabel} · {setterLabel || 'no setter'}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-right">
+                <p className="text-sm font-semibold text-slate-900 tabular-nums">
+                  ${stoneTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </p>
+                {hasManualPrice && (
+                  <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">custom</span>
+                )}
+              </div>
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition group-hover:bg-slate-200 group-hover:text-slate-700">
+                <ChevronDown className="h-4 w-4" />
+              </span>
+            </div>
+          </button>
+          {/* Remove button overlay so it's still reachable without expanding */}
+          <button
+            type="button"
+            onClick={() => removeStone(stone.uid)}
+            aria-label="Remove stone"
+            className="absolute right-12 top-1/2 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 sm:flex"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )
+    }
+
+    // ── Expanded (form) view ────────────────────────────────────────────
     return (
-      <div key={stone.uid} className={`relative rounded-2xl border ${theme.ring} ${theme.tint} p-4 space-y-3 overflow-hidden`}>
+      <div key={stone.uid} className={`relative rounded-2xl border ${theme.ring} ${theme.tint} p-4 space-y-3 overflow-hidden shadow-sm`}>
         <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${theme.dot}`} aria-hidden />
 
         <div className="flex items-center justify-between gap-2 pl-2">
@@ -234,11 +309,18 @@ export function QuoteBuilderPage() {
             <span className={`h-1.5 w-1.5 rounded-full ${theme.dot}`} aria-hidden />
             {theme.label} stone #{index + 1}
           </span>
-          <button type="button" onClick={() => removeStone(stone.uid)}
-            aria-label="Remove stone"
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/70 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600">
-            <X className="h-4 w-4" />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={() => toggleCollapsed(stone.uid)}
+              aria-label="Collapse"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-white/70 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+              <ChevronUp className="h-4 w-4" />
+            </button>
+            <button type="button" onClick={() => removeStone(stone.uid)}
+              aria-label="Remove stone"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-white/70 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-3 md:grid-cols-2 pl-2">
@@ -344,12 +426,23 @@ export function QuoteBuilderPage() {
           )}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 pl-2 pt-2 border-t border-white/60 text-xs text-slate-500">
-          <span>
-            Stone <strong className="text-slate-900">${stoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
-            {hasManualPrice && <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">custom</span>}
-          </span>
-          <span>Setting <strong className="text-slate-900">${stoneLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+        <div className="flex flex-wrap items-center justify-between gap-3 pl-2 pt-3 border-t border-white/60">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+            <span className="rounded-xl bg-white/70 px-3 py-1.5">
+              Stone <strong className="ml-1 text-slate-900">${stoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+              {hasManualPrice && <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">custom</span>}
+            </span>
+            <span className="rounded-xl bg-white/70 px-3 py-1.5">
+              Setting <strong className="ml-1 text-slate-900">${stoneLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => collapseStone(stone.uid)}
+            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition ${theme.btn}`}
+          >
+            <Check className="h-3.5 w-3.5" /> Done
+          </button>
         </div>
       </div>
     )
