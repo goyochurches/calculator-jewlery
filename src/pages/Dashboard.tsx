@@ -523,6 +523,8 @@ export function Dashboard() {
         <ClientsWidget />
       </section>
 
+      <RevenueWidget />
+
       <QuoteStatusWidget />
 
       <section className="grid gap-4 xl:grid-cols-2">
