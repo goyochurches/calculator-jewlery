@@ -19,4 +19,18 @@ export const clientService = {
 
   delete: (id: number): Promise<void> =>
     api.delete(`/api/clients/${id}`),
+
+  async countToday(): Promise<number> {
+    const data = await api.get<{ count: number }>('/api/clients/stats/today')
+    return data.count
+  },
+
+  async countYesterday(): Promise<number> {
+    const data = await api.get<{ count: number }>('/api/clients/stats/yesterday')
+    return data.count
+  },
+
+  async countPerDay(days = 7): Promise<Record<string, number>> {
+    return api.get<Record<string, number>>(`/api/clients/stats/per-day?days=${days}`)
+  },
 }

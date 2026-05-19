@@ -19,7 +19,10 @@
       "Bash(git -C D:/wamp64/www/calculator-jewlery diff -- src/pages/QuoteBuilder.tsx)",
       "Bash(git *)",
       "Bash(mvn -q -DskipTests compile)",
-      "Bash(mvn -q -DskipTests -f \"D:/wamp64/www/price-calculator/pom.xml\" compile)"
+      "Bash(mvn -q -DskipTests -f \"D:/wamp64/www/price-calculator/pom.xml\" compile)",
+      "Bash(mvn -DskipTests -f \"D:/wamp64/www/price-calculator/pom.xml\" compile)",
+      "Bash(mvn -DskipTests -f \"D:/wamp64/www/price-calculator/pom.xml\" clean compile)",
+      "Bash(mvn -DskipTests -f \"D:/wamp64/www/price-calculator/pom.xml\" -q compile)"
     ]
   }
 }
