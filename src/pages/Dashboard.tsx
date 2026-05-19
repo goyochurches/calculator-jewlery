@@ -9,7 +9,7 @@ import { useMetals } from '@/hooks/useMetals'
 import { clientService } from '@/services/clientService'
 import { quotesService, type UserQuoteStats } from '@/services/quotesService'
 import type { ChartDataPoint } from '@/types'
-import { FileText, ShieldCheck, TrendingUp, Users } from 'lucide-react'
+import { DollarSign, FileText, ShieldCheck, TrendingUp, Users } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 
@@ -160,6 +160,85 @@ const STATUS_COLORS = {
 } as const
 
 type StatusKey = keyof typeof STATUS_COLORS
+
+const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+function RevenueWidget() {
+  const [year] = useState(() => new Date().getFullYear())
+  const [yearTotal, setYearTotal] = useState(0)
+  const [monthly, setMonthly] = useState<Array<{ month: string; revenue: number; isCurrent: boolean }>>([])
+
+  useEffect(() => {
+    const currentMonth = new Date().getMonth() // 0-indexed
+    Promise.all([
+      quotesService.revenueYear(year),
+      quotesService.revenuePerMonth(year),
+    ])
+      .then(([total, perMonth]) => {
+        setYearTotal(total.total)
+        const entries = Object.entries(perMonth).sort(([a], [b]) => a.localeCompare(b))
+        setMonthly(entries.map(([key, revenue], idx) => ({
+          month: MONTH_LABELS[idx] ?? key.slice(5),
+          revenue: Number(revenue) || 0,
+          isCurrent: idx === currentMonth,
+        })))
+      })
+      .catch(console.error)
+  }, [year])
+
+  const bestMonth = monthly.reduce(
+    (best, m) => (m.revenue > best.revenue ? m : best),
+    { month: '', revenue: 0, isCurrent: false },
+  )
+
+  return (
+    <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              Approved revenue · {year}
+            </p>
+            <p className="mt-3 text-5xl font-semibold tracking-tight text-slate-950">
+              ${yearTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </p>
+            <p className="mt-2 text-sm text-slate-500">
+              {bestMonth.revenue > 0
+                ? <>Best month: <strong className="text-slate-900">{bestMonth.month}</strong> · ${bestMonth.revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</>
+                : 'No approved quotes yet this year.'}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-600">
+            <DollarSign className="h-5 w-5" />
+          </div>
+        </div>
+
+        <div className="mt-6 h-40">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={monthly} barSize={18}>
+              <XAxis
+                dataKey="month"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 10, fill: '#94a3b8' }}
+              />
+              <Tooltip
+                cursor={false}
+                contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }}
+                formatter={((v: number) => [`$${v.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, 'Revenue']) as never}
+              />
+              <Bar dataKey="revenue" radius={[6, 6, 0, 0]}>
+                {monthly.map((m, idx) => (
+                  <Cell key={idx} fill={m.isCurrent ? '#10b981' : '#a7f3d0'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 function QuoteStatusWidget() {
   const [stats, setStats] = useState<UserQuoteStats[]>([])

@@ -158,6 +158,16 @@ export const quotesService = {
   async statsPerUser(): Promise<UserQuoteStats[]> {
     return api.get<UserQuoteStats[]>('/api/quotes/stats/per-user')
   },
+
+  async revenuePerMonth(year?: number): Promise<Record<string, number>> {
+    const qs = year ? `?year=${year}` : ''
+    return api.get<Record<string, number>>(`/api/quotes/stats/revenue-per-month${qs}`)
+  },
+
+  async revenueYear(year?: number): Promise<{ year: number; total: number }> {
+    const qs = year ? `?year=${year}` : ''
+    return api.get<{ year: number; total: number }>(`/api/quotes/stats/revenue-year${qs}`)
+  },
 }
 
 export interface UserQuoteStats {
