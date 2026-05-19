@@ -129,6 +129,26 @@ export function QuotesListPage() {
 
   const selected = filteredQuotes.find((q) => q.id === selectedId) ?? null
 
+  // Lock body scroll while the detail drawer is open on small screens — same
+  // pattern as the mobile nav. The fixed `xl:hidden` overlay would otherwise
+  // let users scroll the underlying list through it.
+  useEffect(() => {
+    if (!selected) return
+    if (typeof window === 'undefined') return
+    if (window.innerWidth >= 1280) return // xl breakpoint
+    const original = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = original }
+  }, [selected])
+
+  // Close the drawer with Escape on small screens.
+  useEffect(() => {
+    if (!selected) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedId(null) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [selected])
+
   const statusCounts = quotes.reduce<Record<QuoteStatus, number>>(
     (acc, q) => { acc[q.status]++; return acc },
     { draft: 0, pending: 0, approved: 0, rejected: 0 }
@@ -215,8 +235,11 @@ export function QuotesListPage() {
         </CardContent>
       </Card>
 
-      {/* Main content */}
-      <div className={selected ? 'grid gap-6 xl:grid-cols-[1fr_420px]' : ''}>
+      {/* Main content
+          xl+ : table on the left + sticky detail card on the right (when open).
+          <xl : table full-width; detail opens as a slide-in drawer overlay so
+          the user doesn't have to scroll past the table to read it. */}
+      <div className={selected ? 'xl:grid xl:gap-6 xl:grid-cols-[1fr_420px]' : ''}>
         {/* Table */}
         <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
           <CardHeader className="border-b border-slate-100">
@@ -329,17 +352,41 @@ export function QuotesListPage() {
           </CardContent>
         </Card>
 
-        {/* Detail panel */}
+        {/* Detail panel — two variants:
+            • xl+ : inline sticky card in the right grid column.
+            • < xl: fixed drawer that slides in from the right with a backdrop
+                    so it doesn't push the table around or trigger horizontal
+                    scroll on narrow viewports. */}
         {selected && (
-          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)] overflow-hidden">
-            <QuoteDetailPanel
-              quote={selected}
-              onClose={() => setSelectedId(null)}
-              onStatusChange={handleStatusChange}
-              onRefreshToken={isAdmin ? handleRefreshToken : undefined}
-              isAdmin={isAdmin}
-            />
-          </Card>
+          <>
+            {/* Inline desktop variant (xl+) */}
+            <Card className="hidden xl:block rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)] overflow-hidden xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-y-auto">
+              <QuoteDetailPanel
+                quote={selected}
+                onClose={() => setSelectedId(null)}
+                onStatusChange={handleStatusChange}
+                onRefreshToken={isAdmin ? handleRefreshToken : undefined}
+                isAdmin={isAdmin}
+              />
+            </Card>
+
+            {/* Mobile / tablet drawer overlay */}
+            <div className="fixed inset-0 z-50 xl:hidden" role="dialog" aria-modal="true">
+              <div
+                className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+                onClick={() => setSelectedId(null)}
+              />
+              <div className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col overflow-y-auto bg-white shadow-2xl animate-in slide-in-from-right">
+                <QuoteDetailPanel
+                  quote={selected}
+                  onClose={() => setSelectedId(null)}
+                  onStatusChange={handleStatusChange}
+                  onRefreshToken={isAdmin ? handleRefreshToken : undefined}
+                  isAdmin={isAdmin}
+                />
+              </div>
+            </div>
+          </>
         )}
       </div>
     </div>

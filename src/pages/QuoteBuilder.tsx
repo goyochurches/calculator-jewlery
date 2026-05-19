@@ -189,6 +189,19 @@ export function QuoteBuilderPage() {
     }))
   }
 
+  // When the user types a manual price they're overriding the per-carat
+  // calculation, but the SETTING labor (amount × setter fee) must still
+  // apply. Default amount to "1" the first time a manual price is entered
+  // so the labor isn't silently zero — the user can still bump amount up
+  // for multi-stone settings.
+  const onStoneManualPriceChange = (uid: string, priceText: string) => {
+    setStones(prev => prev.map(s => {
+      if (s.uid !== uid) return s
+      const shouldSeedAmount = priceText.trim() !== '' && s.amount.trim() === ''
+      return { ...s, manualPrice: priceText, amount: shouldSeedAmount ? '1' : s.amount }
+    }))
+  }
+
   const mainStone   = stones.find(s => s.role === 'MAIN') ?? null
   const sideStones  = stones.filter(s => s.role === 'SIDE')
   const meleeStones = stones.filter(s => s.role === 'MELEE')
@@ -312,8 +325,11 @@ export function QuoteBuilderPage() {
               Custom price <span className="font-normal normal-case text-slate-400">(optional — overrides carats × ${pricePerCarat.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct)</span>
             </label>
             <input type="number" min={0} step="0.01" value={stone.manualPrice} placeholder="Leave empty to use calculated price"
-              onChange={e => patchStone(stone.uid, { manualPrice: e.target.value })}
+              onChange={e => onStoneManualPriceChange(stone.uid, e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+            <p className="text-[10px] text-slate-400">
+              Setting labor (amount × setter fee) is added on top of this price.
+            </p>
           </div>
 
           {stone.role !== 'MELEE' && (
