@@ -145,7 +145,21 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
 
   const metalCfg = JEWELRY_METAL_OPTIONS[quote.metal] ?? { label: quote.metal }
   const ringLaborCfg = config.ringLaborMap[quote.ringLabor]
-  const stones: QuoteStone[] = quote.stones ?? []
+  // Quotes saved before the multi-stone refactor only have the legacy diamond_*
+  // fields. Synthesize a single MAIN entry so the detail still renders the
+  // section breakdown instead of an empty placeholder.
+  const persistedStones: QuoteStone[] = quote.stones ?? []
+  const stones: QuoteStone[] = persistedStones.length === 0 && (quote.diamondCarats ?? 0) > 0
+    ? [{
+        role: 'MAIN',
+        stoneType: (quote.diamondType as QuoteStone['stoneType']) ?? 'natural',
+        sizeKey: quote.diamondSize ?? '',
+        carats: quote.diamondCarats ?? 0,
+        setterType: quote.setterType ?? '',
+        labReport: null,
+      }]
+    : persistedStones
+  const isLegacy = persistedStones.length === 0 && stones.length > 0
   const stoneByRole: Record<StoneRole, QuoteStone[]> = {
     MAIN:  stones.filter(s => s.role === 'MAIN'),
     SIDE:  stones.filter(s => s.role === 'SIDE'),
@@ -162,7 +176,8 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
     const setterFee = config.setterMap[s.setterType]?.fee ?? 0
     const ct = sizeCfg?.ctPerStone ?? 0
     const amount = ct > 0 ? Math.round((s.carats ?? 0) / ct) : 0
-    acc.cost += (s.carats ?? 0) * pricePerCarat
+    const stoneCost = s.manualPrice != null ? s.manualPrice : (s.carats ?? 0) * pricePerCarat
+    acc.cost += stoneCost
     acc.labor += amount * setterFee
     acc.carats += s.carats ?? 0
     acc.amount += amount
@@ -303,14 +318,28 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
           </div>
         </div>
 
-        {stones.length > 0 && (
-          <div>
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Stones</p>
-            <div className="space-y-3">
+        <div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Stone setting</p>
+          {isLegacy && (
+            <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Legacy quote — created before the Main / Side / Melee breakdown.
+              The values below were reconstructed from the aggregate diamond fields.
+            </div>
+          )}
+          {stones.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-xs text-slate-400">
+              No stones on this quote.
+            </div>
+          ) : (
+            <div className="space-y-4">
               {(['MAIN', 'SIDE', 'MELEE'] as StoneRole[]).map(role => {
                 const items = stoneByRole[role]
-                if (items.length === 0) return null
                 const theme = ROLE_THEME[role]
+                const sectionHint = role === 'MAIN'
+                  ? 'Center stone (0 or 1).'
+                  : role === 'SIDE'
+                  ? 'Accent stones.'
+                  : 'Pavé / melee stones.'
                 // Per-section subtotals so the customer sees cost rolled up by role.
                 const sectionTotal = items.reduce((acc, s) => {
                   const sizeCfg = config.diamondSizeMap[s.sizeKey]
@@ -318,24 +347,35 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                   const ppc = (sizeCfg?.basePrice ?? 0) * mult
                   const ct = sizeCfg?.ctPerStone ?? 0
                   const amount = ct > 0 ? Math.round((s.carats ?? 0) / ct) : 0
-                  acc.cost += (s.carats ?? 0) * ppc
+                  const stoneCost = s.manualPrice != null ? s.manualPrice : (s.carats ?? 0) * ppc
+                  acc.cost += stoneCost
                   acc.labor += amount * (config.setterMap[s.setterType]?.fee ?? 0)
                   acc.carats += s.carats ?? 0
                   acc.amount += amount
                   return acc
                 }, { cost: 0, labor: 0, carats: 0, amount: 0 })
                 return (
-                  <div key={role} className="space-y-2">
+                  <div key={role} className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm space-y-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.chip}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${theme.dot}`} aria-hidden />
-                        {theme.label} · {items.length}
-                      </span>
-                      <span className="text-xs text-slate-500">
-                        {sectionTotal.amount} stone{sectionTotal.amount === 1 ? '' : 's'} · {Math.round(sectionTotal.carats * 10000) / 10000} ct ·
-                        {' '}<strong className="text-slate-900">${(sectionTotal.cost + sectionTotal.labor).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`h-7 w-7 rounded-xl ${theme.chip} flex items-center justify-center`}>
+                          <span className={`h-2 w-2 rounded-full ${theme.dot}`} aria-hidden />
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{theme.label} stones <span className="ml-1 text-xs font-medium text-slate-400">· {items.length}</span></p>
+                          <p className="text-xs text-slate-500">{sectionHint}</p>
+                        </div>
+                      </div>
+                      {items.length > 0 && (
+                        <span className="text-xs text-slate-500">
+                          {sectionTotal.amount} stone{sectionTotal.amount === 1 ? '' : 's'} · {Math.round(sectionTotal.carats * 10000) / 10000} ct ·
+                          {' '}<strong className="text-slate-900">${(sectionTotal.cost + sectionTotal.labor).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                        </span>
+                      )}
                     </div>
+                    {items.length === 0 && (
+                      <p className="rounded-xl border border-dashed border-slate-200 px-3 py-2 text-xs text-slate-400">None.</p>
+                    )}
                     {items.map((s, idx) => {
                       const sizeCfg = config.diamondSizeMap[s.sizeKey]
                       const setter = config.setterMap[s.setterType]
@@ -343,7 +383,8 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                       const ppc = (sizeCfg?.basePrice ?? 0) * mult
                       const ct = sizeCfg?.ctPerStone ?? 0
                       const amount = ct > 0 ? Math.round((s.carats ?? 0) / ct) : 0
-                      const cost = (s.carats ?? 0) * ppc
+                      const hasManualPrice = s.manualPrice != null
+                      const cost = hasManualPrice ? (s.manualPrice ?? 0) : (s.carats ?? 0) * ppc
                       const labor = amount * (setter?.fee ?? 0)
                       const typeLabel = DIAMOND_TYPE_OPTIONS[s.stoneType as keyof typeof DIAMOND_TYPE_OPTIONS]?.label ?? s.stoneType
                       return (
@@ -362,6 +403,14 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                               <div>
                                 <dt className="font-semibold uppercase tracking-wide text-slate-400">Size</dt>
                                 <dd className="text-slate-900">{sizeCfg?.label ?? s.sizeKey}</dd>
+                              </div>
+                              <div>
+                                <dt className="font-semibold uppercase tracking-wide text-slate-400">Shape</dt>
+                                <dd className={s.shape ? 'text-slate-900' : 'text-slate-400'}>{s.shape || '—'}</dd>
+                              </div>
+                              <div>
+                                <dt className="font-semibold uppercase tracking-wide text-slate-400">Color</dt>
+                                <dd className={s.color ? 'text-slate-900' : 'text-slate-400'}>{s.color || '—'}</dd>
                               </div>
                               <div>
                                 <dt className="font-semibold uppercase tracking-wide text-slate-400">Carats</dt>
@@ -385,7 +434,10 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
 
                             <div className="grid grid-cols-2 gap-2 border-t border-white/70 pt-2 text-xs">
                               <div className="rounded-xl bg-white/70 px-3 py-2">
-                                <p className="font-semibold uppercase tracking-wide text-slate-400">Stone cost</p>
+                                <p className="font-semibold uppercase tracking-wide text-slate-400">
+                                  Stone cost
+                                  {hasManualPrice && <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">custom</span>}
+                                </p>
                                 <p className="text-sm font-semibold text-slate-900">${cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                               </div>
                               <div className="rounded-xl bg-white/70 px-3 py-2">
@@ -401,8 +453,8 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                 )
               })}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         <div>
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Cost breakdown</p>

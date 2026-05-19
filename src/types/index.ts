@@ -68,6 +68,9 @@ export interface QuoteStone {
   setterType: string
   labReport?: string | null
   sortOrder?: number | null
+  shape?: string | null
+  color?: string | null
+  manualPrice?: number | null
 }
 
 export interface SavedQuote {

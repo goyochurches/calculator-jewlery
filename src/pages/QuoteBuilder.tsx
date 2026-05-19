@@ -42,6 +42,15 @@ const METAL_GROUPS: Array<{ group: string; keys: JewelryMetalOption[] }> = [
 
 const diamondTypeKeys = Object.keys(DIAMOND_TYPE_OPTIONS) as Array<keyof typeof DIAMOND_TYPE_OPTIONS>
 
+// Standard diamond shapes offered to the user. Empty value = unspecified.
+const STONE_SHAPES = [
+  'Round', 'Princess', 'Oval', 'Cushion', 'Emerald',
+  'Pear', 'Marquise', 'Asscher', 'Radiant', 'Heart',
+] as const
+
+// GIA color grades for white diamonds. Fancy colors fall back to "unspecified".
+const STONE_COLORS = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'] as const
+
 
 export function QuoteBuilderPage() {
   const { user } = useAuth()
@@ -77,6 +86,11 @@ export function QuoteBuilderPage() {
     amount: string
     setterType: string
     labReport: string
+    shape: string
+    color: string
+    // Raw input. When non-empty, overrides carats × pricePerCarat for this
+    // stone's cost. Setting labor is unaffected.
+    manualPrice: string
   }
   const [stones, setStones] = useState<StoneRow[]>([])
   const parseNum = (s: string) => {
@@ -121,6 +135,9 @@ export function QuoteBuilderPage() {
       amount: '',
       setterType: firstSetter,
       labReport: '',
+      shape: '',
+      color: '',
+      manualPrice: '',
     }
   }
 
@@ -190,7 +207,8 @@ export function QuoteBuilderPage() {
     const pricePerCarat = (sizeCfg?.basePrice ?? 0) * DIAMOND_TYPE_OPTIONS[stone.stoneType].multiplier
     const caratsNum = parseNum(stone.carats)
     const amountNum = parseNum(stone.amount)
-    const stoneCost = caratsNum * pricePerCarat
+    const hasManualPrice = stone.manualPrice.trim() !== ''
+    const stoneCost = hasManualPrice ? parseNum(stone.manualPrice) : caratsNum * pricePerCarat
     const stoneSetterFee = config.setterMap[stone.setterType]?.fee ?? 0
     const stoneLabor = amountNum * stoneSetterFee
     const theme = themeForRole(stone.role)
@@ -261,6 +279,43 @@ export function QuoteBuilderPage() {
             </select>
           </div>
 
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Shape <span className="font-normal normal-case text-slate-400">(optional)</span>
+            </label>
+            <select value={stone.shape}
+              onChange={e => patchStone(stone.uid, { shape: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+              <option value="">—</option>
+              {STONE_SHAPES.map(sh => (
+                <option key={sh} value={sh}>{sh}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Color <span className="font-normal normal-case text-slate-400">(optional)</span>
+            </label>
+            <select value={stone.color}
+              onChange={e => patchStone(stone.uid, { color: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+              <option value="">—</option>
+              {STONE_COLORS.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1 md:col-span-2">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Custom price <span className="font-normal normal-case text-slate-400">(optional — overrides carats × ${pricePerCarat.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct)</span>
+            </label>
+            <input type="number" min={0} step="0.01" value={stone.manualPrice} placeholder="Leave empty to use calculated price"
+              onChange={e => patchStone(stone.uid, { manualPrice: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+          </div>
+
           {stone.role !== 'MELEE' && (
             <div className="space-y-1 md:col-span-2">
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -274,7 +329,10 @@ export function QuoteBuilderPage() {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 pl-2 pt-2 border-t border-white/60 text-xs text-slate-500">
-          <span>Stone <strong className="text-slate-900">${stoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
+          <span>
+            Stone <strong className="text-slate-900">${stoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+            {hasManualPrice && <span className="ml-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">custom</span>}
+          </span>
           <span>Setting <strong className="text-slate-900">${stoneLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></span>
         </div>
       </div>
@@ -337,7 +395,8 @@ export function QuoteBuilderPage() {
       const pricePerCarat = (sizeCfg?.basePrice ?? 0) * mult
       const carats = parseNum(s.carats)
       const amount = parseNum(s.amount)
-      const cost = carats * pricePerCarat
+      const hasManualPrice = s.manualPrice.trim() !== ''
+      const cost = hasManualPrice ? parseNum(s.manualPrice) : carats * pricePerCarat
       const setterFee = config.setterMap[s.setterType]?.fee ?? 0
       const labor = amount * setterFee
       diamondCost += cost
@@ -417,6 +476,9 @@ export function QuoteBuilderPage() {
           setterType: s.setterType,
           labReport: s.role === 'MELEE' ? null : (s.labReport || null),
           sortOrder: idx,
+          shape: s.shape || null,
+          color: s.color || null,
+          manualPrice: s.manualPrice.trim() === '' ? null : parseNum(s.manualPrice),
         })),
       }, user.id)
       setSavedQuote({ id: q.id, title: q.title, total: pricing.total, publicToken: q.publicToken ?? null })
