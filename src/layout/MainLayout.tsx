@@ -1,8 +1,9 @@
 import { NotificationPanel } from '@/components/NotificationPanel'
+import { Toast } from '@/components/Toast'
 import { useNotifications } from '@/hooks/useNotifications'
 import { Bell, Menu, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Outlet, useLocation } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 
 const pageCopy: Record<string, { title: string; subtitle: string }> = {
@@ -54,7 +55,8 @@ export function MainLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === 'true'
   })
-  const { notifications, unreadCount, markRead, markAllRead } = useNotifications()
+  const navigate = useNavigate()
+  const { notifications, unreadCount, markRead, markAllRead, lastPush, dismissLastPush } = useNotifications()
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed))
@@ -146,6 +148,20 @@ export function MainLayout() {
           </main>
         </div>
       </div>
+
+      {/* Real-time WebSocket push → transient bottom-right toast. Keyed by
+          notification id so a rapid second push replaces the previous one. */}
+      {lastPush && (
+        <Toast
+          key={lastPush.id}
+          title="New notification"
+          description={lastPush.message}
+          variant={lastPush.type === 'DANGER' ? 'error' : 'success'}
+          actionLabel={lastPush.link ? 'Open' : undefined}
+          onAction={lastPush.link ? () => navigate(lastPush.link!) : undefined}
+          onClose={dismissLastPush}
+        />
+      )}
     </div>
   )
 }
