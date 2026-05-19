@@ -5,7 +5,7 @@ import {
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import type { QuoteStatus, QuoteStone, SavedQuote } from '@/types'
-import { Check, RefreshCw, X, XCircle } from 'lucide-react'
+import { Check, Eye, RefreshCw, X, XCircle } from 'lucide-react'
 import { useState } from 'react'
 
 const STATUS_STYLES: Record<QuoteStatus, string> = {
@@ -100,6 +100,25 @@ interface QuoteDetailPanelProps {
   /** Admin-only callback to rotate the share token + reset 3-month expiration. */
   onRefreshToken?: (id: string) => Promise<void> | void
   isAdmin?: boolean
+}
+
+/** Renders an absolute date + a "X ago" hint for any ISO timestamp. */
+function formatLastOpened(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return null
+  const now = Date.now()
+  const diffMs = now - date.getTime()
+  const minutes = Math.floor(diffMs / 60_000)
+  const hours   = Math.floor(diffMs / 3_600_000)
+  const days    = Math.floor(diffMs / 86_400_000)
+  const relative =
+    minutes < 1 ? 'just now' :
+    minutes < 60 ? `${minutes} min ago` :
+    hours   < 24 ? `${hours} h ago` :
+    days    <  7 ? `${days} d ago` :
+    date.toLocaleDateString()
+  return `${date.toLocaleString()} (${relative})`
 }
 
 function formatExpiration(iso: string | null | undefined): { label: string; expired: boolean } {

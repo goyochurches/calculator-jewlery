@@ -102,6 +102,8 @@ export interface SavedQuote {
   clientId?: number | null
   publicToken?: string | null
   publicTokenExpiresAt?: string | null
+  lastOpenedAt?: string | null
+  openCount?: number | null
 }
 
 export interface GemstonePrice {
