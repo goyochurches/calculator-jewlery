@@ -262,6 +262,24 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                 </button>
               )}
             </div>
+            {/* Client open-tracking — shows when the customer has actually
+                looked at the quote. Stays hidden until first open. */}
+            {quote.lastOpenedAt ? (
+              <div className="mt-3 flex items-center gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                <Eye className="h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0">
+                  <strong>Last opened:</strong> {formatLastOpened(quote.lastOpenedAt)}
+                  {(quote.openCount ?? 0) > 1 && (
+                    <span className="ml-1 text-emerald-700">· {quote.openCount} views</span>
+                  )}
+                </span>
+              </div>
+            ) : (
+              <p className="mt-3 flex items-center gap-2 text-xs text-slate-400">
+                <Eye className="h-3.5 w-3.5 shrink-0" />
+                Not opened yet by the client.
+              </p>
+            )}
           </div>
         )}
 
