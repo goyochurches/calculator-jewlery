@@ -11,9 +11,10 @@ import {
   publicQuoteService,
   PublicQuoteExpiredError,
   PublicQuoteNotFoundError,
+  PublicQuoteUnavailableError,
   type PublicQuote,
 } from '@/services/publicQuoteService'
-import { AlertCircle, Clock, Diamond, Gem, Ruler, Sparkles, Wrench } from 'lucide-react'
+import { AlertCircle, Clock, Diamond, Gem, HelpCircle, Ruler, Sparkles, Wrench } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
@@ -23,6 +24,7 @@ export function PublicQuotePage() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [expired, setExpired] = useState(false)
+  const [unavailable, setUnavailable] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -33,18 +35,40 @@ export function PublicQuotePage() {
       .catch(err => {
         if (err instanceof PublicQuoteNotFoundError) setNotFound(true)
         else if (err instanceof PublicQuoteExpiredError) setExpired(true)
+        else if (err instanceof PublicQuoteUnavailableError) setUnavailable(true)
         else setError(err instanceof Error ? err.message : 'Failed to load quote')
       })
       .finally(() => setLoading(false))
   }, [token])
 
-  if (loading) return <PublicShell><LoadingState /></PublicShell>
-  if (expired)  return <PublicShell><ExpiredState /></PublicShell>
-  if (notFound) return <PublicShell><NotFoundState /></PublicShell>
-  if (error)    return <PublicShell><ErrorState message={error} /></PublicShell>
-  if (!quote)   return <PublicShell><NotFoundState /></PublicShell>
+  if (loading)     return <PublicShell><LoadingState /></PublicShell>
+  if (unavailable) return <PublicShell><UnavailableState /></PublicShell>
+  if (expired)     return <PublicShell><ExpiredState /></PublicShell>
+  if (notFound)    return <PublicShell><NotFoundState /></PublicShell>
+  if (error)       return <PublicShell><ErrorState message={error} /></PublicShell>
+  if (!quote)      return <PublicShell><NotFoundState /></PublicShell>
 
   return <PublicShell companyName={quote.companyName}><QuoteView quote={quote} /></PublicShell>
+}
+
+/** Shown when the backend returns 403 — typically because the team has
+ *  rejected the quote. We intentionally don't expose the reason; the
+ *  customer is steered to contact the studio directly. */
+function UnavailableState() {
+  return (
+    <Card className="rounded-[28px] border border-slate-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.10)]">
+      <CardContent className="flex flex-col items-center gap-3 px-6 py-16 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
+          <HelpCircle className="h-6 w-6" />
+        </div>
+        <h1 className="text-xl font-semibold text-slate-900">Oops — we can't display this quote right now</h1>
+        <p className="max-w-md text-sm text-slate-600">
+          This quote is no longer available through this link. Please contact{' '}
+          <strong>Simone &amp; Son</strong> directly and we'll be happy to help.
+        </p>
+      </CardContent>
+    </Card>
+  )
 }
 
 function ExpiredState() {

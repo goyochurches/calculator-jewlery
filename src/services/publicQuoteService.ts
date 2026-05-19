@@ -35,11 +35,19 @@ export class PublicQuoteExpiredError extends Error {
   constructor() { super('Share link has expired') }
 }
 
+/** Backend returns 403 when the team rejected this quote and the public
+ *  view has been intentionally disabled. We don't reveal the reason to the
+ *  customer — they just see a generic "contact us" fallback. */
+export class PublicQuoteUnavailableError extends Error {
+  constructor() { super('Quote is no longer available') }
+}
+
 export const publicQuoteService = {
   async getByToken(token: string): Promise<PublicQuote> {
     const res = await fetch(`${BASE_URL}/api/public/quotes/${encodeURIComponent(token)}`)
     if (res.status === 404) throw new PublicQuoteNotFoundError()
     if (res.status === 410) throw new PublicQuoteExpiredError()
+    if (res.status === 403) throw new PublicQuoteUnavailableError()
     if (!res.ok) throw new Error(`Failed to load quote (HTTP ${res.status})`)
     return res.json() as Promise<PublicQuote>
   },

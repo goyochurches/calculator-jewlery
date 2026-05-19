@@ -34,10 +34,14 @@ function DailyWidget({ label, tooltipLabel, icon, iconBg, fetcher, fill = 'var(-
   const [todayCount, setTodayCount] = useState(0)
   const [yesterdayCount, setYesterdayCount] = useState(0)
   const [chartData, setChartData] = useState<ChartDay[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
     fetcher()
       .then(({ today, yesterday, perDay }) => {
+        if (cancelled) return
+        setError(null)
         setTodayCount(today)
         setYesterdayCount(yesterday)
         const localISO = (offset = 0) => {
@@ -60,10 +64,16 @@ function DailyWidget({ label, tooltipLabel, icon, iconBg, fetcher, fill = 'var(-
         })
         setChartData(sorted)
       })
-      .catch(console.error)
+      .catch(err => {
+        if (cancelled) return
+        console.error(err)
+        setError(String(err?.message ?? err))
+      })
+    return () => { cancelled = true }
   }, [fetcher])
 
   const diff = todayCount - yesterdayCount
+  const allZero = chartData.length > 0 && chartData.every(c => c.value === 0)
 
   return (
     <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
@@ -86,31 +96,61 @@ function DailyWidget({ label, tooltipLabel, icon, iconBg, fetcher, fill = 'var(-
         </div>
 
         <div className="mt-6 h-28">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} barSize={22}>
-              <XAxis
-                dataKey="day"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 10, fill: '#94a3b8' }}
-              />
-              <Tooltip
-                cursor={false}
-                contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }}
-                formatter={((v: number) => [v, tooltipLabel]) as never}
-              />
-              <Bar
-                dataKey="value"
-                radius={[6, 6, 0, 0]}
-                fill={fill}
-                label={false}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          {error ? (
+            <div className="flex h-full items-center justify-center rounded-2xl bg-rose-50 px-4 text-center text-xs text-rose-700">
+              Couldn't load data — {error}
+            </div>
+          ) : allZero ? (
+            <div className="flex h-full items-center justify-center text-center text-xs text-slate-400">
+              No activity in the last {chartData.length} days.
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} barSize={22}>
+                <XAxis
+                  dataKey="day"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: '#94a3b8' }}
+                />
+                <Tooltip
+                  cursor={false}
+                  contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }}
+                  formatter={((v: number) => [v, tooltipLabel]) as never}
+                />
+                <Bar
+                  dataKey="value"
+                  radius={[6, 6, 0, 0]}
+                  fill={fill}
+                  label={false}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </CardContent>
     </Card>
   )
+}
+
+// Module-level fetchers keep their reference stable across renders so the
+// useEffect inside DailyWidget doesn't re-fire whenever the parent re-renders.
+const fetchQuotesDaily = async () => {
+  const [today, yesterday, perDay] = await Promise.all([
+    quotesService.countToday(),
+    quotesService.countYesterday(),
+    quotesService.countPerDay(7),
+  ])
+  return { today, yesterday, perDay }
+}
+
+const fetchClientsDaily = async () => {
+  const [today, yesterday, perDay] = await Promise.all([
+    clientService.countToday(),
+    clientService.countYesterday(),
+    clientService.countPerDay(7),
+  ])
+  return { today, yesterday, perDay }
 }
 
 function QuotesWidget() {
@@ -120,14 +160,7 @@ function QuotesWidget() {
       tooltipLabel="Quotes"
       icon={<FileText className="h-5 w-5" />}
       iconBg="bg-violet-50 text-violet-600"
-      fetcher={async () => {
-        const [today, yesterday, perDay] = await Promise.all([
-          quotesService.countToday(),
-          quotesService.countYesterday(),
-          quotesService.countPerDay(7),
-        ])
-        return { today, yesterday, perDay }
-      }}
+      fetcher={fetchQuotesDaily}
     />
   )
 }
@@ -140,14 +173,7 @@ function ClientsWidget() {
       icon={<Users className="h-5 w-5" />}
       iconBg="bg-sky-50 text-sky-600"
       fill="#0ea5e9"
-      fetcher={async () => {
-        const [today, yesterday, perDay] = await Promise.all([
-          clientService.countToday(),
-          clientService.countYesterday(),
-          clientService.countPerDay(7),
-        ])
-        return { today, yesterday, perDay }
-      }}
+      fetcher={fetchClientsDaily}
     />
   )
 }
