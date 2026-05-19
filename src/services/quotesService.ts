@@ -10,6 +10,9 @@ interface ApiStone {
   setterType: string
   labReport?: string | null
   sortOrder?: number | null
+  shape?: string | null
+  color?: string | null
+  manualPrice?: number | null
 }
 
 interface ApiQuote {
@@ -88,6 +91,9 @@ function mapStone(s: ApiStone): QuoteStone {
     setterType: s.setterType,
     labReport: s.labReport ?? null,
     sortOrder: s.sortOrder ?? null,
+    shape: s.shape ?? null,
+    color: s.color ?? null,
+    manualPrice: s.manualPrice ?? null,
   }
 }
 
