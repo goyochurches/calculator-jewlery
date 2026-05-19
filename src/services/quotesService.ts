@@ -46,6 +46,8 @@ interface ApiQuote {
   clientId?: number | null
   publicToken?: string | null
   publicTokenExpiresAt?: string | null
+  lastOpenedAt?: string | null
+  openCount?: number | null
 }
 
 function mapQuote(q: ApiQuote): SavedQuote {
@@ -78,6 +80,8 @@ function mapQuote(q: ApiQuote): SavedQuote {
     stones: (q.stones ?? []).map(mapStone),
     publicToken: q.publicToken ?? null,
     publicTokenExpiresAt: q.publicTokenExpiresAt ?? null,
+    lastOpenedAt: q.lastOpenedAt ?? null,
+    openCount: q.openCount ?? null,
   }
 }
 
