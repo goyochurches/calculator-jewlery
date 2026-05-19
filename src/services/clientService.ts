@@ -33,4 +33,9 @@ export const clientService = {
   async countPerDay(days = 7): Promise<Record<string, number>> {
     return api.get<Record<string, number>>(`/api/clients/stats/per-day?days=${days}`)
   },
+
+  async countPerMonth(year?: number): Promise<Record<string, number>> {
+    const qs = year ? `?year=${year}` : ''
+    return api.get<Record<string, number>>(`/api/clients/stats/per-month${qs}`)
+  },
 }

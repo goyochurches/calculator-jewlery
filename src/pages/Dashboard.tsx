@@ -240,6 +240,81 @@ function RevenueWidget() {
   )
 }
 
+function ClientsMonthlyWidget() {
+  const [year] = useState(() => new Date().getFullYear())
+  const [yearTotal, setYearTotal] = useState(0)
+  const [monthly, setMonthly] = useState<Array<{ month: string; clients: number; isCurrent: boolean }>>([])
+
+  useEffect(() => {
+    const currentMonth = new Date().getMonth()
+    clientService.countPerMonth(year)
+      .then(perMonth => {
+        const entries = Object.entries(perMonth).sort(([a], [b]) => a.localeCompare(b))
+        const data = entries.map(([key, count], idx) => ({
+          month: MONTH_LABELS[idx] ?? key.slice(5),
+          clients: Number(count) || 0,
+          isCurrent: idx === currentMonth,
+        }))
+        setMonthly(data)
+        setYearTotal(data.reduce((acc, m) => acc + m.clients, 0))
+      })
+      .catch(console.error)
+  }, [year])
+
+  const bestMonth = monthly.reduce(
+    (best, m) => (m.clients > best.clients ? m : best),
+    { month: '', clients: 0, isCurrent: false },
+  )
+
+  return (
+    <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+              New clients · {year}
+            </p>
+            <p className="mt-3 text-5xl font-semibold tracking-tight text-slate-950">
+              {yearTotal}
+            </p>
+            <p className="mt-2 text-sm text-slate-500">
+              {bestMonth.clients > 0
+                ? <>Best month: <strong className="text-slate-900">{bestMonth.month}</strong> · {bestMonth.clients} new client{bestMonth.clients === 1 ? '' : 's'}</>
+                : 'No new clients yet this year.'}
+            </p>
+          </div>
+          <div className="rounded-2xl bg-sky-50 p-3 text-sky-600">
+            <Users className="h-5 w-5" />
+          </div>
+        </div>
+
+        <div className="mt-6 h-40">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={monthly} barSize={18}>
+              <XAxis
+                dataKey="month"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 10, fill: '#94a3b8' }}
+              />
+              <Tooltip
+                cursor={false}
+                contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }}
+                formatter={((v: number) => [v, 'New clients']) as never}
+              />
+              <Bar dataKey="clients" radius={[6, 6, 0, 0]}>
+                {monthly.map((m, idx) => (
+                  <Cell key={idx} fill={m.isCurrent ? '#0ea5e9' : '#bae6fd'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 function QuoteStatusWidget() {
   const [stats, setStats] = useState<UserQuoteStats[]>([])
 
@@ -523,7 +598,10 @@ export function Dashboard() {
         <ClientsWidget />
       </section>
 
-      <RevenueWidget />
+      <section className="grid gap-4 xl:grid-cols-2">
+        <RevenueWidget />
+        <ClientsMonthlyWidget />
+      </section>
 
       <QuoteStatusWidget />
 
