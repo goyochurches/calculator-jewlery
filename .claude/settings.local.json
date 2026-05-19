@@ -17,7 +17,8 @@
       "Bash(git -C D:/wamp64/www/calculator-jewlery status)",
       "Bash(git -C D:/wamp64/www/price-calculator status)",
       "Bash(git -C D:/wamp64/www/calculator-jewlery diff -- src/pages/QuoteBuilder.tsx)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(mvn -q -DskipTests compile)"
     ]
   }
 }
