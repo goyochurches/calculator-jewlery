@@ -23,7 +23,10 @@
       "Bash(mvn -DskipTests -f \"D:/wamp64/www/price-calculator/pom.xml\" compile)",
       "Bash(mvn -DskipTests -f \"D:/wamp64/www/price-calculator/pom.xml\" clean compile)",
       "Bash(mvn -DskipTests -f \"D:/wamp64/www/price-calculator/pom.xml\" -q compile)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(mvn -f D:/wamp64/www/price-calculator/pom.xml -q compile)",
+      "Bash(mvn -f D:/wamp64/www/price-calculator/pom.xml compile)",
+      "Bash(mvn -f D:/wamp64/www/price-calculator/pom.xml clean compile)"
     ]
   }
 }
