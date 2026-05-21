@@ -110,6 +110,7 @@ export interface SavedQuote {
   photo?: string | null
   engraving?: boolean | null
   setterType?: string | null
+  jewelryType?: string | null
   client?: Client | null
   clientId?: number | null
   publicToken?: string | null

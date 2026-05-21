@@ -55,6 +55,19 @@ const STONE_COLORS = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'] as const
 // Only these setter types make sense for customer-supplied stones.
 const CUSTOMER_STONE_SETTER_KEYS = ['customer_melee', 'channel', 'bezel', 'fancy', 'center'] as const
 
+// Catalogue of jewelry piece types. Stored as the key, label is for display.
+const JEWELRY_TYPE_OPTIONS: Array<{ key: string; label: string }> = [
+  { key: 'ring',      label: 'Ring' },
+  { key: 'pendant',   label: 'Pendant' },
+  { key: 'necklace',  label: 'Necklace' },
+  { key: 'bracelet',  label: 'Bracelet' },
+  { key: 'earrings',  label: 'Earrings' },
+  { key: 'cufflinks', label: 'Cufflinks' },
+  { key: 'brooch',    label: 'Brooch' },
+  { key: 'anklet',    label: 'Anklet' },
+  { key: 'other',     label: 'Other' },
+]
+
 
 export function QuoteBuilderPage() {
   const { user } = useAuth()
@@ -66,6 +79,7 @@ export function QuoteBuilderPage() {
   const [savedQuote, setSavedQuote] = useState<{ id: string; title: string; total: number; publicToken: string | null } | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<{ title?: string; client?: string }>({})
+  const [jewelryType, setJewelryType] = useState<string>('ring')
   const [selectedMetal, setSelectedMetal] = useState<JewelryMetalOption>('gold-18k-white')
   const [ringLabor, setRingLabor] = useState('medium')
   const [weightGrams, setWeightGrams] = useState(12)
@@ -715,6 +729,7 @@ export function QuoteBuilderPage() {
         photo: photo ?? undefined,
         engraving,
         setterType: firstStone?.setterType ?? '',
+        jewelryType,
         stones: stones.map((s, idx) => ({
           role: s.role,
           stoneType: s.stoneType,
@@ -741,12 +756,26 @@ export function QuoteBuilderPage() {
         }),
       }, user.id)
       setSavedQuote({ id: q.id, title: q.title, total: pricing.total, publicToken: q.publicToken ?? null })
+      // Reset every field back to its initial default so the builder is
+      // ready for the next quote without leaking values from the one we
+      // just saved.
       setQuoteTitle('')
       setClient(null)
+      setJewelryType('ring')
+      setSelectedMetal('gold-18k-white')
+      setRingLabor('medium')
+      setWeightGrams(12)
+      setRingWidth(2.5)
+      setFingerSize(7)
+      setExtraCosts(0)
       setEngraving(false)
-      setPhoto(null)
+      setStones([])
       setCustomerStones([])
+      setPhoto(null)
+      setFieldErrors({})
+      setSaveError(null)
       if (photoInputRef.current) photoInputRef.current.value = ''
+      if (cameraInputRef.current) cameraInputRef.current.value = ''
     } catch {
       setSaveError('Failed to save quote. Please try again.')
     } finally {
@@ -858,6 +887,16 @@ export function QuoteBuilderPage() {
                 {fieldErrors.title && (
                   <p className="text-xs font-medium text-rose-600">{fieldErrors.title}</p>
                 )}
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-semibold text-slate-900">Type of piece</label>
+                <select value={jewelryType} onChange={e => setJewelryType(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
+                  {JEWELRY_TYPE_OPTIONS.map(j => (
+                    <option key={j.key} value={j.key}>{j.label}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="space-y-2 md:col-span-2">

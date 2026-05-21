@@ -50,6 +50,7 @@ interface ApiQuote {
   photo?: string | null   // base64 o URL devuelta por el backend
   engraving?: boolean | null
   setterType?: string | null
+  jewelryType?: string | null
   client?: Client | null
   stones?: ApiStone[]
   customerStones?: ApiCustomerStone[]
@@ -87,6 +88,7 @@ function mapQuote(q: ApiQuote): SavedQuote {
     photo: q.photo ?? null,
     engraving: q.engraving ?? false,
     setterType: q.setterType ?? null,
+    jewelryType: q.jewelryType ?? null,
     client: q.client ?? null,
     clientId: q.client?.id ?? q.clientId ?? null,
     stones: (q.stones ?? []).map(mapStone),

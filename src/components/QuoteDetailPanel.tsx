@@ -194,6 +194,12 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
   }
 
   const metalCfg = JEWELRY_METAL_OPTIONS[quote.metal] ?? { label: quote.metal }
+  const JEWELRY_TYPE_LABELS: Record<string, string> = {
+    ring: 'Ring', pendant: 'Pendant', necklace: 'Necklace', bracelet: 'Bracelet',
+    earrings: 'Earrings', cufflinks: 'Cufflinks', brooch: 'Brooch', anklet: 'Anklet',
+    other: 'Other',
+  }
+  const jewelryTypeLabel = quote.jewelryType ? (JEWELRY_TYPE_LABELS[quote.jewelryType] ?? quote.jewelryType) : null
   const ringLaborCfg = config.ringLaborMap[quote.ringLabor]
   // Quotes saved before the multi-stone refactor only have the legacy diamond_*
   // fields. Synthesize a single MAIN entry so the detail still renders the
@@ -251,7 +257,10 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
       <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
         <div>
           <h2 className="text-base font-semibold text-slate-900">{quote.title}</h2>
-          <p className="mt-0.5 text-xs text-slate-400">Quote #{quote.id} · {quote.createdAt}</p>
+          <p className="mt-0.5 text-xs text-slate-400">
+            Quote #{quote.id} · {quote.createdAt}
+            {jewelryTypeLabel ? <> · <span className="font-semibold text-slate-600">{jewelryTypeLabel}</span></> : null}
+          </p>
         </div>
         <button
           onClick={onClose}
