@@ -807,6 +807,7 @@ export function QuoteBuilderPage() {
   }
 
   const ringLaborLabel = config.ringLaborMap[ringLabor]?.label ?? ringLabor
+  const jewelryTypeLabel = JEWELRY_TYPE_OPTIONS.find(j => j.key === jewelryType)?.label ?? jewelryType
 
   if (config.loading) return <QuoteBuilderSkeleton />
 
@@ -1344,7 +1345,7 @@ export function QuoteBuilderPage() {
                   ${((pricing.total - pricing.engravingFee) * 2.5 + pricing.engravingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </p>
                 <p className="mt-2 text-sm text-slate-300">
-                  {selectedMetalConfig.label} | {ringLaborLabel}
+                  <span className="font-semibold text-white">{jewelryTypeLabel}</span> · {selectedMetalConfig.label} · {ringLaborLabel}
                 </p>
               </div>
 
