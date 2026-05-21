@@ -1286,10 +1286,28 @@ export function QuoteBuilderPage() {
 
         {/* ── Columna derecha: estimated total (sticky) + mini-cards ─────── */}
         <div className="space-y-4">
-          <Card className="rounded-[30px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] xl:sticky xl:top-4 xl:z-20">
+          <Card className={`rounded-[30px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] ${pinSummary ? 'xl:sticky xl:top-32 xl:z-10' : ''}`}>
             <CardHeader className="border-b border-slate-100">
-              <CardTitle className="text-base font-semibold text-slate-900">Estimated total</CardTitle>
-              <p className="text-sm text-slate-500">Live breakdown for the current quote.</p>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base font-semibold text-slate-900">Estimated total</CardTitle>
+                  <p className="text-sm text-slate-500">Live breakdown for the current quote.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPinSummary(v => !v)}
+                  title={pinSummary ? 'Unpin — scroll with the page' : 'Pin — keep visible while scrolling'}
+                  aria-label={pinSummary ? 'Unpin summary' : 'Pin summary'}
+                  aria-pressed={pinSummary}
+                  className={`hidden xl:inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition ${
+                    pinSummary
+                      ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100'
+                      : 'border-slate-200 bg-white text-slate-400 hover:bg-slate-100 hover:text-slate-700'
+                  }`}
+                >
+                  {pinSummary ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
+                </button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
               <div className="rounded-2xl p-5 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}>
