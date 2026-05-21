@@ -52,6 +52,9 @@ const STONE_SHAPES = [
 // GIA color grades for white diamonds. Fancy colors fall back to "unspecified".
 const STONE_COLORS = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'] as const
 
+// Only these setter types make sense for customer-supplied stones.
+const CUSTOMER_STONE_SETTER_KEYS = ['customer_melee', 'channel', 'bezel', 'fancy', 'center'] as const
+
 
 export function QuoteBuilderPage() {
   const { user } = useAuth()
@@ -123,10 +126,17 @@ export function QuoteBuilderPage() {
     gemstoneService.getAll().then(setGemstones).catch(console.error)
   }, [])
 
+  // Setters allowed for customer-supplied stones — narrowed to the subset the
+  // user wants to expose in the Customer Stones section.
+  const customerSetters = useMemo(
+    () => config.setters.filter(s => (CUSTOMER_STONE_SETTER_KEYS as readonly string[]).includes(s.typeKey)),
+    [config.setters],
+  )
+
   const defaultCustomerStone = (): CustomerStone => ({
     uid: crypto.randomUUID(),
     gemstoneId: gemstones[0]?.id ?? '',
-    setterType: config.setters[0]?.typeKey ?? '',
+    setterType: customerSetters[0]?.typeKey ?? '',
     size: '',
     quantity: '1',
     photo: null,
@@ -657,12 +667,25 @@ export function QuoteBuilderPage() {
           color: s.color || null,
           manualPrice: s.manualPrice.trim() === '' ? null : parseNum(s.manualPrice),
         })),
+        customerStones: customerStones.map((cs, idx) => {
+          const gem = gemstones.find(g => g.id === cs.gemstoneId)
+          return {
+            gemstoneId: cs.gemstoneId ? Number(cs.gemstoneId) : null,
+            gemstoneName: gem?.name ?? null,
+            setterType: cs.setterType,
+            sizeText: cs.size || null,
+            quantity: Math.max(1, parseNum(cs.quantity || '1') || 1),
+            photo: cs.photo ?? null,
+            sortOrder: idx,
+          }
+        }),
       }, user.id)
       setSavedQuote({ id: q.id, title: q.title, total: pricing.total, publicToken: q.publicToken ?? null })
       setQuoteTitle('')
       setClient(null)
       setEngraving(false)
       setPhoto(null)
+      setCustomerStones([])
       if (photoInputRef.current) photoInputRef.current.value = ''
     } catch {
       setSaveError('Failed to save quote. Please try again.')
@@ -1029,9 +1052,7 @@ export function QuoteBuilderPage() {
                                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
                                 {gemstones.length === 0 && <option value="">No gemstones loaded</option>}
                                 {gemstones.map(g => (
-                                  <option key={g.id} value={g.id}>
-                                    {g.name}{g.color ? ` — ${g.color}` : ''}
-                                  </option>
+                                  <option key={g.id} value={g.id}>{g.name}</option>
                                 ))}
                               </select>
                             </div>
@@ -1041,7 +1062,7 @@ export function QuoteBuilderPage() {
                               <select value={cs.setterType}
                                 onChange={e => patchCustomerStone(cs.uid, { setterType: e.target.value })}
                                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
-                                {config.setters.map(s => (
+                                {customerSetters.map(s => (
                                   <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>
                                 ))}
                               </select>

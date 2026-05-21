@@ -73,6 +73,17 @@ export interface QuoteStone {
   manualPrice?: number | null
 }
 
+export interface QuoteCustomerStone {
+  id?: number | null
+  gemstoneId?: number | null
+  gemstoneName?: string | null
+  setterType: string
+  sizeText?: string | null
+  quantity: number
+  photo?: string | null
+  sortOrder?: number | null
+}
+
 export interface SavedQuote {
   id: string
   title: string
@@ -88,6 +99,7 @@ export interface SavedQuote {
   diamondType: 'natural' | 'lab-grown' | 'grunberger'
   diamondSize: string
   stones?: QuoteStone[]
+  customerStones?: QuoteCustomerStone[]
   weightGrams: number
   ringWidth: number
   fingerSize: number

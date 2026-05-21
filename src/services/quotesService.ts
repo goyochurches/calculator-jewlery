@@ -1,5 +1,5 @@
 import { api } from '@/api/apiClient'
-import type { Client, QuoteStone, SavedQuote } from '../types'
+import type { Client, QuoteCustomerStone, QuoteStone, SavedQuote } from '../types'
 
 interface ApiStone {
   id?: number | null
@@ -13,6 +13,17 @@ interface ApiStone {
   shape?: string | null
   color?: string | null
   manualPrice?: number | null
+}
+
+interface ApiCustomerStone {
+  id?: number | null
+  gemstoneId?: number | null
+  gemstoneName?: string | null
+  setterType: string
+  sizeText?: string | null
+  quantity: number
+  photo?: string | null
+  sortOrder?: number | null
 }
 
 interface ApiQuote {
@@ -41,6 +52,7 @@ interface ApiQuote {
   setterType?: string | null
   client?: Client | null
   stones?: ApiStone[]
+  customerStones?: ApiCustomerStone[]
   // Sent up by the frontend so the backend can resolve the FK; on responses
   // the backend echoes the full `client` object instead.
   clientId?: number | null
@@ -78,6 +90,7 @@ function mapQuote(q: ApiQuote): SavedQuote {
     client: q.client ?? null,
     clientId: q.client?.id ?? q.clientId ?? null,
     stones: (q.stones ?? []).map(mapStone),
+    customerStones: (q.customerStones ?? []).map(mapCustomerStone),
     publicToken: q.publicToken ?? null,
     publicTokenExpiresAt: q.publicTokenExpiresAt ?? null,
     lastOpenedAt: q.lastOpenedAt ?? null,
@@ -98,6 +111,19 @@ function mapStone(s: ApiStone): QuoteStone {
     shape: s.shape ?? null,
     color: s.color ?? null,
     manualPrice: s.manualPrice ?? null,
+  }
+}
+
+function mapCustomerStone(s: ApiCustomerStone): QuoteCustomerStone {
+  return {
+    id: s.id ?? null,
+    gemstoneId: s.gemstoneId ?? null,
+    gemstoneName: s.gemstoneName ?? null,
+    setterType: s.setterType,
+    sizeText: s.sizeText ?? null,
+    quantity: s.quantity ?? 1,
+    photo: s.photo ?? null,
+    sortOrder: s.sortOrder ?? null,
   }
 }
 
