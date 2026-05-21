@@ -1324,8 +1324,14 @@ export function QuoteBuilderPage() {
                 {[
                   ['Material reference', pricing.materialCost],
                   ['CAD design & Jeweler\'s time', pricing.ringLaborFee],
-                  ['Setting labor', pricing.settingFee + pricing.customerSettingFee],
-                  [`Diamonds (${pricing.totalAmount} stones · ${pricing.totalCarats} ct)`, pricing.diamondCost],
+                  // "Setting supplied diamonds" = stone cost + labor for the
+                  // in-house MAIN/SIDE/MELEE stones (we buy them and set them).
+                  [`Setting supplied diamonds (${pricing.totalAmount} stones · ${pricing.totalCarats} ct)`,
+                    pricing.diamondCost + pricing.settingFee],
+                  // "Setting customer diamonds" = labor only — the client
+                  // brought the stones so there's no stone cost on our side.
+                  [`Setting customer diamonds (${customerStones.length} stone${customerStones.length === 1 ? '' : 's'})`,
+                    pricing.customerSettingFee],
                   ['Hand engraving (milgrain)', pricing.engravingFee],
                   ['Extra costs', extraCosts],
                 ].map(([label, value]) => (
