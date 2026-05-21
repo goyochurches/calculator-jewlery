@@ -138,6 +138,7 @@ export function QuoteBuilderPage() {
     size: string
     quantity: string
     photo: string | null
+    comments: string
   }
   const [customerStones, setCustomerStones] = useState<CustomerStone[]>([])
   const [gemstones, setGemstones] = useState<GemstonePrice[]>([])
@@ -162,6 +163,7 @@ export function QuoteBuilderPage() {
     size: '',
     quantity: '1',
     photo: null,
+    comments: '',
   })
 
   const addCustomerStone = () => {
@@ -566,17 +568,15 @@ export function QuoteBuilderPage() {
             </div>
           )}
 
-          {stone.role === 'MAIN' && (
-            <div className="space-y-1 md:col-span-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Additional comments <span className="font-normal normal-case text-slate-400">(optional)</span>
-              </label>
-              <textarea rows={3} value={stone.comments}
-                placeholder="Any notes about clarity, fluorescence, special instructions, etc."
-                onChange={e => patchStone(stone.uid, { comments: e.target.value })}
-                className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
-            </div>
-          )}
+          <div className="space-y-1 md:col-span-2">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Additional comments <span className="font-normal normal-case text-slate-400">(optional)</span>
+            </label>
+            <textarea rows={3} value={stone.comments}
+              placeholder="Any notes about clarity, fluorescence, special instructions, etc."
+              onChange={e => patchStone(stone.uid, { comments: e.target.value })}
+              className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 pl-2 pt-3 border-t border-white/60">
@@ -762,7 +762,7 @@ export function QuoteBuilderPage() {
           shape: s.shape || null,
           color: s.color || null,
           manualPrice: s.manualPrice.trim() === '' ? null : parseNum(s.manualPrice),
-          comments: s.role === 'MAIN' && s.comments.trim() !== '' ? s.comments.trim() : null,
+          comments: s.comments.trim() === '' ? null : s.comments.trim(),
         })),
         customerStones: customerStones.map((cs, idx) => {
           const gem = gemstones.find(g => g.id === cs.gemstoneId)

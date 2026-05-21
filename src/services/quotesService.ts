@@ -129,6 +129,7 @@ function mapCustomerStone(s: ApiCustomerStone): QuoteCustomerStone {
     quantity: s.quantity ?? 1,
     photo: s.photo ?? null,
     sortOrder: s.sortOrder ?? null,
+    comments: s.comments ?? null,
   }
 }
 
