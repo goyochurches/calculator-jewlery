@@ -13,6 +13,7 @@ interface ApiStone {
   shape?: string | null
   color?: string | null
   manualPrice?: number | null
+  comments?: string | null
 }
 
 interface ApiCustomerStone {
@@ -24,6 +25,7 @@ interface ApiCustomerStone {
   quantity: number
   photo?: string | null
   sortOrder?: number | null
+  comments?: string | null
 }
 
 interface ApiQuote {
@@ -113,6 +115,7 @@ function mapStone(s: ApiStone): QuoteStone {
     shape: s.shape ?? null,
     color: s.color ?? null,
     manualPrice: s.manualPrice ?? null,
+    comments: s.comments ?? null,
   }
 }
 

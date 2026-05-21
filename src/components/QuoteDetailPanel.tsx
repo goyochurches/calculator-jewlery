@@ -579,6 +579,12 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                                   <dd className={s.labReport ? 'text-slate-900 font-mono' : 'text-slate-400'}>{s.labReport || '— not provided'}</dd>
                                 </div>
                               )}
+                              {s.role === 'MAIN' && s.comments && (
+                                <div className="col-span-2">
+                                  <dt className="font-semibold uppercase tracking-wide text-slate-400">Additional comments</dt>
+                                  <dd className="whitespace-pre-wrap text-slate-900">{s.comments}</dd>
+                                </div>
+                              )}
                             </dl>
 
                             <div className="grid grid-cols-2 gap-2 border-t border-white/70 pt-2 text-xs">

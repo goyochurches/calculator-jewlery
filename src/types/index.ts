@@ -71,6 +71,7 @@ export interface QuoteStone {
   shape?: string | null
   color?: string | null
   manualPrice?: number | null
+  comments?: string | null
 }
 
 export interface QuoteCustomerStone {
@@ -82,6 +83,7 @@ export interface QuoteCustomerStone {
   quantity: number
   photo?: string | null
   sortOrder?: number | null
+  comments?: string | null
 }
 
 export interface SavedQuote {

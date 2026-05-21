@@ -114,6 +114,9 @@ export function QuoteBuilderPage() {
     // Raw input. When non-empty, overrides carats × pricePerCarat for this
     // stone's cost. Setting labor is unaffected.
     manualPrice: string
+    // Free-form notes the jeweler wants to attach to this stone (rendered on
+    // the MAIN row only for now).
+    comments: string
     /** Whether the form for this stone is folded into a compact summary card.
      *  New stones start expanded; clicking "Done" collapses; chevron toggles. */
     collapsed: boolean
@@ -227,6 +230,7 @@ export function QuoteBuilderPage() {
       shape: '',
       color: '',
       manualPrice: '',
+      comments: '',
       collapsed: false,
     }
   }
@@ -561,6 +565,18 @@ export function QuoteBuilderPage() {
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
             </div>
           )}
+
+          {stone.role === 'MAIN' && (
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Additional comments <span className="font-normal normal-case text-slate-400">(optional)</span>
+              </label>
+              <textarea rows={3} value={stone.comments}
+                placeholder="Any notes about clarity, fluorescence, special instructions, etc."
+                onChange={e => patchStone(stone.uid, { comments: e.target.value })}
+                className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-3 pl-2 pt-3 border-t border-white/60">
@@ -746,6 +762,7 @@ export function QuoteBuilderPage() {
           shape: s.shape || null,
           color: s.color || null,
           manualPrice: s.manualPrice.trim() === '' ? null : parseNum(s.manualPrice),
+          comments: s.role === 'MAIN' && s.comments.trim() !== '' ? s.comments.trim() : null,
         })),
         customerStones: customerStones.map((cs, idx) => {
           const gem = gemstones.find(g => g.id === cs.gemstoneId)
