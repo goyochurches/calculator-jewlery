@@ -4,7 +4,7 @@ import {
 } from '@/constants/config'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
-import type { QuoteStatus, QuoteStone, SavedQuote } from '@/types'
+import type { QuoteCustomerStone, QuoteStatus, QuoteStone, SavedQuote } from '@/types'
 import { Check, ChevronDown, ChevronUp, Eye, RefreshCw, X, XCircle } from 'lucide-react'
 import { useState } from 'react'
 
@@ -210,6 +210,14 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
     acc.amount += amount
     return acc
   }, { cost: 0, labor: 0, carats: 0, amount: 0 })
+
+  // Customer-supplied stones only contribute setter labor (the client brings
+  // the stone). Quantity multiplies the setter fee.
+  const customerStoneFee = (quote.customerStones ?? []).reduce((acc, cs: QuoteCustomerStone) => {
+    const qty = Math.max(1, cs.quantity ?? 1)
+    const fee = config.setterMap[cs.setterType]?.fee ?? 0
+    return acc + qty * fee
+  }, 0)
 
   const showAdminActions = isAdmin
     && onStatusChange
@@ -563,6 +571,61 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
               })}
             </div>
           )}
+
+          {(quote.customerStones?.length ?? 0) > 0 && (
+            <div className="mt-4 space-y-3">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Customer stones</p>
+              {(quote.customerStones ?? []).map((cs, idx) => {
+                const setter = config.setterMap[cs.setterType]
+                const qty = Math.max(1, cs.quantity ?? 1)
+                const lineFee = qty * (setter?.fee ?? 0)
+                return (
+                  <div key={cs.id ?? idx}
+                    className="relative overflow-hidden rounded-2xl border border-indigo-200 bg-indigo-50/40 px-4 py-3 text-sm shadow-sm">
+                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-indigo-500" aria-hidden />
+                    <div className="pl-2 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 text-indigo-800 px-2.5 py-1 text-xs font-semibold">
+                          <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" aria-hidden />
+                          Customer stone #{idx + 1}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-900 tabular-nums">
+                          ${lineFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+
+                      <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                        <div className="col-span-2">
+                          <dt className="font-semibold uppercase tracking-wide text-slate-400">Type of stone</dt>
+                          <dd className={cs.gemstoneName ? 'text-slate-900' : 'text-slate-400'}>
+                            {cs.gemstoneName || '—'}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="font-semibold uppercase tracking-wide text-slate-400">Type of setting</dt>
+                          <dd className="text-slate-900">{setter?.label ?? cs.setterType ?? '—'}</dd>
+                        </div>
+                        <div>
+                          <dt className="font-semibold uppercase tracking-wide text-slate-400">Quantity</dt>
+                          <dd className="text-slate-900">{qty}{setter ? ` × $${setter.fee}` : ''}</dd>
+                        </div>
+                        <div className="col-span-2">
+                          <dt className="font-semibold uppercase tracking-wide text-slate-400">Size</dt>
+                          <dd className={cs.sizeText ? 'text-slate-900' : 'text-slate-400'}>{cs.sizeText || '—'}</dd>
+                        </div>
+                      </dl>
+
+                      {cs.photo && (
+                        <div className="overflow-hidden rounded-xl border border-slate-200">
+                          <img src={cs.photo} alt={`Customer stone ${idx + 1}`} className="w-full object-cover max-h-48" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
 
         <div>
@@ -570,7 +633,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
           <div className="space-y-2">
             <LineItem label="Diamonds total"
               value={`${stoneTotals.amount} stone${stoneTotals.amount === 1 ? '' : 's'} · ${Math.round(stoneTotals.carats * 10000) / 10000} ct · $${stoneTotals.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
-            <LineItem label="Setting labor (all stones)" value={`$${stoneTotals.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+            <LineItem label="Setting labor (all stones)" value={`$${(stoneTotals.labor + customerStoneFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
             <LineItem label="Hand engraving (milgrain)" value={quote.engraving ? '$150.00' : '$0.00'} />
             {quote.extraCosts > 0 && (
               <LineItem label="Extra costs" value={`$${quote.extraCosts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
