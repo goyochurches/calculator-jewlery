@@ -14,7 +14,7 @@ import { ClientPicker } from '@/components/ClientPicker'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { Toast } from '@/components/Toast'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
-import { Calculator, Camera, Check, ChevronDown, ChevronUp, Crown, Diamond, Gem, ImagePlus, Layers3, Ruler, Sparkles, User, X } from 'lucide-react'
+import { Calculator, Camera, Check, ChevronDown, ChevronUp, Crown, Diamond, Gem, ImagePlus, Layers3, Pin, PinOff, Ruler, Sparkles, User, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -80,6 +80,11 @@ export function QuoteBuilderPage() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<{ title?: string; client?: string }>({})
   const [jewelryType, setJewelryType] = useState<string>('ring')
+  // Pin behaviour for the right-column "Estimated total" card.
+  //   true  → sticky, follows the user as they scroll (default).
+  //   false → scrolls away with the rest of the page (the previous behaviour
+  //           before we made it sticky). User toggles with the pin button.
+  const [pinSummary, setPinSummary] = useState(true)
   const [selectedMetal, setSelectedMetal] = useState<JewelryMetalOption>('gold-18k-white')
   const [ringLabor, setRingLabor] = useState('medium')
   const [weightGrams, setWeightGrams] = useState(12)
