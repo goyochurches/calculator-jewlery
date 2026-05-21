@@ -774,6 +774,7 @@ export function QuoteBuilderPage() {
             quantity: Math.max(1, parseNum(cs.quantity || '1') || 1),
             photo: cs.photo ?? null,
             sortOrder: idx,
+            comments: cs.comments.trim() === '' ? null : cs.comments.trim(),
           }
         }),
       }, user.id)
@@ -1250,6 +1251,16 @@ export function QuoteBuilderPage() {
                                   </button>
                                 </div>
                               )}
+                            </div>
+
+                            <div className="space-y-1 md:col-span-2">
+                              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Additional comments <span className="font-normal normal-case text-slate-400">(optional)</span>
+                              </label>
+                              <textarea rows={3} value={cs.comments}
+                                placeholder="Any notes about the stone — provenance, condition, instructions, etc."
+                                onChange={e => patchCustomerStone(cs.uid, { comments: e.target.value })}
+                                className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
                             </div>
                           </div>
 
