@@ -579,7 +579,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                                   <dd className={s.labReport ? 'text-slate-900 font-mono' : 'text-slate-400'}>{s.labReport || '— not provided'}</dd>
                                 </div>
                               )}
-                              {s.role === 'MAIN' && s.comments && (
+                              {s.comments && (
                                 <div className="col-span-2">
                                   <dt className="font-semibold uppercase tracking-wide text-slate-400">Additional comments</dt>
                                   <dd className="whitespace-pre-wrap text-slate-900">{s.comments}</dd>
@@ -656,6 +656,12 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                           <dt className="font-semibold uppercase tracking-wide text-slate-400">Size</dt>
                           <dd className={cs.sizeText ? 'text-slate-900' : 'text-slate-400'}>{cs.sizeText || '—'}</dd>
                         </div>
+                        {cs.comments && (
+                          <div className="col-span-2">
+                            <dt className="font-semibold uppercase tracking-wide text-slate-400">Additional comments</dt>
+                            <dd className="whitespace-pre-wrap text-slate-900">{cs.comments}</dd>
+                          </div>
+                        )}
                       </dl>
 
                       {cs.photo && (
