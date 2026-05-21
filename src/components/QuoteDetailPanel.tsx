@@ -6,7 +6,7 @@ import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import type { QuoteCustomerStone, QuoteStatus, QuoteStone, SavedQuote } from '@/types'
 import { Check, ChevronDown, ChevronUp, Eye, RefreshCw, X, XCircle } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 const STATUS_STYLES: Record<QuoteStatus, string> = {
   draft: 'bg-slate-100 text-slate-600',
@@ -152,14 +152,37 @@ const ROLE_THEME: Record<StoneRole, { label: string; dot: string; ring: string; 
 
 export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToken, isAdmin = false }: QuoteDetailPanelProps) {
   const [refreshing, setRefreshing] = useState(false)
-  // Per-stone expand/collapse state. Keys are `${role}-${index}`. Empty by
-  // default → every stone starts collapsed as a compact summary card.
-  const [expandedStones, setExpandedStones] = useState<Set<string>>(new Set())
+  // Per-stone expand/collapse state. Keys are `${role}-${index}`. We seed the
+  // set with every stone so the detail view shows the full information by
+  // default — the user can still collapse individual rows with the chevron.
+  const [expandedStones, setExpandedStones] = useState<Set<string>>(() => {
+    const seen: Record<string, number> = {}
+    const keys: string[] = []
+    for (const s of (quote.stones ?? [])) {
+      const idx = (seen[s.role] ?? 0)
+      keys.push(`${s.role}-${idx}`)
+      seen[s.role] = idx + 1
+    }
+    return new Set(keys)
+  })
   const toggleStone = (key: string) => setExpandedStones(prev => {
     const next = new Set(prev)
     if (next.has(key)) next.delete(key); else next.add(key)
     return next
   })
+
+  // When the user navigates to a different quote, re-expand every stone so
+  // the new detail view also shows everything by default.
+  useEffect(() => {
+    const seen: Record<string, number> = {}
+    const keys: string[] = []
+    for (const s of (quote.stones ?? [])) {
+      const idx = (seen[s.role] ?? 0)
+      keys.push(`${s.role}-${idx}`)
+      seen[s.role] = idx + 1
+    }
+    setExpandedStones(new Set(keys))
+  }, [quote.id])
   const config = useQuoteConfig()
   const expiration = formatExpiration(quote.publicTokenExpiresAt)
 
@@ -573,23 +596,28 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
           )}
 
           {(quote.customerStones?.length ?? 0) > 0 && (
-            <div className="mt-4 space-y-3">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Customer stones</p>
+            <div className="mt-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-1 w-6 rounded-full bg-gradient-to-r from-rose-300 to-pink-600" aria-hidden />
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-rose-700">
+                  Customer stones · {quote.customerStones?.length}
+                </p>
+              </div>
               {(quote.customerStones ?? []).map((cs, idx) => {
                 const setter = config.setterMap[cs.setterType]
                 const qty = Math.max(1, cs.quantity ?? 1)
                 const lineFee = qty * (setter?.fee ?? 0)
                 return (
                   <div key={cs.id ?? idx}
-                    className="relative overflow-hidden rounded-2xl border border-indigo-200 bg-indigo-50/40 px-4 py-3 text-sm shadow-sm">
-                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-indigo-500" aria-hidden />
+                    className="relative overflow-hidden rounded-2xl border border-rose-200/80 bg-gradient-to-br from-rose-50/70 via-white to-pink-50/40 px-4 py-3 text-sm shadow-sm transition hover:shadow-md">
+                    <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-rose-300 via-rose-500 to-pink-600" aria-hidden />
                     <div className="pl-2 space-y-3">
                       <div className="flex items-center justify-between">
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 text-indigo-800 px-2.5 py-1 text-xs font-semibold">
-                          <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" aria-hidden />
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-100 text-rose-900 ring-1 ring-rose-200 px-2.5 py-1 text-xs font-semibold">
+                          <span className="h-1.5 w-1.5 rounded-full bg-rose-500" aria-hidden />
                           Customer stone #{idx + 1}
                         </span>
-                        <span className="text-xs font-semibold text-slate-900 tabular-nums">
+                        <span className="text-sm font-semibold text-slate-900 tabular-nums">
                           ${lineFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </span>
                       </div>
@@ -597,7 +625,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                       <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                         <div className="col-span-2">
                           <dt className="font-semibold uppercase tracking-wide text-slate-400">Type of stone</dt>
-                          <dd className={cs.gemstoneName ? 'text-slate-900' : 'text-slate-400'}>
+                          <dd className={cs.gemstoneName ? 'text-slate-900 font-medium' : 'text-slate-400'}>
                             {cs.gemstoneName || '—'}
                           </dd>
                         </div>
@@ -616,8 +644,8 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                       </dl>
 
                       {cs.photo && (
-                        <div className="overflow-hidden rounded-xl border border-slate-200">
-                          <img src={cs.photo} alt={`Customer stone ${idx + 1}`} className="w-full object-cover max-h-48" />
+                        <div className="overflow-hidden rounded-xl border border-rose-200/60 shadow-sm">
+                          <img src={cs.photo} alt={`Customer stone ${idx + 1}`} className="w-full object-cover max-h-56" />
                         </div>
                       )}
                     </div>

@@ -14,7 +14,7 @@ import { ClientPicker } from '@/components/ClientPicker'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { Toast } from '@/components/Toast'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
-import { Calculator, Camera, Check, ChevronDown, ChevronUp, Diamond, Gem, ImagePlus, Layers3, Ruler, User, X } from 'lucide-react'
+import { Calculator, Camera, Check, ChevronDown, ChevronUp, Crown, Diamond, Gem, ImagePlus, Layers3, Ruler, Sparkles, User, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -284,12 +284,63 @@ export function QuoteBuilderPage() {
   const sideStones  = stones.filter(s => s.role === 'SIDE')
   const meleeStones = stones.filter(s => s.role === 'MELEE')
 
+  // Jewelry-inspired palette. Each role uses a gradient on the left bar so the
+  // section reads as "luxurious" rather than flat blocks of color.
+  //  · MAIN  = gold / champagne (the headline stone)
+  //  · SIDE  = sapphire (regal blue, complements gold)
+  //  · MELEE = platinum / teal (cool, understated)
   const themeForRole = (role: StoneRole) => {
     switch (role) {
-      case 'MAIN':  return { label: 'Main',  dot: 'bg-amber-500',   ring: 'border-amber-200',   tint: 'bg-amber-50/40',   chip: 'bg-amber-100 text-amber-800',  btn: 'bg-amber-600 hover:bg-amber-500' }
-      case 'SIDE':  return { label: 'Side',  dot: 'bg-sky-500',     ring: 'border-sky-200',     tint: 'bg-sky-50/40',     chip: 'bg-sky-100 text-sky-800',      btn: 'bg-sky-600 hover:bg-sky-500' }
-      case 'MELEE': return { label: 'Melee', dot: 'bg-emerald-500', ring: 'border-emerald-200', tint: 'bg-emerald-50/40', chip: 'bg-emerald-100 text-emerald-800', btn: 'bg-emerald-600 hover:bg-emerald-500' }
+      case 'MAIN':
+        return {
+          label: 'Main',
+          icon: Crown,
+          bar:   'bg-gradient-to-b from-amber-300 via-amber-500 to-yellow-600',
+          dot:   'bg-amber-500',
+          ring:  'border-amber-200/80',
+          tint:  'bg-gradient-to-br from-amber-50/70 via-white to-yellow-50/40',
+          chip:  'bg-amber-100 text-amber-900 ring-1 ring-amber-200',
+          btn:   'bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500',
+          header:'bg-amber-50 text-amber-700 ring-1 ring-amber-200/80',
+        }
+      case 'SIDE':
+        return {
+          label: 'Side',
+          icon: Diamond,
+          bar:   'bg-gradient-to-b from-sky-400 via-blue-500 to-indigo-600',
+          dot:   'bg-blue-500',
+          ring:  'border-blue-200/80',
+          tint:  'bg-gradient-to-br from-sky-50/70 via-white to-indigo-50/40',
+          chip:  'bg-blue-100 text-blue-900 ring-1 ring-blue-200',
+          btn:   'bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500',
+          header:'bg-blue-50 text-blue-700 ring-1 ring-blue-200/80',
+        }
+      case 'MELEE':
+        return {
+          label: 'Melee',
+          icon: Sparkles,
+          bar:   'bg-gradient-to-b from-teal-300 via-emerald-500 to-emerald-700',
+          dot:   'bg-emerald-500',
+          ring:  'border-emerald-200/80',
+          tint:  'bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/40',
+          chip:  'bg-emerald-100 text-emerald-900 ring-1 ring-emerald-200',
+          btn:   'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500',
+          header:'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/80',
+        }
     }
+  }
+
+  // Customer-stone theme (rose / blush) — separated from the role-based set
+  // because customer stones aren't part of MAIN/SIDE/MELEE.
+  const customerTheme = {
+    label: 'Customer',
+    bar:   'bg-gradient-to-b from-rose-300 via-rose-500 to-pink-600',
+    dot:   'bg-rose-500',
+    ring:  'border-rose-200/80',
+    tint:  'bg-gradient-to-br from-rose-50/70 via-white to-pink-50/40',
+    chip:  'bg-rose-100 text-rose-900 ring-1 ring-rose-200',
+    btn:   'bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-400 hover:to-pink-500',
+    header:'bg-rose-50 text-rose-700 ring-1 ring-rose-200/80',
   }
 
   const renderStoneRow = (stone: StoneRow, index: number) => {
@@ -318,8 +369,8 @@ export function QuoteBuilderPage() {
       ].filter(Boolean)
       return (
         <div key={stone.uid}
-          className={`group relative overflow-hidden rounded-2xl border ${theme.ring} bg-white shadow-sm transition hover:shadow-md`}>
-          <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${theme.dot}`} aria-hidden />
+          className={`group relative overflow-hidden rounded-2xl border ${theme.ring} bg-white shadow-sm transition hover:shadow-md hover:-translate-y-0.5`}>
+          <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${theme.bar}`} aria-hidden />
           <button
             type="button"
             onClick={() => toggleCollapsed(stone.uid)}
@@ -368,8 +419,8 @@ export function QuoteBuilderPage() {
 
     // ── Expanded (form) view ────────────────────────────────────────────
     return (
-      <div key={stone.uid} className={`relative rounded-2xl border ${theme.ring} ${theme.tint} p-4 space-y-3 overflow-hidden shadow-sm`}>
-        <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${theme.dot}`} aria-hidden />
+      <div key={stone.uid} className={`relative rounded-2xl border ${theme.ring} ${theme.tint} p-4 space-y-3 overflow-hidden shadow-sm transition hover:shadow-md`}>
+        <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${theme.bar}`} aria-hidden />
 
         <div className="flex items-center justify-between gap-2 pl-2">
           <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.chip}`}>
@@ -525,29 +576,38 @@ export function QuoteBuilderPage() {
     onAdd: () => void
   }) => {
     const theme = themeForRole(opts.role)
+    const Icon = theme.icon
     return (
-    <div className="space-y-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
+    <div className="group/section relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:shadow-md">
+      <span className={`absolute left-0 top-0 bottom-0 w-1 ${theme.bar} opacity-80`} aria-hidden />
+      <div className="flex items-center justify-between gap-3 pl-2">
         <div className="flex items-center gap-3">
-          <span className={`h-8 w-8 rounded-xl ${theme.chip} flex items-center justify-center`}>
-            <Diamond className="h-4 w-4" />
+          <span className={`h-9 w-9 rounded-xl ${theme.header} flex items-center justify-center shadow-sm`}>
+            <Icon className="h-4 w-4" />
           </span>
           <div>
-            <h3 className="text-sm font-semibold text-slate-900">{opts.title} <span className="ml-1 text-xs font-medium text-slate-400">· {opts.items.length}</span></h3>
+            <h3 className="text-sm font-semibold text-slate-900">
+              {opts.title}
+              <span className={`ml-2 inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${theme.chip}`}>
+                {opts.items.length}
+              </span>
+            </h3>
             <p className="text-xs text-slate-500">{opts.hint}</p>
           </div>
         </div>
         {opts.canAdd && (
           <button type="button" onClick={opts.onAdd}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold text-white transition ${theme.btn}`}>
+            className={`inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition ${theme.btn}`}>
             + {opts.addLabel}
           </button>
         )}
       </div>
-      {opts.items.length === 0
-        ? <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-xs text-slate-400">None yet.</p>
-        : <div className="space-y-3">{opts.items.map((s, i) => renderStoneRow(s, i))}</div>
-      }
+      <div className="mt-3 pl-2">
+        {opts.items.length === 0
+          ? <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-3 text-xs text-slate-400">None yet.</p>
+          : <div className="space-y-3">{opts.items.map((s, i) => renderStoneRow(s, i))}</div>
+        }
+      </div>
     </div>
     )
   }
@@ -957,15 +1017,20 @@ export function QuoteBuilderPage() {
           </Card>
 
           {/* Sección 2: STONE SETTING */}
-          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-            <CardHeader className="border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <Diamond className="h-4 w-4 text-slate-500" />
-                <CardTitle className="text-base font-semibold text-slate-900">Stone Setting</CardTitle>
+          <Card className="relative overflow-hidden rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.10),transparent_45%),radial-gradient(circle_at_top_right,rgba(244,63,94,0.08),transparent_50%)]" aria-hidden />
+            <CardHeader className="relative border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <span className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-100 via-rose-100 to-blue-100 text-slate-700 ring-1 ring-white/80 flex items-center justify-center shadow-sm">
+                  <Gem className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle className="text-base font-semibold text-slate-900">Stone Setting</CardTitle>
+                  <p className="text-xs text-slate-500">
+                    Main, side and melee — plus stones supplied by the client.
+                  </p>
+                </div>
               </div>
-              <p className="text-sm text-slate-500">
-                Break the piece down into a main stone, side stones and melee — each with its own size, carats and setting type.
-              </p>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
               {renderStoneSection({
@@ -997,16 +1062,19 @@ export function QuoteBuilderPage() {
               })}
 
               {/* ── Customer stones ─────────────────────────────────────── */}
-              <div className="space-y-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between gap-3">
+              <div className="group/section relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:shadow-md">
+                <span className={`absolute left-0 top-0 bottom-0 w-1 ${customerTheme.bar} opacity-80`} aria-hidden />
+                <div className="flex items-center justify-between gap-3 pl-2">
                   <div className="flex items-center gap-3">
-                    <span className="h-8 w-8 rounded-xl bg-indigo-100 text-indigo-800 flex items-center justify-center">
+                    <span className={`h-9 w-9 rounded-xl ${customerTheme.header} flex items-center justify-center shadow-sm`}>
                       <User className="h-4 w-4" />
                     </span>
                     <div>
                       <h3 className="text-sm font-semibold text-slate-900">
                         Customer stones
-                        <span className="ml-1 text-xs font-medium text-slate-400">· {customerStones.length}</span>
+                        <span className={`ml-2 inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${customerTheme.chip}`}>
+                          {customerStones.length}
+                        </span>
                       </h3>
                       <p className="text-xs text-slate-500">
                         Stones supplied by the client. We only charge setting labor (quantity × setter fee).
@@ -1014,27 +1082,27 @@ export function QuoteBuilderPage() {
                     </div>
                   </div>
                   <button type="button" onClick={addCustomerStone}
-                    className="rounded-full bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white transition">
+                    className={`inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition ${customerTheme.btn}`}>
                     + Add customer stone
                   </button>
                 </div>
 
                 {customerStones.length === 0 ? (
-                  <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-xs text-slate-400">None yet.</p>
+                  <p className="mt-3 ml-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-3 text-xs text-slate-400">None yet.</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="mt-3 pl-2 space-y-3">
                     {customerStones.map((cs, idx) => {
                       const qtyNum = parseNum(cs.quantity || '1') || 1
                       const setterFee = config.setterMap[cs.setterType]?.fee ?? 0
                       const lineFee = qtyNum * setterFee
                       const gem = gemstones.find(g => g.id === cs.gemstoneId)
                       return (
-                        <div key={cs.uid} className="relative rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-3 overflow-hidden shadow-sm">
-                          <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-indigo-500" aria-hidden />
+                        <div key={cs.uid} className={`relative rounded-2xl border ${customerTheme.ring} ${customerTheme.tint} p-4 space-y-3 overflow-hidden shadow-sm transition hover:shadow-md`}>
+                          <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${customerTheme.bar}`} aria-hidden />
 
                           <div className="flex items-center justify-between gap-2 pl-2">
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 text-indigo-800 px-2.5 py-1 text-xs font-semibold">
-                              <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" aria-hidden />
+                            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${customerTheme.chip}`}>
+                              <span className={`h-1.5 w-1.5 rounded-full ${customerTheme.dot}`} aria-hidden />
                               Customer stone #{idx + 1}
                             </span>
                             <button type="button" onClick={() => removeCustomerStone(cs.uid)}
@@ -1144,12 +1212,18 @@ export function QuoteBuilderPage() {
                 )}
               </div>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-900 px-5 py-4 text-sm text-white">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Setting labor — all stones</p>
-                  <p className="text-xs text-slate-500">{pricing.totalAmount} stone{pricing.totalAmount === 1 ? '' : 's'} · {pricing.totalCarats} ct total</p>
+              <div className="relative flex flex-wrap items-center justify-between gap-3 overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-5 py-4 text-sm text-white shadow-[0_10px_30px_rgba(15,23,42,0.25)]">
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(251,191,36,0.18),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(56,189,248,0.15),transparent_45%)]" aria-hidden />
+                <div className="relative">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-amber-300/90">Setting labor</p>
+                  <p className="mt-0.5 text-xs text-slate-300">
+                    {pricing.totalAmount} stone{pricing.totalAmount === 1 ? '' : 's'} · {pricing.totalCarats} ct
+                    {customerStones.length > 0 ? ` + ${customerStones.length} customer` : ''}
+                  </p>
                 </div>
-                <strong className="text-xl">${(pricing.settingFee + pricing.customerSettingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                <strong className="relative text-2xl font-semibold tracking-tight tabular-nums">
+                  ${(pricing.settingFee + pricing.customerSettingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </strong>
               </div>
             </CardContent>
           </Card>
