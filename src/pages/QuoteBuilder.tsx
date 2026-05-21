@@ -7,13 +7,14 @@ import {
 } from '@/constants/config'
 import { useAuth } from '@/context/AuthContext'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
+import { gemstoneService } from '@/services/gemstoneService'
 import { quotesService } from '@/services/quotesService'
-import type { Client, JewelryMetalOption } from '@/types'
+import type { Client, GemstonePrice, JewelryMetalOption } from '@/types'
 import { ClientPicker } from '@/components/ClientPicker'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { Toast } from '@/components/Toast'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
-import { Calculator, Camera, Check, ChevronDown, ChevronUp, Diamond, Gem, ImagePlus, Layers3, Ruler, X } from 'lucide-react'
+import { Calculator, Camera, Check, ChevronDown, ChevronUp, Diamond, Gem, ImagePlus, Layers3, Ruler, User, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -99,6 +100,62 @@ export function QuoteBuilderPage() {
   const parseNum = (s: string) => {
     const n = Number(s)
     return Number.isFinite(n) ? n : 0
+  }
+
+  // ── Customer stones: client brings their own stone, we only charge setting
+  // labor (quantity × setter fee). Stone type is picked from the gemstones
+  // catalog so it shows up properly on the quote. No persistence yet — kept
+  // local to this builder until the user asks for it.
+  interface CustomerStone {
+    uid: string
+    gemstoneId: string
+    setterType: string
+    size: string
+    quantity: string
+    photo: string | null
+  }
+  const [customerStones, setCustomerStones] = useState<CustomerStone[]>([])
+  const [gemstones, setGemstones] = useState<GemstonePrice[]>([])
+  const customerPhotoInputs = useRef<Record<string, HTMLInputElement | null>>({})
+  const customerCameraInputs = useRef<Record<string, HTMLInputElement | null>>({})
+
+  useEffect(() => {
+    gemstoneService.getAll().then(setGemstones).catch(console.error)
+  }, [])
+
+  const defaultCustomerStone = (): CustomerStone => ({
+    uid: crypto.randomUUID(),
+    gemstoneId: gemstones[0]?.id ?? '',
+    setterType: config.setters[0]?.typeKey ?? '',
+    size: '',
+    quantity: '1',
+    photo: null,
+  })
+
+  const addCustomerStone = () => {
+    setCustomerStones(prev => [...prev, defaultCustomerStone()])
+  }
+  const removeCustomerStone = (uid: string) => {
+    setCustomerStones(prev => prev.filter(s => s.uid !== uid))
+    delete customerPhotoInputs.current[uid]
+    delete customerCameraInputs.current[uid]
+  }
+  const patchCustomerStone = (uid: string, patch: Partial<CustomerStone>) => {
+    setCustomerStones(prev => prev.map(s => s.uid === uid ? { ...s, ...patch } : s))
+  }
+  const onCustomerPhotoChange = (uid: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => patchCustomerStone(uid, { photo: reader.result as string })
+    reader.readAsDataURL(file)
+  }
+  const removeCustomerPhoto = (uid: string) => {
+    patchCustomerStone(uid, { photo: null })
+    const p = customerPhotoInputs.current[uid]
+    if (p) p.value = ''
+    const c = customerCameraInputs.current[uid]
+    if (c) c.value = ''
   }
 
   const [photo, setPhoto] = useState<string | null>(null)
@@ -515,11 +572,21 @@ export function QuoteBuilderPage() {
       return { uid: s.uid, cost, labor, pricePerCarat, setterFee }
     })
 
+    // Customer-supplied stones: we don't price the stone itself (the client
+    // brings it), only the setter labor scaled by quantity.
+    let customerSettingFee = 0
+    customerStones.forEach(cs => {
+      const qty = parseNum(cs.quantity || '1') || 1
+      const fee = config.setterMap[cs.setterType]?.fee ?? 0
+      customerSettingFee += qty * fee
+    })
+
     const total =
       materialCost +
       ringLaborFee +
       cadFee +
       settingFee +
+      customerSettingFee +
       diamondCost +
       engravingFee +
       extraCosts
@@ -530,6 +597,7 @@ export function QuoteBuilderPage() {
       ringLaborFee,
       cadFee,
       settingFee,
+      customerSettingFee,
       diamondCost,
       engravingFee,
       totalCarats: Math.round((Number(totalCarats) || 0) * 10000) / 10000,
@@ -538,8 +606,8 @@ export function QuoteBuilderPage() {
       total,
     }
   }, [
-    config, engraving, extraCosts, ringLabor, ringWidth, selectedMetalConfig,
-    stones, weightGrams,
+    config, customerStones, engraving, extraCosts, ringLabor, ringWidth,
+    selectedMetalConfig, stones, weightGrams,
   ])
 
   const handleQuoteReady = async () => {
@@ -905,12 +973,162 @@ export function QuoteBuilderPage() {
                 onAdd: () => addStone('MELEE'),
               })}
 
+              {/* ── Customer stones ─────────────────────────────────────── */}
+              <div className="space-y-3 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="h-8 w-8 rounded-xl bg-indigo-100 text-indigo-800 flex items-center justify-center">
+                      <User className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <h3 className="text-sm font-semibold text-slate-900">
+                        Customer stones
+                        <span className="ml-1 text-xs font-medium text-slate-400">· {customerStones.length}</span>
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Stones supplied by the client. We only charge setting labor (quantity × setter fee).
+                      </p>
+                    </div>
+                  </div>
+                  <button type="button" onClick={addCustomerStone}
+                    className="rounded-full bg-indigo-600 hover:bg-indigo-500 px-3 py-1.5 text-xs font-semibold text-white transition">
+                    + Add customer stone
+                  </button>
+                </div>
+
+                {customerStones.length === 0 ? (
+                  <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-xs text-slate-400">None yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {customerStones.map((cs, idx) => {
+                      const qtyNum = parseNum(cs.quantity || '1') || 1
+                      const setterFee = config.setterMap[cs.setterType]?.fee ?? 0
+                      const lineFee = qtyNum * setterFee
+                      const gem = gemstones.find(g => g.id === cs.gemstoneId)
+                      return (
+                        <div key={cs.uid} className="relative rounded-2xl border border-indigo-200 bg-indigo-50/40 p-4 space-y-3 overflow-hidden shadow-sm">
+                          <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-indigo-500" aria-hidden />
+
+                          <div className="flex items-center justify-between gap-2 pl-2">
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 text-indigo-800 px-2.5 py-1 text-xs font-semibold">
+                              <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" aria-hidden />
+                              Customer stone #{idx + 1}
+                            </span>
+                            <button type="button" onClick={() => removeCustomerStone(cs.uid)}
+                              aria-label="Remove customer stone"
+                              className="flex h-7 w-7 items-center justify-center rounded-full bg-white/70 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600">
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+
+                          <div className="grid gap-3 md:grid-cols-2 pl-2">
+                            <div className="space-y-1">
+                              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type of stone</label>
+                              <select value={cs.gemstoneId}
+                                onChange={e => patchCustomerStone(cs.uid, { gemstoneId: e.target.value })}
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+                                {gemstones.length === 0 && <option value="">No gemstones loaded</option>}
+                                {gemstones.map(g => (
+                                  <option key={g.id} value={g.id}>
+                                    {g.name}{g.color ? ` — ${g.color}` : ''}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type of setting</label>
+                              <select value={cs.setterType}
+                                onChange={e => patchCustomerStone(cs.uid, { setterType: e.target.value })}
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+                                {config.setters.map(s => (
+                                  <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Size</label>
+                              <input type="text" value={cs.size} placeholder="e.g. 6×4 mm oval"
+                                onChange={e => patchCustomerStone(cs.uid, { size: e.target.value })}
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Quantity <span className="font-normal normal-case text-slate-400">(multiplies setter fee)</span>
+                              </label>
+                              <input type="number" min={1} step={1} value={cs.quantity}
+                                onChange={e => patchCustomerStone(cs.uid, { quantity: e.target.value })}
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                            </div>
+
+                            <div className="space-y-1 md:col-span-2">
+                              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                Photo <span className="font-normal normal-case text-slate-400">(optional)</span>
+                              </label>
+
+                              <input
+                                ref={el => { customerPhotoInputs.current[cs.uid] = el }}
+                                id={`cs-photo-${cs.uid}`} type="file" accept="image/*"
+                                onChange={e => onCustomerPhotoChange(cs.uid, e)} className="hidden" />
+                              <input
+                                ref={el => { customerCameraInputs.current[cs.uid] = el }}
+                                id={`cs-camera-${cs.uid}`} type="file" accept="image/*"
+                                capture="environment"
+                                onChange={e => onCustomerPhotoChange(cs.uid, e)} className="hidden" />
+
+                              {!cs.photo ? (
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                  <label htmlFor={`cs-camera-${cs.uid}`}
+                                    className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-xs text-slate-500 transition hover:border-slate-400 sm:hidden">
+                                    <Camera className="h-4 w-4 shrink-0 text-slate-400" />
+                                    <span>Take photo</span>
+                                  </label>
+                                  <label htmlFor={`cs-photo-${cs.uid}`}
+                                    className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-xs text-slate-500 transition hover:border-slate-400 sm:col-span-2">
+                                    <ImagePlus className="h-4 w-4 shrink-0 text-slate-400" />
+                                    <span>Choose photo</span>
+                                  </label>
+                                </div>
+                              ) : (
+                                <div className="relative overflow-hidden rounded-xl border border-slate-200">
+                                  <img src={cs.photo} alt="Customer stone" className="w-full object-cover max-h-48" />
+                                  <button type="button" onClick={() => removeCustomerPhoto(cs.uid)}
+                                    className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm transition hover:bg-black/80">
+                                    <X className="h-3 w-3" /> Remove
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-3 pl-2 pt-3 border-t border-white/60">
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                              {gem && (
+                                <span className="rounded-xl bg-white/70 px-3 py-1.5">
+                                  Stone <strong className="ml-1 text-slate-900">{gem.name}</strong>
+                                </span>
+                              )}
+                              <span className="rounded-xl bg-white/70 px-3 py-1.5">
+                                Setting <strong className="ml-1 text-slate-900">${lineFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                                <span className="ml-1 text-[10px] text-slate-400">({qtyNum} × ${setterFee})</span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-slate-900 px-5 py-4 text-sm text-white">
                 <div>
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Setting labor — all stones</p>
                   <p className="text-xs text-slate-500">{pricing.totalAmount} stone{pricing.totalAmount === 1 ? '' : 's'} · {pricing.totalCarats} ct total</p>
                 </div>
-                <strong className="text-xl">${pricing.settingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                <strong className="text-xl">${(pricing.settingFee + pricing.customerSettingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
               </div>
             </CardContent>
           </Card>
@@ -949,7 +1167,7 @@ export function QuoteBuilderPage() {
                 {[
                   ['Material reference', pricing.materialCost],
                   ['CAD design & Jeweler\'s time', pricing.ringLaborFee],
-                  ['Setting labor', pricing.settingFee],
+                  ['Setting labor', pricing.settingFee + pricing.customerSettingFee],
                   [`Diamonds (${pricing.totalAmount} stones · ${pricing.totalCarats} ct)`, pricing.diamondCost],
                   ['Hand engraving (milgrain)', pricing.engravingFee],
                   ['Extra costs', extraCosts],
@@ -1014,13 +1232,14 @@ export function QuoteBuilderPage() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Setting labor</p>
                   <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-                    ${pricing.settingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    ${(pricing.settingFee + pricing.customerSettingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
                 <div className="rounded-2xl bg-rose-50 p-3 text-rose-600"><Diamond className="h-5 w-5" /></div>
               </div>
               <p className="mt-3 text-sm text-slate-500">
-                Aggregated across {pricing.totalAmount} stone{pricing.totalAmount === 1 ? '' : 's'}.
+                Aggregated across {pricing.totalAmount} stone{pricing.totalAmount === 1 ? '' : 's'}
+                {customerStones.length > 0 ? ` + ${customerStones.length} customer stone${customerStones.length === 1 ? '' : 's'}` : ''}.
               </p>
             </CardContent>
           </Card>
