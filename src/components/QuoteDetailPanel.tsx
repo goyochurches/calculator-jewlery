@@ -668,9 +668,14 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
         <div>
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Cost breakdown</p>
           <div className="space-y-2">
-            <LineItem label="Diamonds total"
-              value={`${stoneTotals.amount} stone${stoneTotals.amount === 1 ? '' : 's'} · ${Math.round(stoneTotals.carats * 10000) / 10000} ct · $${stoneTotals.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
-            <LineItem label="Setting labor (all stones)" value={`$${(stoneTotals.labor + customerStoneFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+            <LineItem
+              label={`Setting supplied diamonds (${stoneTotals.amount} stone${stoneTotals.amount === 1 ? '' : 's'} · ${Math.round(stoneTotals.carats * 10000) / 10000} ct)`}
+              value={`$${(stoneTotals.cost + stoneTotals.labor).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+            {(quote.customerStones?.length ?? 0) > 0 && (
+              <LineItem
+                label={`Setting customer diamonds (${quote.customerStones!.length} stone${quote.customerStones!.length === 1 ? '' : 's'})`}
+                value={`$${customerStoneFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+            )}
             <LineItem label="Hand engraving (milgrain)" value={quote.engraving ? '$150.00' : '$0.00'} />
             {quote.extraCosts > 0 && (
               <LineItem label="Extra costs" value={`$${quote.extraCosts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />

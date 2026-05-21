@@ -1321,20 +1321,24 @@ export function QuoteBuilderPage() {
               </div>
 
               <div className="space-y-3 text-sm">
-                {[
+                {([
                   ['Material reference', pricing.materialCost],
                   ['CAD design & Jeweler\'s time', pricing.ringLaborFee],
                   // "Setting supplied diamonds" = stone cost + labor for the
                   // in-house MAIN/SIDE/MELEE stones (we buy them and set them).
                   [`Setting supplied diamonds (${pricing.totalAmount} stones · ${pricing.totalCarats} ct)`,
                     pricing.diamondCost + pricing.settingFee],
-                  // "Setting customer diamonds" = labor only — the client
-                  // brought the stones so there's no stone cost on our side.
-                  [`Setting customer diamonds (${customerStones.length} stone${customerStones.length === 1 ? '' : 's'})`,
-                    pricing.customerSettingFee],
+                  // Only render the customer line when there's at least one —
+                  // an empty "Setting customer diamonds (0 stones)" line is noise.
+                  ...(customerStones.length > 0
+                    ? [[
+                        `Setting customer diamonds (${customerStones.length} stone${customerStones.length === 1 ? '' : 's'})`,
+                        pricing.customerSettingFee,
+                      ] as [string, number]]
+                    : []),
                   ['Hand engraving (milgrain)', pricing.engravingFee],
                   ['Extra costs', extraCosts],
-                ].map(([label, value]) => (
+                ] as Array<[string, number]>).map(([label, value]) => (
                   <div key={label as string} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
                     <span className="text-slate-500">{label}</span>
                     <span className="font-semibold text-slate-900">${(value as number).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
