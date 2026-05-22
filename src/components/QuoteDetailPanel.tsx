@@ -714,6 +714,42 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
           )}
         </div>
 
+        {(quote.attachments?.length ?? 0) > 0 && (
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                Internal attachments · {quote.attachments?.length}
+              </p>
+              <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700">
+                Not shown to client
+              </span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {quote.attachments?.map((a, idx) => (
+                <a
+                  key={a.id ?? idx}
+                  href={a.photo}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md"
+                  title={a.caption ?? `Attachment ${idx + 1}`}
+                >
+                  <img src={a.photo} alt={a.caption ?? `Attachment ${idx + 1}`}
+                    className="w-full object-cover max-h-48 transition group-hover:scale-[1.02]" />
+                  <div className="space-y-0.5 px-3 py-2">
+                    {a.caption && (
+                      <p className="text-xs font-medium text-slate-700 line-clamp-2">{a.caption}</p>
+                    )}
+                    <p className="text-[10px] text-slate-400">
+                      {a.createdAt ? new Date(a.createdAt).toLocaleString() : ''}
+                    </p>
+                  </div>
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div>
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Cost breakdown</p>
           <div className="space-y-2">
