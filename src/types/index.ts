@@ -109,6 +109,9 @@ export interface SavedQuote {
   hourlyRate: number
   extraCosts: number
   total: number
+  /** Retail markup applied on top of `total` (cost) when showing the customer
+   *  price. Per-quote so each job can override the default 2.5x. */
+  markupMultiplier?: number | null
   photo?: string | null
   engraving?: boolean | null
   setterType?: string | null

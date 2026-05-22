@@ -19,6 +19,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 const HAND_ENGRAVING_FEE = 150
+const DEFAULT_MARKUP = 2.5
+const MARKUP_PRESETS = [2, 2.5, 3] as const
 
 // Tallas disponibles: de 3 a 20 en incrementos de 0.25 (sin coste adicional).
 const FINGER_SIZE_OPTIONS: number[] = (() => {
@@ -98,6 +100,10 @@ export function QuoteBuilderPage() {
   const [fingerSize, setFingerSize] = useState(7)
   const [extraCosts, setExtraCosts] = useState(0)
   const [engraving, setEngraving] = useState(false)
+  // Retail markup applied on top of cost when showing the customer-facing
+  // price. Stored as a string so the user can type "2.5" or "2." without the
+  // input collapsing. Parsed lazily in pricing/save.
+  const [markupText, setMarkupText] = useState(String(DEFAULT_MARKUP))
 
   // Multi-stone breakdown: 0 or 1 MAIN, plus 0..N SIDE and 0..N MELEE.
   // amount lives in UI state so the user can override it independently of
@@ -182,6 +188,7 @@ export function QuoteBuilderPage() {
     setExtraCosts(dup.extraCosts ?? 0)
     setEngraving(!!dup.engraving)
     setPhoto(dup.photo ?? null)
+    setMarkupText(String(dup.markupMultiplier ?? DEFAULT_MARKUP))
 
     setStones((dup.stones ?? []).map(s => {
       const ct = config.diamondSizeMap[s.sizeKey]?.ctPerStone ?? 0
@@ -783,6 +790,16 @@ export function QuoteBuilderPage() {
     selectedMetalConfig, stones, weightGrams,
   ])
 
+  // Parse the markup once from the input. Empty / NaN falls back to the
+  // shop default so we never store a zero or negative multiplier.
+  const parsedMarkup = (() => {
+    const n = Number(markupText)
+    return Number.isFinite(n) && n > 0 ? n : DEFAULT_MARKUP
+  })()
+  // Price shown to the customer (markup applied to cost, leaving engraving
+  // as a flat pass-through). Used in the right-column "Quote total" card.
+  const customerPrice = (pricing.total - pricing.engravingFee) * parsedMarkup + pricing.engravingFee
+
   const handleQuoteReady = async () => {
     if (!user) return
     const errors: { title?: string; client?: string } = {}
@@ -815,6 +832,7 @@ export function QuoteBuilderPage() {
         hourlyRate: 0,
         extraCosts,
         total: pricing.total,
+        markupMultiplier: parsedMarkup,
         photo: photo ?? undefined,
         engraving,
         setterType: firstStone?.setterType ?? '',
@@ -860,6 +878,7 @@ export function QuoteBuilderPage() {
       setFingerSize(7)
       setExtraCosts(0)
       setEngraving(false)
+      setMarkupText(String(DEFAULT_MARKUP))
       setStones([])
       setCustomerStones([])
       setPhoto(null)
@@ -1438,7 +1457,7 @@ export function QuoteBuilderPage() {
               <div className="rounded-2xl p-5 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}>
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Quote total</p>
                 <p className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                  ${((pricing.total - pricing.engravingFee) * 2.5 + pricing.engravingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </p>
                 <p className="mt-2 text-sm text-slate-300">
                   <span className="font-semibold text-white">{jewelryTypeLabel}</span> · {selectedMetalConfig.label} · {ringLaborLabel}
