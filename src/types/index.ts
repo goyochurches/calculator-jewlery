@@ -91,6 +91,17 @@ export interface QuoteCustomerStone {
   comments?: string | null
 }
 
+/** Internal-only photo attachment on a quote — conversation screenshots,
+ *  Pinterest references, etc. Never shown on the public link. */
+export interface QuoteAttachment {
+  id?: number | null
+  photo: string
+  caption?: string | null
+  sortOrder?: number | null
+  /** ISO timestamp set by the backend when the attachment is persisted. */
+  createdAt?: string | null
+}
+
 export interface SavedQuote {
   id: string
   title: string
@@ -113,6 +124,7 @@ export interface SavedQuote {
   diamondSize: string
   stones?: QuoteStone[]
   customerStones?: QuoteCustomerStone[]
+  attachments?: QuoteAttachment[]
   weightGrams: number
   ringWidth: number
   fingerSize: number
