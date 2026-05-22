@@ -156,10 +156,25 @@ function ErrorState({ message }: { message: string }) {
   )
 }
 
+// Customer-facing translation of the internal difficulty keys. The team uses
+// "Super Easy / Easy / Medium / Hard / Super Hard / Crazy" internally; the
+// customer just sees numeric levels on the share link.
+const PUBLIC_RING_LABOR_LEVELS: Record<string, string> = {
+  super_easy: 'Level 1',
+  easy:       'Level 2',
+  medium:     'Level 3',
+  hard:       'Level 4',
+  super_hard: 'Level 5',
+  crazy:      'Level 6',
+}
+
 function QuoteView({ quote }: { quote: PublicQuote }) {
   const metal = JEWELRY_METAL_OPTIONS[quote.metal as keyof typeof JEWELRY_METAL_OPTIONS]?.label ?? quote.metal
   const cad = CAD_DESIGN_OPTIONS[quote.cadDesign as keyof typeof CAD_DESIGN_OPTIONS]?.label ?? quote.cadDesign
-  const labor = RING_LABOR_OPTIONS[quote.ringLabor as keyof typeof RING_LABOR_OPTIONS]?.label ?? quote.ringLabor
+  // Always show the numeric level to the customer regardless of the internal label.
+  const labor = PUBLIC_RING_LABOR_LEVELS[quote.ringLabor]
+    ?? RING_LABOR_OPTIONS[quote.ringLabor as keyof typeof RING_LABOR_OPTIONS]?.label
+    ?? quote.ringLabor
   const diamondTypeLabel = DIAMOND_TYPE_OPTIONS[quote.diamondType as keyof typeof DIAMOND_TYPE_OPTIONS]?.label ?? quote.diamondType
   const diamondSizeLabel = DIAMOND_SIZE_OPTIONS[quote.diamondSize as keyof typeof DIAMOND_SIZE_OPTIONS]?.label ?? quote.diamondSize
 
