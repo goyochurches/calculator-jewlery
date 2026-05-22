@@ -96,6 +96,12 @@ export interface SavedQuote {
   title: string
   clientName: string
   createdBy: string
+  /** Extended creator info — surfaced in the detail panel and on the public
+   *  link so customers know who is quoting them. */
+  createdByEmail?: string | null
+  createdByAvatar?: string | null
+  createdByBio?: string | null
+  createdByPhoto?: string | null
   createdAt: string
   status: QuoteStatus
   metal: JewelryMetalOption

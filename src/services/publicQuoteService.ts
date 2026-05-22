@@ -25,6 +25,9 @@ export interface PublicQuote {
   setterType: string | null
   photo: string | null
   companyName: string | null
+  createdByName: string | null
+  createdByBio: string | null
+  createdByPhoto: string | null
 }
 
 export class PublicQuoteNotFoundError extends Error {

@@ -32,7 +32,7 @@ interface ApiQuote {
   id: number
   title: string
   clientName: string
-  createdBy: { id: number; name: string; email: string; avatar: string }
+  createdBy: { id: number; name: string; email: string; avatar: string; bio?: string | null; photo?: string | null }
   createdAt: string
   status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED'
   metal: string
@@ -72,6 +72,10 @@ function mapQuote(q: ApiQuote): SavedQuote {
     title: q.title,
     clientName: q.clientName ?? '',
     createdBy: q.createdBy?.name ?? 'Unknown',
+    createdByEmail: q.createdBy?.email ?? null,
+    createdByAvatar: q.createdBy?.avatar ?? null,
+    createdByBio: q.createdBy?.bio ?? null,
+    createdByPhoto: q.createdBy?.photo ?? null,
     createdAt: q.createdAt,
     status: q.status.toLowerCase() as SavedQuote['status'],
     metal: q.metal as SavedQuote['metal'],

@@ -17,7 +17,7 @@ import {
   Users,
   X,
 } from 'lucide-react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 
 const navItems: { to: string; label: string; icon: typeof LayoutDashboard; key: NavKey }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' },
@@ -58,7 +58,9 @@ function SidebarContent({
 }) {
   const { user, logout } = useAuth()
   const { companyName, logo } = useBrand()
+  const navigate = useNavigate()
   const visibleNavItems = navItems.filter((item) => canAccess(user?.role, item.key))
+  const goToProfile = () => { onNavigate?.(); navigate('/profile') }
 
   return (
     <div className="flex min-h-full flex-col">
@@ -138,26 +140,45 @@ function SidebarContent({
 
       <div className={cn('mt-auto space-y-3', collapsed ? 'p-2' : 'p-4')}>
         {user && !collapsed && (
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+          <button
+            type="button"
+            onClick={goToProfile}
+            title="Edit your profile"
+            className="block w-full rounded-3xl border border-white/10 bg-white/5 p-4 text-left transition hover:border-white/20 hover:bg-white/10"
+          >
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-xs font-bold text-white">
-                {user.avatar}
-              </div>
+              {user.photo ? (
+                <img src={user.photo} alt={user.name}
+                  className="h-9 w-9 shrink-0 rounded-2xl object-cover ring-1 ring-white/20" />
+              ) : (
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-xs font-bold text-white">
+                  {user.avatar}
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-white">{user.name}</p>
                 <p className="text-xs text-slate-400">{ROLE_LABELS[user.role] ?? user.role}</p>
               </div>
             </div>
-          </div>
+          </button>
         )}
 
         {user && collapsed && (
-          <div
-            className="flex h-9 w-9 mx-auto items-center justify-center rounded-2xl bg-white/10 text-xs font-bold text-white"
-            title={`${user.name} · ${ROLE_LABELS[user.role] ?? user.role}`}
+          <button
+            type="button"
+            onClick={goToProfile}
+            title={`Edit profile — ${user.name} · ${ROLE_LABELS[user.role] ?? user.role}`}
+            className="block mx-auto transition hover:opacity-80"
           >
-            {user.avatar}
-          </div>
+            {user.photo ? (
+              <img src={user.photo} alt={user.name}
+                className="h-9 w-9 rounded-2xl object-cover ring-1 ring-white/20" />
+            ) : (
+              <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-white/10 text-xs font-bold text-white">
+                {user.avatar}
+              </div>
+            )}
+          </button>
         )}
 
         <button
