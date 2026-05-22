@@ -195,6 +195,32 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
         </Card>
       )}
 
+      {/* Jeweler intro — adds personal trust */}
+      {(quote.createdByName || quote.createdByBio || quote.createdByPhoto) && (
+        <Card className="rounded-[24px] border border-slate-200 bg-white">
+          <CardContent className="flex items-start gap-4 p-5">
+            {quote.createdByPhoto ? (
+              <img
+                src={quote.createdByPhoto}
+                alt={quote.createdByName ?? 'Jeweler'}
+                className="h-16 w-16 shrink-0 rounded-2xl object-cover ring-2 ring-white shadow-sm"
+              />
+            ) : (
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
+                <Sparkles className="h-6 w-6" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">Quoted by</p>
+              <p className="mt-1 text-base font-semibold text-slate-900">{quote.createdByName ?? 'Our team'}</p>
+              {quote.createdByBio && (
+                <p className="mt-2 text-sm leading-relaxed text-slate-600 whitespace-pre-wrap">{quote.createdByBio}</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Spec grid */}
       <div className="grid gap-3 sm:grid-cols-2">
         <SpecCard icon={Gem}      label="Metal"          value={metal} />
