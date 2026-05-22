@@ -365,26 +365,26 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
 
         <PhotoDetail src={quote.photo} />
 
-        <div className="rounded-2xl bg-slate-50 px-4 py-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3 min-w-0">
+        <div className="flex gap-3">
+          <div className="flex-1 rounded-2xl bg-slate-50 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Created by</p>
+            <div className="mt-2 flex items-center gap-2">
               {quote.createdByPhoto ? (
                 <img src={quote.createdByPhoto} alt={quote.createdBy}
-                  className="h-10 w-10 shrink-0 rounded-2xl object-cover ring-1 ring-slate-200" />
+                  className="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-slate-200" />
               ) : (
                 <Avatar name={quote.createdBy} />
               )}
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Created by</p>
-                <p className="mt-0.5 text-sm font-semibold text-slate-900">{quote.createdBy}</p>
-                {quote.createdByBio && (
-                  <p className="mt-1 text-xs leading-snug text-slate-600 whitespace-pre-wrap">{quote.createdByBio}</p>
-                )}
-              </div>
+              <p className="text-sm font-semibold text-slate-900">{quote.createdBy}</p>
             </div>
-            <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[quote.status]}`}>
-              {STATUS_LABELS[quote.status]}
-            </span>
+          </div>
+          <div className="flex-1 rounded-2xl bg-slate-50 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Status</p>
+            <div className="mt-2">
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[quote.status]}`}>
+                {STATUS_LABELS[quote.status]}
+              </span>
+            </div>
           </div>
         </div>
 
