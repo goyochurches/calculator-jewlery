@@ -30,7 +30,16 @@ function initials(name: string) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-function Avatar({ name }: { name: string }) {
+function Avatar({ name, photo }: { name: string; photo?: string | null }) {
+  if (photo) {
+    return (
+      <img
+        src={photo}
+        alt={name}
+        className="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-slate-200"
+      />
+    )
+  }
   return (
     <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">
       {initials(name)}
@@ -305,7 +314,7 @@ export function QuotesListPage() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
-                            <Avatar name={quote.createdBy} />
+                            <Avatar name={quote.createdBy} photo={quote.createdByPhoto} />
                             <span className={isSelected ? 'text-slate-300' : 'text-slate-700'}>
                               {quote.createdBy}
                             </span>
