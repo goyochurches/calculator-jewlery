@@ -14,7 +14,7 @@ import {
   PublicQuoteUnavailableError,
   type PublicQuote,
 } from '@/services/publicQuoteService'
-import { AlertCircle, Clock, Diamond, Gem, HelpCircle, Ruler, Sparkles, Wrench } from 'lucide-react'
+import { AlertCircle, Clock, Diamond, Gem, HelpCircle, Quote as QuoteIcon, Ruler, Scissors, Sparkles, Wrench } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
@@ -55,6 +55,26 @@ export function PublicQuotePage() {
   )
 }
 
+// ── Reusable atoms ──────────────────────────────────────────────────────────
+
+/** Tiny ornamental divider: short gold line, diamond glyph, short gold line. */
+function GoldOrnament({ className = '' }: { className?: string }) {
+  return (
+    <div className={`flex items-center justify-center gap-3 ${className}`}>
+      <span className="h-px w-12 bg-gradient-to-r from-transparent via-amber-400/70 to-amber-500" />
+      <span className="text-amber-500" aria-hidden>◆</span>
+      <span className="h-px w-12 bg-gradient-to-l from-transparent via-amber-400/70 to-amber-500" />
+    </div>
+  )
+}
+
+/** Tiny inline gold bullet — used in column headers and footer signatures. */
+function GoldDot() {
+  return <span className="inline-block h-1.5 w-1.5 rounded-full bg-gradient-to-br from-amber-300 to-amber-600 align-middle" aria-hidden />
+}
+
+// ── Error / empty states ────────────────────────────────────────────────────
+
 /** Shown when the backend returns 403 — typically because the team has
  *  rejected the quote. We intentionally don't expose the reason; the
  *  customer is steered to contact the studio directly. */
@@ -67,8 +87,8 @@ function UnavailableState() {
         </div>
         <h1 className="text-xl font-semibold text-slate-900">Oops — we can't display this quote right now</h1>
         <p className="max-w-md text-sm text-slate-600">
-          This quote is no longer available through this link. Please contact{' '}
-          <strong>Simone &amp; Son</strong> directly and we'll be happy to help.
+          This quote is no longer available through this link. Please reach out to
+          the studio directly and we'll be happy to help.
         </p>
       </CardContent>
     </Card>
@@ -84,61 +104,11 @@ function ExpiredState() {
         </div>
         <h1 className="text-xl font-semibold text-slate-900">This share link has expired</h1>
         <p className="max-w-md text-sm text-slate-600">
-          Quote share links are valid for 3 months. Please contact the person who sent it
-          and ask them to refresh the link.
+          Quote share links are valid for 3 months. Please reach out to the
+          person who sent it and we'll refresh the link for you.
         </p>
       </CardContent>
     </Card>
-  )
-}
-
-function PublicShell({
-  children,
-  companyName,
-  companyLogo,
-}: {
-  children: React.ReactNode
-  companyName?: string | null
-  companyLogo?: string | null
-}) {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 px-4 py-8 sm:py-14">
-      <div className="mx-auto max-w-3xl">
-        <header className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-3 text-slate-700">
-            {companyLogo ? (
-              <img
-                src={companyLogo}
-                alt={companyName ?? 'Company logo'}
-                className="h-10 w-10 rounded-2xl object-contain bg-white ring-1 ring-slate-200 p-1 shadow-sm sm:h-12 sm:w-12"
-              />
-            ) : (
-              <Sparkles className="h-5 w-5 text-amber-500" />
-            )}
-            <span className="text-sm font-semibold tracking-wide sm:text-base">
-              {companyName ?? 'Jewelry Quote'}
-            </span>
-          </div>
-        </header>
-        {children}
-        <footer className="mt-10 text-center text-xs text-slate-400">
-          This quote was prepared by {companyName ?? 'our team'}. Shared link — no account required.
-        </footer>
-      </div>
-    </div>
-  )
-}
-
-function LoadingState() {
-  return (
-    <div className="space-y-4">
-      <Skeleton className="h-48 w-full rounded-[28px] bg-slate-200/60" />
-      <div className="grid gap-3 sm:grid-cols-2">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Skeleton key={i} className="h-24 rounded-[20px] bg-slate-200/60" />
-        ))}
-      </div>
-    </div>
   )
 }
 
@@ -176,6 +146,77 @@ function ErrorState({ message }: { message: string }) {
   )
 }
 
+function LoadingState() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-64 w-full rounded-[28px] bg-slate-200/60" />
+      <Skeleton className="h-40 w-full rounded-[24px] bg-slate-200/60" />
+      <div className="space-y-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-12 rounded-2xl bg-slate-200/60" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── Shell (header + footer wrapping every state) ────────────────────────────
+
+function PublicShell({
+  children,
+  companyName,
+  companyLogo,
+}: {
+  children: React.ReactNode
+  companyName?: string | null
+  companyLogo?: string | null
+}) {
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-stone-50 via-white to-amber-50/40 px-4 py-10 sm:py-16">
+      {/* Soft decorative blobs in the background */}
+      <div className="pointer-events-none absolute inset-0 -z-0">
+        <div className="absolute -top-32 -left-32 h-80 w-80 rounded-full bg-amber-200/30 blur-3xl" />
+        <div className="absolute -bottom-40 -right-32 h-96 w-96 rounded-full bg-rose-200/20 blur-3xl" />
+      </div>
+
+      <div className="relative mx-auto max-w-3xl">
+        <header className="mb-10 flex flex-col items-center gap-3 text-center">
+          {companyLogo ? (
+            <img
+              src={companyLogo}
+              alt={companyName ?? 'Company logo'}
+              className="h-16 w-16 rounded-2xl object-contain bg-white p-2 shadow-[0_10px_30px_rgba(15,23,42,0.08)] ring-1 ring-slate-200 sm:h-20 sm:w-20"
+            />
+          ) : (
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-100 via-yellow-50 to-orange-100 text-amber-700 shadow-[0_10px_30px_rgba(245,158,11,0.18)] sm:h-20 sm:w-20">
+              <Sparkles className="h-7 w-7" />
+            </div>
+          )}
+          <p className="font-serif text-xl tracking-wide text-slate-900 sm:text-2xl">
+            {companyName ?? 'Jewelry Quote'}
+          </p>
+          <GoldOrnament />
+        </header>
+
+        {children}
+
+        <footer className="mt-14 flex flex-col items-center gap-3 text-center">
+          <GoldOrnament />
+          <p className="text-xs font-medium uppercase tracking-[0.28em] text-slate-400">
+            Crafted with care
+          </p>
+          <p className="max-w-md text-sm leading-relaxed text-slate-500">
+            Thank you for considering {companyName ?? 'us'} for this piece.
+            Reach out anytime — we'd love to bring this design to life.
+          </p>
+        </footer>
+      </div>
+    </div>
+  )
+}
+
+// ── The actual quote ────────────────────────────────────────────────────────
+
 // Customer-facing translation of the internal difficulty keys. The team uses
 // "Super Easy / Easy / Medium / Hard / Super Hard / Crazy" internally; the
 // customer just sees numeric levels on the share link.
@@ -198,100 +239,168 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
   const diamondTypeLabel = DIAMOND_TYPE_OPTIONS[quote.diamondType as keyof typeof DIAMOND_TYPE_OPTIONS]?.label ?? quote.diamondType
   const diamondSizeLabel = DIAMOND_SIZE_OPTIONS[quote.diamondSize as keyof typeof DIAMOND_SIZE_OPTIONS]?.label ?? quote.diamondSize
 
+  const issuedDate = quote.createdAt ? new Date(quote.createdAt).toLocaleDateString('en-US', {
+    year: 'numeric', month: 'long', day: 'numeric',
+  }) : null
+
+  const specs: { icon: React.ElementType; label: string; value: string }[] = [
+    { icon: Gem,      label: 'Metal',          value: metal },
+    { icon: Wrench,   label: "Jeweler's time", value: labor },
+    { icon: Sparkles, label: 'CAD design',     value: cad },
+    { icon: Diamond,  label: 'Diamonds',       value: `${quote.diamondAmount ?? 0} × ${diamondTypeLabel} ${diamondSizeLabel}` },
+    { icon: Ruler,    label: 'Finger size',    value: `Size ${quote.fingerSize ?? '—'}` },
+    { icon: Ruler,    label: 'Ring width',     value: `${quote.ringWidth ?? 0} mm` },
+  ]
+
   return (
-    <div className="space-y-5">
-      {/* Hero */}
-      <Card className="rounded-[28px] border-0 text-white shadow-[0_30px_80px_rgba(15,23,42,0.24)]" style={{ backgroundColor: 'var(--theme-primary, #0f172a)' }}>
-        <CardContent className="relative p-7 sm:p-9">
-          <div className="absolute inset-0 rounded-[28px] bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.18),transparent_30%)]" />
-          <div className="relative">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-300">Your quote</p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{quote.title}</h1>
-            {quote.clientName && (
-              <p className="mt-1 text-sm text-slate-300">Prepared for {quote.clientName}</p>
-            )}
-            <div className="mt-6 rounded-2xl bg-white/10 p-5 backdrop-blur-sm">
-              <p className="text-xs uppercase tracking-[0.18em] text-white/60">Total</p>
-              <p className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">
-                ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </p>
-              {quote.createdAt && (
-                <p className="mt-2 text-xs text-white/60">Issued {new Date(quote.createdAt).toLocaleDateString()}</p>
-              )}
-            </div>
+    <div className="space-y-8">
+      {/* ── Hero ─────────────────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden rounded-[32px] shadow-[0_40px_100px_rgba(15,23,42,0.18)]">
+        {/* Reference photo as a cinematic backdrop, or the brand color as fallback */}
+        {quote.photo ? (
+          <>
+            <img
+              src={quote.photo}
+              alt="Reference design"
+              className="absolute inset-0 h-full w-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-slate-900/40 via-slate-900/65 to-slate-900/90" />
+          </>
+        ) : (
+          <div className="absolute inset-0" style={{ backgroundColor: 'var(--theme-primary, #0f172a)' }}>
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.20),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(244,114,182,0.10),transparent_30%)]" />
           </div>
-        </CardContent>
-      </Card>
+        )}
 
-      {/* Reference photo */}
-      {quote.photo && (
-        <Card className="overflow-hidden rounded-[24px] border border-slate-200 bg-white">
-          <img src={quote.photo} alt="Reference" className="max-h-[480px] w-full object-cover" />
-        </Card>
-      )}
+        <div className="relative px-7 py-12 text-center text-white sm:px-12 sm:py-16">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.4em] text-amber-300/90">
+            Your bespoke quote
+          </p>
+          <h1 className="mt-5 font-serif text-3xl font-medium leading-tight tracking-tight sm:text-4xl md:text-5xl">
+            {quote.title}
+          </h1>
+          {quote.clientName && (
+            <p className="mt-3 text-sm italic tracking-wide text-amber-100/85 sm:text-base">
+              Prepared for <span className="font-semibold not-italic">{quote.clientName}</span>
+            </p>
+          )}
 
-      {/* Jeweler intro — adds personal trust */}
+          {/* Price centerpiece */}
+          <div className="relative mx-auto mt-10 max-w-md rounded-3xl border border-white/15 bg-white/10 px-6 py-7 backdrop-blur-md">
+            <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-amber-400 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-slate-900 shadow-md">
+              Your investment
+            </span>
+            <p className="font-serif text-5xl font-semibold tracking-tight tabular-nums sm:text-6xl">
+              ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </p>
+            <div className="mx-auto mt-3 h-px w-16 bg-gradient-to-r from-transparent via-amber-300/80 to-transparent" />
+            <p className="mt-3 text-[11px] uppercase tracking-[0.28em] text-white/55">
+              All-inclusive · USD
+            </p>
+          </div>
+
+          {issuedDate && (
+            <p className="mt-7 text-xs uppercase tracking-[0.28em] text-white/55">
+              Issued · {issuedDate}
+            </p>
+          )}
+        </div>
+      </section>
+
+      {/* ── Personal note from the jeweler ──────────────────────────────── */}
       {(quote.createdByName || quote.createdByBio || quote.createdByPhoto) && (
-        <Card className="rounded-[24px] border border-slate-200 bg-white">
-          <CardContent className="flex items-start gap-4 p-5">
+        <section className="relative overflow-hidden rounded-[28px] border border-amber-100 bg-gradient-to-br from-white via-amber-50/30 to-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)] sm:p-8">
+          <QuoteIcon className="absolute right-6 top-6 h-12 w-12 text-amber-200/60" aria-hidden />
+
+          <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-start sm:gap-6 sm:text-left">
             {quote.createdByPhoto ? (
               <img
                 src={quote.createdByPhoto}
                 alt={quote.createdByName ?? 'Jeweler'}
-                className="h-16 w-16 shrink-0 rounded-2xl object-cover ring-2 ring-white shadow-sm"
+                className="h-24 w-24 shrink-0 rounded-full object-cover ring-4 ring-white shadow-[0_10px_30px_rgba(15,23,42,0.12)]"
               />
             ) : (
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
-                <Sparkles className="h-6 w-6" />
+              <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-100 via-yellow-50 to-orange-100 text-amber-700 ring-4 ring-white shadow-[0_10px_30px_rgba(245,158,11,0.18)]">
+                <Sparkles className="h-9 w-9" />
               </div>
             )}
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-700">Quoted by</p>
-              <p className="mt-1 text-base font-semibold text-slate-900">{quote.createdByName ?? 'Our team'}</p>
+
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-amber-700">
+                A personal note from
+              </p>
+              <p className="mt-1.5 font-serif text-xl font-medium tracking-tight text-slate-900 sm:text-2xl">
+                {quote.createdByName ?? 'Our team'}
+              </p>
+
               {quote.createdByBio && (
-                <p className="mt-2 text-sm leading-relaxed text-slate-600 whitespace-pre-wrap">{quote.createdByBio}</p>
+                <>
+                  <div className="mx-auto mt-3 h-px w-16 bg-amber-300/70 sm:mx-0" />
+                  <p className="mt-3 whitespace-pre-wrap text-sm italic leading-relaxed text-slate-600 sm:text-[15px]">
+                    {quote.createdByBio}
+                  </p>
+                </>
               )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
 
-      {/* Spec grid */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <SpecCard icon={Gem}      label="Metal"          value={metal} />
-        <SpecCard icon={Wrench}   label="Jeweler's time" value={labor} />
-        <SpecCard icon={Sparkles} label="CAD design"     value={cad} />
-        <SpecCard icon={Diamond}  label="Diamonds"       value={`${quote.diamondAmount ?? 0} × ${diamondTypeLabel} ${diamondSizeLabel}`} />
-        <SpecCard icon={Ruler}    label="Finger size"    value={`Size ${quote.fingerSize ?? '—'}`} />
-        <SpecCard icon={Ruler}    label="Ring width"     value={`${quote.ringWidth ?? 0} mm`} />
-      </div>
+      {/* ── Specifications: elegant restaurant-menu list ────────────────── */}
+      <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+        <div className="border-b border-slate-100 px-6 py-5 text-center sm:px-8">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-amber-700">
+            <GoldDot /> The piece <GoldDot />
+          </p>
+          <h2 className="mt-1.5 font-serif text-xl font-medium tracking-tight text-slate-900 sm:text-2xl">
+            Specifications
+          </h2>
+        </div>
 
-      {/* Extras */}
+        <dl className="divide-y divide-slate-100">
+          {specs.map(({ icon: Icon, label, value }) => (
+            <div key={label} className="flex items-center justify-between gap-4 px-6 py-4 transition hover:bg-amber-50/30 sm:px-8 sm:py-5">
+              <dt className="flex items-center gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 sm:text-[11px]">
+                  {label}
+                </span>
+              </dt>
+              <dd className="text-right text-sm font-semibold text-slate-900 sm:text-base">
+                {value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      {/* ── Engraving feature banner ────────────────────────────────────── */}
       {quote.engraving && (
-        <Card className="rounded-[20px] border border-amber-200 bg-amber-50/60">
-          <CardContent className="flex items-center gap-3 p-4 text-sm text-amber-900">
-            <Sparkles className="h-4 w-4 shrink-0 text-amber-600" />
-            Includes <strong>Hand Engraving (milgrain)</strong> — ${quote.engravingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-          </CardContent>
-        </Card>
+        <section className="relative overflow-hidden rounded-[24px] border border-amber-200 bg-gradient-to-br from-amber-50 via-yellow-50/60 to-amber-50/50 p-5 sm:p-6">
+          <div className="absolute right-4 top-4 text-amber-300/60">
+            <Sparkles className="h-8 w-8" aria-hidden />
+          </div>
+          <div className="flex items-start gap-4">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-amber-700 shadow-sm ring-1 ring-amber-200">
+              <Scissors className="h-5 w-5" />
+            </span>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.28em] text-amber-700">
+                Artisan touch included
+              </p>
+              <p className="mt-1 font-serif text-lg font-medium tracking-tight text-slate-900">
+                Hand engraving · milgrain
+              </p>
+              <p className="mt-1 text-sm text-slate-600">
+                Adds <strong>${quote.engravingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong> of fine bench work, already reflected in the total.
+              </p>
+            </div>
+          </div>
+        </section>
       )}
     </div>
-  )
-}
-
-function SpecCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
-  return (
-    <Card className="rounded-[20px] border border-slate-200 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.04)]">
-      <CardContent className="flex items-start gap-3 p-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
-          <Icon className="h-4 w-4" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">{label}</p>
-          <p className="mt-0.5 truncate text-sm font-semibold text-slate-900">{value}</p>
-        </div>
-      </CardContent>
-    </Card>
   )
 }
 
