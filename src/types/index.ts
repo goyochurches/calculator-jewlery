@@ -32,6 +32,11 @@ export interface Usuario {
   role: 'admin' | 'manager' | 'jeweler' | 'sales' | 'viewer'
   status: 'active' | 'inactive'
   avatar: string
+  /** Free-form biography shown internally and on the public quote link. */
+  bio?: string | null
+  /** Base64 / URL of the user's profile photo (separate from the
+   *  emoji-style `avatar` initial). */
+  photo?: string | null
 }
 
 export interface AppConfig {
