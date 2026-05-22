@@ -157,6 +157,57 @@ export function QuoteBuilderPage() {
   const customerPhotoInputs = useRef<Record<string, HTMLInputElement | null>>({})
   const customerCameraInputs = useRef<Record<string, HTMLInputElement | null>>({})
 
+  // ── Internal attachments ─────────────────────────────────────────────
+  // Photos the jeweler attaches to a quote for their own records (WhatsApp
+  // screenshots, Pinterest references, etc.). NEVER shown to the client.
+  interface AttachmentRow {
+    uid: string
+    /** When loaded from an existing quote we keep the backend id so the
+     *  server replaces by id instead of duplicating. */
+    backendId?: number | null
+    photo: string
+    caption: string
+    /** ISO string from backend for existing rows; client-side new uploads
+     *  get a synthesized timestamp at upload time. */
+    createdAt: string
+  }
+  const [attachments, setAttachments] = useState<AttachmentRow[]>([])
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
+  const attachmentCameraRef = useRef<HTMLInputElement>(null)
+
+  const handleAttachmentsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0) return
+    let remaining = files.length
+    const newOnes: AttachmentRow[] = []
+    files.forEach(file => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        newOnes.push({
+          uid: crypto.randomUUID(),
+          backendId: null,
+          photo: reader.result as string,
+          caption: '',
+          createdAt: new Date().toISOString(),
+        })
+        remaining -= 1
+        if (remaining === 0) {
+          // Append in input order so the user sees them in the order they picked.
+          setAttachments(prev => [...prev, ...newOnes])
+          if (attachmentInputRef.current) attachmentInputRef.current.value = ''
+          if (attachmentCameraRef.current) attachmentCameraRef.current.value = ''
+        }
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+  const removeAttachment = (uid: string) => {
+    setAttachments(prev => prev.filter(a => a.uid !== uid))
+  }
+  const patchAttachment = (uid: string, patch: Partial<AttachmentRow>) => {
+    setAttachments(prev => prev.map(a => a.uid === uid ? { ...a, ...patch } : a))
+  }
+
   useEffect(() => {
     gemstoneService.getAll().then(setGemstones).catch(console.error)
   }, [])
@@ -219,6 +270,15 @@ export function QuoteBuilderPage() {
       quantity: String(Math.max(1, cs.quantity ?? 1)),
       photo: cs.photo ?? null,
       comments: cs.comments ?? '',
+    })))
+
+    setAttachments((dup.attachments ?? []).map(a => ({
+      uid: crypto.randomUUID(),
+      // Drop the backendId on duplicate — the new quote owns its own rows.
+      backendId: null,
+      photo: a.photo,
+      caption: a.caption ?? '',
+      createdAt: a.createdAt ?? new Date().toISOString(),
     })))
 
     navigate(location.pathname, { replace: true, state: null })
