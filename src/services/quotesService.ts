@@ -1,5 +1,5 @@
 import { api } from '@/api/apiClient'
-import type { Client, QuoteCustomerStone, QuoteStone, SavedQuote } from '../types'
+import type { Client, QuoteAttachment, QuoteCustomerStone, QuoteStone, SavedQuote } from '../types'
 
 interface ApiStone {
   id?: number | null
@@ -14,6 +14,14 @@ interface ApiStone {
   color?: string | null
   manualPrice?: number | null
   comments?: string | null
+}
+
+interface ApiAttachment {
+  id?: number | null
+  photo: string
+  caption?: string | null
+  sortOrder?: number | null
+  createdAt?: string | null
 }
 
 interface ApiCustomerStone {
