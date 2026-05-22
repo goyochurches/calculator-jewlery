@@ -65,6 +65,7 @@ interface ApiQuote {
   client?: Client | null
   stones?: ApiStone[]
   customerStones?: ApiCustomerStone[]
+  attachments?: ApiAttachment[]
   // Sent up by the frontend so the backend can resolve the FK; on responses
   // the backend echoes the full `client` object instead.
   clientId?: number | null
@@ -109,6 +110,7 @@ function mapQuote(q: ApiQuote): SavedQuote {
     clientId: q.client?.id ?? q.clientId ?? null,
     stones: (q.stones ?? []).map(mapStone),
     customerStones: (q.customerStones ?? []).map(mapCustomerStone),
+    attachments: (q.attachments ?? []).map(mapAttachment),
     publicToken: q.publicToken ?? null,
     publicTokenExpiresAt: q.publicTokenExpiresAt ?? null,
     lastOpenedAt: q.lastOpenedAt ?? null,
@@ -130,6 +132,16 @@ function mapStone(s: ApiStone): QuoteStone {
     color: s.color ?? null,
     manualPrice: s.manualPrice ?? null,
     comments: s.comments ?? null,
+  }
+}
+
+function mapAttachment(a: ApiAttachment): QuoteAttachment {
+  return {
+    id: a.id ?? null,
+    photo: a.photo,
+    caption: a.caption ?? null,
+    sortOrder: a.sortOrder ?? null,
+    createdAt: a.createdAt ?? null,
   }
 }
 
