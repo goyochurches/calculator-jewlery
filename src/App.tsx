@@ -12,6 +12,7 @@ import { UsersPage } from '@/pages/Users'
 import { Configuration } from '@/pages/Configuration'
 import MasterTables from '@/pages/MasterTables'
 import QuotesList from '@/pages/QuotesList'
+import { ProfilePage } from '@/pages/Profile'
 import { ClientsPage } from '@/pages/Clients'
 import { ClientDetailPage } from '@/pages/ClientDetail'
 import { PublicQuotePage } from '@/pages/PublicQuote'
@@ -68,6 +69,9 @@ export default function App() {
             <Route element={<PrivateRoutes />}>
               <Route element={<MainLayout />}>
                 <Route path="/" element={<HomeRedirect />} />
+                {/* Profile is available to every authenticated user — no
+                 *  permission gate, since it only edits your own record. */}
+                <Route path="/profile" element={<ProfilePage />} />
                 <Route element={<RequirePermission permission="quotes" />}>
                   <Route path="/quotes" element={<QuoteBuilderPage />} />
                 </Route>
