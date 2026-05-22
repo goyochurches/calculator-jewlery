@@ -910,6 +910,11 @@ export function QuoteBuilderPage() {
           manualPrice: s.manualPrice.trim() === '' ? null : parseNum(s.manualPrice),
           comments: s.comments.trim() === '' ? null : s.comments.trim(),
         })),
+        attachments: attachments.map((a, idx) => ({
+          photo: a.photo,
+          caption: a.caption.trim() === '' ? null : a.caption.trim(),
+          sortOrder: idx,
+        })),
         customerStones: customerStones.map((cs, idx) => {
           const gem = gemstones.find(g => g.id === cs.gemstoneId)
           return {
@@ -941,6 +946,7 @@ export function QuoteBuilderPage() {
       setMarkupText(String(DEFAULT_MARKUP))
       setStones([])
       setCustomerStones([])
+      setAttachments([])
       setPhoto(null)
       setFieldErrors({})
       setSaveError(null)
@@ -1520,6 +1526,83 @@ export function QuoteBuilderPage() {
                   ${(pricing.settingFee + pricing.customerSettingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </strong>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Sección: INTERNAL ATTACHMENTS — not shown to client */}
+          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+            <CardHeader className="border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <span className="h-9 w-9 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center">
+                  <ImagePlus className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle className="text-base font-semibold text-slate-900">
+                    Internal notes & attachments
+                    <span className="ml-2 inline-flex items-center justify-center rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      {attachments.length}
+                    </span>
+                  </CardTitle>
+                  <p className="text-xs text-slate-500">
+                    Conversation screenshots, references, anything for your records.
+                    <span className="ml-1 font-semibold text-rose-600">Never shown to the client.</span>
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 pt-6">
+              <input ref={attachmentInputRef} id="attachment-files" type="file"
+                accept="image/*" multiple
+                onChange={handleAttachmentsChange} className="hidden" />
+              <input ref={attachmentCameraRef} id="attachment-camera" type="file"
+                accept="image/*" capture="environment"
+                onChange={handleAttachmentsChange} className="hidden" />
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label htmlFor="attachment-camera"
+                  className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white sm:hidden">
+                  <Camera className="h-4 w-4 shrink-0 text-slate-400" />
+                  <span>Take photo</span>
+                </label>
+                <label htmlFor="attachment-files"
+                  className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white sm:col-span-2">
+                  <ImagePlus className="h-4 w-4 shrink-0 text-slate-400" />
+                  <span>Add photos (multiple allowed)</span>
+                </label>
+              </div>
+
+              {attachments.length === 0 ? (
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-3 text-xs text-slate-400">
+                  No attachments yet.
+                </p>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {attachments.map((a, idx) => (
+                    <div key={a.uid}
+                      className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                      <img src={a.photo} alt={`Attachment ${idx + 1}`}
+                        className="w-full object-cover max-h-48" />
+                      <button type="button" onClick={() => removeAttachment(a.uid)}
+                        aria-label="Remove attachment"
+                        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition hover:bg-black/80">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                      <div className="space-y-1.5 p-3">
+                        <input
+                          type="text"
+                          value={a.caption}
+                          onChange={e => patchAttachment(a.uid, { caption: e.target.value })}
+                          placeholder="Optional caption (e.g. WhatsApp Apr 15 — switch to sapphires)"
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 outline-none focus:border-slate-400 focus:bg-white"
+                        />
+                        <p className="text-[10px] text-slate-400">
+                          Added {new Date(a.createdAt).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
