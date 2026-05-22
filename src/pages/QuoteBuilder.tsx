@@ -1191,6 +1191,53 @@ export function QuoteBuilderPage() {
                   onChange={e => setExtraCosts(Number(e.target.value) || 0)}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
               </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <label className="text-sm font-semibold text-slate-900">
+                    Retail markup
+                    <span className="ml-2 text-xs font-normal text-slate-500">applied on top of cost (engraving excluded)</span>
+                  </label>
+                  <span className="text-xs font-medium text-slate-500">
+                    Cost <strong className="text-slate-700">${pricing.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                    {' '}→ Customer{' '}
+                    <strong className="text-slate-900">${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative flex-1 min-w-[140px]">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={markupText}
+                      placeholder={String(DEFAULT_MARKUP)}
+                      onChange={e => setMarkupText(e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 pr-9 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+                    />
+                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">×</span>
+                  </div>
+                  {MARKUP_PRESETS.map(p => {
+                    const active = parsedMarkup === p
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setMarkupText(String(p))}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                          active
+                            ? 'bg-slate-900 text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {p}×
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-slate-400">
+                  For a discount, type a number below {DEFAULT_MARKUP} (e.g. 2.2× ≈ 12% off the standard {DEFAULT_MARKUP}× price).
+                </p>
+              </div>
             </CardContent>
           </Card>
 
