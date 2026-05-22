@@ -5,8 +5,9 @@ import {
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import type { QuoteCustomerStone, QuoteStatus, QuoteStone, SavedQuote } from '@/types'
-import { Check, ChevronDown, ChevronUp, Eye, RefreshCw, X, XCircle } from 'lucide-react'
+import { Check, ChevronDown, ChevronUp, Copy, Eye, RefreshCw, X, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 const STATUS_STYLES: Record<QuoteStatus, string> = {
   draft: 'bg-slate-100 text-slate-600',
@@ -151,7 +152,12 @@ const ROLE_THEME: Record<StoneRole, { label: string; dot: string; ring: string; 
 }
 
 export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToken, isAdmin = false }: QuoteDetailPanelProps) {
+  const navigate = useNavigate()
   const [refreshing, setRefreshing] = useState(false)
+  const handleDuplicate = () => {
+    onClose()
+    navigate('/quotes', { state: { duplicateFrom: quote } })
+  }
   // Per-stone expand/collapse state. Keys are `${role}-${index}`. We seed the
   // set with every stone so the detail view shows the full information by
   // default — the user can still collapse individual rows with the chevron.
@@ -262,12 +268,22 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             {jewelryTypeLabel ? <> · <span className="font-semibold text-slate-600">{jewelryTypeLabel}</span></> : null}
           </p>
         </div>
-        <button
-          onClick={onClose}
-          className="ml-4 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <div className="ml-4 flex shrink-0 items-center gap-1.5">
+          <button
+            onClick={handleDuplicate}
+            title="Duplicate this quote and adjust"
+            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            <Copy className="h-3.5 w-3.5" />
+            Duplicate
+          </button>
+          <button
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">

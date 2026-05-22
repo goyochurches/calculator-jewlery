@@ -6,8 +6,9 @@ import { quotesService } from '@/services/quotesService'
 import type { QuoteStatus, SavedQuote } from '@/types'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { QuoteDetailPanel } from '@/components/QuoteDetailPanel'
-import { Bell, ChevronLeft, ChevronRight, ImageOff, Search, X } from 'lucide-react'
+import { Bell, ChevronLeft, ChevronRight, Copy, ImageOff, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 const STATUS_STYLES: Record<QuoteStatus, string> = {
   draft: 'bg-slate-100 text-slate-600',
@@ -70,6 +71,7 @@ const DEFAULT_PAGE_SIZE = 10
 
 export function QuotesListPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const isAdmin = user?.role === 'ADMIN'
   const [quotes, setQuotes] = useState<SavedQuote[]>([])
   const [loading, setLoading] = useState(true)
@@ -252,7 +254,7 @@ export function QuotesListPage() {
               <table className="w-full min-w-[760px] text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50/70">
-                    {['Photo', 'Quote', 'Client', 'Created by', 'Metal', 'Status', 'Date', 'Total', 'Share link'].map((h) => (
+                    {['Photo', 'Quote', 'Client', 'Created by', 'Metal', 'Status', 'Date', 'Total', 'Actions'].map((h) => (
                       <th key={h} className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 last:text-right">
                         {h}
                       </th>
@@ -262,7 +264,7 @@ export function QuotesListPage() {
                 <tbody>
                   {filteredQuotes.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="px-6 py-12 text-center text-sm text-slate-400">
+                      <td colSpan={9} className="px-6 py-12 text-center text-sm text-slate-400">
                         No quotes match the current filters.
                       </td>
                     </tr>
@@ -326,7 +328,25 @@ export function QuotesListPage() {
                           ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </td>
                         <td className="px-3 py-4">
-                          <CopyShareLinkButton token={quote.publicToken} iconOnly={false} />
+                          <div className="flex items-center justify-end gap-1.5">
+                            <CopyShareLinkButton token={quote.publicToken} iconOnly={false} />
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                navigate('/quotes', { state: { duplicateFrom: quote } })
+                              }}
+                              title="Duplicate this quote and adjust"
+                              aria-label="Duplicate quote"
+                              className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition ${
+                                isSelected
+                                  ? 'border-white/30 bg-white/10 text-white hover:bg-white/20'
+                                  : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700'
+                              }`}
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )

@@ -9,14 +9,14 @@ import { useAuth } from '@/context/AuthContext'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { gemstoneService } from '@/services/gemstoneService'
 import { quotesService } from '@/services/quotesService'
-import type { Client, GemstonePrice, JewelryMetalOption } from '@/types'
+import type { Client, GemstonePrice, JewelryMetalOption, SavedQuote } from '@/types'
 import { ClientPicker } from '@/components/ClientPicker'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { Toast } from '@/components/Toast'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
-import { Calculator, Camera, Check, ChevronDown, ChevronUp, Crown, Diamond, Gem, ImagePlus, Layers3, Pin, PinOff, Ruler, Sparkles, User, X } from 'lucide-react'
+import { Calculator, Camera, Check, ChevronDown, ChevronUp, Copy, Crown, Diamond, Gem, ImagePlus, Layers3, Pin, PinOff, Ruler, Sparkles, User, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
 const HAND_ENGRAVING_FEE = 150
 
@@ -72,6 +72,12 @@ const JEWELRY_TYPE_OPTIONS: Array<{ key: string; label: string }> = [
 export function QuoteBuilderPage() {
   const { user } = useAuth()
   const config = useQuoteConfig()
+  const location = useLocation()
+  const navigate = useNavigate()
+  // Source quote when the user landed here via "Duplicate" — drives the
+  // banner and the one-shot prefill effect below. Cleared after consuming so
+  // refreshing the page doesn't re-apply the duplicate.
+  const [duplicatedFrom, setDuplicatedFrom] = useState<SavedQuote | null>(null)
 
   const [quoteTitle, setQuoteTitle] = useState('')
   const [client, setClient] = useState<Client | null>(null)
@@ -148,6 +154,68 @@ export function QuoteBuilderPage() {
   useEffect(() => {
     gemstoneService.getAll().then(setGemstones).catch(console.error)
   }, [])
+
+  // ── Duplicate prefill ────────────────────────────────────────────────
+  // When the user lands here via "Duplicate" on a saved quote, the source
+  // quote is passed in router state. We prefill every field once (after
+  // config loads, so the diamond size map is available for amount math) and
+  // then clear the nav state so reloading or returning to the page doesn't
+  // re-apply the duplicate on top of in-progress changes.
+  const duplicateAppliedRef = useRef(false)
+  useEffect(() => {
+    if (duplicateAppliedRef.current) return
+    if (config.loading) return
+    const navState = location.state as { duplicateFrom?: SavedQuote } | null
+    const dup = navState?.duplicateFrom
+    if (!dup) return
+    duplicateAppliedRef.current = true
+
+    setDuplicatedFrom(dup)
+    setQuoteTitle(dup.title)
+    setClient(dup.client ?? null)
+    setJewelryType(dup.jewelryType ?? 'ring')
+    setSelectedMetal(dup.metal as JewelryMetalOption)
+    setRingLabor(dup.ringLabor)
+    setWeightGrams(dup.weightGrams ?? 0)
+    setRingWidth(dup.ringWidth ?? 0)
+    setFingerSize(dup.fingerSize ?? 7)
+    setExtraCosts(dup.extraCosts ?? 0)
+    setEngraving(!!dup.engraving)
+    setPhoto(dup.photo ?? null)
+
+    setStones((dup.stones ?? []).map(s => {
+      const ct = config.diamondSizeMap[s.sizeKey]?.ctPerStone ?? 0
+      const carats = s.carats ?? 0
+      const amount = ct > 0 && carats > 0 ? String(Math.round(carats / ct)) : ''
+      return {
+        uid: crypto.randomUUID(),
+        role: s.role,
+        stoneType: s.stoneType,
+        sizeKey: s.sizeKey,
+        carats: carats > 0 ? String(carats) : '',
+        amount,
+        setterType: s.setterType ?? '',
+        labReport: s.labReport ?? '',
+        shape: s.shape ?? '',
+        color: s.color ?? '',
+        manualPrice: s.manualPrice != null ? String(s.manualPrice) : '',
+        comments: s.comments ?? '',
+        collapsed: true,
+      }
+    }))
+
+    setCustomerStones((dup.customerStones ?? []).map(cs => ({
+      uid: crypto.randomUUID(),
+      gemstoneId: cs.gemstoneId != null ? String(cs.gemstoneId) : '',
+      setterType: cs.setterType ?? '',
+      size: cs.sizeText ?? '',
+      quantity: String(Math.max(1, cs.quantity ?? 1)),
+      photo: cs.photo ?? null,
+      comments: cs.comments ?? '',
+    })))
+
+    navigate(location.pathname, { replace: true, state: null })
+  }, [config.loading, config.diamondSizeMap, location.pathname, location.state, navigate])
 
   // Setters allowed for customer-supplied stones — narrowed to the subset the
   // user wants to expose in the Customer Stones section.
@@ -797,6 +865,7 @@ export function QuoteBuilderPage() {
       setPhoto(null)
       setFieldErrors({})
       setSaveError(null)
+      setDuplicatedFrom(null)
       if (photoInputRef.current) photoInputRef.current.value = ''
       if (cameraInputRef.current) cameraInputRef.current.value = ''
     } catch {
@@ -813,6 +882,33 @@ export function QuoteBuilderPage() {
 
   return (
     <div className="space-y-6">
+      {/* ── Duplicate banner — explains the quote is a clone, not an edit ── */}
+      {duplicatedFrom && (
+        <Card className="rounded-[24px] border border-sky-200 bg-sky-50/60 shadow-[0_20px_60px_rgba(56,189,248,0.16)]">
+          <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3 min-w-0">
+              <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
+                <Copy className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Duplicating quote</p>
+                <p className="mt-1 text-sm text-slate-700">
+                  Prefilled from <strong>{duplicatedFrom.title}</strong> (quote #{duplicatedFrom.id}). Adjust the stones,
+                  client or any other field — saving creates a <strong>new</strong> quote and leaves the original untouched.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setDuplicatedFrom(null)}
+              className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-white hover:text-slate-700"
+            >
+              Dismiss
+            </button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Persistent share-link card after creating a quote ─────────────── */}
       {savedQuote?.publicToken && (
         <Card className="rounded-[24px] border border-emerald-200 bg-emerald-50/60 shadow-[0_20px_60px_rgba(16,185,129,0.16)]">
