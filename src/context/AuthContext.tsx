@@ -8,6 +8,8 @@ export interface AuthUser {
   role: 'ADMIN' | 'MANAGER' | 'JEWELER' | 'SALES' | 'VIEWER'
   status: 'ACTIVE' | 'INACTIVE'
   avatar: string
+  bio?: string | null
+  photo?: string | null
 }
 
 interface LoginResponse {
@@ -18,6 +20,8 @@ interface LoginResponse {
   role: 'ADMIN' | 'MANAGER' | 'JEWELER' | 'SALES' | 'VIEWER'
   status: 'ACTIVE' | 'INACTIVE'
   avatar: string
+  bio?: string | null
+  photo?: string | null
 }
 
 interface AuthContextType {
@@ -25,6 +29,8 @@ interface AuthContextType {
   token: string | null
   login: (email: string, password: string) => Promise<void>
   logout: () => void
+  /** Refresh from /api/users/me — call after self-editing the profile. */
+  refreshUser: () => Promise<void>
   isAuthenticated: boolean
   isLoading: boolean
 }
@@ -64,7 +70,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       role: data.role,
       status: data.status,
       avatar: data.avatar,
+      bio: data.bio ?? null,
+      photo: data.photo ?? null,
     })
+  }
+
+  async function refreshUser() {
+    try {
+      const u = await api.get<AuthUser>('/api/users/me')
+      setUser(u)
+    } catch {
+      // Silent — caller can decide what to do (typically just retry next login).
+    }
   }
 
   function logout() {
@@ -75,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!user, isLoading }}>
+    <AuthContext.Provider value={{ user, token, login, logout, refreshUser, isAuthenticated: !!user, isLoading }}>
       {children}
     </AuthContext.Provider>
   )
