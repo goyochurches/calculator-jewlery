@@ -296,14 +296,21 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
         <div className="rounded-2xl p-5 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}>
           <p className="text-xs uppercase tracking-[0.18em] text-white/60">Quote total</p>
           <p className="mt-2 text-4xl font-semibold tracking-tight">
-            ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-          </p>
-          <p className="mt-1.5 text-xs text-white/60">
-            Cost ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })} × {markup}×{engraveFee ? ` + $${ENGRAVING_FEE} engraving` : ''}
+            ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </p>
           <p className="mt-1.5 text-sm text-white/70">
             {metalCfg.label} · {ringLaborCfg?.label ?? quote.ringLabor}
           </p>
+          {quote.publicToken && (
+            <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/85">
+              <Eye className="h-3 w-3" />
+              Customer sees{' '}
+              <strong className="font-semibold text-amber-300">
+                ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </strong>
+              {' '}via share link · markup {markup}×
+            </p>
+          )}
         </div>
 
         {/* Share link */}

@@ -1504,7 +1504,10 @@ export function QuoteBuilderPage() {
               <div className="rounded-2xl p-5 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}>
                 <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Quote total</p>
                 <p className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                  ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  ${pricing.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="mt-1.5 text-xs font-medium text-amber-300/90">
+                  Customer sees ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })} via share link ({parsedMarkup}×)
                 </p>
                 <p className="mt-2 text-sm text-slate-300">
                   <span className="font-semibold text-white">{jewelryTypeLabel}</span> · {selectedMetalConfig.label} · {ringLaborLabel}

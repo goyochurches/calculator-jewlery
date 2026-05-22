@@ -271,11 +271,6 @@ export function QuotesListPage() {
                   )}
                   {pagedQuotes.map((quote) => {
                     const isSelected = quote.id === selectedId
-                    // Customer price = (cost - engraving) × markup + engraving.
-                    // Falls back to the legacy 2.5× for quotes saved before V22.
-                    const engraveFee = quote.engraving ? 150 : 0
-                    const markup = quote.markupMultiplier ?? 2.5
-                    const customerPrice = (quote.total - engraveFee) * markup + engraveFee
                     return (
                       <tr
                         key={quote.id}
@@ -330,10 +325,7 @@ export function QuotesListPage() {
                           {quote.createdAt}
                         </td>
                         <td className={`px-6 py-4 text-right font-semibold ${isSelected ? 'text-amber-300' : 'text-slate-900'}`}>
-                          ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                          <span className={`block text-[10px] font-normal ${isSelected ? 'text-white/50' : 'text-slate-400'}`}>
-                            cost ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })} · {markup}×
-                          </span>
+                          ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                         </td>
                         <td className="px-3 py-4">
                           <div className="flex items-center justify-end gap-1.5">

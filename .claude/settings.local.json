@@ -26,7 +26,10 @@
       "Bash(npm install *)",
       "Bash(mvn -f D:/wamp64/www/price-calculator/pom.xml -q compile)",
       "Bash(mvn -f D:/wamp64/www/price-calculator/pom.xml compile)",
-      "Bash(mvn -f D:/wamp64/www/price-calculator/pom.xml clean compile)"
+      "Bash(mvn -f D:/wamp64/www/price-calculator/pom.xml clean compile)",
+      "Bash(./mvnw -q -DskipTests compile)",
+      "Bash(command -v mvn)",
+      "Bash(echo \"EXIT=$?\")"
     ]
   }
 }
