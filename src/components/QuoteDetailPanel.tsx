@@ -191,6 +191,12 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
   }, [quote.id])
   const config = useQuoteConfig()
   const expiration = formatExpiration(quote.publicTokenExpiresAt)
+  // Customer-facing price = (cost - engraving) × markup + engraving. Falls back
+  // to the legacy 2.5× for quotes saved before V22.
+  const ENGRAVING_FEE = 150
+  const markup = quote.markupMultiplier ?? 2.5
+  const engraveFee = quote.engraving ? ENGRAVING_FEE : 0
+  const customerPrice = (quote.total - engraveFee) * markup + engraveFee
 
   const handleRefresh = async () => {
     if (!onRefreshToken) return
@@ -290,7 +296,10 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
         <div className="rounded-2xl p-5 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}>
           <p className="text-xs uppercase tracking-[0.18em] text-white/60">Quote total</p>
           <p className="mt-2 text-4xl font-semibold tracking-tight">
-            ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </p>
+          <p className="mt-1.5 text-xs text-white/60">
+            Cost ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })} × {markup}×{engraveFee ? ` + $${ENGRAVING_FEE} engraving` : ''}
           </p>
           <p className="mt-1.5 text-sm text-white/70">
             {metalCfg.label} · {ringLaborCfg?.label ?? quote.ringLabor}
