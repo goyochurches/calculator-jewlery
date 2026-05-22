@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -8,7 +8,7 @@ import { ROLE_LABELS } from '@/constants/config'
 import { userService } from '@/services/userService'
 import { useAuth } from '@/context/AuthContext'
 import type { Usuario } from '@/types'
-import { Plus, Trash2, X } from 'lucide-react'
+import { ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react'
 
 const AVATAR_COLORS: Record<string, string> = {
   admin: 'bg-slate-900 text-white',
@@ -29,7 +29,7 @@ function computeAvatar(name: string): string {
 }
 
 export function UsersPage() {
-  const { user: currentUser } = useAuth()
+  const { user: currentUser, refreshUser } = useAuth()
   const currentUserId = currentUser ? String(currentUser.id) : null
 
   const [users, setUsers] = useState<Usuario[]>([])
@@ -43,6 +43,7 @@ export function UsersPage() {
   const [deletedUser, setDeletedUser] = useState<{ id: string; name: string; email: string } | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<Usuario | null>(null)
   const [errorToast, setErrorToast] = useState<{ id: string; title: string; description: string } | null>(null)
+  const [editingUser, setEditingUser] = useState<Usuario | null>(null)
 
   useEffect(() => {
     userService.getAll().then((data) => { setUsers(data); setLoading(false) })
@@ -184,12 +185,20 @@ export function UsersPage() {
       <CardContent className="divide-y divide-slate-100">
         {users.map((u) => (
           <div key={u.id} className="flex flex-col gap-4 py-5 md:flex-row md:items-center">
-            <div className={`flex h-12 w-12 items-center justify-center rounded-2xl text-sm font-semibold ${AVATAR_COLORS[u.role]}`}>
-              {u.avatar}
-            </div>
+            {u.photo ? (
+              <img src={u.photo} alt={u.name}
+                className="h-12 w-12 shrink-0 rounded-2xl object-cover ring-1 ring-slate-200" />
+            ) : (
+              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-semibold ${AVATAR_COLORS[u.role]}`}>
+                {u.avatar}
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-slate-900">{u.name}</p>
               <p className="text-sm text-slate-500">{u.email}</p>
+              {u.bio && (
+                <p className="mt-1 text-xs leading-snug text-slate-500 line-clamp-2">{u.bio}</p>
+              )}
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
@@ -198,6 +207,10 @@ export function UsersPage() {
               <span className={`rounded-full px-3 py-1 text-xs font-semibold ${u.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
                 {u.status === 'active' ? 'Active' : 'Inactive'}
               </span>
+              <Button variant="outline" size="lg" onClick={() => setEditingUser(u)}>
+                <Pencil className="mr-1.5 h-4 w-4" />
+                Edit profile
+              </Button>
               <Button variant="outline" size="lg" onClick={() => toggleStatus(u.id, u.status)}>
                 {u.status === 'active' ? 'Disable' : 'Enable'}
               </Button>
@@ -245,6 +258,21 @@ export function UsersPage() {
         />
       )}
 
+      {editingUser && (
+        <EditProfileDialog
+          user={editingUser}
+          isSelf={editingUser.id === currentUserId}
+          onCancel={() => setEditingUser(null)}
+          onSaved={async (updated) => {
+            setUsers(prev => prev.map(x => x.id === updated.id ? updated : x))
+            // If the admin just edited their OWN profile, refresh the auth
+            // context so the sidebar etc. pick up the new photo/bio.
+            if (updated.id === currentUserId) await refreshUser()
+            setEditingUser(null)
+          }}
+        />
+      )}
+
       <ConfirmDialog
         open={!!confirmTarget}
         variant="danger"
@@ -267,6 +295,155 @@ export function UsersPage() {
         onCancel={() => !deletingId && setConfirmTarget(null)}
       />
     </Card>
+  )
+}
+
+function EditProfileDialog({
+  user,
+  isSelf,
+  onCancel,
+  onSaved,
+}: {
+  user: Usuario
+  isSelf: boolean
+  onCancel: () => void
+  onSaved: (u: Usuario) => void | Promise<void>
+}) {
+  const [name, setName] = useState(user.name)
+  const [avatar, setAvatar] = useState(user.avatar ?? '')
+  const [bio, setBio] = useState(user.bio ?? '')
+  const [photo, setPhoto] = useState<string | null>(user.photo ?? null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => setPhoto(reader.result as string)
+    reader.readAsDataURL(file)
+  }
+
+  const handleRemovePhoto = () => {
+    setPhoto(null)
+    if (photoInputRef.current) photoInputRef.current.value = ''
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      const updated = await userService.updateProfile(user.id, { name, avatar, bio, photo })
+      await onSaved(updated)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save profile.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputCls = 'w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400'
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4"
+      role="dialog"
+      aria-modal="true"
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-lg rounded-3xl bg-white shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">
+              {isSelf ? 'Edit my profile' : `Edit ${user.name}'s profile`}
+            </h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              Customers see the photo and bio on the share link.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="max-h-[70vh] overflow-y-auto px-6 py-5 space-y-5">
+          {/* Photo */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">Profile photo</label>
+            <input ref={photoInputRef} id={`edit-photo-${user.id}`} type="file" accept="image/*"
+              onChange={handlePhotoChange} className="hidden" />
+            {!photo ? (
+              <label htmlFor={`edit-photo-${user.id}`}
+                className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-5 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white">
+                <ImagePlus className="h-4 w-4 shrink-0 text-slate-400" />
+                <span>Choose photo</span>
+              </label>
+            ) : (
+              <div className="flex items-center gap-4">
+                <img src={photo} alt="Profile" className="h-20 w-20 rounded-2xl object-cover ring-2 ring-white shadow-sm" />
+                <div className="flex flex-col gap-2">
+                  <label htmlFor={`edit-photo-${user.id}`}
+                    className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+                    <ImagePlus className="h-3.5 w-3.5" /> Change
+                  </label>
+                  <button type="button" onClick={handleRemovePhoto}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:border-rose-200 hover:bg-rose-50">
+                    <X className="h-3.5 w-3.5" /> Remove
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Name */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold text-slate-900">Display name</label>
+            <input type="text" value={name} className={inputCls}
+              onChange={e => setName(e.target.value)} placeholder="Full name" />
+          </div>
+
+          {/* Initials */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold text-slate-900">
+              Initials
+              <span className="ml-2 text-xs font-normal text-slate-500">shown in compact lists (max 5)</span>
+            </label>
+            <input type="text" value={avatar} maxLength={5}
+              className={`${inputCls} w-32 uppercase tracking-wide`}
+              onChange={e => setAvatar(e.target.value)} placeholder="MD" />
+          </div>
+
+          {/* Bio */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold text-slate-900">
+              Short biography
+              <span className="ml-2 text-xs font-normal text-slate-500">visible to customers</span>
+            </label>
+            <textarea rows={4} value={bio ?? ''} className={`${inputCls} resize-y`}
+              onChange={e => setBio(e.target.value)}
+              placeholder="A few lines about experience, specialties, etc." />
+          </div>
+
+          {error && <p className="text-xs font-medium text-rose-600">{error}</p>}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/60 px-6 py-4">
+          <Button variant="outline" onClick={onCancel} disabled={saving}>Cancel</Button>
+          <Button onClick={handleSave} disabled={saving} className="text-white"
+            style={{ backgroundColor: 'var(--theme-primary)' }}>
+            {saving ? 'Saving…' : 'Save changes'}
+          </Button>
+        </div>
+      </div>
+    </div>
   )
 }
 

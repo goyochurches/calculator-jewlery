@@ -48,7 +48,11 @@ export function PublicQuotePage() {
   if (error)       return <PublicShell><ErrorState message={error} /></PublicShell>
   if (!quote)      return <PublicShell><NotFoundState /></PublicShell>
 
-  return <PublicShell companyName={quote.companyName}><QuoteView quote={quote} /></PublicShell>
+  return (
+    <PublicShell companyName={quote.companyName} companyLogo={quote.companyLogo}>
+      <QuoteView quote={quote} />
+    </PublicShell>
+  )
 }
 
 /** Shown when the backend returns 403 — typically because the team has
@@ -88,14 +92,30 @@ function ExpiredState() {
   )
 }
 
-function PublicShell({ children, companyName }: { children: React.ReactNode; companyName?: string | null }) {
+function PublicShell({
+  children,
+  companyName,
+  companyLogo,
+}: {
+  children: React.ReactNode
+  companyName?: string | null
+  companyLogo?: string | null
+}) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 px-4 py-8 sm:py-14">
       <div className="mx-auto max-w-3xl">
         <header className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-2 text-slate-600">
-            <Sparkles className="h-5 w-5 text-amber-500" />
-            <span className="text-sm font-semibold tracking-wide">
+          <div className="flex items-center gap-3 text-slate-700">
+            {companyLogo ? (
+              <img
+                src={companyLogo}
+                alt={companyName ?? 'Company logo'}
+                className="h-10 w-10 rounded-2xl object-contain bg-white ring-1 ring-slate-200 p-1 shadow-sm sm:h-12 sm:w-12"
+              />
+            ) : (
+              <Sparkles className="h-5 w-5 text-amber-500" />
+            )}
+            <span className="text-sm font-semibold tracking-wide sm:text-base">
               {companyName ?? 'Jewelry Quote'}
             </span>
           </div>

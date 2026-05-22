@@ -25,6 +25,7 @@ export interface PublicQuote {
   setterType: string | null
   photo: string | null
   companyName: string | null
+  companyLogo: string | null
   createdByName: string | null
   createdByBio: string | null
   createdByPhoto: string | null
