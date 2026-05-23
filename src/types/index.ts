@@ -164,6 +164,9 @@ export interface SavedQuote {
    *  Only set on PENDING quotes — drives the green/amber/red badge in
    *  /quotes-list so the admin knows the approval link reached them. */
   pendingWhatsappStatus?: string | null
+  /** WhatsApp delivery status of the notification sent to the CREATOR
+   *  when the quote was approved. Only set on APPROVED quotes. */
+  approvalWhatsappStatus?: string | null
 }
 
 export interface GemstonePrice {

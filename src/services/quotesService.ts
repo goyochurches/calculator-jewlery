@@ -83,6 +83,8 @@ interface ApiQuote {
   parentQuote?: { id: number } | null
   /** Twilio status from the latest approval token (only for PENDING). */
   pendingWhatsappStatus?: string | null
+  /** Twilio status of the approval notification sent to the creator (only for APPROVED). */
+  approvalWhatsappStatus?: string | null
 }
 
 function mapQuote(q: ApiQuote): SavedQuote {
@@ -129,6 +131,7 @@ function mapQuote(q: ApiQuote): SavedQuote {
     openCount: q.openCount ?? null,
     parentQuoteId: q.parentQuoteId ?? null,
     pendingWhatsappStatus: q.pendingWhatsappStatus ?? null,
+    approvalWhatsappStatus: q.approvalWhatsappStatus ?? null,
   }
 }
 
