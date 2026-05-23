@@ -312,6 +312,7 @@ function EditProfileDialog({
   const [name, setName] = useState(user.name)
   const [avatar, setAvatar] = useState(user.avatar ?? '')
   const [bio, setBio] = useState(user.bio ?? '')
+  const [phone, setPhone] = useState(user.phone ?? '')
   const [photo, setPhoto] = useState<string | null>(user.photo ?? null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -334,7 +335,7 @@ function EditProfileDialog({
     setSaving(true)
     setError(null)
     try {
-      const updated = await userService.updateProfile(user.id, { name, avatar, bio, photo })
+      const updated = await userService.updateProfile(user.id, { name, avatar, bio, photo, phone: phone.trim() || null })
       await onSaved(updated)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save profile.')
@@ -430,6 +431,29 @@ function EditProfileDialog({
             <textarea rows={4} value={bio ?? ''} className={`${inputCls} resize-y`}
               onChange={e => setBio(e.target.value)}
               placeholder="A few lines about experience, specialties, etc." />
+          </div>
+
+          {/* WhatsApp phone — needed so the system can text the user when one
+              of their quotes is approved (full international format, no
+              "whatsapp:" prefix; e.g. "+34664577327"). */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-semibold text-slate-900">
+              WhatsApp phone
+              <span className="ml-2 text-xs font-normal text-slate-500">
+                receives the share link when their quotes are approved
+              </span>
+            </label>
+            <input
+              type="tel"
+              inputMode="tel"
+              value={phone ?? ''}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="+34664577327"
+              className={inputCls}
+            />
+            <p className="text-[11px] text-slate-400">
+              Full international format with country code. Internal only — never shown to customers.
+            </p>
           </div>
 
           {error && <p className="text-xs font-medium text-rose-600">{error}</p>}
