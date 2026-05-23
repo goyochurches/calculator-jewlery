@@ -21,6 +21,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 const HAND_ENGRAVING_FEE = 150
 const DEFAULT_MARKUP = 2.5
 const MARKUP_PRESETS = [2, 2.5, 3] as const
+const DISCOUNT_PRESETS = [5, 10, 15, 20, 25, 30] as const
 
 // Tallas disponibles: de 3 a 20 en incrementos de 0.25 (sin coste adicional).
 const FINGER_SIZE_OPTIONS: number[] = (() => {
@@ -104,6 +105,9 @@ export function QuoteBuilderPage() {
   // price. Stored as a string so the user can type "2.5" or "2." without the
   // input collapsing. Parsed lazily in pricing/save.
   const [markupText, setMarkupText] = useState(String(DEFAULT_MARKUP))
+  // Optional customer discount (percent). Stored as a string so the user can
+  // type "10" or "12." without the input collapsing. Empty / 0 = no discount.
+  const [discountText, setDiscountText] = useState('')
 
   // Multi-stone breakdown: 0 or 1 MAIN, plus 0..N SIDE and 0..N MELEE.
   // amount lives in UI state so the user can override it independently of
@@ -856,9 +860,18 @@ export function QuoteBuilderPage() {
     const n = Number(markupText)
     return Number.isFinite(n) && n > 0 ? n : DEFAULT_MARKUP
   })()
+  // Parse the discount. Empty / NaN / out-of-range = 0 (no discount). Capped
+  // at 100% so we never go negative.
+  const parsedDiscount = (() => {
+    const n = Number(discountText)
+    if (!Number.isFinite(n) || n <= 0) return 0
+    return Math.min(n, 100)
+  })()
   // Price shown to the customer (markup applied to cost, leaving engraving
   // as a flat pass-through). Used in the right-column "Quote total" card.
-  const customerPrice = (pricing.total - pricing.engravingFee) * parsedMarkup + pricing.engravingFee
+  const customerPriceBeforeDiscount = (pricing.total - pricing.engravingFee) * parsedMarkup + pricing.engravingFee
+  const discountAmount = customerPriceBeforeDiscount * (parsedDiscount / 100)
+  const customerPrice = customerPriceBeforeDiscount - discountAmount
 
   const handleQuoteReady = async () => {
     if (!user) return
@@ -873,11 +886,15 @@ export function QuoteBuilderPage() {
       // Legacy fields are populated with aggregates so older list views keep
       // rendering until they're rewritten to consume `stones` directly.
       const firstStone = mainStone ?? sideStones[0] ?? meleeStones[0] ?? null
+      // Approval rule: discounts ≤ 15% are auto-approved (covers "no discount"
+      // and the everyday range). Anything above 15% lands in PENDING so a
+      // manager has to sign it off before the client sees it.
+      const autoStatus = parsedDiscount > 15 ? 'PENDING' : 'APPROVED'
       const q = await quotesService.create({
         title: quoteTitle.trim(),
         clientName: client ? `${client.name}${client.surname ? ' ' + client.surname : ''}` : '',
         client: client ?? undefined,
-        status: 'PENDING',
+        status: autoStatus,
         metal: selectedMetal,
         ringLabor,
         cadDesign: ringLabor,
@@ -944,6 +961,7 @@ export function QuoteBuilderPage() {
       setExtraCosts(0)
       setEngraving(false)
       setMarkupText(String(DEFAULT_MARKUP))
+      setDiscountText('')
       setStones([])
       setCustomerStones([])
       setAttachments([])
@@ -1304,6 +1322,87 @@ export function QuoteBuilderPage() {
                   For a discount, type a number below {DEFAULT_MARKUP} (e.g. 2.2× ≈ 12% off the standard {DEFAULT_MARKUP}× price).
                 </p>
               </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <label className="text-sm font-semibold text-slate-900">
+                    Customer discount
+                    <span className="ml-2 text-xs font-normal text-slate-500">optional — applied on top of the markup</span>
+                  </label>
+                  <span className="text-xs font-medium text-slate-500">
+                    {parsedDiscount > 0 ? (
+                      <>
+                        Save <strong className="text-emerald-600">${discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                        {' '}→ Final{' '}
+                        <strong className="text-slate-900">${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                      </>
+                    ) : (
+                      <span className="text-slate-400">No discount applied</span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative flex-1 min-w-[140px]">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={discountText}
+                      placeholder="0"
+                      onChange={e => setDiscountText(e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 pr-9 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+                    />
+                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">%</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDiscountText('')}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      parsedDiscount === 0
+                        ? 'bg-slate-900 text-white shadow-sm'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    None
+                  </button>
+                  {DISCOUNT_PRESETS.map(p => {
+                    const active = parsedDiscount === p
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setDiscountText(String(p))}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                          active
+                            ? 'bg-emerald-600 text-white shadow-sm'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {p}%
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-slate-400">
+                  Pick a preset or type any value. Leave empty (or pick None) to charge the full markup price.
+                </p>
+                <div className={`flex items-start gap-2 rounded-2xl border px-3 py-2 text-xs ${
+                  parsedDiscount > 15
+                    ? 'border-amber-200 bg-amber-50 text-amber-800'
+                    : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                }`}>
+                  <span className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${
+                    parsedDiscount > 15 ? 'bg-amber-500' : 'bg-emerald-500'
+                  }`}>
+                    {parsedDiscount > 15 ? '!' : '✓'}
+                  </span>
+                  <span>
+                    {parsedDiscount > 15
+                      ? <>Discounts above 15% need approval — this quote will be saved as <strong>Pending</strong>.</>
+                      : <>Discounts up to 15% are auto-approved — this quote will be saved as <strong>Approved</strong>.</>
+                    }
+                  </span>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -1650,8 +1749,13 @@ export function QuoteBuilderPage() {
                   ${pricing.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </p>
                 <p className="mt-1.5 text-xs font-medium text-amber-300/90">
-                  Customer sees ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })} via share link ({parsedMarkup}×)
+                  Customer sees ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })} via share link ({parsedMarkup}×{parsedDiscount > 0 ? `, −${parsedDiscount}%` : ''})
                 </p>
+                {parsedDiscount > 0 && (
+                  <p className="mt-1 text-xs text-emerald-300/90">
+                    Discount −${discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ({parsedDiscount}% off ${customerPriceBeforeDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })})
+                  </p>
+                )}
                 <p className="mt-2 text-sm text-slate-300">
                   <span className="font-semibold text-white">{jewelryTypeLabel}</span> · {selectedMetalConfig.label} · {ringLaborLabel}
                 </p>
