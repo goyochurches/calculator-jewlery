@@ -139,6 +139,9 @@ export interface SavedQuote {
    *  markup. 0 (or null) = no discount. Quotes above 15% are saved as
    *  PENDING (manager approval); ≤ 15% are auto-approved. */
   discountPercent?: number | null
+  /** Free-form internal notes for the jeweler — surfaced only on the
+   *  authenticated detail view, NEVER on the public share link. */
+  internalNotes?: string | null
   photo?: string | null
   engraving?: boolean | null
   setterType?: string | null

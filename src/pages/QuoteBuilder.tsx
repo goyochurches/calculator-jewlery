@@ -176,6 +176,9 @@ export function QuoteBuilderPage() {
     createdAt: string
   }
   const [attachments, setAttachments] = useState<AttachmentRow[]>([])
+  // Free-form internal notes the jeweler keeps with the quote. Never shown
+  // to the client; surfaced only on the authenticated detail panel.
+  const [internalNotes, setInternalNotes] = useState('')
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const attachmentCameraRef = useRef<HTMLInputElement>(null)
 
@@ -245,6 +248,7 @@ export function QuoteBuilderPage() {
     setPhoto(dup.photo ?? null)
     setMarkupText(String(dup.markupMultiplier ?? DEFAULT_MARKUP))
     setDiscountText(dup.discountPercent && dup.discountPercent > 0 ? String(dup.discountPercent) : '')
+    setInternalNotes(dup.internalNotes ?? '')
 
     setStones((dup.stones ?? []).map(s => {
       const ct = config.diamondSizeMap[s.sizeKey]?.ctPerStone ?? 0
@@ -924,6 +928,7 @@ export function QuoteBuilderPage() {
         total: pricing.total,
         markupMultiplier: parsedMarkup,
         discountPercent: parsedDiscount,
+        internalNotes: internalNotes.trim() === '' ? null : internalNotes.trim(),
         parentQuote: parentQuoteRef,
         photo: photo ?? undefined,
         engraving,
@@ -980,6 +985,7 @@ export function QuoteBuilderPage() {
       setStones([])
       setCustomerStones([])
       setAttachments([])
+      setInternalNotes('')
       setPhoto(null)
       setFieldErrors({})
       setSaveError(null)
