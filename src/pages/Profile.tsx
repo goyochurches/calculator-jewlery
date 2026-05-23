@@ -20,6 +20,7 @@ export function ProfilePage() {
   const [name, setName] = useState(user?.name ?? '')
   const [avatar, setAvatar] = useState(user?.avatar ?? '')
   const [bio, setBio] = useState(user?.bio ?? '')
+  const [phone, setPhone] = useState(user?.phone ?? '')
   const [photo, setPhoto] = useState<string | null>(user?.photo ?? null)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -48,7 +49,7 @@ export function ProfilePage() {
     setError(null)
     setSaved(false)
     try {
-      await userService.updateProfile(String(user.id), { name, avatar, bio, photo })
+      await userService.updateProfile(String(user.id), { name, avatar, bio, photo, phone: phone.trim() || null })
       await refreshUser()
       setSaved(true)
       setTimeout(() => setSaved(false), 2500)
