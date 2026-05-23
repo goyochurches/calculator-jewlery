@@ -158,6 +158,25 @@ export function ProfilePage() {
             />
           </div>
 
+          {/* WhatsApp phone */}
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">
+              WhatsApp phone
+              <span className="ml-2 text-xs font-normal text-slate-500">optional — we'll text you when your quotes get approved</span>
+            </label>
+            <input
+              type="tel"
+              inputMode="tel"
+              value={phone ?? ''}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="+34664577327"
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+            />
+            <p className="text-[11px] text-slate-400">
+              Full international format with country code, no spaces. Internal use only — never shown to customers.
+            </p>
+          </div>
+
           {/* Read-only meta */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-2xl bg-slate-50 px-4 py-3">
