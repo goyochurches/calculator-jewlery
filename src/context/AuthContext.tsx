@@ -26,6 +26,7 @@ interface LoginResponse {
   avatar: string
   bio?: string | null
   photo?: string | null
+  phone?: string | null
 }
 
 interface AuthContextType {

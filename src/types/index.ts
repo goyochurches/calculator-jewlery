@@ -37,6 +37,9 @@ export interface Usuario {
   /** Base64 / URL of the user's profile photo (separate from the
    *  emoji-style `avatar` initial). */
   photo?: string | null
+  /** Full international format without "whatsapp:" prefix (e.g. "+34612345678").
+   *  Used by backend to send WhatsApp on quote approval. Internal only. */
+  phone?: string | null
 }
 
 export interface AppConfig {
