@@ -10,6 +10,10 @@ export interface AuthUser {
   avatar: string
   bio?: string | null
   photo?: string | null
+  /** Full international format without "whatsapp:" prefix
+   *  (e.g. "+34612345678"). Used by backend to send WhatsApp
+   *  notifications when one of the user's quotes is approved. */
+  phone?: string | null
 }
 
 interface LoginResponse {

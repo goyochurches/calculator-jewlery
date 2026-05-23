@@ -81,6 +81,8 @@ interface ApiQuote {
    *  (mirrors the pattern used for `client`). The backend never echoes
    *  this back as an object; it surfaces `parentQuoteId` instead. */
   parentQuote?: { id: number } | null
+  /** Twilio status from the latest approval token (only for PENDING). */
+  pendingWhatsappStatus?: string | null
 }
 
 function mapQuote(q: ApiQuote): SavedQuote {
@@ -126,6 +128,7 @@ function mapQuote(q: ApiQuote): SavedQuote {
     lastOpenedAt: q.lastOpenedAt ?? null,
     openCount: q.openCount ?? null,
     parentQuoteId: q.parentQuoteId ?? null,
+    pendingWhatsappStatus: q.pendingWhatsappStatus ?? null,
   }
 }
 

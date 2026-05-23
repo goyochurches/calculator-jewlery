@@ -157,6 +157,10 @@ export interface SavedQuote {
    *  there is only one level of nesting in the UI). Null for standalone
    *  quotes. */
   parentQuoteId?: number | null
+  /** Latest WhatsApp delivery status from the most recent approval token.
+   *  Only set on PENDING quotes — drives the green/amber/red badge in
+   *  /quotes-list so the admin knows the approval link reached them. */
+  pendingWhatsappStatus?: string | null
 }
 
 export interface GemstonePrice {
