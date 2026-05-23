@@ -6,7 +6,7 @@ import { quotesService } from '@/services/quotesService'
 import type { QuoteStatus, SavedQuote } from '@/types'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { QuoteDetailPanel } from '@/components/QuoteDetailPanel'
-import { Bell, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CornerDownRight, Copy, ImageOff, MessageCircle, Search, X } from 'lucide-react'
+import { Bell, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CornerDownRight, Copy, ImageOff, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -745,58 +745,6 @@ function QuoteRow({
         </div>
       </td>
     </tr>
-  )
-}
-
-/** WhatsApp delivery indicator. Shown on PENDING (status of the approval
- *  link sent to admin) and on APPROVED (status of the notification sent to
- *  the creator with the share link). Status values come straight from Twilio
- *  (queued / sent / delivered / …) or our synthetic markers
- *  (NOT_CONFIGURED / NO_RECIPIENT / FAILED). */
-function WhatsAppBadge({
-  status, kind, isSelected,
-}: {
-  status: string | null
-  /** Who the message was for — drives the tooltip wording. */
-  kind: 'approval' | 'creator'
-  isSelected: boolean
-}) {
-  const s = (status ?? '').toUpperCase()
-  const isOk      = ['SENT', 'DELIVERED', 'READ'].includes(s)
-  const isError   = ['FAILED', 'UNDELIVERED'].includes(s)
-  const isPending = ['QUEUED', 'SENDING', 'ACCEPTED'].includes(s) && !isOk
-  const isMissing = !s || s === 'NOT_CONFIGURED' || s === 'NO_RECIPIENT'
-
-  const tone = isOk      ? 'bg-emerald-100 text-emerald-800 ring-emerald-300'
-             : isError   ? 'bg-rose-100 text-rose-800 ring-rose-300'
-             : isPending ? 'bg-amber-100 text-amber-800 ring-amber-300 animate-pulse'
-             : 'bg-slate-100 text-slate-500 ring-slate-300'
-
-  const label = isOk      ? 'WA ✓ sent'
-              : isError   ? 'WA ✗ failed'
-              : isPending ? 'WA ⏳ queued'
-              : isMissing ? 'WA — not sent'
-              : `WA ${s.toLowerCase()}`
-
-  const target = kind === 'approval' ? 'admin (approval link)' : 'creator (share link)'
-  const tooltip = isMissing
-    ? `No WhatsApp sent to ${target} — check Twilio config / phone number`
-    : isError
-      ? `WhatsApp to ${target} FAILED (${s})`
-      : isOk
-        ? `WhatsApp to ${target}: delivered (${s.toLowerCase()})`
-        : `WhatsApp to ${target}: ${s.toLowerCase()}`
-
-  return (
-    <span
-      title={tooltip}
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ring-1 shadow-sm ${
-        isSelected ? 'bg-white/15 text-white ring-white/30' : tone
-      }`}
-    >
-      <MessageCircle className="h-3.5 w-3.5" />
-      {label}
-    </span>
   )
 }
 
