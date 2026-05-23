@@ -643,14 +643,20 @@ function QuoteRow({
               onClick={(e) => { e.stopPropagation(); onToggle?.() }}
               disabled={!canToggle}
               title={expanded ? 'Hide revisions' : `Show ${childCount} revision${childCount === 1 ? '' : 's'}`}
-              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide transition ${
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide shadow-sm ring-1 transition-all duration-200 ${
                 isSelected
-                  ? 'bg-white/20 text-white hover:bg-white/30'
-                  : 'bg-violet-100 text-violet-700 hover:bg-violet-200 disabled:cursor-default disabled:hover:bg-violet-100'
+                  ? 'bg-white/20 text-white ring-white/40 hover:bg-white/30'
+                  : expanded
+                    ? 'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-900 ring-amber-300 hover:from-amber-200 hover:to-orange-200'
+                    : 'bg-gradient-to-r from-violet-100 to-fuchsia-100 text-violet-700 ring-violet-300 hover:from-violet-200 hover:to-fuchsia-200 animate-pulse-slow disabled:cursor-default'
               }`}
             >
-              {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-              +{childCount} rev
+              <span className={`inline-flex h-4 w-4 items-center justify-center rounded-full transition-transform duration-200 ${
+                expanded ? 'rotate-180 bg-amber-200/60' : 'bg-violet-200/60'
+              }`}>
+                <ChevronDown className="h-3 w-3" />
+              </span>
+              {expanded ? 'Hide' : 'Show'} {childCount} {childCount === 1 ? 'revision' : 'revisions'}
             </button>
           )}
           {isChild && (
