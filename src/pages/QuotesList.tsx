@@ -602,15 +602,36 @@ function QuoteRow({
 }) {
   const isChild = kind === 'child'
   const isGhost = kind === 'parent-ghost'
+  const hasChildren = !isChild && childCount != null && childCount > 0
+  // Visual story:
+  //  · parent + has revisions + collapsed → violet tint (invites exploration)
+  //  · parent + has revisions + expanded  → amber tint + thicker left border
+  //                                          (visually "groups" with its children below)
+  //  · plain parent (no revisions)        → neutral
+  //  · child                               → indented gray, distinct from parent
   const rowBg = isSelected
     ? 'text-white'
     : isChild
-      ? `bg-slate-50/60 hover:bg-slate-100/60 ${isLastChild ? '' : ''}`
-      : 'hover:bg-slate-50/80'
+      ? 'bg-slate-50/70 hover:bg-slate-100/80'
+      : hasChildren && expanded
+        ? 'bg-gradient-to-r from-amber-100 via-orange-50/60 to-transparent hover:from-amber-200/90'
+        : hasChildren
+          ? 'bg-gradient-to-r from-violet-100/80 via-fuchsia-50/40 to-transparent hover:from-violet-200/90'
+          : 'hover:bg-slate-50/80'
+  // Strong left accent bar so the eye catches "this one has history" at a
+  // glance even before reading the badge. Color matches the expanded/collapsed
+  // state of the row so they're consistent.
+  const leftAccent = !isSelected && hasChildren
+    ? expanded
+      ? 'border-l-4 border-l-amber-400'
+      : 'border-l-4 border-l-violet-400'
+    : isChild && !isSelected
+      ? 'border-l-4 border-l-slate-200'
+      : ''
   return (
     <tr
       onClick={onSelect}
-      className={`cursor-pointer border-b border-slate-100 transition-colors last:border-0 ${rowBg} ${isGhost ? 'opacity-60' : ''}`}
+      className={`cursor-pointer border-b border-slate-100 transition-all duration-200 last:border-0 ${rowBg} ${leftAccent} ${isGhost ? 'opacity-60' : ''}`}
       style={isSelected ? { backgroundColor: 'var(--theme-primary)' } : undefined}
     >
       <td className="px-6 py-3">
