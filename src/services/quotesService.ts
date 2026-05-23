@@ -83,8 +83,11 @@ interface ApiQuote {
   parentQuote?: { id: number } | null
   /** Twilio status from the latest approval token (only for PENDING). */
   pendingWhatsappStatus?: string | null
+  pendingWhatsappTo?: string | null
+  pendingWhatsappError?: string | null
   /** Twilio status of the approval notification sent to the creator (only for APPROVED). */
   approvalWhatsappStatus?: string | null
+  approvalWhatsappError?: string | null
 }
 
 function mapQuote(q: ApiQuote): SavedQuote {
@@ -131,7 +134,10 @@ function mapQuote(q: ApiQuote): SavedQuote {
     openCount: q.openCount ?? null,
     parentQuoteId: q.parentQuoteId ?? null,
     pendingWhatsappStatus: q.pendingWhatsappStatus ?? null,
+    pendingWhatsappTo: q.pendingWhatsappTo ?? null,
+    pendingWhatsappError: q.pendingWhatsappError ?? null,
     approvalWhatsappStatus: q.approvalWhatsappStatus ?? null,
+    approvalWhatsappError: q.approvalWhatsappError ?? null,
   }
 }
 

@@ -161,12 +161,17 @@ export interface SavedQuote {
    *  quotes. */
   parentQuoteId?: number | null
   /** Latest WhatsApp delivery status from the most recent approval token.
-   *  Only set on PENDING quotes — drives the green/amber/red badge in
-   *  /quotes-list so the admin knows the approval link reached them. */
+   *  Only set on PENDING quotes — drives the badge in the detail panel. */
   pendingWhatsappStatus?: string | null
+  /** Destination phone the pending-approval link was texted to. */
+  pendingWhatsappTo?: string | null
+  /** Twilio error message if the pending send failed. */
+  pendingWhatsappError?: string | null
   /** WhatsApp delivery status of the notification sent to the CREATOR
    *  when the quote was approved. Only set on APPROVED quotes. */
   approvalWhatsappStatus?: string | null
+  /** Twilio error message if the creator notification send failed. */
+  approvalWhatsappError?: string | null
 }
 
 export interface GemstonePrice {
