@@ -6,7 +6,7 @@ import { quotesService } from '@/services/quotesService'
 import type { QuoteStatus, SavedQuote } from '@/types'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { QuoteDetailPanel } from '@/components/QuoteDetailPanel'
-import { Bell, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CornerDownRight, Copy, ImageOff, Search, X } from 'lucide-react'
+import { Bell, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CornerDownRight, Copy, ImageOff, MessageCircle, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -714,11 +714,16 @@ function QuoteRow({
         {JEWELRY_METAL_OPTIONS[quote.metal]?.label ?? quote.metal}
       </td>
       <td className="px-6 py-4">
-        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-          isSelected ? 'bg-white/15 text-white' : STATUS_STYLES[quote.status]
-        }`}>
-          {STATUS_LABELS[quote.status]}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+            isSelected ? 'bg-white/15 text-white' : STATUS_STYLES[quote.status]
+          }`}>
+            {STATUS_LABELS[quote.status]}
+          </span>
+          {quote.status === 'pending' && (
+            <WhatsAppBadge status={quote.pendingWhatsappStatus ?? null} isSelected={isSelected} />
+          )}
+        </div>
       </td>
       <td className={`px-6 py-4 ${isSelected ? 'text-slate-400' : 'text-slate-400'}`}>
         {quote.createdAt}
@@ -745,6 +750,47 @@ function QuoteRow({
         </div>
       </td>
     </tr>
+  )
+}
+
+/** Tiny WhatsApp delivery indicator shown next to PENDING quotes so the
+ *  admin can tell at a glance whether the approval link reached them.
+ *  Status values come straight from Twilio (queued / sent / delivered / …)
+ *  or our synthetic markers (NOT_CONFIGURED / NO_RECIPIENT / FAILED). */
+function WhatsAppBadge({ status, isSelected }: { status: string | null; isSelected: boolean }) {
+  const s = (status ?? '').toUpperCase()
+  const isOk     = ['SENT', 'ACCEPTED', 'DELIVERED', 'READ'].includes(s)
+  const isError  = ['FAILED', 'UNDELIVERED'].includes(s)
+  const isPending = ['QUEUED', 'SENDING', 'ACCEPTED'].includes(s) && !isOk
+  const isMissing = !s || s === 'NOT_CONFIGURED' || s === 'NO_RECIPIENT'
+
+  const tone = isOk      ? 'bg-emerald-100 text-emerald-700 ring-emerald-200'
+             : isError   ? 'bg-rose-100 text-rose-700 ring-rose-200'
+             : isPending ? 'bg-amber-100 text-amber-700 ring-amber-200 animate-pulse'
+             : 'bg-slate-100 text-slate-500 ring-slate-200'
+
+  const label = isOk      ? 'sent'
+              : isError   ? 'failed'
+              : isPending ? 'queued'
+              : isMissing ? 'no whatsapp'
+              : s.toLowerCase()
+
+  const tooltip = isMissing
+    ? 'No WhatsApp sent — check twilio.* config and approval.phone'
+    : isError
+      ? `WhatsApp delivery failed (${s})`
+      : `WhatsApp status: ${s}`
+
+  return (
+    <span
+      title={tooltip}
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ${
+        isSelected ? 'bg-white/15 text-white ring-white/30' : tone
+      }`}
+    >
+      <MessageCircle className="h-3 w-3" />
+      {label}
+    </span>
   )
 }
 
