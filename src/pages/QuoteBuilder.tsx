@@ -244,6 +244,7 @@ export function QuoteBuilderPage() {
     setEngraving(!!dup.engraving)
     setPhoto(dup.photo ?? null)
     setMarkupText(String(dup.markupMultiplier ?? DEFAULT_MARKUP))
+    setDiscountText(dup.discountPercent && dup.discountPercent > 0 ? String(dup.discountPercent) : '')
 
     setStones((dup.stones ?? []).map(s => {
       const ct = config.diamondSizeMap[s.sizeKey]?.ctPerStone ?? 0
@@ -910,6 +911,7 @@ export function QuoteBuilderPage() {
         extraCosts,
         total: pricing.total,
         markupMultiplier: parsedMarkup,
+        discountPercent: parsedDiscount,
         photo: photo ?? undefined,
         engraving,
         setterType: firstStone?.setterType ?? '',

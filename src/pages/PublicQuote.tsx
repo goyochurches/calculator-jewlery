@@ -290,9 +290,19 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
             <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-amber-400 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-slate-900 shadow-md">
               Your investment
             </span>
+            {quote.discountPercent > 0 && (
+              <p className="mb-2 font-serif text-2xl text-white/40 line-through tabular-nums">
+                ${(quote.total + quote.discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </p>
+            )}
             <p className="font-serif text-5xl font-semibold tracking-tight tabular-nums sm:text-6xl">
               ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
             </p>
+            {quote.discountPercent > 0 && (
+              <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] text-emerald-200 ring-1 ring-emerald-300/40">
+                You save ${quote.discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} · {quote.discountPercent}% off
+              </p>
+            )}
             <div className="mx-auto mt-3 h-px w-16 bg-gradient-to-r from-transparent via-amber-300/80 to-transparent" />
             <p className="mt-3 text-[11px] uppercase tracking-[0.28em] text-white/55">
               All-inclusive · USD

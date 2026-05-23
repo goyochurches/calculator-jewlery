@@ -58,6 +58,7 @@ interface ApiQuote {
   extraCosts: number
   total: number
   markupMultiplier?: number | null
+  discountPercent?: number | null
   photo?: string | null   // base64 o URL devuelta por el backend
   engraving?: boolean | null
   setterType?: string | null
@@ -102,6 +103,7 @@ function mapQuote(q: ApiQuote): SavedQuote {
     extraCosts: q.extraCosts,
     total: q.total,
     markupMultiplier: q.markupMultiplier ?? null,
+    discountPercent: q.discountPercent ?? null,
     photo: q.photo ?? null,
     engraving: q.engraving ?? false,
     setterType: q.setterType ?? null,

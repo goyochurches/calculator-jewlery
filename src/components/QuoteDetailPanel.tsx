@@ -191,12 +191,15 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
   }, [quote.id])
   const config = useQuoteConfig()
   const expiration = formatExpiration(quote.publicTokenExpiresAt)
-  // Customer-facing price = (cost - engraving) × markup + engraving. Falls back
-  // to the legacy 2.5× for quotes saved before V22.
+  // Customer-facing price = ((cost - engraving) × markup + engraving) × (1 - discount/100).
+  // Falls back to the legacy 2.5× / 0% for quotes saved before V22 / V27.
   const ENGRAVING_FEE = 150
   const markup = quote.markupMultiplier ?? 2.5
+  const discount = Math.max(0, Math.min(100, quote.discountPercent ?? 0))
   const engraveFee = quote.engraving ? ENGRAVING_FEE : 0
-  const customerPrice = (quote.total - engraveFee) * markup + engraveFee
+  const customerPriceBeforeDiscount = (quote.total - engraveFee) * markup + engraveFee
+  const discountAmount = customerPriceBeforeDiscount * (discount / 100)
+  const customerPrice = customerPriceBeforeDiscount - discountAmount
 
   const handleRefresh = async () => {
     if (!onRefreshToken) return
@@ -308,7 +311,12 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
               <strong className="font-semibold text-amber-300">
                 ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </strong>
-              {' '}via share link · markup {markup}×
+              {' '}via share link · markup {markup}×{discount > 0 ? `, −${discount}%` : ''}
+            </p>
+          )}
+          {discount > 0 && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-1 text-[11px] font-medium text-emerald-200">
+              Discount −${discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ({discount}% off ${customerPriceBeforeDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })})
             </p>
           )}
         </div>

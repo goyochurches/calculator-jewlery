@@ -12,6 +12,10 @@ export interface PublicQuote {
   total: number
   internalTotal: number
   engravingFee: number
+  /** Optional customer discount (percent). 0 when no discount was applied. */
+  discountPercent: number
+  /** Money saved thanks to the discount (priceBeforeDiscount - total). */
+  discountAmount: number
   metal: string
   ringLabor: string
   cadDesign: string

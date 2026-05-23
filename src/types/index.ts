@@ -135,6 +135,10 @@ export interface SavedQuote {
   /** Retail markup applied on top of `total` (cost) when showing the customer
    *  price. Per-quote so each job can override the default 2.5x. */
   markupMultiplier?: number | null
+  /** Optional one-off customer discount as a percentage applied on top of the
+   *  markup. 0 (or null) = no discount. Quotes above 15% are saved as
+   *  PENDING (manager approval); ≤ 15% are auto-approved. */
+  discountPercent?: number | null
   photo?: string | null
   engraving?: boolean | null
   setterType?: string | null
