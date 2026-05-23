@@ -16,6 +16,7 @@ import { ProfilePage } from '@/pages/Profile'
 import { ClientsPage } from '@/pages/Clients'
 import { ClientDetailPage } from '@/pages/ClientDetail'
 import { PublicQuotePage } from '@/pages/PublicQuote'
+import { ApprovalPage } from '@/pages/Approval'
 import Login from '@/pages/Login'
 import SetupPassword from '@/pages/SetupPassword'
 import { canAccess, defaultRouteFor, type NavKey } from '@/constants/permissions'
@@ -66,6 +67,9 @@ export default function App() {
             <Route path="/setup-password/:token" element={<SetupPassword />} />
             {/* Public, unauthenticated quote viewer for shareable links */}
             <Route path="/q/:token" element={<PublicQuotePage />} />
+            {/* Public approval page reached from the WhatsApp link sent to
+                the admin when a quote is saved as PENDING. */}
+            <Route path="/approve/:token" element={<ApprovalPage />} />
             <Route element={<PrivateRoutes />}>
               <Route element={<MainLayout />}>
                 <Route path="/" element={<HomeRedirect />} />
