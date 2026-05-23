@@ -891,6 +891,18 @@ export function QuoteBuilderPage() {
       // and the everyday range). Anything above 15% lands in PENDING so a
       // manager has to sign it off before the client sees it.
       const autoStatus = parsedDiscount > 15 ? 'PENDING' : 'APPROVED'
+      // Revision tracking: if we got here via "Duplicate" AND the user kept
+      // the same client, attach the new quote to the ROOT of the chain so
+      // the listing shows it nested under the original. Changing the client
+      // breaks the link → it becomes a standalone top-level quote.
+      const sameClientAsSource =
+        duplicatedFrom != null &&
+        client != null &&
+        duplicatedFrom.client?.id != null &&
+        duplicatedFrom.client.id === client.id
+      const parentQuoteRef = sameClientAsSource
+        ? { id: duplicatedFrom!.parentQuoteId ?? Number(duplicatedFrom!.id) }
+        : null
       const q = await quotesService.create({
         title: quoteTitle.trim(),
         clientName: client ? `${client.name}${client.surname ? ' ' + client.surname : ''}` : '',
@@ -912,6 +924,7 @@ export function QuoteBuilderPage() {
         total: pricing.total,
         markupMultiplier: parsedMarkup,
         discountPercent: parsedDiscount,
+        parentQuote: parentQuoteRef,
         photo: photo ?? undefined,
         engraving,
         setterType: firstStone?.setterType ?? '',

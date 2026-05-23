@@ -30,7 +30,8 @@
       "Bash(./mvnw -q -DskipTests compile)",
       "Bash(command -v mvn)",
       "Bash(echo \"EXIT=$?\")",
-      "Bash(mvn -DskipTests compile)"
+      "Bash(mvn -DskipTests compile)",
+      "Bash(mvn -DskipTests clean compile)"
     ]
   }
 }

@@ -74,6 +74,12 @@ interface ApiQuote {
   publicTokenExpiresAt?: string | null
   lastOpenedAt?: string | null
   openCount?: number | null
+  /** Response field — root parent id when this quote is a revision. */
+  parentQuoteId?: number | null
+  /** Request field — send `{ id: N }` on create so JPA resolves the FK
+   *  (mirrors the pattern used for `client`). The backend never echoes
+   *  this back as an object; it surfaces `parentQuoteId` instead. */
+  parentQuote?: { id: number } | null
 }
 
 function mapQuote(q: ApiQuote): SavedQuote {
@@ -117,6 +123,7 @@ function mapQuote(q: ApiQuote): SavedQuote {
     publicTokenExpiresAt: q.publicTokenExpiresAt ?? null,
     lastOpenedAt: q.lastOpenedAt ?? null,
     openCount: q.openCount ?? null,
+    parentQuoteId: q.parentQuoteId ?? null,
   }
 }
 

@@ -149,6 +149,11 @@ export interface SavedQuote {
   publicTokenExpiresAt?: string | null
   lastOpenedAt?: string | null
   openCount?: number | null
+  /** Set when this quote was created by duplicating another one with the
+   *  same client. Points to the ROOT of the chain (revisions stay flat —
+   *  there is only one level of nesting in the UI). Null for standalone
+   *  quotes. */
+  parentQuoteId?: number | null
 }
 
 export interface GemstonePrice {

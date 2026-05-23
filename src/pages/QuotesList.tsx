@@ -6,7 +6,7 @@ import { quotesService } from '@/services/quotesService'
 import type { QuoteStatus, SavedQuote } from '@/types'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { QuoteDetailPanel } from '@/components/QuoteDetailPanel'
-import { Bell, ChevronLeft, ChevronRight, Copy, ImageOff, Search, X } from 'lucide-react'
+import { Bell, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CornerDownRight, Copy, ImageOff, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -89,6 +89,17 @@ export function QuotesListPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  // Which parent groups are expanded. Start collapsed so the listing stays
+  // compact; the chevron + "+N revisions" badge makes the affordance obvious.
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const toggleGroup = (id: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
 
   useEffect(() => {
     quotesService.getAll()
@@ -115,30 +126,86 @@ export function QuotesListPage() {
     }
   }
 
-  const filteredQuotes = useMemo(() => {
+  // ── Group quotes into parent + revisions ────────────────────────────
+  // A "group" is one top-level (parent) quote plus any revisions created by
+  // duplicating it with the same client. Children always show under their
+  // root parent — chains stay flat (V28 stores root, not immediate ancestor).
+  // If a child's parent was deleted, the child is promoted to a top-level
+  // group of its own so it doesn't disappear.
+  interface QuoteGroup { parent: SavedQuote; children: SavedQuote[] }
+  const groups = useMemo<QuoteGroup[]>(() => {
+    const byId = new Map<string, SavedQuote>()
+    quotes.forEach((q) => byId.set(q.id, q))
+    const childrenByParent = new Map<string, SavedQuote[]>()
+    const parents: SavedQuote[] = []
+    quotes.forEach((q) => {
+      const parentId = q.parentQuoteId != null ? String(q.parentQuoteId) : null
+      if (parentId && byId.has(parentId)) {
+        const arr = childrenByParent.get(parentId) ?? []
+        arr.push(q)
+        childrenByParent.set(parentId, arr)
+      } else {
+        parents.push(q)
+      }
+    })
+    return parents.map((p) => {
+      // Newest revision first within the group so the most recent attempt
+      // is the closest one to the parent row.
+      const kids = (childrenByParent.get(p.id) ?? []).slice()
+      kids.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
+      return { parent: p, children: kids }
+    })
+  }, [quotes])
+
+  // Apply filters at the GROUP level: a group survives if the parent or any
+  // child matches. Children are individually filtered so non-matching ones
+  // don't render — but a non-matching parent still appears (grey) as the
+  // header for its matching children, so the revision context is preserved.
+  const filteredGroups = useMemo(() => {
     const q = searchQuery.trim().toLowerCase()
-    return quotes.filter((quote) => {
+    const matches = (quote: SavedQuote) => {
       if (statusFilter !== 'all' && quote.status !== statusFilter) return false
       if (!q) return true
       return (
         quote.title.toLowerCase().includes(q) ||
         (quote.clientName ?? '').toLowerCase().includes(q)
       )
-    })
-  }, [quotes, statusFilter, searchQuery])
+    }
+    const out: Array<{ parent: SavedQuote; children: SavedQuote[]; parentMatches: boolean }> = []
+    for (const g of groups) {
+      const parentMatches = matches(g.parent)
+      const matchingChildren = g.children.filter(matches)
+      if (parentMatches || matchingChildren.length > 0) {
+        out.push({ parent: g.parent, children: matchingChildren, parentMatches })
+      }
+    }
+    return out
+  }, [groups, statusFilter, searchQuery])
+
+  // Auto-expand groups whose parent doesn't match the filter (their relevant
+  // content is in the children). User-controlled toggle still wins for
+  // groups whose parent does match.
+  const effectivelyExpanded = (groupId: string, parentMatches: boolean) => {
+    if (!parentMatches) return true
+    return expandedGroups.has(groupId)
+  }
 
   // Reset to page 1 whenever the filter set changes
   useEffect(() => {
     setPage(1)
   }, [statusFilter, searchQuery, pageSize])
 
-  const totalPages = Math.max(1, Math.ceil(filteredQuotes.length / pageSize))
+  // Pagination operates on GROUPS, so page size is predictable regardless of
+  // how many revisions any one parent has.
+  const totalPages = Math.max(1, Math.ceil(filteredGroups.length / pageSize))
   const safePage = Math.min(page, totalPages)
   const pageStart = (safePage - 1) * pageSize
-  const pageEnd = Math.min(pageStart + pageSize, filteredQuotes.length)
-  const pagedQuotes = filteredQuotes.slice(pageStart, pageEnd)
+  const pageEnd = Math.min(pageStart + pageSize, filteredGroups.length)
+  const pagedGroups = filteredGroups.slice(pageStart, pageEnd)
 
-  const selected = filteredQuotes.find((q) => q.id === selectedId) ?? null
+  // The detail drawer needs to find any selected quote — parent or child —
+  // across the full (unfiltered) set.
+  const selected = quotes.find((q) => q.id === selectedId) ?? null
 
   // Lock body scroll while the detail drawer is open so the underlying
   // table doesn't scroll behind the overlay.
@@ -253,9 +320,9 @@ export function QuotesListPage() {
           <CardHeader className="border-b border-slate-100">
             <CardTitle className="text-base font-semibold text-slate-900">All quotes</CardTitle>
             <p className="text-sm text-slate-500">
-              {filteredQuotes.length === quotes.length
-                ? 'Click any row to see the full breakdown.'
-                : `Showing ${filteredQuotes.length} of ${quotes.length} quotes.`}
+              {filteredGroups.length === groups.length
+                ? 'Click any row to see the full breakdown. Duplicates with the same client appear as revisions below their original.'
+                : `Showing ${filteredGroups.length} of ${groups.length} quotes.`}
             </p>
           </CardHeader>
           <CardContent className="p-0">
@@ -271,105 +338,58 @@ export function QuotesListPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredQuotes.length === 0 && (
+                  {filteredGroups.length === 0 && (
                     <tr>
                       <td colSpan={9} className="px-6 py-12 text-center text-sm text-slate-400">
                         No quotes match the current filters.
                       </td>
                     </tr>
                   )}
-                  {pagedQuotes.map((quote) => {
-                    const isSelected = quote.id === selectedId
-                    return (
-                      <tr
-                        key={quote.id}
-                        onClick={() => setSelectedId(isSelected ? null : quote.id)}
-                        className={`cursor-pointer border-b border-slate-100 transition-colors last:border-0 ${
-                          isSelected ? 'text-white' : 'hover:bg-slate-50/80'
-                        }`}
-                        style={isSelected ? { backgroundColor: 'var(--theme-primary)' } : undefined}
-                      >
-                        {/* Photo thumbnail */}
-                        <td className="px-6 py-3">
-                          {quote.photo ? (
-                            <img
-                              src={quote.photo}
-                              alt="ref"
-                              className="h-10 w-10 rounded-xl object-cover ring-2 ring-white shadow-sm"
-                            />
-                          ) : (
-                            <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${isSelected ? 'bg-white/10' : 'bg-slate-100'}`}>
-                              <ImageOff className={`h-4 w-4 ${isSelected ? 'text-white/40' : 'text-slate-300'}`} />
-                            </div>
-                          )}
-                        </td>
-
-                        <td className="px-6 py-4">
-                          <span className={`font-semibold ${isSelected ? 'text-white' : 'text-slate-900'}`}>
-                            {quote.title}
-                          </span>
-                        </td>
-                        <td className={`px-6 py-4 ${isSelected ? 'text-slate-200' : 'text-slate-600'}`}>
-                          {quote.clientName || <span className="text-slate-300">—</span>}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <Avatar name={quote.createdBy} photo={quote.createdByPhoto} />
-                            <span className={isSelected ? 'text-slate-300' : 'text-slate-700'}>
-                              {quote.createdBy}
-                            </span>
-                          </div>
-                        </td>
-                        <td className={`px-6 py-4 ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
-                          {JEWELRY_METAL_OPTIONS[quote.metal]?.label ?? quote.metal}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                            isSelected ? 'bg-white/15 text-white' : STATUS_STYLES[quote.status]
-                          }`}>
-                            {STATUS_LABELS[quote.status]}
-                          </span>
-                        </td>
-                        <td className={`px-6 py-4 ${isSelected ? 'text-slate-400' : 'text-slate-400'}`}>
-                          {quote.createdAt}
-                        </td>
-                        <td className={`px-6 py-4 text-right font-semibold ${isSelected ? 'text-amber-300' : 'text-slate-900'}`}>
-                          ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="px-3 py-4">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <CopyShareLinkButton token={quote.publicToken} iconOnly={false} />
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                navigate('/quotes', { state: { duplicateFrom: quote } })
-                              }}
-                              title="Duplicate this quote and adjust"
-                              aria-label="Duplicate quote"
-                              className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition ${
-                                isSelected
-                                  ? 'border-white/30 bg-white/10 text-white hover:bg-white/20'
-                                  : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700'
-                              }`}
-                            >
-                              <Copy className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                  {pagedGroups.flatMap((group) => {
+                    const rows: React.ReactNode[] = []
+                    const expanded = effectivelyExpanded(group.parent.id, group.parentMatches)
+                    const childCount = group.children.length
+                    rows.push(
+                      <QuoteRow
+                        key={group.parent.id}
+                        quote={group.parent}
+                        kind={group.parentMatches ? 'parent' : 'parent-ghost'}
+                        isSelected={group.parent.id === selectedId}
+                        onSelect={() => setSelectedId(group.parent.id === selectedId ? null : group.parent.id)}
+                        onDuplicate={() => navigate('/quotes', { state: { duplicateFrom: group.parent } })}
+                        childCount={childCount}
+                        expanded={expanded}
+                        canToggle={group.parentMatches && childCount > 0}
+                        onToggle={() => toggleGroup(group.parent.id)}
+                      />,
                     )
+                    if (expanded) {
+                      group.children.forEach((child, idx) => {
+                        rows.push(
+                          <QuoteRow
+                            key={child.id}
+                            quote={child}
+                            kind="child"
+                            isLastChild={idx === group.children.length - 1}
+                            isSelected={child.id === selectedId}
+                            onSelect={() => setSelectedId(child.id === selectedId ? null : child.id)}
+                            onDuplicate={() => navigate('/quotes', { state: { duplicateFrom: child } })}
+                          />,
+                        )
+                      })
+                    }
+                    return rows
                   })}
                 </tbody>
               </table>
             </div>
-            {filteredQuotes.length > 0 && (
+            {filteredGroups.length > 0 && (
               <PaginationBar
                 page={safePage}
                 totalPages={totalPages}
                 pageStart={pageStart}
                 pageEnd={pageEnd}
-                total={filteredQuotes.length}
+                total={filteredGroups.length}
                 pageSize={pageSize}
                 onPageChange={setPage}
                 onPageSizeChange={setPageSize}
@@ -556,6 +576,138 @@ function QuotesListSkeleton() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+/** Single row in the quotes table. Renders three visual variants:
+ *   · parent       — full opacity, may show an expand chevron + "N revisions"
+ *   · parent-ghost — greyed out, header of a group whose only matching rows
+ *                    are children (filter active, parent itself doesn't pass)
+ *   · child        — indented with a ↳ arrow, shaded background, smaller chip
+ */
+function QuoteRow({
+  quote, kind, isSelected, onSelect, onDuplicate,
+  childCount, expanded, canToggle, onToggle, isLastChild,
+}: {
+  quote: SavedQuote
+  kind: 'parent' | 'parent-ghost' | 'child'
+  isSelected: boolean
+  onSelect: () => void
+  onDuplicate: () => void
+  childCount?: number
+  expanded?: boolean
+  canToggle?: boolean
+  onToggle?: () => void
+  isLastChild?: boolean
+}) {
+  const isChild = kind === 'child'
+  const isGhost = kind === 'parent-ghost'
+  const rowBg = isSelected
+    ? 'text-white'
+    : isChild
+      ? `bg-slate-50/60 hover:bg-slate-100/60 ${isLastChild ? '' : ''}`
+      : 'hover:bg-slate-50/80'
+  return (
+    <tr
+      onClick={onSelect}
+      className={`cursor-pointer border-b border-slate-100 transition-colors last:border-0 ${rowBg} ${isGhost ? 'opacity-60' : ''}`}
+      style={isSelected ? { backgroundColor: 'var(--theme-primary)' } : undefined}
+    >
+      <td className="px-6 py-3">
+        <div className="flex items-center gap-2">
+          {isChild && (
+            <CornerDownRight className={`h-4 w-4 shrink-0 ${isSelected ? 'text-white/60' : 'text-slate-300'}`} aria-hidden />
+          )}
+          {quote.photo ? (
+            <img
+              src={quote.photo}
+              alt="ref"
+              className={`rounded-xl object-cover ring-2 ring-white shadow-sm ${isChild ? 'h-8 w-8' : 'h-10 w-10'}`}
+            />
+          ) : (
+            <div className={`flex items-center justify-center rounded-xl ${isChild ? 'h-8 w-8' : 'h-10 w-10'} ${isSelected ? 'bg-white/10' : 'bg-slate-100'}`}>
+              <ImageOff className={`h-4 w-4 ${isSelected ? 'text-white/40' : 'text-slate-300'}`} />
+            </div>
+          )}
+        </div>
+      </td>
+
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-2">
+          <span className={`font-semibold ${isSelected ? 'text-white' : isChild ? 'text-slate-700' : 'text-slate-900'}`}>
+            {quote.title}
+          </span>
+          {!isChild && childCount != null && childCount > 0 && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onToggle?.() }}
+              disabled={!canToggle}
+              title={expanded ? 'Hide revisions' : `Show ${childCount} revision${childCount === 1 ? '' : 's'}`}
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide transition ${
+                isSelected
+                  ? 'bg-white/20 text-white hover:bg-white/30'
+                  : 'bg-violet-100 text-violet-700 hover:bg-violet-200 disabled:cursor-default disabled:hover:bg-violet-100'
+              }`}
+            >
+              {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              +{childCount} rev
+            </button>
+          )}
+          {isChild && (
+            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+              isSelected ? 'bg-white/20 text-white' : 'bg-violet-50 text-violet-700'
+            }`}>
+              Revision
+            </span>
+          )}
+        </div>
+      </td>
+      <td className={`px-6 py-4 ${isSelected ? 'text-slate-200' : 'text-slate-600'}`}>
+        {quote.clientName || <span className="text-slate-300">—</span>}
+      </td>
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-2">
+          <Avatar name={quote.createdBy} photo={quote.createdByPhoto} />
+          <span className={isSelected ? 'text-slate-300' : 'text-slate-700'}>
+            {quote.createdBy}
+          </span>
+        </div>
+      </td>
+      <td className={`px-6 py-4 ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
+        {JEWELRY_METAL_OPTIONS[quote.metal]?.label ?? quote.metal}
+      </td>
+      <td className="px-6 py-4">
+        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+          isSelected ? 'bg-white/15 text-white' : STATUS_STYLES[quote.status]
+        }`}>
+          {STATUS_LABELS[quote.status]}
+        </span>
+      </td>
+      <td className={`px-6 py-4 ${isSelected ? 'text-slate-400' : 'text-slate-400'}`}>
+        {quote.createdAt}
+      </td>
+      <td className={`px-6 py-4 text-right font-semibold ${isSelected ? 'text-amber-300' : 'text-slate-900'}`}>
+        ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+      </td>
+      <td className="px-3 py-4">
+        <div className="flex items-center justify-end gap-1.5">
+          <CopyShareLinkButton token={quote.publicToken} iconOnly={false} />
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onDuplicate() }}
+            title="Duplicate this quote and adjust"
+            aria-label="Duplicate quote"
+            className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition ${
+              isSelected
+                ? 'border-white/30 bg-white/10 text-white hover:bg-white/20'
+                : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700'
+            }`}
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </td>
+    </tr>
   )
 }
 
