@@ -151,11 +151,22 @@ export function QuotesListPage() {
     if (byDate !== 0) return byDate
     return Number(b.id) - Number(a.id)
   }
+  // Within-group order: APPROVED first (it's the "winning" revision the
+  // admin actually accepted), then everything else newest first. After the
+  // cascade rule (V28) only one member can be APPROVED at a time, so this
+  // always promotes that one to the visible head of the group regardless of
+  // whether it was the original parent or a duplicated revision.
+  const groupOrder = (a: SavedQuote, b: SavedQuote): number => {
+    const aApproved = a.status === 'approved' ? 1 : 0
+    const bApproved = b.status === 'approved' ? 1 : 0
+    if (aApproved !== bApproved) return bApproved - aApproved
+    return newestFirst(a, b)
+  }
   const groups = useMemo<QuoteGroup[]>(() => {
     const byId = new Map<string, SavedQuote>()
     quotes.forEach((q) => byId.set(q.id, q))
     const childrenByParent = new Map<string, SavedQuote[]>()
-    const parents: SavedQuote[] = []
+    const roots: SavedQuote[] = []
     quotes.forEach((q) => {
       const parentId = q.parentQuoteId != null ? String(q.parentQuoteId) : null
       if (parentId && byId.has(parentId)) {
@@ -163,16 +174,24 @@ export function QuotesListPage() {
         arr.push(q)
         childrenByParent.set(parentId, arr)
       } else {
-        parents.push(q)
+        roots.push(q)
       }
     })
-    parents.sort(newestFirst)
-    return parents.map((p) => {
-      // Newest revision first within the group so the most recent attempt
-      // is the closest one to the parent row.
-      const kids = (childrenByParent.get(p.id) ?? []).slice().sort(newestFirst)
-      return { parent: p, children: kids }
+    const out = roots.map((root) => {
+      // Flatten root + its children, then reorder so APPROVED is the head.
+      const allMembers = [root, ...(childrenByParent.get(root.id) ?? [])]
+      allMembers.sort(groupOrder)
+      const [head, ...rest] = allMembers
+      return { parent: head, children: rest }
     })
+    // Top-level group order: by most recent activity in the group, so a
+    // group that just got a new revision floats to the top even if its
+    // head (the APPROVED one) is older.
+    const maxDate = (g: QuoteGroup) =>
+      [g.parent, ...g.children].reduce((max, q) =>
+        (q.createdAt ?? '') > max ? (q.createdAt ?? '') : max, '')
+    out.sort((a, b) => maxDate(b).localeCompare(maxDate(a)))
+    return out
   }, [quotes])
 
   // Apply filters at the GROUP level: a group survives if the parent or any
