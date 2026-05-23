@@ -714,27 +714,11 @@ function QuoteRow({
         {JEWELRY_METAL_OPTIONS[quote.metal]?.label ?? quote.metal}
       </td>
       <td className="px-6 py-4">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-            isSelected ? 'bg-white/15 text-white' : STATUS_STYLES[quote.status]
-          }`}>
-            {STATUS_LABELS[quote.status]}
-          </span>
-          {quote.status === 'pending' && (
-            <WhatsAppBadge
-              status={quote.pendingWhatsappStatus ?? null}
-              kind="approval"
-              isSelected={isSelected}
-            />
-          )}
-          {quote.status === 'approved' && (
-            <WhatsAppBadge
-              status={quote.approvalWhatsappStatus ?? null}
-              kind="creator"
-              isSelected={isSelected}
-            />
-          )}
-        </div>
+        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+          isSelected ? 'bg-white/15 text-white' : STATUS_STYLES[quote.status]
+        }`}>
+          {STATUS_LABELS[quote.status]}
+        </span>
       </td>
       <td className={`px-6 py-4 ${isSelected ? 'text-slate-400' : 'text-slate-400'}`}>
         {quote.createdAt}
