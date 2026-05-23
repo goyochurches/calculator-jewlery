@@ -111,7 +111,17 @@ export function QuotesListPage() {
   const handleStatusChange = async (id: string, status: 'APPROVED' | 'REJECTED' | 'PENDING') => {
     try {
       const updated = await quotesService.updateStatus(id, status)
-      setQuotes((prev) => prev.map((q) => (q.id === id ? updated : q)))
+      // Approving a quote auto-rejects every other revision in its group on
+      // the server (see QuoteGroupService.rejectGroupMembersExcept). Refetch
+      // the full list so those cascaded REJECTED statuses show immediately
+      // instead of waiting for the next page load. For non-approval changes
+      // an in-place swap is enough.
+      if (status === 'APPROVED') {
+        const fresh = await quotesService.getAll()
+        setQuotes(fresh)
+      } else {
+        setQuotes((prev) => prev.map((q) => (q.id === id ? updated : q)))
+      }
     } catch (err) {
       console.error(err)
     }

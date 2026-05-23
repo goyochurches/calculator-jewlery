@@ -63,10 +63,18 @@ export function ClientDetailPage() {
 
   const selectedQuote = quotes.find(q => q.id === selectedId) ?? null
 
-  const handleStatusChange = async (id: string, status: 'APPROVED' | 'REJECTED' | 'PENDING') => {
+  const handleStatusChange = async (clientQuoteId: string, status: 'APPROVED' | 'REJECTED' | 'PENDING') => {
     try {
-      const updated = await quotesService.updateStatus(id, status)
-      setQuotes(prev => prev.map(q => q.id === id ? updated : q))
+      const updated = await quotesService.updateStatus(clientQuoteId, status)
+      // Approval cascades to siblings on the server — refetch this client's
+      // quotes so any auto-rejected revisions in the same group appear up to
+      // date instead of stale.
+      if (status === 'APPROVED' && id) {
+        const fresh = await quotesService.getByClient(Number(id))
+        setQuotes(fresh)
+      } else {
+        setQuotes(prev => prev.map(q => q.id === clientQuoteId ? updated : q))
+      }
     } catch (e) {
       console.error(e)
     }
