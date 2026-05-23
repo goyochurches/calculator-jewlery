@@ -1671,6 +1671,19 @@ export function QuoteBuilderPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-3 pt-6">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Internal notes <span className="font-normal normal-case text-slate-400">(optional)</span>
+                </label>
+                <textarea
+                  rows={4}
+                  value={internalNotes}
+                  onChange={e => setInternalNotes(e.target.value)}
+                  placeholder="Customer preferences, follow-up reminders, context for your records. Never shown to the client."
+                  className="w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+                />
+              </div>
+
               <input ref={attachmentInputRef} id="attachment-files" type="file"
                 accept="image/*" multiple
                 onChange={handleAttachmentsChange} className="hidden" />
