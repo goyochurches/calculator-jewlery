@@ -867,27 +867,45 @@ function WhatsAppRow({ title, subtitle, to, toLabel, status, error }: {
   error: string | null
 }) {
   const s = (status ?? '').toUpperCase()
-  const isOk      = ['SENT', 'DELIVERED', 'READ'].includes(s)
-  const isError   = ['FAILED', 'UNDELIVERED'].includes(s) || error != null
-  const isQueued  = ['QUEUED', 'SENDING', 'ACCEPTED'].includes(s) && !isOk
-  const isMissing = !s || s === 'NOT_CONFIGURED' || s === 'NO_RECIPIENT'
+  const isOk       = ['SENT', 'DELIVERED', 'READ'].includes(s)
+  const isQueued   = ['QUEUED', 'SENDING', 'ACCEPTED'].includes(s) && !isOk
+  const isMissing  = s === 'NOT_CONFIGURED' || s === 'NO_RECIPIENT'
+  // A true "error" is when Twilio/UltraMsg returned a failure. NO_RECIPIENT
+  // gets its own amber treatment (missing config / phone) so users can tell
+  // the difference at a glance between "the gateway refused it" and "we
+  // never even tried because nobody told us where to send".
+  const isError    = (['FAILED', 'UNDELIVERED'].includes(s) || (!!error && !isMissing)) && !isOk
 
   const tone = isError   ? 'border-rose-200 bg-rose-50'
              : isOk      ? 'border-emerald-200 bg-emerald-50'
              : isQueued  ? 'border-amber-200 bg-amber-50'
+             : isMissing ? 'border-amber-200 bg-amber-50/60'
              : 'border-slate-200 bg-white'
 
-  const Icon = isError ? AlertTriangle : isOk ? Check : MessageCircle
-  const iconTone = isError ? 'text-rose-600' : isOk ? 'text-emerald-600' : isQueued ? 'text-amber-600' : 'text-slate-500'
+  const Icon = isError || isMissing ? AlertTriangle : isOk ? Check : MessageCircle
+  const iconTone = isError ? 'text-rose-600' : isOk ? 'text-emerald-600' : (isQueued || isMissing) ? 'text-amber-600' : 'text-slate-500'
 
-  const statusLabel = isOk      ? 'Delivered'
-                    : isError   ? 'Failed'
+  const statusLabel = isOk      ? 'Delivered ✓'
+                    : isError   ? 'Failed ✗'
                     : isQueued  ? 'Queued / sending'
-                    : isMissing ? (s === 'NO_RECIPIENT' ? 'No recipient configured' : 'Not sent (Twilio not configured)')
+                    : s === 'NO_RECIPIENT'  ? 'Not sent — no recipient'
+                    : s === 'NOT_CONFIGURED' ? 'Not sent — gateway not configured'
+                    : !s ? 'Not sent'
                     : s
 
   // Strip the "whatsapp:" prefix when displaying so the phone reads cleanly.
   const prettyPhone = to ? to.replace(/^whatsapp:/i, '') : null
+
+  // Color of the explanation box: rose for real failures, amber for the
+  // "missing config / no phone" case (it's a setup problem, not a delivery error).
+  const reasonTone = isError
+    ? 'bg-white/70 text-rose-700'
+    : 'bg-white/70 text-amber-800'
+  const reasonLabel = isError
+    ? 'Error'
+    : isMissing
+      ? 'Reason not sent'
+      : 'Note'
 
   return (
     <div className={`rounded-2xl border ${tone} p-3`}>
@@ -897,9 +915,10 @@ function WhatsAppRow({ title, subtitle, to, toLabel, status, error }: {
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-semibold text-slate-900">{title}</p>
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-              isError ? 'bg-rose-100 text-rose-700' :
-              isOk ? 'bg-emerald-100 text-emerald-700' :
-              isQueued ? 'bg-amber-100 text-amber-700' :
+              isError   ? 'bg-rose-100 text-rose-700' :
+              isOk      ? 'bg-emerald-100 text-emerald-700' :
+              isQueued  ? 'bg-amber-100 text-amber-700' :
+              isMissing ? 'bg-amber-100 text-amber-700' :
               'bg-slate-100 text-slate-500'
             }`}>{statusLabel}</span>
           </div>
@@ -914,9 +933,18 @@ function WhatsAppRow({ title, subtitle, to, toLabel, status, error }: {
             </p>
           )}
 
+          {/* Friendly explanation when the send didn't go (no phone /
+              gateway not configured) so the user knows exactly what to fix. */}
+          {!prettyPhone && !toLabel && isMissing && (
+            <p className="text-xs text-amber-800">
+              <span className="text-slate-400">To: </span>
+              <span className="italic">no destination available</span>
+            </p>
+          )}
+
           {error && (
-            <p className="mt-1 rounded-lg bg-white/70 px-2 py-1.5 text-[11px] text-rose-700">
-              <strong>Error:</strong> {error}
+            <p className={`mt-1 rounded-lg px-2 py-1.5 text-[11px] ${reasonTone}`}>
+              <strong>{reasonLabel}:</strong> {error}
             </p>
           )}
         </div>
