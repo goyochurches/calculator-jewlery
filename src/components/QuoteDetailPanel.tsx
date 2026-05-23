@@ -799,3 +799,128 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
     </div>
   )
 }
+
+/** WhatsApp notification breakdown for the quote. Renders:
+ *   · For PENDING quotes  — the approval link sent to the admin
+ *   · For APPROVED quotes — the approval link sent to admin (historical, taken
+ *                            from the prior PENDING state, if data is there)
+ *                            PLUS the share-link notification sent to the creator
+ *  Status, destination phone, recipient name and any Twilio error are all
+ *  surfaced so the admin can diagnose problems without reading server logs.
+ */
+function WhatsAppNotificationsBlock({ quote }: { quote: SavedQuote }) {
+  const hasPending = quote.status === 'pending' && (
+    quote.pendingWhatsappStatus != null ||
+    quote.pendingWhatsappTo != null ||
+    quote.pendingWhatsappError != null
+  )
+  const hasApproval = quote.status === 'approved' && (
+    quote.approvalWhatsappStatus != null ||
+    quote.approvalWhatsappError != null
+  )
+  if (!hasPending && !hasApproval) return null
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+          WhatsApp notifications
+        </p>
+        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+          Internal
+        </span>
+      </div>
+
+      {hasPending && (
+        <WhatsAppRow
+          title="Approval link → Admin"
+          subtitle="Sent when this quote was saved as Pending (discount > 15%)."
+          to={quote.pendingWhatsappTo ?? null}
+          toLabel={null}
+          status={quote.pendingWhatsappStatus ?? null}
+          error={quote.pendingWhatsappError ?? null}
+        />
+      )}
+
+      {hasApproval && (
+        <WhatsAppRow
+          title="Share link → Creator"
+          subtitle="Sent when the quote was approved, so the creator can forward the public link to the customer."
+          to={quote.createdByEmail ? null : null /* phone not echoed on quote payload, only name */}
+          toLabel={quote.createdBy ?? null}
+          status={quote.approvalWhatsappStatus ?? null}
+          error={quote.approvalWhatsappError ?? null}
+        />
+      )}
+    </div>
+  )
+}
+
+function WhatsAppRow({ title, subtitle, to, toLabel, status, error }: {
+  title: string
+  subtitle: string
+  /** Phone number the message was texted to. */
+  to: string | null
+  /** Human name of the recipient (when phone isn't echoed — e.g. creator). */
+  toLabel: string | null
+  status: string | null
+  error: string | null
+}) {
+  const s = (status ?? '').toUpperCase()
+  const isOk      = ['SENT', 'DELIVERED', 'READ'].includes(s)
+  const isError   = ['FAILED', 'UNDELIVERED'].includes(s) || error != null
+  const isQueued  = ['QUEUED', 'SENDING', 'ACCEPTED'].includes(s) && !isOk
+  const isMissing = !s || s === 'NOT_CONFIGURED' || s === 'NO_RECIPIENT'
+
+  const tone = isError   ? 'border-rose-200 bg-rose-50'
+             : isOk      ? 'border-emerald-200 bg-emerald-50'
+             : isQueued  ? 'border-amber-200 bg-amber-50'
+             : 'border-slate-200 bg-white'
+
+  const Icon = isError ? AlertTriangle : isOk ? Check : MessageCircle
+  const iconTone = isError ? 'text-rose-600' : isOk ? 'text-emerald-600' : isQueued ? 'text-amber-600' : 'text-slate-500'
+
+  const statusLabel = isOk      ? 'Delivered'
+                    : isError   ? 'Failed'
+                    : isQueued  ? 'Queued / sending'
+                    : isMissing ? (s === 'NO_RECIPIENT' ? 'No recipient configured' : 'Not sent (Twilio not configured)')
+                    : s
+
+  // Strip the "whatsapp:" prefix when displaying so the phone reads cleanly.
+  const prettyPhone = to ? to.replace(/^whatsapp:/i, '') : null
+
+  return (
+    <div className={`rounded-2xl border ${tone} p-3`}>
+      <div className="flex items-start gap-2.5">
+        <Icon className={`h-4 w-4 shrink-0 mt-0.5 ${iconTone}`} />
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-slate-900">{title}</p>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+              isError ? 'bg-rose-100 text-rose-700' :
+              isOk ? 'bg-emerald-100 text-emerald-700' :
+              isQueued ? 'bg-amber-100 text-amber-700' :
+              'bg-slate-100 text-slate-500'
+            }`}>{statusLabel}</span>
+          </div>
+          <p className="text-[11px] text-slate-500">{subtitle}</p>
+
+          {(prettyPhone || toLabel) && (
+            <p className="text-xs text-slate-700">
+              <span className="text-slate-400">To: </span>
+              {toLabel && <span className="font-semibold">{toLabel}</span>}
+              {toLabel && prettyPhone && <span className="text-slate-400"> · </span>}
+              {prettyPhone && <span className="font-mono">{prettyPhone}</span>}
+            </p>
+          )}
+
+          {error && (
+            <p className="mt-1 rounded-lg bg-white/70 px-2 py-1.5 text-[11px] text-rose-700">
+              <strong>Error:</strong> {error}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
