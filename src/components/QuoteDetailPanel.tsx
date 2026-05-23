@@ -722,6 +722,22 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
           )}
         </div>
 
+        {quote.internalNotes && quote.internalNotes.trim() !== '' && (
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                Internal notes
+              </p>
+              <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-rose-700">
+                Not shown to client
+              </span>
+            </div>
+            <div className="rounded-2xl border border-amber-100 bg-amber-50/50 px-4 py-3">
+              <p className="whitespace-pre-wrap text-sm text-slate-700">{quote.internalNotes}</p>
+            </div>
+          </div>
+        )}
+
         {(quote.attachments?.length ?? 0) > 0 && (
           <div>
             <div className="mb-2 flex items-center justify-between">
