@@ -143,6 +143,14 @@ export function QuotesListPage() {
   // If a child's parent was deleted, the child is promoted to a top-level
   // group of its own so it doesn't disappear.
   interface QuoteGroup { parent: SavedQuote; children: SavedQuote[] }
+  // Sort newest-first. createdAt is just a date, so tie-break with numeric id
+  // DESC (ids are monotonically increasing) — the most recently saved quote
+  // of the same day still ends up at the top.
+  const newestFirst = (a: SavedQuote, b: SavedQuote): number => {
+    const byDate = (b.createdAt ?? '').localeCompare(a.createdAt ?? '')
+    if (byDate !== 0) return byDate
+    return Number(b.id) - Number(a.id)
+  }
   const groups = useMemo<QuoteGroup[]>(() => {
     const byId = new Map<string, SavedQuote>()
     quotes.forEach((q) => byId.set(q.id, q))
@@ -158,11 +166,11 @@ export function QuotesListPage() {
         parents.push(q)
       }
     })
+    parents.sort(newestFirst)
     return parents.map((p) => {
       // Newest revision first within the group so the most recent attempt
       // is the closest one to the parent row.
-      const kids = (childrenByParent.get(p.id) ?? []).slice()
-      kids.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
+      const kids = (childrenByParent.get(p.id) ?? []).slice().sort(newestFirst)
       return { parent: p, children: kids }
     })
   }, [quotes])
