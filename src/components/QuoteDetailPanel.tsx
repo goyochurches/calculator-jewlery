@@ -5,7 +5,7 @@ import {
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import type { QuoteCustomerStone, QuoteStatus, QuoteStone, SavedQuote } from '@/types'
-import { Check, ChevronDown, ChevronUp, Copy, Eye, RefreshCw, X, XCircle } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, ChevronUp, Copy, Eye, MessageCircle, RefreshCw, X, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -370,6 +370,10 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             )}
           </div>
         )}
+
+        {/* WhatsApp notifications — visible to admins so they can verify the
+            approval flow worked (or diagnose why a message didn't go out). */}
+        <WhatsAppNotificationsBlock quote={quote} />
 
         <PhotoDetail src={quote.photo} />
 
