@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/context/AuthContext'
 import { userService } from '@/services/userService'
 import { Camera, Check, ImagePlus, User, X } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Administrator',
@@ -27,6 +27,18 @@ export function ProfilePage() {
   const [error, setError] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
+
+  // On hard refresh, useAuth() returns null briefly while it rehydrates the
+  // token, so the useState seeds above capture empty strings. Re-sync the
+  // form once the user lands so the inputs reflect the persisted profile.
+  useEffect(() => {
+    if (!user) return
+    setName(user.name ?? '')
+    setAvatar(user.avatar ?? '')
+    setBio(user.bio ?? '')
+    setPhone(user.phone ?? '')
+    setPhoto(user.photo ?? null)
+  }, [user?.id, user?.name, user?.avatar, user?.bio, user?.phone, user?.photo])
 
   if (!user) return null
 
