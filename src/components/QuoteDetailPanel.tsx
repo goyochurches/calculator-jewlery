@@ -5,7 +5,8 @@ import {
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import type { QuoteCustomerStone, QuoteStatus, QuoteStone, SavedQuote } from '@/types'
-import { AlertTriangle, Check, ChevronDown, ChevronUp, Copy, Eye, MessageCircle, RefreshCw, X, XCircle } from 'lucide-react'
+import { quotesService } from '@/services/quotesService'
+import { AlertTriangle, Check, ChevronDown, ChevronUp, Copy, Eye, FileDown, MessageCircle, RefreshCw, X, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -154,9 +155,18 @@ const ROLE_THEME: Record<StoneRole, { label: string; dot: string; ring: string; 
 export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToken, isAdmin = false }: QuoteDetailPanelProps) {
   const navigate = useNavigate()
   const [refreshing, setRefreshing] = useState(false)
+  const [pdfLoading, setPdfLoading] = useState(false)
   const handleDuplicate = () => {
     onClose()
     navigate('/quotes', { state: { duplicateFrom: quote } })
+  }
+  const handleDownloadPdf = async () => {
+    setPdfLoading(true)
+    try { await quotesService.downloadPdf(quote.id) }
+    catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to download PDF'
+      alert(msg)
+    } finally { setPdfLoading(false) }
   }
   // Per-stone expand/collapse state. Keys are `${role}-${index}`. We seed the
   // set with every stone so the detail view shows the full information by
@@ -278,6 +288,15 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
           </p>
         </div>
         <div className="ml-4 flex shrink-0 items-center gap-1.5">
+          <button
+            onClick={handleDownloadPdf}
+            disabled={pdfLoading}
+            title="Download branded PDF (same layout as the customer share link)"
+            className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:border-amber-300 hover:bg-amber-100 disabled:cursor-wait disabled:opacity-60"
+          >
+            <FileDown className="h-3.5 w-3.5" />
+            {pdfLoading ? 'Opening…' : 'PDF'}
+          </button>
           <button
             onClick={handleDuplicate}
             title="Duplicate this quote and adjust"

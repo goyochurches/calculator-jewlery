@@ -33,7 +33,9 @@
       "Bash(mvn -DskipTests compile)",
       "Bash(mvn -DskipTests clean compile)",
       "Bash(node_modules/.bin/tsc --project tsconfig.app.json --noEmit)",
-      "Bash(node \"D:/wamp64/www/calculator-jewlery/node_modules/typescript/bin/tsc\" --project \"D:/wamp64/www/calculator-jewlery/tsconfig.app.json\" --noEmit)"
+      "Bash(node \"D:/wamp64/www/calculator-jewlery/node_modules/typescript/bin/tsc\" --project \"D:/wamp64/www/calculator-jewlery/tsconfig.app.json\" --noEmit)",
+      "Bash(npm prune *)",
+      "Bash(npm run *)"
     ]
   }
 }

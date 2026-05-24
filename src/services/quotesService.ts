@@ -238,6 +238,28 @@ export const quotesService = {
     return mapQuote(data)
   },
 
+  /**
+   * Downloads the branded PDF for an authenticated user. Opens in a new
+   * tab — the customer-facing share-link PDF is a separate public endpoint
+   * (see publicQuoteService). We use raw fetch here because we need a Blob,
+   * not JSON, so the shared api client doesn't fit.
+   */
+  async downloadPdf(id: string): Promise<void> {
+    const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+    const token = localStorage.getItem('auth-token')
+    const res = await fetch(`${BASE_URL}/api/quotes/${id}/pdf`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+    if (!res.ok) throw new Error(`Failed to download PDF (HTTP ${res.status})`)
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    // Open in a new tab so the browser's built-in viewer shows it. The
+    // viewer's "Download" button still works on the object URL.
+    window.open(url, '_blank', 'noopener,noreferrer')
+    // Revoke after a delay so the new tab has time to fetch the blob.
+    setTimeout(() => URL.revokeObjectURL(url), 30_000)
+  },
+
   async countToday(): Promise<number> {
     const data = await api.get<{ count: number }>('/api/quotes/stats/today')
     return data.count
