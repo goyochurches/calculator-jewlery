@@ -63,7 +63,7 @@ export type JewelryMetalOption =
   | 'gold-18k'
   | 'silver'
 
-export type QuoteStatus = 'draft' | 'pending' | 'approved' | 'rejected'
+export type QuoteStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'fully_paid'
 
 export type StoneRole = 'MAIN' | 'SIDE' | 'MELEE'
 
@@ -176,6 +176,14 @@ export interface SavedQuote {
   openedWhatsappStatus?: string | null
   openedWhatsappError?: string | null
   openedWhatsappSentAt?: string | null
+  /** Payment plan rollup — computed server-side from installments. Absent
+   *  (or hasPlan=false) when no plan has been set up. */
+  paymentHasPlan?: boolean | null
+  paymentTotalDue?: number | null
+  paymentTotalPaid?: number | null
+  paymentTotalCount?: number | null
+  paymentPaidCount?: number | null
+  paymentFullyPaid?: boolean | null
 }
 
 export interface GemstonePrice {

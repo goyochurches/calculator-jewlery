@@ -97,6 +97,13 @@ interface ApiQuote {
   openedWhatsappStatus?: string | null
   openedWhatsappError?: string | null
   openedWhatsappSentAt?: string | null
+  /** Payment plan rollup — server-derived from installments. */
+  paymentHasPlan?: boolean | null
+  paymentTotalDue?: number | null
+  paymentTotalPaid?: number | null
+  paymentTotalCount?: number | null
+  paymentPaidCount?: number | null
+  paymentFullyPaid?: boolean | null
 }
 
 function mapQuote(q: ApiQuote): SavedQuote {
@@ -154,6 +161,12 @@ function mapQuote(q: ApiQuote): SavedQuote {
     openedWhatsappStatus: q.openedWhatsappStatus ?? null,
     openedWhatsappError: q.openedWhatsappError ?? null,
     openedWhatsappSentAt: q.openedWhatsappSentAt ?? null,
+    paymentHasPlan: q.paymentHasPlan ?? null,
+    paymentTotalDue: q.paymentTotalDue ?? null,
+    paymentTotalPaid: q.paymentTotalPaid ?? null,
+    paymentTotalCount: q.paymentTotalCount ?? null,
+    paymentPaidCount: q.paymentPaidCount ?? null,
+    paymentFullyPaid: q.paymentFullyPaid ?? null,
   }
 }
 
