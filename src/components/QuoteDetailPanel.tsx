@@ -6,6 +6,8 @@ import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import type { QuoteCustomerStone, QuoteStatus, QuoteStone, SavedQuote } from '@/types'
 import { PaymentPlanBlock } from '@/components/PaymentPlanBlock'
+import { useAuth } from '@/context/AuthContext'
+import { FEATURES } from '@/lib/featureFlags'
 import { quotesService } from '@/services/quotesService'
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Copy, Eye, FileDown, MessageCircle, RefreshCw, X, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -155,6 +157,8 @@ const ROLE_THEME: Record<StoneRole, { label: string; dot: string; ring: string; 
 
 export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToken, isAdmin = false }: QuoteDetailPanelProps) {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const canSeePayments = FEATURES.payments && user?.role === 'admin'
   const [refreshing, setRefreshing] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
   const handleDuplicate = () => {
@@ -817,8 +821,10 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
         </div>
 
         {/* Payment plan — splits the customer-facing total into Stripe
-            checkout sessions the jeweler can copy and paste. */}
-        <PaymentPlanBlock quoteId={quote.id} total={customerPrice} />
+            checkout sessions the jeweler can copy and paste. Admin-only
+            and gated by the FEATURES.payments flag so the whole feature
+            can be toggled off without code changes. */}
+        {canSeePayments && <PaymentPlanBlock quoteId={quote.id} total={customerPrice} />}
       </div>
     </div>
   )

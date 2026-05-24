@@ -2,10 +2,12 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/context/AuthContext'
 import { useBrand } from '@/context/BrandContext'
 import { canAccess, type NavKey } from '@/constants/permissions'
+import { FEATURES } from '@/lib/featureFlags'
 import {
   Calculator,
   ClipboardList,
   Contact,
+  CreditCard,
   Diamond,
   FileText,
   LayoutDashboard,
@@ -19,7 +21,7 @@ import {
 } from 'lucide-react'
 import { NavLink, useNavigate } from 'react-router-dom'
 
-const navItems: { to: string; label: string; icon: typeof LayoutDashboard; key: NavKey }[] = [
+const navItems: { to: string; label: string; icon: typeof LayoutDashboard; key: NavKey; hidden?: boolean }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' },
   { to: '/quotes', label: 'Quote Builder', icon: Calculator, key: 'quotes' },
   { to: '/quotes-list', label: 'Quotes', icon: FileText, key: 'quotes-list' },
@@ -28,6 +30,9 @@ const navItems: { to: string; label: string; icon: typeof LayoutDashboard; key: 
   { to: '/charts', label: 'Charts', icon: LineChart, key: 'charts' },
   { to: '/history', label: 'History', icon: ClipboardList, key: 'history' },
   { to: '/users', label: 'Users', icon: Users, key: 'users' },
+  // Gated by the payments feature flag — drops out of the list entirely
+  // when disabled so the link doesn't show even to admins.
+  { to: '/payments', label: 'Payments', icon: CreditCard, key: 'payments', hidden: !FEATURES.payments },
   { to: '/configuration', label: 'Configuration', icon: Settings, key: 'configuration' },
   { to: '/master-tables', label: 'Master Tables', icon: ClipboardList, key: 'master-tables' },
 ]
@@ -59,7 +64,7 @@ function SidebarContent({
   const { user, logout } = useAuth()
   const { companyName, logo } = useBrand()
   const navigate = useNavigate()
-  const visibleNavItems = navItems.filter((item) => canAccess(user?.role, item.key))
+  const visibleNavItems = navItems.filter((item) => !item.hidden && canAccess(user?.role, item.key))
   const goToProfile = () => { onNavigate?.(); navigate('/profile') }
 
   return (

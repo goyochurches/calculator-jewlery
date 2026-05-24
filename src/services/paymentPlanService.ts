@@ -53,3 +53,27 @@ export async function fetchPublicInstallment(
   if (!res.ok) throw new Error(`Failed to load installment (HTTP ${res.status})`)
   return res.json() as Promise<PaymentInstallment>
 }
+
+/** Cross-quote payment row used by the admin Payments page. */
+export interface PaymentRow {
+  id: number
+  sortOrder: number
+  amount: number
+  currency: string
+  dueDate: string | null
+  status: InstallmentStatus
+  paidAt: string | null
+  quoteId: number
+  quoteTitle: string | null
+  quoteStatus: string | null
+  clientName: string | null
+  createdByName: string | null
+  createdAt: string
+}
+
+export const paymentsAdminService = {
+  async list(status?: InstallmentStatus): Promise<PaymentRow[]> {
+    const qs = status ? `?status=${status}` : ''
+    return api.get<PaymentRow[]>(`/api/payments${qs}`)
+  },
+}

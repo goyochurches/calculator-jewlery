@@ -36,7 +36,8 @@
       "Bash(node \"D:/wamp64/www/calculator-jewlery/node_modules/typescript/bin/tsc\" --project \"D:/wamp64/www/calculator-jewlery/tsconfig.app.json\" --noEmit)",
       "Bash(npm prune *)",
       "Bash(npm run *)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:www.podium.com)"
     ]
   }
 }

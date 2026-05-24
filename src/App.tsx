@@ -19,6 +19,8 @@ import { PublicQuotePage } from '@/pages/PublicQuote'
 import { ApprovalPage } from '@/pages/Approval'
 import { PaymentSuccessPage } from '@/pages/PaymentSuccess'
 import { PaymentCancelPage } from '@/pages/PaymentCancel'
+import { PaymentsPage } from '@/pages/Payments'
+import { FEATURES } from '@/lib/featureFlags'
 import Login from '@/pages/Login'
 import SetupPassword from '@/pages/SetupPassword'
 import { canAccess, defaultRouteFor, type NavKey } from '@/constants/permissions'
@@ -102,6 +104,11 @@ export default function App() {
                 <Route element={<RequirePermission permission="users" />}>
                   <Route path="/users" element={<UsersPage />} />
                 </Route>
+                {FEATURES.payments && (
+                  <Route element={<RequirePermission permission="payments" />}>
+                    <Route path="/payments" element={<PaymentsPage />} />
+                  </Route>
+                )}
                 <Route element={<RequirePermission permission="configuration" />}>
                   <Route path="/configuration" element={<Configuration />} />
                 </Route>
