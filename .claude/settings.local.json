@@ -40,7 +40,8 @@
       "WebFetch(domain:www.podium.com)",
       "Bash(curl -i -s \"https://price-calculator-latest.onrender.com/api/public/installments/999999\")",
       "Bash(curl -i -s \"https://price-calculator-latest.onrender.com/api/public/installments/1\")",
-      "Bash(curl -i -s \"https://price-calculator-latest.onrender.com/api/public/quotes/this-token-does-not-exist\")"
+      "Bash(curl -i -s \"https://price-calculator-latest.onrender.com/api/public/quotes/this-token-does-not-exist\")",
+      "Bash(curl -s -i \"https://price-calculator-latest.onrender.com/api/payments/by-client/1\")"
     ]
   }
 }

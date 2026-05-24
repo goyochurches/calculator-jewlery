@@ -36,6 +36,28 @@ export const paymentPlanService = {
     )
     return res.url
   },
+
+  /** Generates the link AND texts it to the client's WhatsApp. Returns
+   *  the send result so the UI can show success / "no recipient" / error. */
+  async sendCheckoutLinkViaWhatsApp(
+    quoteId: string | number,
+    installmentId: number,
+  ): Promise<{ ok: boolean; status: string | null; error: string | null; sid: string | null }> {
+    return api.post(`/api/quotes/${quoteId}/payment-plan/${installmentId}/send-whatsapp`, {})
+  },
+
+  /** Issues a refund on Stripe. Pass `amount` (USD) for partial,
+   *  omit for full. The webhook flips the installment status. */
+  async refundInstallment(
+    quoteId: string | number,
+    installmentId: number,
+    amount?: number,
+  ): Promise<{ refundId: string }> {
+    return api.post(
+      `/api/quotes/${quoteId}/payment-plan/${installmentId}/refund`,
+      amount != null ? { amount } : {},
+    )
+  },
 }
 
 /**

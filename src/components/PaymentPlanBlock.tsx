@@ -7,6 +7,9 @@ interface Props {
   /** Quote total in USD — used to pre-fill the first installment when the
    *  jeweler starts from scratch. */
   total: number
+  /** Client's WhatsApp phone (E.164). When absent, the "Send WhatsApp"
+   *  button is disabled with a tooltip explaining why. */
+  clientPhone?: string | null
 }
 
 interface Draft {
@@ -16,7 +19,7 @@ interface Draft {
 
 /** Inline editor + viewer of a quote's payment plan. Wipes & recreates on
  *  save (matches the backend semantics — there's no per-row update). */
-export function PaymentPlanBlock({ quoteId, total }: Props) {
+export function PaymentPlanBlock({ quoteId, total, clientPhone }: Props) {
   const [plan, setPlan] = useState<PaymentInstallment[] | null>(null)
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [editing, setEditing] = useState(false)
@@ -25,6 +28,9 @@ export function PaymentPlanBlock({ quoteId, total }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [linkLoadingId, setLinkLoadingId] = useState<number | null>(null)
   const [copiedId, setCopiedId] = useState<number | null>(null)
+  const [sendingId, setSendingId] = useState<number | null>(null)
+  const [sentId, setSentId] = useState<number | null>(null)
+  const [refundingId, setRefundingId] = useState<number | null>(null)
 
   useEffect(() => {
     let alive = true
