@@ -81,14 +81,19 @@ interface ApiQuote {
    *  (mirrors the pattern used for `client`). The backend never echoes
    *  this back as an object; it surfaces `parentQuoteId` instead. */
   parentQuote?: { id: number } | null
-  /** Twilio status from the latest approval token (only for PENDING). */
+  /** Pending-approval WhatsApp (admin) — status / recipient / error / when. */
   pendingWhatsappStatus?: string | null
   pendingWhatsappTo?: string | null
   pendingWhatsappError?: string | null
-  /** Twilio status of the approval notification sent to the creator (only for APPROVED). */
+  pendingWhatsappSentAt?: string | null
+  /** Admin action via the WhatsApp link (token consumption). */
+  approvalActionAt?: string | null
+  approvalAction?: 'APPROVED' | 'REJECTED' | null
+  /** Approval-notification WhatsApp (creator) — status / error / when. */
   approvalWhatsappStatus?: string | null
   approvalWhatsappError?: string | null
-  /** Twilio status of the "customer opened the share link" notification. */
+  approvalWhatsappSentAt?: string | null
+  /** Customer-opened WhatsApp (creator). */
   openedWhatsappStatus?: string | null
   openedWhatsappError?: string | null
   openedWhatsappSentAt?: string | null
@@ -140,8 +145,12 @@ function mapQuote(q: ApiQuote): SavedQuote {
     pendingWhatsappStatus: q.pendingWhatsappStatus ?? null,
     pendingWhatsappTo: q.pendingWhatsappTo ?? null,
     pendingWhatsappError: q.pendingWhatsappError ?? null,
+    pendingWhatsappSentAt: q.pendingWhatsappSentAt ?? null,
+    approvalActionAt: q.approvalActionAt ?? null,
+    approvalAction: q.approvalAction ?? null,
     approvalWhatsappStatus: q.approvalWhatsappStatus ?? null,
     approvalWhatsappError: q.approvalWhatsappError ?? null,
+    approvalWhatsappSentAt: q.approvalWhatsappSentAt ?? null,
     openedWhatsappStatus: q.openedWhatsappStatus ?? null,
     openedWhatsappError: q.openedWhatsappError ?? null,
     openedWhatsappSentAt: q.openedWhatsappSentAt ?? null,
