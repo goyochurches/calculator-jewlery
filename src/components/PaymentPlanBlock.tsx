@@ -224,7 +224,12 @@ export function PaymentPlanBlock({ quoteId, total }: Props) {
 
           {error && <p className="rounded-lg bg-rose-50 px-2 py-1.5 text-[11px] text-rose-700">{error}</p>}
 
-          <div className="flex justify-end gap-2 pt-1">
+          <div className="flex items-center justify-end gap-2 pt-1">
+            {totalMismatch && (
+              <span className="mr-auto text-[11px] font-semibold text-amber-700">
+                Adjust the amounts so the sum matches the quote total.
+              </span>
+            )}
             <button
               type="button"
               onClick={cancelEditing}
@@ -236,8 +241,9 @@ export function PaymentPlanBlock({ quoteId, total }: Props) {
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
+              disabled={saving || totalMismatch}
+              title={totalMismatch ? 'Installment amounts must sum to the quote total before saving.' : undefined}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving && <Loader2 className="h-3 w-3 animate-spin" />}
               {saving ? 'Saving…' : 'Save plan'}

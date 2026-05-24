@@ -17,6 +17,8 @@ import { ClientsPage } from '@/pages/Clients'
 import { ClientDetailPage } from '@/pages/ClientDetail'
 import { PublicQuotePage } from '@/pages/PublicQuote'
 import { ApprovalPage } from '@/pages/Approval'
+import { PaymentSuccessPage } from '@/pages/PaymentSuccess'
+import { PaymentCancelPage } from '@/pages/PaymentCancel'
 import Login from '@/pages/Login'
 import SetupPassword from '@/pages/SetupPassword'
 import { canAccess, defaultRouteFor, type NavKey } from '@/constants/permissions'
@@ -70,6 +72,8 @@ export default function App() {
             {/* Public approval page reached from the WhatsApp link sent to
                 the admin when a quote is saved as PENDING. */}
             <Route path="/approve/:token" element={<ApprovalPage />} />
+            <Route path="/payment-success" element={<PaymentSuccessPage />} />
+            <Route path="/payment-cancel" element={<PaymentCancelPage />} />
             <Route element={<PrivateRoutes />}>
               <Route element={<MainLayout />}>
                 <Route path="/" element={<HomeRedirect />} />

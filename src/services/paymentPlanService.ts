@@ -37,3 +37,19 @@ export const paymentPlanService = {
     return res.url
   },
 }
+
+/**
+ * Public-facing lookup used by the /payment-success page. Sends the
+ * Stripe session_id so the backend can verify with Stripe directly even
+ * before the webhook arrives.
+ */
+export async function fetchPublicInstallment(
+  installmentId: number,
+  sessionId?: string | null,
+): Promise<PaymentInstallment> {
+  const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+  const qs = sessionId ? `?session=${encodeURIComponent(sessionId)}` : ''
+  const res = await fetch(`${BASE_URL}/api/public/installments/${installmentId}${qs}`)
+  if (!res.ok) throw new Error(`Failed to load installment (HTTP ${res.status})`)
+  return res.json() as Promise<PaymentInstallment>
+}
