@@ -66,6 +66,7 @@ export interface PaymentRow {
   quoteId: number
   quoteTitle: string | null
   quoteStatus: string | null
+  clientId: number | null
   clientName: string | null
   createdByName: string | null
   createdAt: string
@@ -87,6 +88,7 @@ export interface StripePaymentRow {
   installmentTotalCount: number | null
   quoteId: number | null
   quoteTitle: string | null
+  clientId: number | null
   clientName: string | null
   dashboardUrl: string | null
 }
@@ -99,6 +101,10 @@ export const paymentsAdminService = {
 
   async listStripe(limit = 50): Promise<StripePaymentRow[]> {
     return api.get<StripePaymentRow[]>(`/api/payments/stripe?limit=${limit}`)
+  },
+
+  async listByClient(clientId: number | string): Promise<PaymentRow[]> {
+    return api.get<PaymentRow[]>(`/api/payments/by-client/${clientId}`)
   },
 }
 

@@ -176,7 +176,15 @@ function InstallmentRow({ row }: { row: PaymentRow }) {
         <p className="font-semibold text-slate-900">{row.quoteTitle ?? '—'}</p>
         <p className="text-[11px] text-slate-400">#{row.quoteId}</p>
       </td>
-      <td className="px-4 py-3 text-slate-700">{row.clientName ?? '—'}</td>
+      <td className="px-4 py-3">
+        {row.clientId != null && row.clientName ? (
+          <Link to={`/clients/${row.clientId}`} className="text-slate-700 hover:text-amber-700 hover:underline">
+            {row.clientName}
+          </Link>
+        ) : (
+          <span className="text-slate-700">{row.clientName ?? '—'}</span>
+        )}
+      </td>
       <td className="px-4 py-3 text-slate-600">#{row.sortOrder + 1}</td>
       <td className="px-4 py-3 text-slate-600">
         {row.dueDate ? new Date(row.dueDate).toLocaleDateString() : <span className="text-slate-300">—</span>}
@@ -309,11 +317,25 @@ function StripeRow({ row }: { row: StripePaymentRow }) {
             <p className="font-semibold text-slate-900">{row.quoteTitle}</p>
             <p className="text-[11px] text-slate-400">
               {row.quoteId && <>#{row.quoteId}{row.clientName ? ' · ' : ''}</>}
-              {row.clientName && <span className="text-slate-600">{row.clientName}</span>}
+              {row.clientName && (
+                row.clientId != null ? (
+                  <Link to={`/clients/${row.clientId}`} className="text-slate-600 hover:text-amber-700 hover:underline">
+                    {row.clientName}
+                  </Link>
+                ) : (
+                  <span className="text-slate-600">{row.clientName}</span>
+                )
+              )}
             </p>
           </>
         ) : row.clientName ? (
-          <p className="text-slate-700">{row.clientName}</p>
+          row.clientId != null ? (
+            <Link to={`/clients/${row.clientId}`} className="text-slate-700 hover:text-amber-700 hover:underline">
+              {row.clientName}
+            </Link>
+          ) : (
+            <p className="text-slate-700">{row.clientName}</p>
+          )
         ) : (
           <span className="text-slate-400">—</span>
         )}

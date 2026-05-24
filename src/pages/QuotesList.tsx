@@ -8,7 +8,7 @@ import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { QuoteDetailPanel } from '@/components/QuoteDetailPanel'
 import { Bell, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CornerDownRight, Copy, ImageOff, Search, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 
 const STATUS_STYLES: Record<QuoteStatus, string> = {
   draft: 'bg-slate-100 text-slate-600',
@@ -83,6 +83,7 @@ const DEFAULT_PAGE_SIZE = 10
 export function QuotesListPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const isAdmin = user?.role === 'ADMIN'
   const [quotes, setQuotes] = useState<SavedQuote[]>([])
   const [loading, setLoading] = useState(true)
@@ -109,6 +110,30 @@ export function QuotesListPage() {
       .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
+
+  // Deep-link support: if the URL carries ?quoteId=X (e.g. from the
+  // Payments page or a notification), auto-open the detail panel for
+  // that quote once the list has loaded. We also expand its parent group
+  // if it's a revision so the row is actually visible.
+  useEffect(() => {
+    const deepLinkId = searchParams.get('quoteId')
+    if (!deepLinkId || quotes.length === 0) return
+    const match = quotes.find(q => q.id === deepLinkId)
+    if (!match) return
+    setSelectedId(deepLinkId)
+    if (match.parentQuoteId != null) {
+      setExpandedGroups(prev => {
+        const next = new Set(prev)
+        next.add(String(match.parentQuoteId))
+        return next
+      })
+    }
+    // Strip the param so refreshing the page doesn't re-open after the
+    // user closes the panel.
+    const next = new URLSearchParams(searchParams)
+    next.delete('quoteId')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, quotes, setSearchParams])
 
   const handleStatusChange = async (id: string, status: 'APPROVED' | 'REJECTED' | 'PENDING') => {
     try {
