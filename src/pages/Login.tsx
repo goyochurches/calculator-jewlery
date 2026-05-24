@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 
@@ -10,12 +10,28 @@ export default function Login() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Drop a stale "Invalid email or password" the second the user starts
+  // typing again — otherwise the error sticks visually even though the
+  // attempt was a one-off (e.g. accidental Enter, browser autofill of
+  // a stale saved password, etc.).
+  useEffect(() => {
+    if (error) setError('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email, password])
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    const cleanEmail = email.trim()
+    const cleanPassword = password   // do NOT trim — passwords may contain
+                                     // intentional trailing spaces.
+    if (!cleanEmail || !cleanPassword) {
+      setError('Please enter both your email and password.')
+      return
+    }
     setError('')
     setLoading(true)
     try {
-      await login(email, password)
+      await login(cleanEmail, cleanPassword)
       navigate('/')
     } catch {
       setError('Invalid email or password')
