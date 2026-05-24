@@ -1817,12 +1817,24 @@ export function QuoteBuilderPage() {
                   ${pricing.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </p>
                 <p className="mt-1.5 text-xs font-medium text-amber-300/90">
-                  Customer sees ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })} via share link ({parsedMarkup}×{parsedDiscount > 0 ? `, −${parsedDiscount}%` : ''})
+                  Customer sees ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })} via share link ({parsedMarkup}×{parsedDiscount > 0 ? `, −${parsedDiscount}%` : ''}{applyTaxes ? ', +7.75% tax' : ''})
                 </p>
                 {parsedDiscount > 0 && (
                   <p className="mt-1 text-xs text-emerald-300/90">
                     Discount −${discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ({parsedDiscount}% off ${customerPriceBeforeDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })})
                   </p>
+                )}
+                {applyTaxes && (
+                  <div className="mt-2 rounded-xl bg-emerald-500/15 border border-emerald-300/40 px-3 py-2 text-[11px]">
+                    <div className="flex items-center justify-between text-emerald-200">
+                      <span className="font-bold uppercase tracking-wider">Sales tax 7.75% applied</span>
+                      <span className="font-bold tabular-nums">+${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between text-emerald-100/80">
+                      <span>Subtotal (before tax)</span>
+                      <span className="tabular-nums">${customerPriceAfterDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
                 )}
                 <p className="mt-2 text-sm text-slate-300">
                   <span className="font-semibold text-white">{jewelryTypeLabel}</span> · {selectedMetalConfig.label} · {ringLaborLabel}
