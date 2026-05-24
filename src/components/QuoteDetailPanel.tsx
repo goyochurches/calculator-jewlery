@@ -830,7 +830,11 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             and gated by the FEATURES.payments flag. Also hidden on
             REJECTED quotes — the deal is dead, no payments to collect. */}
         {canSeePayments && quote.status !== 'rejected' && (
-          <PaymentPlanBlock quoteId={quote.id} total={customerPrice} />
+          <PaymentPlanBlock
+            quoteId={quote.id}
+            total={customerPrice}
+            clientPhone={quote.client?.phone ?? null}
+          />
         )}
       </div>
     </div>
