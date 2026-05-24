@@ -800,84 +800,157 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
   )
 }
 
-/** WhatsApp notification breakdown for the quote. Renders:
- *   · For PENDING quotes  — the approval link sent to the admin
- *   · For APPROVED quotes — the approval link sent to admin (historical, taken
- *                            from the prior PENDING state, if data is there)
- *                            PLUS the share-link notification sent to the creator
- *  Status, destination phone, recipient name and any Twilio error are all
- *  surfaced so the admin can diagnose problems without reading server logs.
+/** Full WhatsApp / approval-link activity timeline for the quote. Renders
+ *  every event in chronological order so the admin gets a "history of what
+ *  happened with this quote" view — useful for diagnosing missed messages
+ *  or just confirming that the customer actually opened the share link.
+ *
+ *  Event types (each becomes one row when there's data for it):
+ *   1. Approval link → Admin               (PENDING quote was created with discount > 15%)
+ *   2. Admin decision via link              (admin clicked approve/reject on the WhatsApp link)
+ *   3. Share link → Creator                 (quote was approved, creator gets the public link)
+ *   4. Customer opened → Creator            (customer opened the share link; cooldown 30 min)
  */
 function WhatsAppNotificationsBlock({ quote }: { quote: SavedQuote }) {
-  // Show every notification that has any historical record — regardless of
-  // the quote's CURRENT status. An APPROVED quote still went through
-  // PENDING, so its admin notification belongs in the history, alongside
-  // the creator notification that fired when it was approved.
-  const hasPending = (
-    quote.pendingWhatsappStatus != null ||
-    quote.pendingWhatsappTo != null ||
-    quote.pendingWhatsappError != null
-  )
-  const hasApproval = (
-    quote.approvalWhatsappStatus != null ||
-    quote.approvalWhatsappError != null
-  )
-  const hasOpened = (
-    quote.openedWhatsappStatus != null ||
-    quote.openedWhatsappError != null
-  )
-  if (!hasPending && !hasApproval && !hasOpened) return null
+  type Event = {
+    key: string
+    at: string | null
+    /** Stable rank so events without a timestamp still order naturally. */
+    seq: number
+    row: React.ReactNode
+  }
+  const events: Event[] = []
+
+  if (quote.pendingWhatsappStatus != null || quote.pendingWhatsappTo != null || quote.pendingWhatsappError != null) {
+    events.push({
+      key: 'pending',
+      at: quote.pendingWhatsappSentAt ?? null,
+      seq: 1,
+      row: <WhatsAppRow
+        title="Approval link → Admin"
+        subtitle="Sent when the quote was saved as Pending (discount > 15%)."
+        sentAt={quote.pendingWhatsappSentAt ?? null}
+        to={quote.pendingWhatsappTo ?? null}
+        toLabel={null}
+        status={quote.pendingWhatsappStatus ?? null}
+        error={quote.pendingWhatsappError ?? null}
+      />,
+    })
+  }
+
+  if (quote.approvalActionAt != null && quote.approvalAction != null) {
+    events.push({
+      key: 'admin-action',
+      at: quote.approvalActionAt,
+      seq: 2,
+      row: <AdminActionRow action={quote.approvalAction} at={quote.approvalActionAt} />,
+    })
+  }
+
+  if (quote.approvalWhatsappStatus != null || quote.approvalWhatsappError != null) {
+    events.push({
+      key: 'approval',
+      at: quote.approvalWhatsappSentAt ?? null,
+      seq: 3,
+      row: <WhatsAppRow
+        title="Share link → Creator"
+        subtitle="Sent when the quote was approved, so the creator can forward the public link to the customer."
+        sentAt={quote.approvalWhatsappSentAt ?? null}
+        to={null}
+        toLabel={quote.createdBy ?? null}
+        status={quote.approvalWhatsappStatus ?? null}
+        error={quote.approvalWhatsappError ?? null}
+      />,
+    })
+  }
+
+  if (quote.openedWhatsappStatus != null || quote.openedWhatsappError != null) {
+    const openCount = quote.openCount ?? 0
+    const repeatNote = openCount > 1
+      ? ` · customer has opened ${openCount} time${openCount === 1 ? '' : 's'} total (repeats within 30 min collapse into one notification)`
+      : ' · further opens within 30 min collapse into one notification'
+    events.push({
+      key: 'opened',
+      at: quote.openedWhatsappSentAt ?? null,
+      seq: 4,
+      row: <WhatsAppRow
+        title="Customer opened → Creator"
+        subtitle={`Sent when the customer opened the share link${repeatNote}.`}
+        sentAt={quote.openedWhatsappSentAt ?? null}
+        to={null}
+        toLabel={quote.createdBy ?? null}
+        status={quote.openedWhatsappStatus ?? null}
+        error={quote.openedWhatsappError ?? null}
+      />,
+    })
+  }
+
+  if (events.length === 0) return null
+
+  // Chronological order (oldest first — reads top→bottom as the lifecycle
+  // of the quote). Events missing a timestamp fall back to their natural
+  // sequence (creation → admin action → creator notified → customer opens).
+  events.sort((a, b) => {
+    if (a.at && b.at) return a.at.localeCompare(b.at)
+    if (a.at) return -1
+    if (b.at) return 1
+    return a.seq - b.seq
+  })
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
-          WhatsApp notifications
+          WhatsApp notifications · timeline
         </p>
         <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
           Internal
         </span>
       </div>
-
-      {hasPending && (
-        <WhatsAppRow
-          title="Approval link → Admin"
-          subtitle="Sent when this quote was saved as Pending (discount > 15%)."
-          to={quote.pendingWhatsappTo ?? null}
-          toLabel={null}
-          status={quote.pendingWhatsappStatus ?? null}
-          error={quote.pendingWhatsappError ?? null}
-        />
-      )}
-
-      {hasApproval && (
-        <WhatsAppRow
-          title="Share link → Creator"
-          subtitle="Sent when the quote was approved, so the creator can forward the public link to the customer."
-          to={null}
-          toLabel={quote.createdBy ?? null}
-          status={quote.approvalWhatsappStatus ?? null}
-          error={quote.approvalWhatsappError ?? null}
-        />
-      )}
-
-      {hasOpened && (
-        <WhatsAppRow
-          title="Customer opened → Creator"
-          subtitle={`Sent when the customer first opened the share link${quote.openedWhatsappSentAt ? ' · last fired ' + new Date(quote.openedWhatsappSentAt).toLocaleString() : ''}. Repeat opens within 30 min are collapsed.`}
-          to={null}
-          toLabel={quote.createdBy ?? null}
-          status={quote.openedWhatsappStatus ?? null}
-          error={quote.openedWhatsappError ?? null}
-        />
-      )}
+      {events.map((e) => <div key={e.key}>{e.row}</div>)}
     </div>
   )
 }
 
-function WhatsAppRow({ title, subtitle, to, toLabel, status, error }: {
+/** Compact row recording when (and how) the admin took action via the
+ *  WhatsApp approval link. Distinct visual from the WhatsApp rows because
+ *  this isn't a message send — it's the admin's decision being captured. */
+function AdminActionRow({ action, at }: { action: 'APPROVED' | 'REJECTED'; at: string }) {
+  const isApproved = action === 'APPROVED'
+  const tone = isApproved ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'
+  const iconTone = isApproved ? 'text-emerald-600' : 'text-rose-600'
+  const Icon = isApproved ? Check : XCircle
+  const label = isApproved ? 'Approved via link' : 'Rejected via link'
+  const chipTone = isApproved ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+  return (
+    <div className={`rounded-2xl border ${tone} p-3`}>
+      <div className="flex items-start gap-2.5">
+        <Icon className={`h-4 w-4 shrink-0 mt-0.5 ${iconTone}`} />
+        <div className="min-w-0 flex-1 space-y-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-slate-900">Admin decision via WhatsApp link</p>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${chipTone}`}>
+              {label}
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-500">
+            The admin opened the approval link in WhatsApp and clicked {isApproved ? 'Approve' : 'Reject'}.
+          </p>
+          <p className="text-xs text-slate-700">
+            <span className="text-slate-400">When: </span>
+            <span className="font-mono">{new Date(at).toLocaleString()}</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function WhatsAppRow({ title, subtitle, sentAt, to, toLabel, status, error }: {
   title: string
   subtitle: string
+  /** When the message went out (so the timeline reads top→bottom in order). */
+  sentAt: string | null
   /** Phone number the message was texted to. */
   to: string | null
   /** Human name of the recipient (when phone isn't echoed — e.g. creator). */
@@ -949,6 +1022,13 @@ function WhatsAppRow({ title, subtitle, to, toLabel, status, error }: {
               {toLabel && <span className="font-semibold">{toLabel}</span>}
               {toLabel && prettyPhone && <span className="text-slate-400"> · </span>}
               {prettyPhone && <span className="font-mono">{prettyPhone}</span>}
+            </p>
+          )}
+
+          {sentAt && (
+            <p className="text-xs text-slate-700">
+              <span className="text-slate-400">Sent: </span>
+              <span className="font-mono">{new Date(sentAt).toLocaleString()}</span>
             </p>
           )}
 
