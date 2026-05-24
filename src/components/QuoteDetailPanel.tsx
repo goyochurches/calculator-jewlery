@@ -223,7 +223,12 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
   const engraveFee = quote.engraving ? ENGRAVING_FEE : 0
   const customerPriceBeforeDiscount = (quote.total - engraveFee) * markup + engraveFee
   const discountAmount = customerPriceBeforeDiscount * (discount / 100)
-  const customerPrice = customerPriceBeforeDiscount - discountAmount
+  const customerPriceAfterDiscount = customerPriceBeforeDiscount - discountAmount
+  // 7.75% sales tax applied on top when the seller toggled it on.
+  const SALES_TAX_RATE = 0.0775
+  const applyTaxes = !!quote.applyTaxes
+  const taxAmount = applyTaxes ? customerPriceAfterDiscount * SALES_TAX_RATE : 0
+  const customerPrice = customerPriceAfterDiscount + taxAmount
 
   const handleRefresh = async () => {
     if (!onRefreshToken) return
@@ -347,7 +352,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
               <strong className="font-semibold text-amber-300">
                 ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </strong>
-              {' '}via share link · markup {markup}×{discount > 0 ? `, −${discount}%` : ''}
+              {' '}via share link · markup {markup}×{discount > 0 ? `, −${discount}%` : ''}{applyTaxes ? ', +7.75% tax' : ''}
             </p>
           )}
           {discount > 0 && (
@@ -836,6 +841,12 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             <LineItem label="Hand engraving (milgrain)" value={quote.engraving ? '$150.00' : '$0.00'} />
             {quote.extraCosts > 0 && (
               <LineItem label="Extra costs" value={`$${quote.extraCosts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+            )}
+            {applyTaxes && (
+              <LineItem
+                label="Sales tax (7.75%) · added to customer total"
+                value={`$${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+              />
             )}
           </div>
         </div>

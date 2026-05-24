@@ -101,6 +101,9 @@ export function QuoteBuilderPage() {
   const [fingerSize, setFingerSize] = useState(7)
   const [extraCosts, setExtraCosts] = useState(0)
   const [engraving, setEngraving] = useState(false)
+  // Optional 7.75% sales tax. When ON, the customer-facing total adds the
+  // tax and the PDF / share link surface it as a separate line.
+  const [applyTaxes, setApplyTaxes] = useState(false)
   // Retail markup applied on top of cost when showing the customer-facing
   // price. Stored as a string so the user can type "2.5" or "2." without the
   // input collapsing. Parsed lazily in pricing/save.
@@ -245,6 +248,7 @@ export function QuoteBuilderPage() {
     setFingerSize(dup.fingerSize ?? 7)
     setExtraCosts(dup.extraCosts ?? 0)
     setEngraving(!!dup.engraving)
+    setApplyTaxes(!!dup.applyTaxes)
     setPhoto(dup.photo ?? null)
     setMarkupText(String(dup.markupMultiplier ?? DEFAULT_MARKUP))
     setDiscountText(dup.discountPercent && dup.discountPercent > 0 ? String(dup.discountPercent) : '')
@@ -876,7 +880,12 @@ export function QuoteBuilderPage() {
   // as a flat pass-through). Used in the right-column "Quote total" card.
   const customerPriceBeforeDiscount = (pricing.total - pricing.engravingFee) * parsedMarkup + pricing.engravingFee
   const discountAmount = customerPriceBeforeDiscount * (parsedDiscount / 100)
-  const customerPrice = customerPriceBeforeDiscount - discountAmount
+  const customerPriceAfterDiscount = customerPriceBeforeDiscount - discountAmount
+  // 7.75% sales tax — only when the seller toggled it on. Mirrors the
+  // backend SavedQuote.SALES_TAX_RATE constant.
+  const SALES_TAX_RATE = 0.0775
+  const taxAmount = applyTaxes ? customerPriceAfterDiscount * SALES_TAX_RATE : 0
+  const customerPrice = customerPriceAfterDiscount + taxAmount
 
   const handleQuoteReady = async () => {
     if (!user) return
@@ -932,6 +941,7 @@ export function QuoteBuilderPage() {
         parentQuote: parentQuoteRef,
         photo: photo ?? undefined,
         engraving,
+        applyTaxes,
         setterType: firstStone?.setterType ?? '',
         jewelryType,
         stones: stones.map((s, idx) => ({
@@ -980,6 +990,7 @@ export function QuoteBuilderPage() {
       setFingerSize(7)
       setExtraCosts(0)
       setEngraving(false)
+      setApplyTaxes(false)
       setMarkupText(String(DEFAULT_MARKUP))
       setDiscountText('')
       setStones([])
@@ -1288,6 +1299,29 @@ export function QuoteBuilderPage() {
                   <option value="no">No</option>
                   <option value="yes">Yes</option>
                 </select>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-semibold text-slate-900">
+                  Sales tax (7.75%)
+                  <span className="ml-2 text-xs font-normal text-slate-500">applied on top of the customer total</span>
+                </label>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={applyTaxes}
+                  onClick={() => setApplyTaxes(!applyTaxes)}
+                  className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+                    applyTaxes
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  <span>{applyTaxes ? 'Including 7.75% sales tax' : 'No sales tax'}</span>
+                  <span className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${applyTaxes ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition ${applyTaxes ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                  </span>
+                </button>
               </div>
 
               <div className="space-y-2 md:col-span-2">

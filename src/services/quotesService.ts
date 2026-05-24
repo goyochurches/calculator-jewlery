@@ -64,6 +64,7 @@ interface ApiQuote {
   engraving?: boolean | null
   setterType?: string | null
   jewelryType?: string | null
+  applyTaxes?: boolean | null
   client?: Client | null
   stones?: ApiStone[]
   customerStones?: ApiCustomerStone[]
@@ -140,6 +141,7 @@ function mapQuote(q: ApiQuote): SavedQuote {
     engraving: q.engraving ?? false,
     setterType: q.setterType ?? null,
     jewelryType: q.jewelryType ?? null,
+    applyTaxes: q.applyTaxes ?? false,
     client: q.client ?? null,
     clientId: q.client?.id ?? q.clientId ?? null,
     stones: (q.stones ?? []).map(mapStone),

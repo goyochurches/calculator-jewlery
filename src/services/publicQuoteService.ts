@@ -14,8 +14,14 @@ export interface PublicQuote {
   engravingFee: number
   /** Optional customer discount (percent). 0 when no discount was applied. */
   discountPercent: number
-  /** Money saved thanks to the discount (priceBeforeDiscount - total). */
+  /** Money saved thanks to the discount (priceBeforeDiscount - subtotal). */
   discountAmount: number
+  /** Total after discount, BEFORE tax. */
+  subtotal: number
+  /** True when 7.75% sales tax is added on top. */
+  applyTaxes: boolean | null
+  taxRate: number
+  taxAmount: number
   metal: string
   ringLabor: string
   cadDesign: string

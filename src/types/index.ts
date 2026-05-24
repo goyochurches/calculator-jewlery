@@ -149,6 +149,9 @@ export interface SavedQuote {
   engraving?: boolean | null
   setterType?: string | null
   jewelryType?: string | null
+  /** When true, adds 7.75% sales tax on top of the customer price. The
+   *  PDF and share link show the tax as a separate line. Default false. */
+  applyTaxes?: boolean | null
   client?: Client | null
   clientId?: number | null
   publicToken?: string | null
