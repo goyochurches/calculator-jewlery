@@ -8,6 +8,7 @@ import type { QuoteCustomerStone, QuoteStatus, QuoteStone, SavedQuote } from '@/
 import { PaymentPlanBlock } from '@/components/PaymentPlanBlock'
 import { useAuth } from '@/context/AuthContext'
 import { canSeePayments } from '@/lib/paymentsAccess'
+import { displayStatusFor } from '@/lib/quoteStatusDisplay'
 import { quotesService } from '@/services/quotesService'
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Copy, Eye, FileDown, MessageCircle, RefreshCw, X, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -422,9 +423,17 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
           <div className="flex-1 rounded-2xl bg-slate-50 px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Status</p>
             <div className="mt-2">
-              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[quote.status]}`}>
-                {STATUS_LABELS[quote.status]}
-              </span>
+              {(() => {
+                // Belt-and-braces: even if a stale response leaks
+                // fully_paid to a non-admin, the helper normalises it
+                // to approved before the badge renders.
+                const visible = displayStatusFor(quote.status, user)
+                return (
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[visible]}`}>
+                    {STATUS_LABELS[visible]}
+                  </span>
+                )
+              })()}
             </div>
           </div>
         </div>

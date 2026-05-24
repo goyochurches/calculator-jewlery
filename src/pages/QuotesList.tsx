@@ -288,8 +288,11 @@ export function QuotesListPage() {
     return () => document.removeEventListener('keydown', onKey)
   }, [selected])
 
+  // Counts use the DISPLAY status (fully_paid → approved for non-admins)
+  // so the dashboard tiles + filter chips never reveal the existence of
+  // payment-only statuses to users who shouldn't see them.
   const statusCounts = quotes.reduce<Record<QuoteStatus, number>>(
-    (acc, q) => { acc[q.status]++; return acc },
+    (acc, q) => { acc[displayStatusFor(q.status, user)]++; return acc },
     { draft: 0, pending: 0, approved: 0, rejected: 0, fully_paid: 0 }
   )
 
