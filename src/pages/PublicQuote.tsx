@@ -14,9 +14,13 @@ import {
   PublicQuoteUnavailableError,
   type PublicQuote,
 } from '@/services/publicQuoteService'
-import { AlertCircle, Clock, Diamond, Gem, HelpCircle, Quote as QuoteIcon, Ruler, Scissors, Sparkles, Wrench } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { AlertCircle, Clock, Diamond, Gem, Hand, HelpCircle, Quote as QuoteIcon, Ruler, Scissors, Sparkles, Wrench } from 'lucide-react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+
+// Lazy-loaded so the Three.js + MediaPipe bundle only ships when the
+// customer actually taps "Try on your hand".
+const RingTryOn = lazy(() => import('@/components/RingTryOn'))
 
 export function PublicQuotePage() {
   const { token } = useParams<{ token: string }>()
@@ -230,6 +234,10 @@ const PUBLIC_RING_LABOR_LEVELS: Record<string, string> = {
 }
 
 function QuoteView({ quote }: { quote: PublicQuote }) {
+  const [arOpen, setArOpen] = useState(false)
+  // AR try-on is only meaningful for rings. Treat null jewelryType as
+  // "ring" for legacy quotes that pre-date the field.
+  const canTryOn = quote.jewelryType == null || quote.jewelryType === 'ring'
   const metal = JEWELRY_METAL_OPTIONS[quote.metal as keyof typeof JEWELRY_METAL_OPTIONS]?.label ?? quote.metal
   const cad = CAD_DESIGN_OPTIONS[quote.cadDesign as keyof typeof CAD_DESIGN_OPTIONS]?.label ?? quote.cadDesign
   // Always show the numeric level to the customer regardless of the internal label.
@@ -314,8 +322,34 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
               Issued · {issuedDate}
             </p>
           )}
+
+          {canTryOn && (
+            <button
+              type="button"
+              onClick={() => setArOpen(true)}
+              className="group mx-auto mt-8 inline-flex items-center gap-2.5 rounded-full bg-amber-400 px-6 py-3 text-sm font-bold text-slate-900 shadow-[0_10px_30px_rgba(245,158,11,0.45)] transition hover:scale-[1.02] hover:bg-amber-300 sm:text-base"
+            >
+              <Hand className="h-4 w-4 transition group-hover:rotate-[-8deg]" />
+              Try it on your hand
+              <span className="rounded-full bg-slate-900/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-900/70">
+                AR
+              </span>
+            </button>
+          )}
         </div>
       </section>
+
+      {/* ── AR try-on modal (lazy) ─────────────────────────────────────── */}
+      {arOpen && (
+        <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 text-white text-sm">Loading try-on…</div>}>
+          <RingTryOn
+            metal={quote.metal}
+            ringWidthMm={quote.ringWidth ?? 2.0}
+            stoneCarats={quote.diamondCarats ?? null}
+            onClose={() => setArOpen(false)}
+          />
+        </Suspense>
+      )}
 
       {/* ── Personal note from the jeweler ──────────────────────────────── */}
       {(quote.createdByName || quote.createdByBio || quote.createdByPhoto) && (
