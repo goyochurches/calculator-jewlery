@@ -71,9 +71,33 @@ export interface PaymentRow {
   createdAt: string
 }
 
+/** Live row from Stripe's Checkout Session list, enriched with the
+ *  local quote/client context when we can match the metadata. */
+export interface StripePaymentRow {
+  sessionId: string
+  paymentIntentId: string | null
+  amountCents: number | null
+  currency: string | null
+  sessionStatus: string | null       // open / complete / expired
+  paymentStatus: string | null       // paid / unpaid / no_payment_required
+  createdEpoch: number
+  customerEmail: string | null
+  installmentId: number | null
+  installmentSortOrder: number | null
+  installmentTotalCount: number | null
+  quoteId: number | null
+  quoteTitle: string | null
+  clientName: string | null
+  dashboardUrl: string | null
+}
+
 export const paymentsAdminService = {
   async list(status?: InstallmentStatus): Promise<PaymentRow[]> {
     const qs = status ? `?status=${status}` : ''
     return api.get<PaymentRow[]>(`/api/payments${qs}`)
+  },
+
+  async listStripe(limit = 50): Promise<StripePaymentRow[]> {
+    return api.get<StripePaymentRow[]>(`/api/payments/stripe?limit=${limit}`)
   },
 }
