@@ -66,6 +66,8 @@ function InstallmentsTab() {
   /** Snapshot of each row's `paidAt` at refund-start so we can detect
    *  when the webhook lands (paidAt clears on full refund → PENDING). */
   const [refundBaselinePaidAt, setRefundBaselinePaidAt] = useState<Record<number, string | null>>({})
+  /** Row selected for the refund dialog. null = closed. */
+  const [refundDialogFor, setRefundDialogFor] = useState<PaymentRow | null>(null)
 
   const load = () => {
     setLoading(true)
@@ -78,32 +80,12 @@ function InstallmentsTab() {
 
   useEffect(load, [])
 
-  const handleRefund = async (row: PaymentRow) => {
-    const fullAmount = row.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })
-    const fullOk = window.confirm(
-      `Refund installment #${row.sortOrder + 1} of "${row.quoteTitle ?? '—'}" for $${fullAmount}?\n\n` +
-      `OK = enter partial amount.  Cancel = full refund.`
-    )
-    let amount: number | undefined
-    if (fullOk) {
-      const raw = window.prompt(
-        `Partial refund amount in USD (max ${row.amount}). Leave blank to refund in full.`,
-        ''
-      )
-      if (raw === null) return
-      const trimmed = raw.trim()
-      if (trimmed !== '') {
-        const n = Number(trimmed)
-        if (Number.isNaN(n) || n <= 0 || n > row.amount) {
-          setError(`Invalid amount: must be > 0 and ≤ ${row.amount}`)
-          return
-        }
-        amount = n
-      }
-    } else {
-      const confirmFull = window.confirm(`Issue a FULL refund of $${fullAmount}?`)
-      if (!confirmFull) return
-    }
+  const handleRefund = (row: PaymentRow) => {
+    setError(null)
+    setRefundDialogFor(row)
+  }
+
+  const runRefund = async (row: PaymentRow, amount: number | undefined) => {
     setRefundState(s => ({ ...s, [row.id]: 'requesting' }))
     setRefundBaselinePaidAt(s => ({ ...s, [row.id]: row.paidAt }))
     setError(null)
@@ -257,6 +239,22 @@ function InstallmentsTab() {
           )}
         </CardContent>
       </Card>
+
+      <RefundDialog
+        open={refundDialogFor !== null}
+        installmentNumber={refundDialogFor ? refundDialogFor.sortOrder + 1 : 0}
+        totalInstallments={0}
+        amount={refundDialogFor?.amount ?? 0}
+        quoteTitle={refundDialogFor?.quoteTitle ?? null}
+        loading={refundDialogFor != null && refundState[refundDialogFor.id] === 'requesting'}
+        onConfirm={(amount) => {
+          if (!refundDialogFor) return
+          const target = refundDialogFor
+          setRefundDialogFor(null)
+          runRefund(target, amount)
+        }}
+        onCancel={() => setRefundDialogFor(null)}
+      />
     </div>
   )
 }
