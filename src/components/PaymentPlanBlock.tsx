@@ -1,5 +1,5 @@
 import { paymentPlanService, quoteEventsService, type PaymentInstallment, type PlanRow, type QuoteEvent } from '@/services/paymentPlanService'
-import { AlertTriangle, Bell, Check, Clock, Copy, CreditCard, Link as LinkIcon, Loader2, MessageCircle, Plus, RefreshCw, Trash2, XCircle } from 'lucide-react'
+import { AlertTriangle, Bell, Check, Clock, Copy, CreditCard, Link as LinkIcon, Loader2, MessageCircle, Plus, RefreshCw, RotateCcw, Trash2, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 interface Props {
@@ -392,9 +392,11 @@ function InstallmentRow({
 }) {
   const isPaid = installment.status === 'PAID'
   const isCanceled = installment.status === 'CANCELED'
+  const isRefunded = installment.status === 'REFUNDED'
 
   const statusTone = isPaid     ? 'border-emerald-200 bg-emerald-50'
                    : isCanceled ? 'border-slate-200 bg-slate-50'
+                   : isRefunded ? 'border-violet-200 bg-violet-50/60'
                    :              'border-amber-100 bg-amber-50/40'
 
   return (
@@ -419,7 +421,7 @@ function InstallmentRow({
         </div>
       </div>
 
-      {!isPaid && !isCanceled && (
+      {!isPaid && !isCanceled && !isRefunded && (
         <div className="mt-2 flex items-center gap-2">
           <button
             type="button"
@@ -458,6 +460,11 @@ function StatusChip({ status }: { status: PaymentInstallment['status'] }) {
   if (status === 'CANCELED') return (
     <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-slate-600">
       <XCircle className="h-2.5 w-2.5" /> Canceled
+    </span>
+  )
+  if (status === 'REFUNDED') return (
+    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-violet-700">
+      <RotateCcw className="h-2.5 w-2.5" /> Refunded
     </span>
   )
   return (

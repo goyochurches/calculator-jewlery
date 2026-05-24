@@ -1,18 +1,19 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { paymentsAdminService, type PaymentRow, type StripePaymentRow } from '@/services/paymentPlanService'
-import { Check, Clock, CreditCard, ExternalLink, Filter, RefreshCw, XCircle } from 'lucide-react'
+import { Check, Clock, CreditCard, ExternalLink, Filter, RefreshCw, RotateCcw, XCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
 type Tab = 'installments' | 'stripe'
 
-type StatusFilter = 'ALL' | 'PENDING' | 'PAID' | 'CANCELED'
+type StatusFilter = 'ALL' | 'PENDING' | 'PAID' | 'CANCELED' | 'REFUNDED'
 
 const FILTERS: { key: StatusFilter; label: string }[] = [
-  { key: 'ALL',     label: 'All' },
-  { key: 'PENDING', label: 'Pending' },
-  { key: 'PAID',    label: 'Paid' },
-  { key: 'CANCELED',label: 'Canceled' },
+  { key: 'ALL',      label: 'All' },
+  { key: 'PENDING',  label: 'Pending' },
+  { key: 'PAID',     label: 'Paid' },
+  { key: 'REFUNDED', label: 'Refunded' },
+  { key: 'CANCELED', label: 'Canceled' },
 ]
 
 export function PaymentsPage() {
@@ -78,14 +79,15 @@ function InstallmentsTab() {
   }, [rows, filter])
 
   const totals = useMemo(() => {
-    if (!rows) return { paid: 0, pending: 0, total: 0, count: { paid: 0, pending: 0, canceled: 0 } }
+    if (!rows) return { paid: 0, pending: 0, total: 0, count: { paid: 0, pending: 0, canceled: 0, refunded: 0 } }
     return rows.reduce((acc, r) => {
       acc.total += r.amount
       if (r.status === 'PAID')     { acc.paid    += r.amount; acc.count.paid++ }
       if (r.status === 'PENDING')  { acc.pending += r.amount; acc.count.pending++ }
       if (r.status === 'CANCELED') {                          acc.count.canceled++ }
+      if (r.status === 'REFUNDED') {                          acc.count.refunded++ }
       return acc
-    }, { paid: 0, pending: 0, total: 0, count: { paid: 0, pending: 0, canceled: 0 } })
+    }, { paid: 0, pending: 0, total: 0, count: { paid: 0, pending: 0, canceled: 0, refunded: 0 } })
   }, [rows])
 
   return (
@@ -112,6 +114,7 @@ function InstallmentsTab() {
               ALL: rows?.length ?? 0,
               PENDING: totals.count.pending,
               PAID: totals.count.paid,
+              REFUNDED: totals.count.refunded,
               CANCELED: totals.count.canceled,
             }} />
             <button
@@ -417,6 +420,11 @@ function LocalStatusBadge({ status, paidAt }: { status: PaymentRow['status']; pa
       </span>
       {paidAt && <p className="mt-1 text-[10px] text-slate-400">{new Date(paidAt).toLocaleDateString()}</p>}
     </div>
+  )
+  if (status === 'REFUNDED') return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700">
+      <RotateCcw className="h-2.5 w-2.5" /> Refunded
+    </span>
   )
   if (status === 'CANCELED') return (
     <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">

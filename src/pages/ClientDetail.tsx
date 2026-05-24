@@ -9,7 +9,7 @@ import { clientService } from '@/services/clientService'
 import { paymentsAdminService, type PaymentRow } from '@/services/paymentPlanService'
 import { quotesService } from '@/services/quotesService'
 import type { Client, QuoteStatus, SavedQuote } from '@/types'
-import { ArrowLeft, Check, Clock, CreditCard, FileText, Mail, Phone, User, XCircle } from 'lucide-react'
+import { ArrowLeft, Check, Clock, CreditCard, FileText, Mail, Phone, RotateCcw, User, XCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
@@ -370,6 +370,10 @@ function ClientPaymentsBlock({ clientId }: { clientId: string }) {
                     {r.status === 'PAID' ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
                         <Check className="h-2.5 w-2.5" /> Paid
+                      </span>
+                    ) : r.status === 'REFUNDED' ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-700">
+                        <RotateCcw className="h-2.5 w-2.5" /> Refunded
                       </span>
                     ) : r.status === 'CANCELED' ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">
