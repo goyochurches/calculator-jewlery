@@ -428,6 +428,7 @@ export function QuotesListPage() {
                         expanded={expanded}
                         canToggle={group.parentMatches && childCount > 0}
                         onToggle={() => toggleGroup(group.parent.id)}
+                        viewerUser={user}
                       />,
                     )
                     if (expanded) {
@@ -441,6 +442,7 @@ export function QuotesListPage() {
                             isSelected={child.id === selectedId}
                             onSelect={() => setSelectedId(child.id === selectedId ? null : child.id)}
                             onDuplicate={() => navigate('/quotes', { state: { duplicateFrom: child } })}
+                            viewerUser={user}
                           />,
                         )
                       })
@@ -654,7 +656,7 @@ function QuotesListSkeleton() {
  */
 function QuoteRow({
   quote, kind, isSelected, onSelect, onDuplicate,
-  childCount, expanded, canToggle, onToggle, isLastChild,
+  childCount, expanded, canToggle, onToggle, isLastChild, viewerUser,
 }: {
   quote: SavedQuote
   kind: 'parent' | 'parent-ghost' | 'child'
@@ -666,6 +668,9 @@ function QuoteRow({
   canToggle?: boolean
   onToggle?: () => void
   isLastChild?: boolean
+  /** Current viewer — drives status display normalisation so non-admin
+   *  accounts see fully_paid rendered as approved. */
+  viewerUser: { email?: string } | null | undefined
 }) {
   const isChild = kind === 'child'
   const isGhost = kind === 'parent-ghost'
@@ -771,11 +776,18 @@ function QuoteRow({
         {JEWELRY_METAL_OPTIONS[quote.metal]?.label ?? quote.metal}
       </td>
       <td className="px-6 py-4">
-        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-          isSelected ? 'bg-white/15 text-white' : STATUS_STYLES[quote.status]
-        }`}>
-          {STATUS_LABELS[quote.status]}
-        </span>
+        {(() => {
+          // Display-mapped: hides fully_paid → approved for non-admins
+          // even if the row data leaks the raw status.
+          const visible = displayStatusFor(quote.status, viewerUser)
+          return (
+            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+              isSelected ? 'bg-white/15 text-white' : STATUS_STYLES[visible]
+            }`}>
+              {STATUS_LABELS[visible]}
+            </span>
+          )
+        })()}
       </td>
       <td className={`px-6 py-4 ${isSelected ? 'text-slate-400' : 'text-slate-400'}`}>
         {quote.createdAt}
