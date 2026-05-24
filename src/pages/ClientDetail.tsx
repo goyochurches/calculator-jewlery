@@ -4,12 +4,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/context/AuthContext'
+import { FEATURES } from '@/lib/featureFlags'
 import { clientService } from '@/services/clientService'
+import { paymentsAdminService, type PaymentRow } from '@/services/paymentPlanService'
 import { quotesService } from '@/services/quotesService'
 import type { Client, QuoteStatus, SavedQuote } from '@/types'
-import { ArrowLeft, FileText, Mail, Phone, User } from 'lucide-react'
+import { ArrowLeft, Check, Clock, CreditCard, FileText, Mail, Phone, User, XCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 
 const STATUS_STYLES: Record<QuoteStatus, string> = {
   draft:      'bg-slate-100 text-slate-600',
@@ -252,6 +254,11 @@ export function ClientDetailPage() {
           </Card>
         )}
       </div>
+
+      {/* Client-scoped payment activity (admin-only, payments-flag gated). */}
+      {isAdmin && FEATURES.payments && id && (
+        <ClientPaymentsBlock clientId={id} />
+      )}
     </div>
   )
 }
