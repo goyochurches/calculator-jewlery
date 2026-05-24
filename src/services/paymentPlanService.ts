@@ -1,6 +1,6 @@
 import { api } from '@/api/apiClient'
 
-export type InstallmentStatus = 'PENDING' | 'PAID' | 'CANCELED'
+export type InstallmentStatus = 'PENDING' | 'PAID' | 'CANCELED' | 'REFUNDED'
 
 export interface PaymentInstallment {
   id: number
@@ -136,7 +136,17 @@ export interface QuoteEvent {
 }
 
 export const quoteEventsService = {
+  /** Returns the activity log for a quote. Treats 404 as "feature not
+   *  deployed yet on this backend" → empty list, so the panel doesn't
+   *  show a noisy error during the rollout window where the FE is on
+   *  Vercel but the BE is still building on Render. */
   async forQuote(quoteId: string | number): Promise<QuoteEvent[]> {
-    return api.get<QuoteEvent[]>(`/api/quotes/${quoteId}/events`)
+    try {
+      return await api.get<QuoteEvent[]>(`/api/quotes/${quoteId}/events`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg.includes('404') || msg.includes('Not Found')) return []
+      throw err
+    }
   },
 }

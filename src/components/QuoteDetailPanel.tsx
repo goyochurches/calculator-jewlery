@@ -827,9 +827,11 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
 
         {/* Payment plan — splits the customer-facing total into Stripe
             checkout sessions the jeweler can copy and paste. Admin-only
-            and gated by the FEATURES.payments flag so the whole feature
-            can be toggled off without code changes. */}
-        {canSeePayments && <PaymentPlanBlock quoteId={quote.id} total={customerPrice} />}
+            and gated by the FEATURES.payments flag. Also hidden on
+            REJECTED quotes — the deal is dead, no payments to collect. */}
+        {canSeePayments && quote.status !== 'rejected' && (
+          <PaymentPlanBlock quoteId={quote.id} total={customerPrice} />
+        )}
       </div>
     </div>
   )
