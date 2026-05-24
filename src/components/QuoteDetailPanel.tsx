@@ -18,6 +18,7 @@ const STATUS_STYLES: Record<QuoteStatus, string> = {
   pending: 'bg-amber-50 text-amber-700',
   approved: 'bg-emerald-50 text-emerald-700',
   rejected: 'bg-rose-50 text-rose-700',
+  fully_paid: 'bg-emerald-100 text-emerald-800',
 }
 
 const STATUS_LABELS: Record<QuoteStatus, string> = {
@@ -25,6 +26,7 @@ const STATUS_LABELS: Record<QuoteStatus, string> = {
   pending: 'Pending',
   approved: 'Approved',
   rejected: 'Rejected',
+  fully_paid: 'Fully paid',
 }
 
 function initials(name: string) {
@@ -158,7 +160,7 @@ const ROLE_THEME: Record<StoneRole, { label: string; dot: string; ring: string; 
 export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToken, isAdmin = false }: QuoteDetailPanelProps) {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const canSeePayments = FEATURES.payments && user?.role === 'admin'
+  const canSeePayments = FEATURES.payments && user?.role === 'ADMIN'
   const [refreshing, setRefreshing] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
   const handleDuplicate = () => {
@@ -286,7 +288,10 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
     <div className="flex flex-col">
       <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
         <div>
-          <h2 className="text-base font-semibold text-slate-900">{quote.title}</h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold text-slate-900">{quote.title}</h2>
+            {canSeePayments && <PaymentSummaryBadge quote={quote} />}
+          </div>
           <p className="mt-0.5 text-xs text-slate-400">
             Quote #{quote.id} · {quote.createdAt}
             {jewelryTypeLabel ? <> · <span className="font-semibold text-slate-600">{jewelryTypeLabel}</span></> : null}
@@ -1079,5 +1084,28 @@ function WhatsAppRow({ title, subtitle, sentAt, to, toLabel, status, error }: {
         </div>
       </div>
     </div>
+  )
+}
+
+/** Compact pill near the quote title summarising payment progress.
+ *  Renders nothing when there's no payment plan, a green "Paid" when
+ *  fully collected, or an amber "Paid X/Y · $A of $B" while in progress. */
+function PaymentSummaryBadge({ quote }: { quote: SavedQuote }) {
+  if (!quote.paymentHasPlan) return null
+  const paidCount = quote.paymentPaidCount ?? 0
+  const totalCount = quote.paymentTotalCount ?? 0
+  const paid = quote.paymentTotalPaid ?? 0
+  const due = quote.paymentTotalDue ?? 0
+  if (quote.paymentFullyPaid) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+        <Check className="h-3 w-3" /> Paid · ${paid.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800">
+      {paidCount}/{totalCount} paid · ${paid.toLocaleString('en-US', { minimumFractionDigits: 2 })} of ${due.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+    </span>
   )
 }
