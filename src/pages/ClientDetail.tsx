@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/context/AuthContext'
-import { FEATURES } from '@/lib/featureFlags'
+import { canSeePayments } from '@/lib/paymentsAccess'
 import { clientService } from '@/services/clientService'
 import { paymentsAdminService, type PaymentRow } from '@/services/paymentPlanService'
 import { quotesService } from '@/services/quotesService'
@@ -255,8 +255,9 @@ export function ClientDetailPage() {
         )}
       </div>
 
-      {/* Client-scoped payment activity (admin-only, payments-flag gated). */}
-      {isAdmin && FEATURES.payments && id && (
+      {/* Client-scoped payment activity — shown only to the shop-owner
+          account, gated by the payments feature flag. */}
+      {canSeePayments(user) && id && (
         <ClientPaymentsBlock clientId={id} />
       )}
     </div>

@@ -21,6 +21,7 @@ import { PaymentSuccessPage } from '@/pages/PaymentSuccess'
 import { PaymentCancelPage } from '@/pages/PaymentCancel'
 import { PaymentsPage } from '@/pages/Payments'
 import { FEATURES } from '@/lib/featureFlags'
+import { canSeePayments } from '@/lib/paymentsAccess'
 import Login from '@/pages/Login'
 import SetupPassword from '@/pages/SetupPassword'
 import { canAccess, defaultRouteFor, type NavKey } from '@/constants/permissions'
@@ -51,6 +52,15 @@ function PrivateRoutes() {
 function RequirePermission({ permission }: { permission: NavKey }) {
   const { user } = useAuth()
   if (!canAccess(user?.role, permission)) return <Navigate to={defaultRouteFor(user?.role)} replace />
+  return <Outlet />
+}
+
+/** Stricter gate just for the payments route — uses the email-based
+ *  canSeePayments check so even another ADMIN user can't reach the page
+ *  by typing the URL directly. */
+function RequirePaymentsAccess() {
+  const { user } = useAuth()
+  if (!canSeePayments(user)) return <Navigate to={defaultRouteFor(user?.role)} replace />
   return <Outlet />
 }
 
@@ -105,7 +115,7 @@ export default function App() {
                   <Route path="/users" element={<UsersPage />} />
                 </Route>
                 {FEATURES.payments && (
-                  <Route element={<RequirePermission permission="payments" />}>
+                  <Route element={<RequirePaymentsAccess />}>
                     <Route path="/payments" element={<PaymentsPage />} />
                   </Route>
                 )}

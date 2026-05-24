@@ -1,3 +1,4 @@
+import { RefundDialog } from '@/components/RefundDialog'
 import { paymentPlanService, quoteEventsService, type PaymentInstallment, type PlanRow, type QuoteEvent } from '@/services/paymentPlanService'
 import { AlertTriangle, Bell, Check, Clock, Copy, CreditCard, Link as LinkIcon, Loader2, MessageCircle, Plus, RefreshCw, RotateCcw, Trash2, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -10,6 +11,9 @@ interface Props {
   /** Client's WhatsApp phone (E.164). When absent, the "Send WhatsApp"
    *  button is disabled with a tooltip explaining why. */
   clientPhone?: string | null
+  /** Quote title — surfaced in the refund dialog so the admin double-
+   *  checks they're refunding the right deal. */
+  quoteTitle?: string
 }
 
 interface Draft {
@@ -19,7 +23,7 @@ interface Draft {
 
 /** Inline editor + viewer of a quote's payment plan. Wipes & recreates on
  *  save (matches the backend semantics — there's no per-row update). */
-export function PaymentPlanBlock({ quoteId, total, clientPhone }: Props) {
+export function PaymentPlanBlock({ quoteId, total, clientPhone, quoteTitle }: Props) {
   const [plan, setPlan] = useState<PaymentInstallment[] | null>(null)
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [editing, setEditing] = useState(false)
@@ -35,6 +39,8 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone }: Props) {
    *  (status flipped to REFUNDED). Absent = idle. Lets us show distinct
    *  pill messages without conflating in-flight with awaiting-webhook. */
   const [refundState, setRefundState] = useState<Record<number, 'requesting' | 'awaiting' | 'completed'>>({})
+  /** Installment selected for the refund dialog. null = closed. */
+  const [refundDialogFor, setRefundDialogFor] = useState<PaymentInstallment | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -140,31 +146,9 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone }: Props) {
     }
   }
 
-  const handleRefund = async (installment: PaymentInstallment) => {
-    const fullAmount = installment.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })
-    const ok = window.confirm(
-      `Refund installment #${installment.sortOrder + 1} for $${fullAmount}?\n\n` +
-      `Cancel for full refund. Click OK to enter a partial amount instead (leave blank to refund in full).`
-    )
-    if (!ok) {
-      // User canceled — give them the chance to do a full refund via a second prompt.
-      const doFull = window.confirm(`Issue a FULL refund of $${fullAmount}?`)
-      if (!doFull) return
-      return runRefund(installment, undefined)
-    }
-    const raw = window.prompt(
-      `Partial refund amount in USD (max ${installment.amount}). Leave blank to refund in full.`,
-      ''
-    )
-    if (raw === null) return
-    const trimmed = raw.trim()
-    if (trimmed === '') return runRefund(installment, undefined)
-    const amount = Number(trimmed)
-    if (Number.isNaN(amount) || amount <= 0 || amount > installment.amount) {
-      setError(`Invalid amount: must be > 0 and ≤ ${installment.amount}`)
-      return
-    }
-    return runRefund(installment, amount)
+  const handleRefund = (installment: PaymentInstallment) => {
+    setError(null)
+    setRefundDialogFor(installment)
   }
 
   const runRefund = async (installment: PaymentInstallment, amount: number | undefined) => {
@@ -384,6 +368,22 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone }: Props) {
       {/* Activity timeline — payment events for this quote (plan
           creation, reminders sent, payments received, plan completion). */}
       <PaymentEventsTimeline quoteId={quoteId} />
+
+      <RefundDialog
+        open={refundDialogFor !== null}
+        installmentNumber={refundDialogFor ? refundDialogFor.sortOrder + 1 : 0}
+        totalInstallments={plan?.length ?? 0}
+        amount={refundDialogFor?.amount ?? 0}
+        quoteTitle={quoteTitle ?? null}
+        loading={refundDialogFor != null && refundState[refundDialogFor.id] === 'requesting'}
+        onConfirm={(amount) => {
+          if (!refundDialogFor) return
+          const target = refundDialogFor
+          setRefundDialogFor(null)
+          runRefund(target, amount)
+        }}
+        onCancel={() => setRefundDialogFor(null)}
+      />
     </div>
   )
 }

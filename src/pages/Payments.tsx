@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { RefundDialog } from '@/components/RefundDialog'
 import { paymentPlanService, paymentsAdminService, type PaymentRow, type StripePaymentRow } from '@/services/paymentPlanService'
 import { Check, Clock, CreditCard, ExternalLink, Filter, Loader2, RefreshCw, RotateCcw, XCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'

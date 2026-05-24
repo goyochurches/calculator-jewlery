@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useBrand } from '@/context/BrandContext'
 import { canAccess, type NavKey } from '@/constants/permissions'
 import { FEATURES } from '@/lib/featureFlags'
+import { canSeePayments } from '@/lib/paymentsAccess'
 import {
   Calculator,
   ClipboardList,
@@ -64,7 +65,13 @@ function SidebarContent({
   const { user, logout } = useAuth()
   const { companyName, logo } = useBrand()
   const navigate = useNavigate()
-  const visibleNavItems = navItems.filter((item) => !item.hidden && canAccess(user?.role, item.key))
+  const visibleNavItems = navItems.filter((item) => {
+    if (item.hidden) return false
+    // Payments is gated on the specific shop-owner email, not on role.
+    // Hide the sidebar entry for anyone else, even other ADMIN accounts.
+    if (item.key === 'payments' && !canSeePayments(user)) return false
+    return canAccess(user?.role, item.key)
+  })
   const goToProfile = () => { onNavigate?.(); navigate('/profile') }
 
   return (

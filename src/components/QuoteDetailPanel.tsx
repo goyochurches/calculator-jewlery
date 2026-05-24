@@ -7,7 +7,7 @@ import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import type { QuoteCustomerStone, QuoteStatus, QuoteStone, SavedQuote } from '@/types'
 import { PaymentPlanBlock } from '@/components/PaymentPlanBlock'
 import { useAuth } from '@/context/AuthContext'
-import { FEATURES } from '@/lib/featureFlags'
+import { canSeePayments } from '@/lib/paymentsAccess'
 import { quotesService } from '@/services/quotesService'
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Copy, Eye, FileDown, MessageCircle, RefreshCw, X, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -160,7 +160,7 @@ const ROLE_THEME: Record<StoneRole, { label: string; dot: string; ring: string; 
 export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToken, isAdmin = false }: QuoteDetailPanelProps) {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const canSeePayments = FEATURES.payments && user?.role === 'ADMIN'
+  const canSeePayments_ = canSeePayments(user)
   const [refreshing, setRefreshing] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
   const handleDuplicate = () => {
@@ -290,7 +290,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-base font-semibold text-slate-900">{quote.title}</h2>
-            {canSeePayments && <PaymentSummaryBadge quote={quote} />}
+            {canSeePayments_ && <PaymentSummaryBadge quote={quote} />}
           </div>
           <p className="mt-0.5 text-xs text-slate-400">
             Quote #{quote.id} · {quote.createdAt}
@@ -829,11 +829,12 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             checkout sessions the jeweler can copy and paste. Admin-only
             and gated by the FEATURES.payments flag. Also hidden on
             REJECTED quotes — the deal is dead, no payments to collect. */}
-        {canSeePayments && quote.status !== 'rejected' && (
+        {canSeePayments_ && quote.status !== 'rejected' && (
           <PaymentPlanBlock
             quoteId={quote.id}
             total={customerPrice}
             clientPhone={quote.client?.phone ?? null}
+            quoteTitle={quote.title}
           />
         )}
       </div>
