@@ -101,3 +101,36 @@ export const paymentsAdminService = {
     return api.get<StripePaymentRow[]>(`/api/payments/stripe?limit=${limit}`)
   },
 }
+
+/** Type of quote-scoped event surfaced in the activity timeline. Mirrors
+ *  the backend QuoteEvent.Type enum verbatim. */
+export type QuoteEventType =
+  | 'PLAN_CREATED'
+  | 'PLAN_UPDATED'
+  | 'PLAN_CANCELED'
+  | 'REMINDER_CREATOR'
+  | 'REMINDER_CLIENT'
+  | 'INSTALLMENT_PAID'
+  | 'PLAN_FULLY_PAID'
+  | 'OVERDUE'
+
+export type QuoteEventChannel = 'WHATSAPP' | 'IN_APP' | 'SYSTEM'
+
+export interface QuoteEvent {
+  id: number
+  type: QuoteEventType
+  title: string
+  body: string | null
+  channel: QuoteEventChannel | null
+  recipient: string | null
+  externalId: string | null
+  status: string | null
+  error: string | null
+  createdAt: string
+}
+
+export const quoteEventsService = {
+  async forQuote(quoteId: string | number): Promise<QuoteEvent[]> {
+    return api.get<QuoteEvent[]>(`/api/quotes/${quoteId}/events`)
+  },
+}
