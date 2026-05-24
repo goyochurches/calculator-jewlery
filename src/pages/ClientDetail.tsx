@@ -282,4 +282,113 @@ function StatCard({ label, value }: { label: string; value: string }) {
   )
 }
 
+/** Installments across every quote of this client. Admin-only, gated by
+ *  the payments feature flag. Shows a per-quote rollup + the raw rows
+ *  so the jeweler can see at a glance who has paid what. */
+function ClientPaymentsBlock({ clientId }: { clientId: string }) {
+  const [rows, setRows] = useState<PaymentRow[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    setLoading(true)
+    paymentsAdminService.listByClient(clientId)
+      .then(p => { if (alive) { setRows(p); setLoading(false) } })
+      .catch(err => {
+        if (alive) {
+          setError(err instanceof Error ? err.message : 'Failed to load payments')
+          setLoading(false)
+        }
+      })
+    return () => { alive = false }
+  }, [clientId])
+
+  const totals = useMemo(() => {
+    if (!rows) return { paid: 0, pending: 0, count: { paid: 0, pending: 0, canceled: 0 } }
+    return rows.reduce((acc, r) => {
+      if (r.status === 'PAID')     { acc.paid    += r.amount; acc.count.paid++ }
+      if (r.status === 'PENDING')  { acc.pending += r.amount; acc.count.pending++ }
+      if (r.status === 'CANCELED') {                          acc.count.canceled++ }
+      return acc
+    }, { paid: 0, pending: 0, count: { paid: 0, pending: 0, canceled: 0 } })
+  }, [rows])
+
+  if (loading) return null
+  if (error) return (
+    <Card className="rounded-[28px] border border-rose-200 bg-rose-50/40">
+      <CardContent className="px-6 py-5 text-sm text-rose-700">{error}</CardContent>
+    </Card>
+  )
+  if (!rows || rows.length === 0) return null
+
+  return (
+    <Card className="rounded-[28px] border border-white/80 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+      <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-slate-100">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+            <CreditCard className="h-5 w-5" />
+          </span>
+          <div>
+            <CardTitle className="text-base font-semibold text-slate-900">Payments by this client</CardTitle>
+            <p className="text-sm text-slate-500">
+              ${totals.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })} collected ·
+              {' '}${totals.pending.toLocaleString('en-US', { minimumFractionDigits: 2 })} outstanding
+            </p>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+              <tr>
+                <th className="px-4 py-3 text-left">Quote</th>
+                <th className="px-4 py-3 text-left">Installment</th>
+                <th className="px-4 py-3 text-left">Due</th>
+                <th className="px-4 py-3 text-right">Amount</th>
+                <th className="px-4 py-3 text-left">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map(r => (
+                <tr key={r.id} className="transition hover:bg-amber-50/30">
+                  <td className="px-4 py-3">
+                    <Link to={`/quotes-list?quoteId=${r.quoteId}`} className="font-semibold text-slate-900 hover:text-amber-700 hover:underline">
+                      {r.quoteTitle ?? '—'}
+                    </Link>
+                    <p className="text-[11px] text-slate-400">#{r.quoteId}</p>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600">#{r.sortOrder + 1}</td>
+                  <td className="px-4 py-3 text-slate-600">
+                    {r.dueDate ? new Date(r.dueDate).toLocaleDateString() : <span className="text-slate-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right font-bold tabular-nums text-slate-900">
+                    ${r.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </td>
+                  <td className="px-4 py-3">
+                    {r.status === 'PAID' ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                        <Check className="h-2.5 w-2.5" /> Paid
+                      </span>
+                    ) : r.status === 'CANCELED' ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                        <XCircle className="h-2.5 w-2.5" /> Canceled
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                        <Clock className="h-2.5 w-2.5" /> Pending
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
 export default ClientDetailPage
