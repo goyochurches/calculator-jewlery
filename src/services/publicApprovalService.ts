@@ -4,17 +4,86 @@
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
+export interface ApprovalStoneDetail {
+  id: number | null
+  role: 'MAIN' | 'SIDE' | 'MELEE' | null
+  stoneTypeLabel: string | null
+  sizeLabel: string | null
+  sizeKey: string | null
+  carats: number | null
+  amount: number | null
+  setterLabel: string | null
+  setterFee: number | null
+  shape: string | null
+  color: string | null
+  labReport: string | null
+  comments: string | null
+  stoneCost: number
+  settingLabor: number
+  subtotal: number
+  hasManualPrice: boolean
+}
+
+export interface ApprovalCustomerStoneDetail {
+  id: number | null
+  gemstoneName: string | null
+  setterLabel: string | null
+  setterFee: number | null
+  sizeText: string | null
+  quantity: number | null
+  photo: string | null
+  comments: string | null
+  lineFee: number
+}
+
+export interface ApprovalAttachmentDetail {
+  id: number | null
+  photo: string | null
+  caption: string | null
+  createdAt: string | null
+}
+
 export interface ApprovalDetails {
   quoteId: number
   title: string
   clientName: string | null
   createdByName: string | null
   createdAt: string | null
+  jewelryTypeLabel: string | null
+
   internalCost: number
   customerPrice: number
+  customerPriceBeforeDiscount: number
+  discountAmount: number
   discountPercent: number
   markupMultiplier: number
+
+  metalLabel: string | null
+  weightGrams: number | null
+  ringWidth: number | null
+  fingerSize: number | null
+  ringLaborLabel: string | null
+  ringLaborFee: number | null
+  cadDesignLabel: string | null
+  cadDesignFee: number | null
+  laborHours: number | null
+  hourlyRate: number | null
+  extraCosts: number | null
   engraving: boolean | null
+  engravingFee: number
+
+  photo: string | null
+  internalNotes: string | null
+  attachments: ApprovalAttachmentDetail[]
+
+  stones: ApprovalStoneDetail[]
+  customerStones: ApprovalCustomerStoneDetail[]
+  stonesSubtotalCost: number
+  stonesSubtotalLabor: number
+  customerStonesSubtotalFee: number
+  stonesTotalAmount: number
+  stonesTotalCarats: number
+
   token: string
   expiresAt: string
   used: boolean
