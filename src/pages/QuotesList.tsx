@@ -15,6 +15,7 @@ const STATUS_STYLES: Record<QuoteStatus, string> = {
   pending: 'bg-amber-50 text-amber-700',
   approved: 'bg-emerald-50 text-emerald-700',
   rejected: 'bg-rose-50 text-rose-700',
+  fully_paid: 'bg-emerald-100 text-emerald-800',
 }
 
 const STATUS_LABELS: Record<QuoteStatus, string> = {
@@ -22,6 +23,7 @@ const STATUS_LABELS: Record<QuoteStatus, string> = {
   pending: 'Pending',
   approved: 'Approved',
   rejected: 'Rejected',
+  fully_paid: 'Fully paid',
 }
 
 function initials(name: string) {
@@ -263,7 +265,7 @@ export function QuotesListPage() {
 
   const statusCounts = quotes.reduce<Record<QuoteStatus, number>>(
     (acc, q) => { acc[q.status]++; return acc },
-    { draft: 0, pending: 0, approved: 0, rejected: 0 }
+    { draft: 0, pending: 0, approved: 0, rejected: 0, fully_paid: 0 }
   )
 
   if (loading) return <QuotesListSkeleton />
