@@ -14,6 +14,12 @@ interface Props {
   /** Quote title — surfaced in the refund dialog so the admin double-
    *  checks they're refunding the right deal. */
   quoteTitle?: string
+  /** Fires when something that may have changed the parent quote's
+   *  status happens (plan created/updated, payment received via webhook,
+   *  refund completed). Parents pass this to refresh their quote list /
+   *  badges so the cascade (FULLY_PAID ↔ APPROVED) is visible without
+   *  a manual reload. */
+  onPaymentChanged?: () => void
 }
 
 interface Draft {
@@ -23,7 +29,7 @@ interface Draft {
 
 /** Inline editor + viewer of a quote's payment plan. Wipes & recreates on
  *  save (matches the backend semantics — there's no per-row update). */
-export function PaymentPlanBlock({ quoteId, total, clientPhone, quoteTitle }: Props) {
+export function PaymentPlanBlock({ quoteId, total, clientPhone, quoteTitle, onPaymentChanged }: Props) {
   const [plan, setPlan] = useState<PaymentInstallment[] | null>(null)
   const [drafts, setDrafts] = useState<Draft[]>([])
   const [editing, setEditing] = useState(false)
@@ -103,6 +109,7 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone, quoteTitle }: Pr
       const updated = await paymentPlanService.upsert(quoteId, rows)
       setPlan(updated)
       setEditing(false)
+      onPaymentChanged?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save plan')
     } finally {
@@ -193,6 +200,10 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone, quoteTitle }: Pr
         void requestedAmount
         if (done) {
           setRefundState(s => ({ ...s, [installmentId]: 'completed' }))
+          // Tell the parent (QuotesList / ClientDetail) so it can refetch
+          // its quote list — the cascade just moved status FULLY_PAID →
+          // APPROVED on the backend and the row badge must follow.
+          onPaymentChanged?.()
           setTimeout(() => setRefundState(s => {
             const next = { ...s }; delete next[installmentId]; return next
           }), 4000)

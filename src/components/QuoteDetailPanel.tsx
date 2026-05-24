@@ -108,6 +108,12 @@ interface QuoteDetailPanelProps {
   /** Admin-only callback to rotate the share token + reset 3-month expiration. */
   onRefreshToken?: (id: string) => Promise<void> | void
   isAdmin?: boolean
+  /** Fires when the embedded PaymentPlanBlock detects a change that may
+   *  have moved the parent quote's status (refund completed, payment
+   *  received, plan saved). The host page wires this up to refetch its
+   *  list so the cascade FULLY_PAID ↔ APPROVED becomes visible without
+   *  a manual reload. */
+  onPaymentChanged?: () => void
 }
 
 /** Renders an absolute date + a "X ago" hint for any ISO timestamp. */
@@ -158,7 +164,7 @@ const ROLE_THEME: Record<StoneRole, { label: string; dot: string; ring: string; 
   MELEE: { label: 'Melee', dot: 'bg-emerald-500', ring: 'border-emerald-200', tint: 'bg-emerald-50/40', chip: 'bg-emerald-100 text-emerald-800' },
 }
 
-export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToken, isAdmin = false }: QuoteDetailPanelProps) {
+export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToken, isAdmin = false, onPaymentChanged }: QuoteDetailPanelProps) {
   const navigate = useNavigate()
   const { user } = useAuth()
   const canSeePayments_ = canSeePayments(user)
@@ -844,6 +850,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             total={customerPrice}
             clientPhone={quote.client?.phone ?? null}
             quoteTitle={quote.title}
+            onPaymentChanged={onPaymentChanged}
           />
         )}
       </div>

@@ -483,6 +483,12 @@ export function QuotesListPage() {
                 onStatusChange={handleStatusChange}
                 onRefreshToken={isAdmin ? handleRefreshToken : undefined}
                 isAdmin={isAdmin}
+                onPaymentChanged={() => {
+                  // Refetch the full list so the status badge of the
+                  // affected quote reflects the cascade (e.g. FULLY_PAID
+                  // → APPROVED after a refund).
+                  quotesService.getAll().then(setQuotes).catch(console.error)
+                }}
               />
             </div>
           </div>

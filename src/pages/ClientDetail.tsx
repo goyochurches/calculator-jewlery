@@ -256,6 +256,12 @@ export function ClientDetailPage() {
               onStatusChange={handleStatusChange}
               onRefreshToken={isAdmin ? handleRefreshToken : undefined}
               onClose={() => setSelectedId(null)}
+              onPaymentChanged={() => {
+                if (!id) return
+                // Refetch the client's quote list so the status badge in
+                // the table updates after a refund/payment cascade.
+                quotesService.getByClient(Number(id)).then(setQuotes).catch(console.error)
+              }}
             />
           </Card>
         )}
