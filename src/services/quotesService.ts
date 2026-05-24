@@ -88,6 +88,10 @@ interface ApiQuote {
   /** Twilio status of the approval notification sent to the creator (only for APPROVED). */
   approvalWhatsappStatus?: string | null
   approvalWhatsappError?: string | null
+  /** Twilio status of the "customer opened the share link" notification. */
+  openedWhatsappStatus?: string | null
+  openedWhatsappError?: string | null
+  openedWhatsappSentAt?: string | null
 }
 
 function mapQuote(q: ApiQuote): SavedQuote {
@@ -138,6 +142,9 @@ function mapQuote(q: ApiQuote): SavedQuote {
     pendingWhatsappError: q.pendingWhatsappError ?? null,
     approvalWhatsappStatus: q.approvalWhatsappStatus ?? null,
     approvalWhatsappError: q.approvalWhatsappError ?? null,
+    openedWhatsappStatus: q.openedWhatsappStatus ?? null,
+    openedWhatsappError: q.openedWhatsappError ?? null,
+    openedWhatsappSentAt: q.openedWhatsappSentAt ?? null,
   }
 }
 

@@ -809,16 +809,24 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
  *  surfaced so the admin can diagnose problems without reading server logs.
  */
 function WhatsAppNotificationsBlock({ quote }: { quote: SavedQuote }) {
-  const hasPending = quote.status === 'pending' && (
+  // Show every notification that has any historical record — regardless of
+  // the quote's CURRENT status. An APPROVED quote still went through
+  // PENDING, so its admin notification belongs in the history, alongside
+  // the creator notification that fired when it was approved.
+  const hasPending = (
     quote.pendingWhatsappStatus != null ||
     quote.pendingWhatsappTo != null ||
     quote.pendingWhatsappError != null
   )
-  const hasApproval = quote.status === 'approved' && (
+  const hasApproval = (
     quote.approvalWhatsappStatus != null ||
     quote.approvalWhatsappError != null
   )
-  if (!hasPending && !hasApproval) return null
+  const hasOpened = (
+    quote.openedWhatsappStatus != null ||
+    quote.openedWhatsappError != null
+  )
+  if (!hasPending && !hasApproval && !hasOpened) return null
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 space-y-3">
@@ -846,10 +854,21 @@ function WhatsAppNotificationsBlock({ quote }: { quote: SavedQuote }) {
         <WhatsAppRow
           title="Share link → Creator"
           subtitle="Sent when the quote was approved, so the creator can forward the public link to the customer."
-          to={quote.createdByEmail ? null : null /* phone not echoed on quote payload, only name */}
+          to={null}
           toLabel={quote.createdBy ?? null}
           status={quote.approvalWhatsappStatus ?? null}
           error={quote.approvalWhatsappError ?? null}
+        />
+      )}
+
+      {hasOpened && (
+        <WhatsAppRow
+          title="Customer opened → Creator"
+          subtitle={`Sent when the customer first opened the share link${quote.openedWhatsappSentAt ? ' · last fired ' + new Date(quote.openedWhatsappSentAt).toLocaleString() : ''}. Repeat opens within 30 min are collapsed.`}
+          to={null}
+          toLabel={quote.createdBy ?? null}
+          status={quote.openedWhatsappStatus ?? null}
+          error={quote.openedWhatsappError ?? null}
         />
       )}
     </div>

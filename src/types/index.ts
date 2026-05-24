@@ -172,6 +172,12 @@ export interface SavedQuote {
   approvalWhatsappStatus?: string | null
   /** Twilio error message if the creator notification send failed. */
   approvalWhatsappError?: string | null
+  /** WhatsApp delivery status of the notification sent to the CREATOR
+   *  when the customer opened the public share link. */
+  openedWhatsappStatus?: string | null
+  openedWhatsappError?: string | null
+  /** ISO timestamp of when the last open-notification was sent. */
+  openedWhatsappSentAt?: string | null
 }
 
 export interface GemstonePrice {
