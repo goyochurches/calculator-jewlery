@@ -160,23 +160,21 @@ export interface SavedQuote {
    *  there is only one level of nesting in the UI). Null for standalone
    *  quotes. */
   parentQuoteId?: number | null
-  /** Latest WhatsApp delivery status from the most recent approval token.
-   *  Only set on PENDING quotes — drives the badge in the detail panel. */
+  /** Pending-approval WhatsApp (admin) — status, recipient, error and when. */
   pendingWhatsappStatus?: string | null
-  /** Destination phone the pending-approval link was texted to. */
   pendingWhatsappTo?: string | null
-  /** Twilio error message if the pending send failed. */
   pendingWhatsappError?: string | null
-  /** WhatsApp delivery status of the notification sent to the CREATOR
-   *  when the quote was approved. Only set on APPROVED quotes. */
+  pendingWhatsappSentAt?: string | null
+  /** Approval action taken via the WhatsApp link (token consumption). */
+  approvalActionAt?: string | null
+  approvalAction?: 'APPROVED' | 'REJECTED' | null
+  /** Approval-notification WhatsApp (creator) — status, error, when. */
   approvalWhatsappStatus?: string | null
-  /** Twilio error message if the creator notification send failed. */
   approvalWhatsappError?: string | null
-  /** WhatsApp delivery status of the notification sent to the CREATOR
-   *  when the customer opened the public share link. */
+  approvalWhatsappSentAt?: string | null
+  /** Customer-opened WhatsApp (creator) — status, error, when. */
   openedWhatsappStatus?: string | null
   openedWhatsappError?: string | null
-  /** ISO timestamp of when the last open-notification was sent. */
   openedWhatsappSentAt?: string | null
 }
 
