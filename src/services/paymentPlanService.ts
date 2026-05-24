@@ -12,6 +12,12 @@ export interface PaymentInstallment {
   stripeSessionUrl: string | null
   stripeSessionExpiresAt: string | null
   paidAt: string | null
+  /** Total dollars refunded across the history of this installment.
+   *  Non-null means a refund happened at some point (full refunds send
+   *  the row back to PENDING so the jeweler can re-collect — the refund
+   *  fields are the breadcrumb that it happened). */
+  refundAmount: number | null
+  refundedAt: string | null
 }
 
 export interface PlanRow {

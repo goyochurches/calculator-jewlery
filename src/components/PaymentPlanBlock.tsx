@@ -30,7 +30,11 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone }: Props) {
   const [copiedId, setCopiedId] = useState<number | null>(null)
   const [sendingId, setSendingId] = useState<number | null>(null)
   const [sentId, setSentId] = useState<number | null>(null)
-  const [refundingId, setRefundingId] = useState<number | null>(null)
+  /** Per-installment refund phase: 'requesting' (API in flight),
+   *  'awaiting' (waiting for Stripe webhook to confirm), 'completed'
+   *  (status flipped to REFUNDED). Absent = idle. Lets us show distinct
+   *  pill messages without conflating in-flight with awaiting-webhook. */
+  const [refundState, setRefundState] = useState<Record<number, 'requesting' | 'awaiting' | 'completed'>>({})
 
   useEffect(() => {
     let alive = true
@@ -164,23 +168,66 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone }: Props) {
   }
 
   const runRefund = async (installment: PaymentInstallment, amount: number | undefined) => {
-    setRefundingId(installment.id)
+    setRefundState(s => ({ ...s, [installment.id]: 'requesting' }))
     setError(null)
     try {
       await paymentPlanService.refundInstallment(quoteId, installment.id, amount)
-      // Webhook fires asynchronously — reload after a short delay so we
-      // capture the status flip without making the user refresh.
-      setTimeout(async () => {
-        try {
-          const fresh = await paymentPlanService.get(quoteId)
-          setPlan(fresh)
-        } catch { /* ignore */ }
-      }, 2500)
+      // Stripe accepts → switch to "awaiting webhook" and poll until the
+      // installment flips to REFUNDED (or partial refund stays PAID with
+      // amounts diverging — in that case we resolve after the first poll).
+      setRefundState(s => ({ ...s, [installment.id]: 'awaiting' }))
+      pollForRefundUpdate(installment.id, amount)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Refund failed')
-    } finally {
-      setRefundingId(null)
+      setRefundState(s => {
+        const next = { ...s }; delete next[installment.id]; return next
+      })
     }
+  }
+
+  /** Poll up to ~16s for the webhook to flip the installment status.
+   *  We resolve as soon as either (a) status becomes REFUNDED or (b) for
+   *  partial refunds, refundAmountCents shows up on the row. */
+  const pollForRefundUpdate = (installmentId: number, requestedAmount: number | undefined) => {
+    const start = Date.now()
+    const MAX_MS = 16_000
+    const STEP_MS = 2_000
+
+    const tick = async () => {
+      try {
+        const fresh = await paymentPlanService.get(quoteId)
+        setPlan(fresh)
+        const row = fresh.find(p => p.id === installmentId)
+        // Backend re-issues a full refund as PENDING + populates
+        // refundAmount; partial keeps PAID + populates refundAmount.
+        // Either way, refundAmount being non-null is the signal that
+        // the webhook landed and our DB caught up.
+        const done = row && row.refundAmount != null
+        // requestedAmount kept around for future logic — e.g. if we
+        // ever want to differentiate UX for partial vs full once
+        // confirmed; lint suppression below.
+        void requestedAmount
+        if (done) {
+          setRefundState(s => ({ ...s, [installmentId]: 'completed' }))
+          setTimeout(() => setRefundState(s => {
+            const next = { ...s }; delete next[installmentId]; return next
+          }), 4000)
+          return
+        }
+      } catch { /* ignore individual poll failures */ }
+      if (Date.now() - start < MAX_MS) {
+        setTimeout(tick, STEP_MS)
+      } else {
+        // Stripe accepted the refund but the webhook didn't land in time.
+        // Leave the awaiting pill so the user knows something is in flight
+        // and prompt them to refresh.
+        setError('Refund issued in Stripe but the status update is taking longer than usual. Refresh in a few seconds.')
+        setRefundState(s => {
+          const next = { ...s }; delete next[installmentId]; return next
+        })
+      }
+    }
+    setTimeout(tick, STEP_MS)
   }
 
   if (loading) {
@@ -224,7 +271,7 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone }: Props) {
               loading={linkLoadingId === p.id}
               sending={sendingId === p.id}
               sent={sentId === p.id}
-              refunding={refundingId === p.id}
+              refundPhase={refundState[p.id] ?? null}
               clientPhone={clientPhone ?? null}
               onCopy={() => handleCopyLink(p)}
               onSendWhatsApp={() => handleSendWhatsApp(p)}
@@ -459,7 +506,7 @@ function statusChip(status: string): string {
 }
 
 function InstallmentRow({
-  installment, index, total, copied, loading, sending, sent, refunding,
+  installment, index, total, copied, loading, sending, sent, refundPhase,
   clientPhone, onCopy, onSendWhatsApp, onRefund,
 }: {
   installment: PaymentInstallment
@@ -469,7 +516,7 @@ function InstallmentRow({
   loading: boolean
   sending: boolean
   sent: boolean
-  refunding: boolean
+  refundPhase: 'requesting' | 'awaiting' | 'completed' | null
   clientPhone: string | null
   onCopy: () => void
   onSendWhatsApp: () => void
@@ -477,7 +524,9 @@ function InstallmentRow({
 }) {
   const isPaid = installment.status === 'PAID'
   const isCanceled = installment.status === 'CANCELED'
-  const isRefunded = installment.status === 'REFUNDED'
+  const isRefunded = installment.status === 'REFUNDED'  // legacy rows that may pre-date the change
+  const wasRefunded = installment.refundAmount != null  // history flag — works regardless of current status
+  const refunding = refundPhase === 'requesting' || refundPhase === 'awaiting'
 
   const statusTone = isPaid     ? 'border-emerald-200 bg-emerald-50'
                    : isCanceled ? 'border-slate-200 bg-slate-50'
@@ -505,6 +554,33 @@ function InstallmentRow({
           <StatusChip status={installment.status} />
         </div>
       </div>
+
+      {/* Refund history banner — visible regardless of current status so
+          the jeweler always sees "this installment was refunded once". */}
+      {wasRefunded && (
+        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
+          <RotateCcw className="h-2.5 w-2.5" />
+          Refunded ${installment.refundAmount!.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          {installment.refundedAt && <> · {new Date(installment.refundedAt).toLocaleDateString()}</>}
+        </div>
+      )}
+
+      {/* Refund-in-flight feedback pills */}
+      {refundPhase === 'requesting' && (
+        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-2 py-1 text-[10px] font-semibold text-violet-700">
+          <Loader2 className="h-3 w-3 animate-spin" /> Sending refund to Stripe…
+        </div>
+      )}
+      {refundPhase === 'awaiting' && (
+        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-700">
+          <Loader2 className="h-3 w-3 animate-spin" /> Refund issued · waiting for Stripe confirmation…
+        </div>
+      )}
+      {refundPhase === 'completed' && (
+        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-700">
+          <Check className="h-3 w-3" /> Refund completed
+        </div>
+      )}
 
       {!isPaid && !isCanceled && !isRefunded && (
         <div className="mt-2 flex items-center gap-2">

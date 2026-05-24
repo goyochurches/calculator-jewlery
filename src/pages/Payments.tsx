@@ -60,7 +60,11 @@ function InstallmentsTab() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<StatusFilter>('ALL')
-  const [refundingId, setRefundingId] = useState<number | null>(null)
+  /** Per-row refund phase. Mirrors the one in PaymentPlanBlock. */
+  const [refundState, setRefundState] = useState<Record<number, 'requesting' | 'awaiting' | 'completed'>>({})
+  /** Snapshot of each row's `paidAt` at refund-start so we can detect
+   *  when the webhook lands (paidAt clears on full refund → PENDING). */
+  const [refundBaselinePaidAt, setRefundBaselinePaidAt] = useState<Record<number, string | null>>({})
 
   const load = () => {
     setLoading(true)
@@ -99,19 +103,54 @@ function InstallmentsTab() {
       const confirmFull = window.confirm(`Issue a FULL refund of $${fullAmount}?`)
       if (!confirmFull) return
     }
-    setRefundingId(row.id)
+    setRefundState(s => ({ ...s, [row.id]: 'requesting' }))
+    setRefundBaselinePaidAt(s => ({ ...s, [row.id]: row.paidAt }))
     setError(null)
     try {
       await paymentPlanService.refundInstallment(row.quoteId, row.id, amount)
-      // Webhook hits Render a couple of seconds later — refresh after a
-      // short delay so the row flips to REFUNDED in the UI without the
-      // user having to click reload.
-      setTimeout(load, 2500)
+      setRefundState(s => ({ ...s, [row.id]: 'awaiting' }))
+      pollForRefundUpdate(row.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Refund failed')
-    } finally {
-      setRefundingId(null)
+      setRefundState(s => { const next = { ...s }; delete next[row.id]; return next })
     }
+  }
+
+  const pollForRefundUpdate = (rowId: number) => {
+    const start = Date.now()
+    const MAX_MS = 16_000
+    const STEP_MS = 2_000
+
+    const tick = async () => {
+      try {
+        const fresh = await paymentsAdminService.list()
+        setRows(fresh)
+        const row = fresh.find(r => r.id === rowId)
+        // The PaymentRow shape doesn't include refundAmount yet — we
+        // detect the webhook landing by either: status flipped away from
+        // PAID, OR paidAt was cleared (full refund), OR status REFUNDED.
+        const baseline = refundBaselinePaidAt[rowId]
+        const done = row && (
+          row.status === 'REFUNDED' ||
+          row.status === 'PENDING'  ||
+          (baseline != null && row.paidAt == null)
+        )
+        if (done) {
+          setRefundState(s => ({ ...s, [rowId]: 'completed' }))
+          setTimeout(() => setRefundState(s => {
+            const next = { ...s }; delete next[rowId]; return next
+          }), 4000)
+          return
+        }
+      } catch { /* ignore */ }
+      if (Date.now() - start < MAX_MS) {
+        setTimeout(tick, STEP_MS)
+      } else {
+        setError('Refund issued in Stripe but status update is taking longer than usual. Click refresh.')
+        setRefundState(s => { const next = { ...s }; delete next[rowId]; return next })
+      }
+    }
+    setTimeout(tick, STEP_MS)
   }
 
   const filtered = useMemo(() => {
@@ -207,7 +246,7 @@ function InstallmentsTab() {
                     <InstallmentRow
                       key={row.id}
                       row={row}
-                      refunding={refundingId === row.id}
+                      refundPhase={refundState[row.id] ?? null}
                       onRefund={() => handleRefund(row)}
                     />
                   ))}
@@ -221,11 +260,12 @@ function InstallmentsTab() {
   )
 }
 
-function InstallmentRow({ row, refunding, onRefund }: {
+function InstallmentRow({ row, refundPhase, onRefund }: {
   row: PaymentRow
-  refunding: boolean
+  refundPhase: 'requesting' | 'awaiting' | 'completed' | null
   onRefund: () => void
 }) {
+  const refunding = refundPhase === 'requesting' || refundPhase === 'awaiting'
   return (
     <tr className="transition hover:bg-amber-50/30">
       <td className="px-4 py-3">
@@ -248,7 +288,26 @@ function InstallmentRow({ row, refunding, onRefund }: {
       <td className="px-4 py-3 text-right font-bold tabular-nums text-slate-900">
         ${row.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
       </td>
-      <td className="px-4 py-3"><LocalStatusBadge status={row.status} paidAt={row.paidAt} /></td>
+      <td className="px-4 py-3">
+        <div className="space-y-1">
+          <LocalStatusBadge status={row.status} paidAt={row.paidAt} />
+          {refundPhase === 'requesting' && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[9px] font-semibold text-violet-700">
+              <Loader2 className="h-2.5 w-2.5 animate-spin" /> Sending refund…
+            </span>
+          )}
+          {refundPhase === 'awaiting' && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[9px] font-semibold text-amber-700">
+              <Loader2 className="h-2.5 w-2.5 animate-spin" /> Waiting for Stripe…
+            </span>
+          )}
+          {refundPhase === 'completed' && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold text-emerald-700">
+              <Check className="h-2.5 w-2.5" /> Refund completed
+            </span>
+          )}
+        </div>
+      </td>
       <td className="px-4 py-3 text-right">
         <div className="flex justify-end gap-1">
           {row.status === 'PAID' && (
