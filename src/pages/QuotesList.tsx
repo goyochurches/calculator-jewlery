@@ -444,6 +444,8 @@ export function QuotesListPage() {
                             onSelect={() => setSelectedId(child.id === selectedId ? null : child.id)}
                             onDuplicate={() => navigate('/quotes', { state: { duplicateFrom: child } })}
                             viewerUser={user}
+                            revisionIndex={idx + 1}
+                            totalRevisions={group.children.length}
                           />,
                         )
                       })
@@ -664,6 +666,7 @@ function QuotesListSkeleton() {
 function QuoteRow({
   quote, kind, isSelected, onSelect, onDuplicate,
   childCount, expanded, canToggle, onToggle, isLastChild, viewerUser,
+  revisionIndex, totalRevisions,
 }: {
   quote: SavedQuote
   kind: 'parent' | 'parent-ghost' | 'child'
@@ -678,34 +681,43 @@ function QuoteRow({
   /** Current viewer — drives status display normalisation so non-admin
    *  accounts see fully_paid rendered as approved. */
   viewerUser: { email?: string } | null | undefined
+  /** 1-based position of this revision within its parent group. Only set
+   *  for child rows so the title cell can show a "Rev 2 of 3" badge. */
+  revisionIndex?: number
+  totalRevisions?: number
 }) {
   const isChild = kind === 'child'
   const isGhost = kind === 'parent-ghost'
   const hasChildren = !isChild && childCount != null && childCount > 0
-  // Visual story:
+  // Visual story (revision grouping):
   //  · parent + has revisions + collapsed → violet tint (invites exploration)
-  //  · parent + has revisions + expanded  → amber tint + thicker left border
-  //                                          (visually "groups" with its children below)
+  //  · parent + has revisions + expanded  → amber tint, thick amber left bar
+  //  · child (revision) of an expanded parent → SAME amber tint, lighter
+  //    intensity → reads as "same group" instead of a generic indented row.
+  //    Left bar continues amber so the group looks like one connected card,
+  //    and the last child gets a rounded bottom corner.
   //  · plain parent (no revisions)        → neutral
-  //  · child                               → indented gray, distinct from parent
   const rowBg = isSelected
     ? 'text-white'
     : isChild
-      ? 'bg-slate-50/70 hover:bg-slate-100/80'
+      ? isLastChild
+        ? 'bg-gradient-to-r from-amber-50 via-amber-50/70 to-transparent hover:from-amber-100'
+        : 'bg-gradient-to-r from-amber-50 via-amber-50/70 to-transparent hover:from-amber-100'
       : hasChildren && expanded
         ? 'bg-gradient-to-r from-amber-100 via-orange-50/60 to-transparent hover:from-amber-200/90'
         : hasChildren
           ? 'bg-gradient-to-r from-violet-100/80 via-fuchsia-50/40 to-transparent hover:from-violet-200/90'
           : 'hover:bg-slate-50/80'
-  // Strong left accent bar so the eye catches "this one has history" at a
-  // glance even before reading the badge. Color matches the expanded/collapsed
-  // state of the row so they're consistent.
+  // Left accent bar — amber column that visually connects the expanded
+  // parent with every revision below it, making the whole group read as
+  // one card. Last child gets a rounded bottom corner so the column has
+  // a clear end.
   const leftAccent = !isSelected && hasChildren
     ? expanded
       ? 'border-l-4 border-l-amber-400'
       : 'border-l-4 border-l-violet-400'
     : isChild && !isSelected
-      ? 'border-l-4 border-l-slate-200'
+      ? `border-l-4 border-l-amber-400 ${isLastChild ? 'rounded-bl-2xl shadow-[inset_0_-2px_0_rgba(245,158,11,0.25)]' : ''}`
       : ''
   return (
     <tr
@@ -716,7 +728,16 @@ function QuoteRow({
       <td className="px-6 py-3">
         <div className="flex items-center gap-2">
           {isChild && (
-            <CornerDownRight className={`h-4 w-4 shrink-0 ${isSelected ? 'text-white/60' : 'text-slate-300'}`} aria-hidden />
+            // Stronger tree connector: vertical line above + horizontal
+            // elbow, in the same amber as the group's left accent bar.
+            // Reads as "this row hangs off the parent above".
+            <div className="relative flex h-8 w-5 shrink-0 items-center justify-center" aria-hidden>
+              <span className={`absolute left-1/2 top-0 h-1/2 w-0.5 -translate-x-1/2 ${isSelected ? 'bg-white/40' : 'bg-amber-300'}`} />
+              {!isLastChild && (
+                <span className={`absolute left-1/2 bottom-0 h-1/2 w-0.5 -translate-x-1/2 ${isSelected ? 'bg-white/40' : 'bg-amber-300'}`} />
+              )}
+              <span className={`absolute left-1/2 top-1/2 h-0.5 w-3 -translate-y-1/2 ${isSelected ? 'bg-white/40' : 'bg-amber-300'}`} />
+            </div>
           )}
           {quote.photo ? (
             <img
@@ -734,6 +755,24 @@ function QuoteRow({
 
       <td className="px-6 py-4">
         <div className="flex items-center gap-2">
+          {isChild && revisionIndex != null && totalRevisions != null && (
+            <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+              isSelected
+                ? 'bg-white/20 text-white ring-1 ring-white/40'
+                : 'bg-amber-100 text-amber-800 ring-1 ring-amber-300'
+            }`}>
+              Rev {revisionIndex}/{totalRevisions}
+            </span>
+          )}
+          {!isChild && hasChildren && expanded && (
+            <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+              isSelected
+                ? 'bg-white/20 text-white ring-1 ring-white/40'
+                : 'bg-amber-200 text-amber-900 ring-1 ring-amber-400'
+            }`}>
+              Original
+            </span>
+          )}
           <span className={`font-semibold ${isSelected ? 'text-white' : isChild ? 'text-slate-700' : 'text-slate-900'}`}>
             {quote.title}
           </span>
