@@ -1,8 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { paymentsAdminService, type PaymentRow } from '@/services/paymentPlanService'
+import { paymentsAdminService, type PaymentRow, type StripePaymentRow } from '@/services/paymentPlanService'
 import { Check, Clock, CreditCard, ExternalLink, Filter, RefreshCw, XCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+
+type Tab = 'installments' | 'stripe'
 
 type StatusFilter = 'ALL' | 'PENDING' | 'PAID' | 'CANCELED'
 
@@ -14,6 +16,45 @@ const FILTERS: { key: StatusFilter; label: string }[] = [
 ]
 
 export function PaymentsPage() {
+  const [tab, setTab] = useState<Tab>('installments')
+
+  return (
+    <div className="space-y-6">
+      <div className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white p-1 shadow-sm">
+        <TabButton active={tab === 'installments'} onClick={() => setTab('installments')}>
+          Installments
+        </TabButton>
+        <TabButton active={tab === 'stripe'} onClick={() => setTab('stripe')}>
+          Stripe transactions
+        </TabButton>
+      </div>
+
+      {tab === 'installments' && <InstallmentsTab />}
+      {tab === 'stripe'        && <StripeTab />}
+    </div>
+  )
+}
+
+function TabButton({ active, onClick, children }: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${
+        active ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+// ─── Installments tab (local DB view) ─────────────────────────────────────
+function InstallmentsTab() {
   const [rows, setRows] = useState<PaymentRow[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -40,38 +81,21 @@ export function PaymentsPage() {
     if (!rows) return { paid: 0, pending: 0, total: 0, count: { paid: 0, pending: 0, canceled: 0 } }
     return rows.reduce((acc, r) => {
       acc.total += r.amount
-      if (r.status === 'PAID') { acc.paid += r.amount; acc.count.paid++ }
-      else if (r.status === 'PENDING') { acc.pending += r.amount; acc.count.pending++ }
-      else if (r.status === 'CANCELED') { acc.count.canceled++ }
+      if (r.status === 'PAID')     { acc.paid    += r.amount; acc.count.paid++ }
+      if (r.status === 'PENDING')  { acc.pending += r.amount; acc.count.pending++ }
+      if (r.status === 'CANCELED') {                          acc.count.canceled++ }
       return acc
     }, { paid: 0, pending: 0, total: 0, count: { paid: 0, pending: 0, canceled: 0 } })
   }, [rows])
 
   return (
     <div className="space-y-6">
-      {/* Summary cards */}
       <div className="grid gap-4 sm:grid-cols-3">
-        <SummaryCard
-          label="Collected"
-          value={`$${totals.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          sublabel={`${totals.count.paid} paid installment${totals.count.paid === 1 ? '' : 's'}`}
-          tone="emerald"
-        />
-        <SummaryCard
-          label="Outstanding"
-          value={`$${totals.pending.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          sublabel={`${totals.count.pending} pending installment${totals.count.pending === 1 ? '' : 's'}`}
-          tone="amber"
-        />
-        <SummaryCard
-          label="Total billed"
-          value={`$${totals.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          sublabel={`${rows?.length ?? 0} installments`}
-          tone="slate"
-        />
+        <SummaryCard label="Collected"    value={`$${totals.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}    sublabel={`${totals.count.paid} paid installment${totals.count.paid === 1 ? '' : 's'}`}       tone="emerald" />
+        <SummaryCard label="Outstanding"  value={`$${totals.pending.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} sublabel={`${totals.count.pending} pending installment${totals.count.pending === 1 ? '' : 's'}`} tone="amber" />
+        <SummaryCard label="Total billed" value={`$${totals.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}   sublabel={`${rows?.length ?? 0} installments`} tone="slate" />
       </div>
 
-      {/* Table */}
       <Card className="rounded-[28px] border border-white/80 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
         <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
@@ -79,8 +103,8 @@ export function PaymentsPage() {
               <CreditCard className="h-5 w-5" />
             </span>
             <div>
-              <CardTitle className="text-base font-semibold text-slate-900">Payments</CardTitle>
-              <p className="text-sm text-slate-500">All installments across every quote.</p>
+              <CardTitle className="text-base font-semibold text-slate-900">Installments</CardTitle>
+              <p className="text-sm text-slate-500">Local payment-plan rows across every quote.</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -117,9 +141,7 @@ export function PaymentsPage() {
             </div>
           )}
           {!error && filtered.length === 0 && rows && rows.length > 0 && (
-            <div className="p-10 text-center text-sm text-slate-400">
-              No installments match the current filter.
-            </div>
+            <div className="p-10 text-center text-sm text-slate-400">No installments match the current filter.</div>
           )}
           {!error && filtered.length > 0 && (
             <div className="overflow-x-auto">
@@ -136,7 +158,7 @@ export function PaymentsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filtered.map(row => <PaymentRow key={row.id} row={row} />)}
+                  {filtered.map(row => <InstallmentRow key={row.id} row={row} />)}
                 </tbody>
               </table>
             </div>
@@ -147,7 +169,7 @@ export function PaymentsPage() {
   )
 }
 
-function PaymentRow({ row }: { row: PaymentRow }) {
+function InstallmentRow({ row }: { row: PaymentRow }) {
   return (
     <tr className="transition hover:bg-amber-50/30">
       <td className="px-4 py-3">
@@ -155,18 +177,14 @@ function PaymentRow({ row }: { row: PaymentRow }) {
         <p className="text-[11px] text-slate-400">#{row.quoteId}</p>
       </td>
       <td className="px-4 py-3 text-slate-700">{row.clientName ?? '—'}</td>
-      <td className="px-4 py-3 text-slate-600">
-        #{row.sortOrder + 1}
-      </td>
+      <td className="px-4 py-3 text-slate-600">#{row.sortOrder + 1}</td>
       <td className="px-4 py-3 text-slate-600">
         {row.dueDate ? new Date(row.dueDate).toLocaleDateString() : <span className="text-slate-300">—</span>}
       </td>
       <td className="px-4 py-3 text-right font-bold tabular-nums text-slate-900">
         ${row.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
       </td>
-      <td className="px-4 py-3">
-        <StatusBadge status={row.status} paidAt={row.paidAt} />
-      </td>
+      <td className="px-4 py-3"><LocalStatusBadge status={row.status} paidAt={row.paidAt} /></td>
       <td className="px-4 py-3 text-right">
         <Link
           to={`/quotes-list?quoteId=${row.quoteId}`}
@@ -180,7 +198,196 @@ function PaymentRow({ row }: { row: PaymentRow }) {
   )
 }
 
-function StatusBadge({ status, paidAt }: { status: PaymentRow['status']; paidAt: string | null }) {
+// ─── Stripe tab (live from Stripe API) ────────────────────────────────────
+function StripeTab() {
+  const [rows, setRows] = useState<StripePaymentRow[] | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = () => {
+    setLoading(true)
+    setError(null)
+    paymentsAdminService.listStripe(100)
+      .then(setRows)
+      .catch(err => setError(err instanceof Error ? err.message : 'Failed to load Stripe transactions'))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(load, [])
+
+  const totals = useMemo(() => {
+    if (!rows) return { paid: 0, unpaid: 0, count: { paid: 0, unpaid: 0 } }
+    return rows.reduce((acc, r) => {
+      const amount = (r.amountCents ?? 0) / 100
+      if (r.paymentStatus === 'paid') { acc.paid += amount; acc.count.paid++ }
+      else                            { acc.unpaid += amount; acc.count.unpaid++ }
+      return acc
+    }, { paid: 0, unpaid: 0, count: { paid: 0, unpaid: 0 } })
+  }, [rows])
+
+  return (
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-3">
+        <SummaryCard label="Stripe collected" value={`$${totals.paid.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}   sublabel={`${totals.count.paid} paid session${totals.count.paid === 1 ? '' : 's'}`}       tone="emerald" />
+        <SummaryCard label="Open / unpaid"    value={`$${totals.unpaid.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} sublabel={`${totals.count.unpaid} unpaid session${totals.count.unpaid === 1 ? '' : 's'}`} tone="amber" />
+        <SummaryCard label="Sessions shown"   value={String(rows?.length ?? 0)} sublabel="Latest pull from Stripe API" tone="slate" />
+      </div>
+
+      <Card className="rounded-[28px] border border-white/80 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
+              <CreditCard className="h-5 w-5" />
+            </span>
+            <div>
+              <CardTitle className="text-base font-semibold text-slate-900">Stripe transactions</CardTitle>
+              <p className="text-sm text-slate-500">Live Checkout Sessions from your Stripe account. Latest 100.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={load}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50"
+            title="Refresh"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </CardHeader>
+        <CardContent className="p-0">
+          {error && (
+            <div className="p-6 text-sm text-rose-700">
+              {error.includes('403') || error.includes('Forbidden')
+                ? "You don't have permission to view Stripe transactions."
+                : error.includes('not configured')
+                ? "Stripe isn't configured on the backend. Set STRIPE_SECRET_KEY in the environment."
+                : error}
+            </div>
+          )}
+          {!error && loading && !rows && (
+            <div className="p-10 text-center text-sm text-slate-400">Loading from Stripe…</div>
+          )}
+          {!error && rows && rows.length === 0 && (
+            <div className="p-10 text-center text-sm text-slate-400">No Stripe sessions found in this account.</div>
+          )}
+          {!error && rows && rows.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+                  <tr>
+                    <th className="px-4 py-3 text-left">When</th>
+                    <th className="px-4 py-3 text-left">Quote · Client</th>
+                    <th className="px-4 py-3 text-left">Installment</th>
+                    <th className="px-4 py-3 text-right">Amount</th>
+                    <th className="px-4 py-3 text-left">Status</th>
+                    <th className="px-4 py-3 text-left">Customer email</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {rows.map(row => <StripeRow key={row.sessionId} row={row} />)}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function StripeRow({ row }: { row: StripePaymentRow }) {
+  const amount = (row.amountCents ?? 0) / 100
+  const currency = (row.currency ?? 'usd').toUpperCase()
+  return (
+    <tr className="transition hover:bg-violet-50/20">
+      <td className="px-4 py-3 text-slate-700">
+        {new Date(row.createdEpoch * 1000).toLocaleString()}
+      </td>
+      <td className="px-4 py-3">
+        {row.quoteTitle ? (
+          <>
+            <p className="font-semibold text-slate-900">{row.quoteTitle}</p>
+            <p className="text-[11px] text-slate-400">
+              {row.quoteId && <>#{row.quoteId}{row.clientName ? ' · ' : ''}</>}
+              {row.clientName && <span className="text-slate-600">{row.clientName}</span>}
+            </p>
+          </>
+        ) : row.clientName ? (
+          <p className="text-slate-700">{row.clientName}</p>
+        ) : (
+          <span className="text-slate-400">—</span>
+        )}
+      </td>
+      <td className="px-4 py-3 text-slate-600">
+        {row.installmentSortOrder != null && row.installmentTotalCount != null
+          ? `#${row.installmentSortOrder + 1} of ${row.installmentTotalCount}`
+          : row.installmentId != null
+          ? `#${row.installmentId}`
+          : <span className="text-slate-300">—</span>}
+      </td>
+      <td className="px-4 py-3 text-right font-bold tabular-nums text-slate-900">
+        ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+        <span className="ml-1 text-[10px] font-medium text-slate-400">{currency}</span>
+      </td>
+      <td className="px-4 py-3">
+        <StripeStatusBadge sessionStatus={row.sessionStatus} paymentStatus={row.paymentStatus} />
+      </td>
+      <td className="px-4 py-3 text-[11px] text-slate-600">
+        {row.customerEmail ?? <span className="text-slate-300">—</span>}
+      </td>
+      <td className="px-4 py-3 text-right">
+        <div className="flex justify-end gap-1">
+          {row.quoteId && (
+            <Link
+              to={`/quotes-list?quoteId=${row.quoteId}`}
+              title="Open quote"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          )}
+          {row.dashboardUrl && (
+            <a
+              href={row.dashboardUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open in Stripe dashboard"
+              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-violet-200 bg-violet-50 text-violet-700 transition hover:bg-violet-100"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          )}
+        </div>
+      </td>
+    </tr>
+  )
+}
+
+function StripeStatusBadge({ sessionStatus, paymentStatus }: { sessionStatus: string | null; paymentStatus: string | null }) {
+  if (paymentStatus === 'paid') return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+      <Check className="h-2.5 w-2.5" /> Paid
+    </span>
+  )
+  if (sessionStatus === 'expired') return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+      <XCircle className="h-2.5 w-2.5" /> Expired
+    </span>
+  )
+  if (sessionStatus === 'open') return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+      <Clock className="h-2.5 w-2.5" /> Open
+    </span>
+  )
+  return (
+    <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+      {paymentStatus ?? sessionStatus ?? 'unknown'}
+    </span>
+  )
+}
+
+// ─── Shared atoms ─────────────────────────────────────────────────────────
+function LocalStatusBadge({ status, paidAt }: { status: PaymentRow['status']; paidAt: string | null }) {
   if (status === 'PAID') return (
     <div>
       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
@@ -237,9 +444,7 @@ function FilterChips({ active, onChange, counts }: {
           type="button"
           onClick={() => onChange(f.key)}
           className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-            active === f.key
-              ? 'bg-slate-900 text-white'
-              : 'text-slate-600 hover:bg-slate-100'
+            active === f.key ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
           {f.label} <span className="opacity-60">({counts[f.key]})</span>

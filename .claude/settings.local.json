@@ -37,7 +37,10 @@
       "Bash(npm prune *)",
       "Bash(npm run *)",
       "WebSearch",
-      "WebFetch(domain:www.podium.com)"
+      "WebFetch(domain:www.podium.com)",
+      "Bash(curl -i -s \"https://price-calculator-latest.onrender.com/api/public/installments/999999\")",
+      "Bash(curl -i -s \"https://price-calculator-latest.onrender.com/api/public/installments/1\")",
+      "Bash(curl -i -s \"https://price-calculator-latest.onrender.com/api/public/quotes/this-token-does-not-exist\")"
     ]
   }
 }
