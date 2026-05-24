@@ -117,6 +117,72 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone }: Props) {
     }
   }
 
+  const handleSendWhatsApp = async (installment: PaymentInstallment) => {
+    if (!clientPhone) return
+    setSendingId(installment.id)
+    setError(null)
+    try {
+      const res = await paymentPlanService.sendCheckoutLinkViaWhatsApp(quoteId, installment.id)
+      if (!res.ok) {
+        setError(res.error ?? 'WhatsApp send failed')
+      } else {
+        setSentId(installment.id)
+        setTimeout(() => setSentId(s => s === installment.id ? null : s), 3000)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send WhatsApp')
+    } finally {
+      setSendingId(null)
+    }
+  }
+
+  const handleRefund = async (installment: PaymentInstallment) => {
+    const fullAmount = installment.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })
+    const ok = window.confirm(
+      `Refund installment #${installment.sortOrder + 1} for $${fullAmount}?\n\n` +
+      `Cancel for full refund. Click OK to enter a partial amount instead (leave blank to refund in full).`
+    )
+    if (!ok) {
+      // User canceled — give them the chance to do a full refund via a second prompt.
+      const doFull = window.confirm(`Issue a FULL refund of $${fullAmount}?`)
+      if (!doFull) return
+      return runRefund(installment, undefined)
+    }
+    const raw = window.prompt(
+      `Partial refund amount in USD (max ${installment.amount}). Leave blank to refund in full.`,
+      ''
+    )
+    if (raw === null) return
+    const trimmed = raw.trim()
+    if (trimmed === '') return runRefund(installment, undefined)
+    const amount = Number(trimmed)
+    if (Number.isNaN(amount) || amount <= 0 || amount > installment.amount) {
+      setError(`Invalid amount: must be > 0 and ≤ ${installment.amount}`)
+      return
+    }
+    return runRefund(installment, amount)
+  }
+
+  const runRefund = async (installment: PaymentInstallment, amount: number | undefined) => {
+    setRefundingId(installment.id)
+    setError(null)
+    try {
+      await paymentPlanService.refundInstallment(quoteId, installment.id, amount)
+      // Webhook fires asynchronously — reload after a short delay so we
+      // capture the status flip without making the user refresh.
+      setTimeout(async () => {
+        try {
+          const fresh = await paymentPlanService.get(quoteId)
+          setPlan(fresh)
+        } catch { /* ignore */ }
+      }, 2500)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Refund failed')
+    } finally {
+      setRefundingId(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-400">
@@ -156,7 +222,13 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone }: Props) {
               total={plan.length}
               copied={copiedId === p.id}
               loading={linkLoadingId === p.id}
+              sending={sendingId === p.id}
+              sent={sentId === p.id}
+              refunding={refundingId === p.id}
+              clientPhone={clientPhone ?? null}
               onCopy={() => handleCopyLink(p)}
+              onSendWhatsApp={() => handleSendWhatsApp(p)}
+              onRefund={() => handleRefund(p)}
             />
           ))}
           <PlanSummary plan={plan} total={total} />
@@ -387,14 +459,21 @@ function statusChip(status: string): string {
 }
 
 function InstallmentRow({
-  installment, index, total, copied, loading, onCopy,
+  installment, index, total, copied, loading, sending, sent, refunding,
+  clientPhone, onCopy, onSendWhatsApp, onRefund,
 }: {
   installment: PaymentInstallment
   index: number
   total: number
   copied: boolean
   loading: boolean
+  sending: boolean
+  sent: boolean
+  refunding: boolean
+  clientPhone: string | null
   onCopy: () => void
+  onSendWhatsApp: () => void
+  onRefund: () => void
 }) {
   const isPaid = installment.status === 'PAID'
   const isCanceled = installment.status === 'CANCELED'
@@ -432,13 +511,27 @@ function InstallmentRow({
           <button
             type="button"
             onClick={onCopy}
-            disabled={loading}
+            disabled={loading || sending}
             className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-3 py-2 text-[11px] font-bold text-white transition hover:bg-slate-800 disabled:opacity-60"
           >
             {loading      ? <Loader2 className="h-3 w-3 animate-spin" />
               : copied    ? <Check className="h-3 w-3" />
               :             <Copy className="h-3 w-3" />}
             {loading ? 'Generating…' : copied ? 'Copied!' : 'Copy pay link'}
+          </button>
+          <button
+            type="button"
+            onClick={onSendWhatsApp}
+            disabled={!clientPhone || sending || loading}
+            title={clientPhone
+              ? `Send the payment link to ${clientPhone} via WhatsApp`
+              : 'Client has no WhatsApp phone on file — set one on the client record to enable this'}
+            className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+          >
+            {sending  ? <Loader2 className="h-3 w-3 animate-spin" />
+              : sent  ? <Check className="h-3 w-3" />
+              :         <MessageCircle className="h-3 w-3" />}
+            {sending ? 'Sending…' : sent ? 'Sent!' : 'Send'}
           </button>
           {installment.stripeSessionUrl && !loading && !copied && (
             <a
@@ -451,6 +544,20 @@ function InstallmentRow({
               <LinkIcon className="h-3.5 w-3.5" />
             </a>
           )}
+        </div>
+      )}
+      {isPaid && (
+        <div className="mt-2 flex items-center justify-end">
+          <button
+            type="button"
+            onClick={onRefund}
+            disabled={refunding}
+            title="Issue a full or partial refund via Stripe"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-bold text-violet-700 transition hover:border-violet-300 hover:bg-violet-100 disabled:opacity-60"
+          >
+            {refunding ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+            {refunding ? 'Refunding…' : 'Refund'}
+          </button>
         </div>
       )}
     </div>
