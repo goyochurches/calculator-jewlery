@@ -5,6 +5,7 @@ import {
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import type { QuoteCustomerStone, QuoteStatus, QuoteStone, SavedQuote } from '@/types'
+import { PaymentPlanBlock } from '@/components/PaymentPlanBlock'
 import { quotesService } from '@/services/quotesService'
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Copy, Eye, FileDown, MessageCircle, RefreshCw, X, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -814,6 +815,10 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             )}
           </div>
         </div>
+
+        {/* Payment plan — splits the customer-facing total into Stripe
+            checkout sessions the jeweler can copy and paste. */}
+        <PaymentPlanBlock quoteId={quote.id} total={customerPrice} />
       </div>
     </div>
   )
