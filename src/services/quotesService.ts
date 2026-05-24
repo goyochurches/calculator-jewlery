@@ -42,7 +42,7 @@ interface ApiQuote {
   clientName: string
   createdBy: { id: number; name: string; email: string; avatar: string; bio?: string | null; photo?: string | null }
   createdAt: string
-  status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED'
+  status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'FULLY_PAID'
   metal: string
   ringLabor: string
   cadDesign: string
