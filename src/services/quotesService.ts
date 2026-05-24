@@ -89,6 +89,7 @@ interface ApiQuote {
   /** Admin action via the WhatsApp link (token consumption). */
   approvalActionAt?: string | null
   approvalAction?: 'APPROVED' | 'REJECTED' | null
+  approvalRejectionReason?: string | null
   /** Approval-notification WhatsApp (creator) — status / error / when. */
   approvalWhatsappStatus?: string | null
   approvalWhatsappError?: string | null
@@ -155,6 +156,7 @@ function mapQuote(q: ApiQuote): SavedQuote {
     pendingWhatsappSentAt: q.pendingWhatsappSentAt ?? null,
     approvalActionAt: q.approvalActionAt ?? null,
     approvalAction: q.approvalAction ?? null,
+    approvalRejectionReason: q.approvalRejectionReason ?? null,
     approvalWhatsappStatus: q.approvalWhatsappStatus ?? null,
     approvalWhatsappError: q.approvalWhatsappError ?? null,
     approvalWhatsappSentAt: q.approvalWhatsappSentAt ?? null,

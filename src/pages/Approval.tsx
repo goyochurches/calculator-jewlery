@@ -1,3 +1,4 @@
+import { RejectReasonDialog } from '@/components/RejectReasonDialog'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -38,13 +39,27 @@ export function ApprovalPage() {
       })
   }, [token])
 
-  const handle = async (action: 'approve' | 'reject') => {
+  const [rejectOpen, setRejectOpen] = useState(false)
+
+  const handleApprove = async () => {
     if (state.kind !== 'ready') return
     setState({ kind: 'submitting', details: state.details })
     try {
-      const details = action === 'approve'
-        ? await publicApprovalService.approve(token!)
-        : await publicApprovalService.reject(token!)
+      const details = await publicApprovalService.approve(token!)
+      setState({ kind: 'done', details })
+    } catch (err) {
+      if (err instanceof ApprovalAlreadyUsedError) setState({ kind: 'done', details: err.details })
+      else if (err instanceof ApprovalExpiredError) setState({ kind: 'expired' })
+      else setState({ kind: 'error', message: err instanceof Error ? err.message : 'Action failed' })
+    }
+  }
+
+  const handleReject = async (reason: string) => {
+    if (state.kind !== 'ready') return
+    setRejectOpen(false)
+    setState({ kind: 'submitting', details: state.details })
+    try {
+      const details = await publicApprovalService.reject(token!, reason)
       setState({ kind: 'done', details })
     } catch (err) {
       if (err instanceof ApprovalAlreadyUsedError) setState({ kind: 'done', details: err.details })
@@ -64,12 +79,20 @@ export function ApprovalPage() {
           <ApprovalCard
             details={state.details}
             busy={state.kind === 'submitting'}
-            onApprove={() => handle('approve')}
-            onReject={() => handle('reject')}
+            onApprove={handleApprove}
+            onReject={() => setRejectOpen(true)}
           />
         )}
         {state.kind === 'done' && <DoneCard details={state.details} />}
       </div>
+
+      <RejectReasonDialog
+        open={rejectOpen && (state.kind === 'ready' || state.kind === 'submitting')}
+        quoteTitle={state.kind === 'ready' || state.kind === 'submitting' || state.kind === 'done' ? state.details.title : ''}
+        loading={state.kind === 'submitting'}
+        onConfirm={handleReject}
+        onCancel={() => setRejectOpen(false)}
+      />
     </div>
   )
 }
@@ -542,6 +565,12 @@ function DoneCard({ details }: { details: ApprovalDetails }) {
           <h1 className="mt-1 text-lg font-semibold text-slate-900">{details.title}</h1>
           <p className="mt-0.5 text-sm text-slate-500">#{details.quoteId} · {details.clientName ?? '—'}</p>
         </div>
+        {!approved && details.rejectionReason && (
+          <div className="rounded-2xl border border-rose-100 bg-rose-50/60 px-4 py-3 text-left">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-rose-700">Rejection reason</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">{details.rejectionReason}</p>
+          </div>
+        )}
         <p className="rounded-2xl bg-slate-50 px-4 py-3 text-xs text-slate-500">
           This link is single-use and can't be opened again.
         </p>

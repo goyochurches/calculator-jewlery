@@ -168,6 +168,9 @@ export interface SavedQuote {
   /** Approval action taken via the WhatsApp link (token consumption). */
   approvalActionAt?: string | null
   approvalAction?: 'APPROVED' | 'REJECTED' | null
+  /** Free-text reason the admin gave when rejecting via the WhatsApp
+   *  link. Surfaced in the detail panel so the creator knows why. */
+  approvalRejectionReason?: string | null
   /** Approval-notification WhatsApp (creator) — status, error, when. */
   approvalWhatsappStatus?: string | null
   approvalWhatsappError?: string | null

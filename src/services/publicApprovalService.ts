@@ -88,6 +88,9 @@ export interface ApprovalDetails {
   expiresAt: string
   used: boolean
   actionTaken: 'APPROVED' | 'REJECTED' | null
+  /** Free-text reason set when the admin rejects. Null on approval or
+   *  on rejections done before the feature existed. */
+  rejectionReason: string | null
 }
 
 export class ApprovalNotFoundError extends Error {
@@ -126,8 +129,12 @@ export const publicApprovalService = {
     const res = await fetch(`${BASE_URL}/api/public/approve/${encodeURIComponent(token)}/approve`, { method: 'POST' })
     return parseOrThrow(res)
   },
-  async reject(token: string): Promise<ApprovalDetails> {
-    const res = await fetch(`${BASE_URL}/api/public/approve/${encodeURIComponent(token)}/reject`, { method: 'POST' })
+  async reject(token: string, reason?: string): Promise<ApprovalDetails> {
+    const res = await fetch(`${BASE_URL}/api/public/approve/${encodeURIComponent(token)}/reject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reason ? { reason } : {}),
+    })
     return parseOrThrow(res)
   },
 }
