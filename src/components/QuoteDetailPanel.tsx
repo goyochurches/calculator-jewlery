@@ -901,7 +901,11 @@ function WhatsAppNotificationsBlock({ quote }: { quote: SavedQuote }) {
       key: 'admin-action',
       at: quote.approvalActionAt,
       seq: 2,
-      row: <AdminActionRow action={quote.approvalAction} at={quote.approvalActionAt} />,
+      row: <AdminActionRow
+        action={quote.approvalAction}
+        at={quote.approvalActionAt}
+        reason={quote.approvalRejectionReason ?? null}
+      />,
     })
   }
 
@@ -973,7 +977,7 @@ function WhatsAppNotificationsBlock({ quote }: { quote: SavedQuote }) {
 /** Compact row recording when (and how) the admin took action via the
  *  WhatsApp approval link. Distinct visual from the WhatsApp rows because
  *  this isn't a message send — it's the admin's decision being captured. */
-function AdminActionRow({ action, at }: { action: 'APPROVED' | 'REJECTED'; at: string }) {
+function AdminActionRow({ action, at, reason }: { action: 'APPROVED' | 'REJECTED'; at: string; reason?: string | null }) {
   const isApproved = action === 'APPROVED'
   const tone = isApproved ? 'border-emerald-200 bg-emerald-50' : 'border-rose-200 bg-rose-50'
   const iconTone = isApproved ? 'text-emerald-600' : 'text-rose-600'
@@ -994,6 +998,11 @@ function AdminActionRow({ action, at }: { action: 'APPROVED' | 'REJECTED'; at: s
           <p className="text-[11px] text-slate-500">
             The admin opened the approval link in WhatsApp and clicked {isApproved ? 'Approve' : 'Reject'}.
           </p>
+          {!isApproved && reason && (
+            <div className="mt-1 rounded-lg bg-white/70 px-2 py-1.5 text-[11px] text-rose-800">
+              <strong>Reason:</strong> <span className="whitespace-pre-wrap">{reason}</span>
+            </div>
+          )}
           <p className="text-xs text-slate-700">
             <span className="text-slate-400">When: </span>
             <span className="font-mono">{new Date(at).toLocaleString()}</span>
