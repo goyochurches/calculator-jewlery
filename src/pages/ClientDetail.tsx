@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/context/AuthContext'
 import { canSeePayments } from '@/lib/paymentsAccess'
+import { displayStatusFor } from '@/lib/quoteStatusDisplay'
 import { clientService } from '@/services/clientService'
 import { paymentsAdminService, type PaymentRow } from '@/services/paymentPlanService'
 import { quotesService } from '@/services/quotesService'
@@ -222,9 +223,14 @@ export function ClientDetailPage() {
                           <td className="px-6 py-4 font-semibold text-slate-900">{q.title}</td>
                           <td className="px-6 py-4 text-slate-500">{q.createdAt}</td>
                           <td className="px-6 py-4">
-                            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${STATUS_STYLES[q.status]}`}>
-                              {STATUS_LABELS[q.status]}
-                            </span>
+                            {(() => {
+                              const visible = displayStatusFor(q.status, user)
+                              return (
+                                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize ${STATUS_STYLES[visible]}`}>
+                                  {STATUS_LABELS[visible]}
+                                </span>
+                              )
+                            })()}
                           </td>
                           <td className="px-6 py-4 text-right font-semibold text-slate-900">
                             ${(q.total ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
