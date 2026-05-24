@@ -22,17 +22,11 @@ export interface PublicQuote {
   diamondType: string
   diamondSize: string
   diamondAmount: number
-  /** Total carat weight of the stones on this quote. Drives the size of
-   *  the centre stone in the AR try-on. */
-  diamondCarats: number | null
   weightGrams: number
   ringWidth: number
   fingerSize: number
   engraving: boolean | null
   setterType: string | null
-  /** Type of piece (ring / pendant / ...). Drives whether the AR
-   *  try-on button is shown on the customer-facing page. */
-  jewelryType: string | null
   photo: string | null
   companyName: string | null
   companyLogo: string | null
