@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { paymentsAdminService, type PaymentRow, type StripePaymentRow } from '@/services/paymentPlanService'
-import { Check, Clock, CreditCard, ExternalLink, Filter, RefreshCw, RotateCcw, XCircle } from 'lucide-react'
+import { paymentPlanService, paymentsAdminService, type PaymentRow, type StripePaymentRow } from '@/services/paymentPlanService'
+import { Check, Clock, CreditCard, ExternalLink, Filter, Loader2, RefreshCw, RotateCcw, XCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 
@@ -60,6 +60,7 @@ function InstallmentsTab() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filter, setFilter] = useState<StatusFilter>('ALL')
+  const [refundingId, setRefundingId] = useState<number | null>(null)
 
   const load = () => {
     setLoading(true)
@@ -71,6 +72,47 @@ function InstallmentsTab() {
   }
 
   useEffect(load, [])
+
+  const handleRefund = async (row: PaymentRow) => {
+    const fullAmount = row.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })
+    const fullOk = window.confirm(
+      `Refund installment #${row.sortOrder + 1} of "${row.quoteTitle ?? '—'}" for $${fullAmount}?\n\n` +
+      `OK = enter partial amount.  Cancel = full refund.`
+    )
+    let amount: number | undefined
+    if (fullOk) {
+      const raw = window.prompt(
+        `Partial refund amount in USD (max ${row.amount}). Leave blank to refund in full.`,
+        ''
+      )
+      if (raw === null) return
+      const trimmed = raw.trim()
+      if (trimmed !== '') {
+        const n = Number(trimmed)
+        if (Number.isNaN(n) || n <= 0 || n > row.amount) {
+          setError(`Invalid amount: must be > 0 and ≤ ${row.amount}`)
+          return
+        }
+        amount = n
+      }
+    } else {
+      const confirmFull = window.confirm(`Issue a FULL refund of $${fullAmount}?`)
+      if (!confirmFull) return
+    }
+    setRefundingId(row.id)
+    setError(null)
+    try {
+      await paymentPlanService.refundInstallment(row.quoteId, row.id, amount)
+      // Webhook hits Render a couple of seconds later — refresh after a
+      // short delay so the row flips to REFUNDED in the UI without the
+      // user having to click reload.
+      setTimeout(load, 2500)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Refund failed')
+    } finally {
+      setRefundingId(null)
+    }
+  }
 
   const filtered = useMemo(() => {
     if (!rows) return []
@@ -161,7 +203,14 @@ function InstallmentsTab() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filtered.map(row => <InstallmentRow key={row.id} row={row} />)}
+                  {filtered.map(row => (
+                    <InstallmentRow
+                      key={row.id}
+                      row={row}
+                      refunding={refundingId === row.id}
+                      onRefund={() => handleRefund(row)}
+                    />
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -172,7 +221,11 @@ function InstallmentsTab() {
   )
 }
 
-function InstallmentRow({ row }: { row: PaymentRow }) {
+function InstallmentRow({ row, refunding, onRefund }: {
+  row: PaymentRow
+  refunding: boolean
+  onRefund: () => void
+}) {
   return (
     <tr className="transition hover:bg-amber-50/30">
       <td className="px-4 py-3">
@@ -197,13 +250,27 @@ function InstallmentRow({ row }: { row: PaymentRow }) {
       </td>
       <td className="px-4 py-3"><LocalStatusBadge status={row.status} paidAt={row.paidAt} /></td>
       <td className="px-4 py-3 text-right">
-        <Link
-          to={`/quotes-list?quoteId=${row.quoteId}`}
-          title="Open quote"
-          className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
-        >
-          <ExternalLink className="h-3.5 w-3.5" />
-        </Link>
+        <div className="flex justify-end gap-1">
+          {row.status === 'PAID' && (
+            <button
+              type="button"
+              onClick={onRefund}
+              disabled={refunding}
+              title="Issue a full or partial refund via Stripe"
+              className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[10px] font-bold text-violet-700 transition hover:border-violet-300 hover:bg-violet-100 disabled:opacity-60"
+            >
+              {refunding ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+              {refunding ? 'Refunding…' : 'Refund'}
+            </button>
+          )}
+          <Link
+            to={`/quotes-list?quoteId=${row.quoteId}`}
+            title="Open quote"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Link>
+        </div>
       </td>
     </tr>
   )
