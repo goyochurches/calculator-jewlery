@@ -57,6 +57,11 @@ export interface ApprovalDetails {
   discountAmount: number
   discountPercent: number
   markupMultiplier: number
+  /** Subtotal after discount, BEFORE tax. */
+  customerPriceBeforeTax: number
+  applyTaxes: boolean | null
+  taxRate: number
+  taxAmount: number
 
   metalLabel: string | null
   weightGrams: number | null

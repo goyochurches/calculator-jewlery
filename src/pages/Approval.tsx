@@ -210,6 +210,31 @@ function PriceBlock({ details }: { details: ApprovalDetails }) {
           Pre-discount: {money(details.customerPriceBeforeDiscount)}
         </p>
       )}
+      {/* Sales tax status — always visible so the admin knows what
+          the customer is being charged before approving. */}
+      <div className={`mt-3 rounded-xl border px-3 py-2 text-[11px] ${
+        details.applyTaxes
+          ? 'border-emerald-300/40 bg-emerald-500/15'
+          : 'border-white/15 bg-white/5'
+      }`}>
+        {details.applyTaxes ? (
+          <>
+            <div className="flex items-center justify-between text-emerald-200">
+              <span className="font-bold uppercase tracking-wider">Sales tax 7.75% applied</span>
+              <span className="font-bold tabular-nums">+{money(details.taxAmount)}</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between text-emerald-100/80">
+              <span>Subtotal (before tax)</span>
+              <span className="tabular-nums">{money(details.customerPriceBeforeTax)}</span>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center justify-between text-white/70">
+            <span className="font-semibold uppercase tracking-wider">Sales tax 7.75%</span>
+            <span className="font-medium">Not applied</span>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

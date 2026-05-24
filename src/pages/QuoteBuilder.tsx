@@ -1824,18 +1824,29 @@ export function QuoteBuilderPage() {
                     Discount −${discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ({parsedDiscount}% off ${customerPriceBeforeDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })})
                   </p>
                 )}
-                {applyTaxes && (
-                  <div className="mt-2 rounded-xl bg-emerald-500/15 border border-emerald-300/40 px-3 py-2 text-[11px]">
-                    <div className="flex items-center justify-between text-emerald-200">
-                      <span className="font-bold uppercase tracking-wider">Sales tax 7.75% applied</span>
-                      <span className="font-bold tabular-nums">+${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                <div className={`mt-2 rounded-xl border px-3 py-2 text-[11px] ${
+                  applyTaxes
+                    ? 'bg-emerald-500/15 border-emerald-300/40'
+                    : 'bg-white/5 border-white/15'
+                }`}>
+                  {applyTaxes ? (
+                    <>
+                      <div className="flex items-center justify-between text-emerald-200">
+                        <span className="font-bold uppercase tracking-wider">Sales tax 7.75% applied</span>
+                        <span className="font-bold tabular-nums">+${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-emerald-100/80">
+                        <span>Subtotal (before tax)</span>
+                        <span className="tabular-nums">${customerPriceAfterDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center justify-between text-slate-300">
+                      <span className="font-semibold uppercase tracking-wider">Sales tax 7.75%</span>
+                      <span className="font-medium">Not applied</span>
                     </div>
-                    <div className="mt-1 flex items-center justify-between text-emerald-100/80">
-                      <span>Subtotal (before tax)</span>
-                      <span className="tabular-nums">${customerPriceAfterDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
                 <p className="mt-2 text-sm text-slate-300">
                   <span className="font-semibold text-white">{jewelryTypeLabel}</span> · {selectedMetalConfig.label} · {ringLaborLabel}
                 </p>

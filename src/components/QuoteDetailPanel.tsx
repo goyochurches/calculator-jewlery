@@ -360,6 +360,31 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
               Discount −${discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ({discount}% off ${customerPriceBeforeDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })})
             </p>
           )}
+          {/* Tax status block — always visible, shows ON or OFF so the
+              jeweler knows at a glance whether sales tax is applied. */}
+          <div className={`mt-2 rounded-xl border px-3 py-2 text-[11px] ${
+            applyTaxes
+              ? 'bg-emerald-500/15 border-emerald-300/40'
+              : 'bg-white/5 border-white/15'
+          }`}>
+            {applyTaxes ? (
+              <>
+                <div className="flex items-center justify-between text-emerald-200">
+                  <span className="font-bold uppercase tracking-wider">Sales tax 7.75% applied</span>
+                  <span className="font-bold tabular-nums">+${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between text-emerald-100/80">
+                  <span>Subtotal (before tax)</span>
+                  <span className="tabular-nums">${customerPriceAfterDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex items-center justify-between text-white/70">
+                <span className="font-semibold uppercase tracking-wider">Sales tax 7.75%</span>
+                <span className="font-medium">Not applied</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Share link */}
