@@ -293,6 +293,7 @@ function NewConversationDialog({
   const [channel, setChannel] = useState<'WHATSAPP' | 'SMS'>(
     canWa ? 'WHATSAPP' : canSms ? 'SMS' : 'WHATSAPP',
   )
+  const [firstMessage, setFirstMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -306,6 +307,13 @@ function NewConversationDialog({
   const submit = async () => {
     const trimmed = phone.trim()
     if (!trimmed) { setError('Phone number is required.'); return }
+    const draft = firstMessage.trim()
+    if (draft && !channelEnabled) {
+      setError(channel === 'WHATSAPP'
+        ? 'WhatsApp sender is not configured — cannot send the first message.'
+        : 'SMS sender is not configured — cannot send the first message.')
+      return
+    }
     setSubmitting(true); setError(null)
     try {
       const thread = await inboxService.openOrCreate({
@@ -313,6 +321,21 @@ function NewConversationDialog({
         peerPhone: trimmed,
         clientId: client?.id ?? null,
       })
+      // If the user typed an opening message, fire it through the same
+      // reply endpoint we use elsewhere — keeps Twilio + persistence +
+      // STOMP broadcast on one path. Failures here surface in the dialog
+      // so the user can retry without losing the thread.
+      if (draft) {
+        try {
+          await inboxService.reply(thread.id, draft)
+        } catch (sendErr) {
+          setError(sendErr instanceof Error
+            ? `Thread created, but the first message failed: ${sendErr.message}`
+            : 'Thread created, but the first message failed.')
+          onCreated(thread)
+          return
+        }
+      }
       onCreated(thread)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to start the conversation.')
@@ -393,6 +416,25 @@ function NewConversationDialog({
             </p>
           </div>
 
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              First message (optional)
+            </p>
+            <textarea
+              value={firstMessage}
+              onChange={(e) => setFirstMessage(e.target.value)}
+              rows={3}
+              disabled={!channelEnabled}
+              placeholder={channelEnabled
+                ? 'Type the opening message…'
+                : 'Sender not configured — you can still create the thread.'}
+              className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-400 disabled:bg-slate-100 disabled:text-slate-400"
+            />
+            <p className="mt-1 text-[11px] text-slate-400">
+              Leave blank to just open the thread without sending anything.
+            </p>
+          </div>
+
           {!channelEnabled && (
             <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               {channel === 'WHATSAPP'
@@ -419,9 +461,12 @@ function NewConversationDialog({
             type="button"
             onClick={() => void submit()}
             disabled={submitting || !phone.trim()}
-            className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {submitting ? 'Starting…' : 'Start conversation'}
+            {firstMessage.trim() && <Send className="h-3.5 w-3.5" />}
+            {submitting
+              ? (firstMessage.trim() ? 'Sending…' : 'Starting…')
+              : (firstMessage.trim() ? 'Send & open' : 'Start conversation')}
           </button>
         </footer>
       </div>
