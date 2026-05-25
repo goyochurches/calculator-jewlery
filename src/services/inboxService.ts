@@ -25,4 +25,13 @@ export const inboxService = {
   markRead(threadId: number): Promise<void> {
     return api.post<void>(`/api/inbox/threads/${threadId}/mark-read`, {})
   },
+
+  /** Find or create a thread for (channel, peerPhone). Idempotent. */
+  openOrCreate(args: { channel: 'WHATSAPP' | 'SMS'; peerPhone: string; clientId?: number | null }): Promise<InboxThread> {
+    return api.post<InboxThread>('/api/inbox/threads', {
+      channel: args.channel,
+      peerPhone: args.peerPhone,
+      clientId: args.clientId ?? null,
+    })
+  },
 }

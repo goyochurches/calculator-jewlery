@@ -1,8 +1,9 @@
+import { ClientPicker } from '@/components/ClientPicker'
 import { useAuth } from '@/context/AuthContext'
 import { getBrokerUrl, useWebSocket } from '@/hooks/useWebSocket'
 import { inboxService } from '@/services/inboxService'
-import type { InboxCapabilities, InboxMessage, InboxThread } from '@/types'
-import { MessageCircle, MessageSquare, Send } from 'lucide-react'
+import type { Client, InboxCapabilities, InboxMessage, InboxThread } from '@/types'
+import { MessageCircle, MessageSquare, Plus, Send, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 interface InboxPushEvent {
@@ -23,6 +24,7 @@ export function InboxPage() {
   const [sendError, setSendError] = useState<string | null>(null)
   const [loadingThreads, setLoadingThreads] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(false)
+  const [newOpen, setNewOpen] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -109,9 +111,19 @@ export function InboxPage() {
     <div className="grid gap-4 lg:grid-cols-[360px_1fr]">
       {/* ── Thread list ─────────────────────────────────────────────── */}
       <aside className="flex h-[calc(100vh-180px)] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        <header className="border-b border-slate-100 px-5 py-4">
-          <h2 className="text-base font-semibold text-slate-900">Conversations</h2>
-          <p className="text-xs text-slate-500">WhatsApp + SMS · shared inbox</p>
+        <header className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Conversations</h2>
+            <p className="text-xs text-slate-500">WhatsApp + SMS · shared inbox</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setNewOpen(true)}
+            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New
+          </button>
         </header>
         <div className="flex-1 overflow-y-auto">
           {loadingThreads ? (
@@ -171,6 +183,18 @@ export function InboxPage() {
           )}
         </div>
       </aside>
+
+      {newOpen && (
+        <NewConversationDialog
+          capabilities={capabilities}
+          onClose={() => setNewOpen(false)}
+          onCreated={async (thread) => {
+            setNewOpen(false)
+            await refreshThreads()
+            setActiveId(thread.id)
+          }}
+        />
+      )}
 
       {/* ── Conversation pane ────────────────────────────────────────── */}
       <section className="flex h-[calc(100vh-180px)] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
