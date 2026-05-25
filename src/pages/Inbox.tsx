@@ -44,8 +44,20 @@ export function InboxPage() {
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [newOpen, setNewOpen] = useState(false)
   const [search, setSearch] = useState('')
+  /** Unix-ms timestamp until which sending is blocked because the user
+   *  tripped the anti-spam guard (repeated identical messages). */
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null)
+  /** Force a re-render once per second while a cooldown is active, so the
+   *  countdown in the banner ticks down live. */
+  const [, setTick] = useState(0)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  /**
+   * Per-thread recent send log used by the anti-spam guard. We keep
+   * { body, at } entries for ~60s and count consecutive duplicates.
+   * Ref instead of state because it doesn't drive any rendering.
+   */
+  const sendHistoryRef = useRef<Map<number, { body: string; at: number }[]>>(new Map())
 
   const refreshThreads = useCallback(async () => {
     try {
@@ -109,6 +121,22 @@ export function InboxPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: 'end' })
   }, [messages.length])
+
+  // Tick the cooldown countdown every second while it's active.
+  useEffect(() => {
+    if (cooldownUntil == null) return
+    const ms = cooldownUntil - Date.now()
+    if (ms <= 0) { setCooldownUntil(null); return }
+    const interval = setInterval(() => {
+      if (Date.now() >= cooldownUntil) {
+        setCooldownUntil(null)
+        clearInterval(interval)
+      } else {
+        setTick(t => t + 1)
+      }
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [cooldownUntil])
 
   useWebSocket<InboxPushEvent>({
     url: getBrokerUrl(),
