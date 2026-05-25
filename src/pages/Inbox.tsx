@@ -186,6 +186,36 @@ export function InboxPage() {
     const body = draft.trim()
     const threadId = activeThread.id
     const channel = activeThread.channel
+
+    // ── Anti-spam guard ────────────────────────────────────────────
+    // Twilio charges per send and repeated identical messages are
+    // almost always a misclick (double-tap, frustrated retry). Block
+    // when the user has sent THIS exact body 3+ times in the last
+    // minute and lock the button for SPAM_COOLDOWN_MS so they have a
+    // chance to course-correct.
+    const SPAM_WINDOW_MS = 60_000
+    const SPAM_THRESHOLD = 3
+    const SPAM_COOLDOWN_MS = 15_000
+    const now = Date.now()
+    if (cooldownUntil != null && now < cooldownUntil) {
+      const left = Math.ceil((cooldownUntil - now) / 1000)
+      setSendError(`Wait ${left}s before sending again — too many repeats.`)
+      return
+    }
+    const recent = (sendHistoryRef.current.get(threadId) ?? [])
+      .filter(s => now - s.at < SPAM_WINDOW_MS)
+    const sameCount = recent.filter(s => s.body === body).length
+    if (sameCount >= SPAM_THRESHOLD) {
+      setCooldownUntil(now + SPAM_COOLDOWN_MS)
+      setSendError(
+        `You've sent this same message ${sameCount} times in the last minute. ` +
+        `Pause for ${SPAM_COOLDOWN_MS / 1000}s to avoid duplicates.`,
+      )
+      return
+    }
+    recent.push({ body, at: now })
+    sendHistoryRef.current.set(threadId, recent)
+
     setSending(true); setSendError(null)
     // Optimistically clear the input and append a placeholder bubble so
     // the message appears instantly. The real row replaces it once the
@@ -318,6 +348,9 @@ export function InboxPage() {
               sending={sending}
               draft={draft}
               error={sendError}
+              cooldownSecondsLeft={cooldownUntil != null
+                ? Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000))
+                : 0}
               onChange={setDraft}
               onSend={() => void handleSend()}
             />
@@ -603,7 +636,7 @@ function DeliveryTick({ status }: { status: string | null }) {
 // ───────────────────────────────────────────────────────────────────
 
 function Composer({
-  canReply, capabilities, channel, sending, draft, error, onChange, onSend,
+  canReply, capabilities, channel, sending, draft, error, cooldownSecondsLeft, onChange, onSend,
 }: {
   canReply: boolean
   capabilities: InboxCapabilities | null
@@ -611,10 +644,13 @@ function Composer({
   sending: boolean
   draft: string
   error: string | null
+  cooldownSecondsLeft: number
   onChange: (v: string) => void
   onSend: () => void
 }) {
   const sendBg = channel === 'WHATSAPP' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-sky-600 hover:bg-sky-700'
+  const cooling = cooldownSecondsLeft > 0
+  const disabled = !canReply || sending || cooling || draft.trim() === ''
 
   return (
     <footer className="border-t border-slate-100 bg-white/80 px-5 py-4 backdrop-blur">
@@ -625,15 +661,21 @@ function Composer({
             : 'SMS sender is not configured — set TWILIO_SMS_FROM (and buy a Twilio SMS number) to enable replies.'}
         </p>
       )}
+      {cooling && (
+        <p className="mb-2 flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+          <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-[10px] font-bold text-amber-900">
+            {cooldownSecondsLeft}
+          </span>
+          Too many repeated messages. Wait {cooldownSecondsLeft}s to avoid duplicates.
+        </p>
+      )}
       <div className="flex items-end gap-2">
         <textarea
           value={draft}
           onChange={e => onChange(e.target.value)}
           onKeyDown={e => {
             // Enter sends; Shift+Enter inserts a newline (chat-standard UX).
-            // We also keep Ctrl/Cmd+Enter as a no-shift alternative so people
-            // muscle-memoried to the old shortcut don't get caught.
-            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
+            if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault()
               onSend()
             }
@@ -648,14 +690,14 @@ function Composer({
         <button
           type="button"
           onClick={onSend}
-          disabled={!canReply || sending || draft.trim() === ''}
+          disabled={disabled}
           className={`inline-flex h-10 items-center gap-1.5 rounded-2xl px-4 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-white/80 ${sendBg}`}
         >
           <Send className="h-4 w-4" />
-          {sending ? 'Sending…' : 'Send'}
+          {sending ? 'Sending…' : cooling ? `Wait ${cooldownSecondsLeft}s` : 'Send'}
         </button>
       </div>
-      {error && (
+      {error && !cooling && (
         <p className="mt-2 text-xs font-medium text-rose-600">{error}</p>
       )}
     </footer>
