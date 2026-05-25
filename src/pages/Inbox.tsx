@@ -3,11 +3,11 @@ import { useAuth } from '@/context/AuthContext'
 import { getBrokerUrl, useWebSocket } from '@/hooks/useWebSocket'
 import { inboxService } from '@/services/inboxService'
 import type { Client, InboxCapabilities, InboxMessage, InboxThread } from '@/types'
-import { MessageCircle, MessageSquare, Plus, Send, X } from 'lucide-react'
+import { Check, CheckCheck, MessageCircle, MessageSquare, Plus, Send, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 interface InboxPushEvent {
-  kind: 'inbound' | 'outbound' | 'read'
+  kind: 'inbound' | 'outbound' | 'read' | 'status' | 'thread'
   threadId: number
 }
 
@@ -485,15 +485,46 @@ function MessageBubble({ m }: { m: InboxMessage }) {
           : 'bg-slate-100 text-slate-900'
       }`}>
         <p className="whitespace-pre-wrap break-words">{m.body ?? ''}</p>
-        <p className={`mt-1 text-[10px] ${isOut ? (failed ? 'text-rose-800' : 'text-slate-300') : 'text-slate-400'}`}>
-          {isOut && m.sentByUserName ? `${m.sentByUserName} · ` : ''}
-          {formatTime(m.createdAt)}
-          {failed && m.error ? ` · ${m.error}` : ''}
-          {isOut && !failed && m.status ? ` · ${m.status.toLowerCase()}` : ''}
+        <p className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${isOut ? (failed ? 'text-rose-800' : 'text-slate-300') : 'text-slate-400'}`}>
+          {isOut && m.sentByUserName ? <span>{m.sentByUserName} ·</span> : null}
+          <span>{formatTime(m.createdAt)}</span>
+          {failed && m.error ? <span>· {m.error}</span> : null}
+          {isOut && !failed && <DeliveryTick status={m.status} />}
         </p>
       </div>
     </div>
   )
+}
+
+/**
+ * WhatsApp-style delivery indicator for OUTBOUND messages. Maps the
+ * provider status to a glyph:
+ *   queued / sending  → single hollow tick
+ *   sent              → single tick
+ *   delivered         → double tick
+ *   read              → double tick, blue
+ *   undelivered       → single tick, amber
+ *   anything else     → nothing (e.g. SMS providers that don't report)
+ */
+function DeliveryTick({ status }: { status: string | null }) {
+  if (!status) return null
+  const s = status.toLowerCase()
+  if (s === 'read') {
+    return <CheckCheck className="h-3.5 w-3.5 text-sky-400" aria-label="read" />
+  }
+  if (s === 'delivered') {
+    return <CheckCheck className="h-3.5 w-3.5" aria-label="delivered" />
+  }
+  if (s === 'sent') {
+    return <Check className="h-3.5 w-3.5" aria-label="sent" />
+  }
+  if (s === 'undelivered') {
+    return <Check className="h-3.5 w-3.5 text-amber-400" aria-label="undelivered" />
+  }
+  if (s === 'queued' || s === 'sending' || s === 'accepted' || s === 'scheduled') {
+    return <Check className="h-3.5 w-3.5 opacity-50" aria-label="queued" />
+  }
+  return null
 }
 
 function formatRelative(iso: string): string {
