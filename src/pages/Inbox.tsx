@@ -371,28 +371,28 @@ function NewConversationDialog({
               <button
                 type="button"
                 onClick={() => setChannel('WHATSAPP')}
-                disabled={!canWa}
                 className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
                   channel === 'WHATSAPP'
                     ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
                     : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                } ${!canWa ? 'cursor-not-allowed opacity-50' : ''}`}
+                }`}
               >
                 <MessageCircle className="h-4 w-4" />
                 WhatsApp
+                {!canWa && <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-700">off</span>}
               </button>
               <button
                 type="button"
                 onClick={() => setChannel('SMS')}
-                disabled={!canSms}
                 className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
                   channel === 'SMS'
                     ? 'border-sky-500 bg-sky-50 text-sky-800'
                     : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                } ${!canSms ? 'cursor-not-allowed opacity-50' : ''}`}
+                }`}
               >
                 <MessageCircle className="h-4 w-4" />
                 SMS
+                {!canSms && <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-700">off</span>}
               </button>
             </div>
           </div>
