@@ -1903,7 +1903,7 @@ export function QuoteBuilderPage() {
             <CardContent className="space-y-4 pt-6">
               <div className="rounded-2xl p-5 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}>
                 <div className="flex items-start justify-between gap-2">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Quote total</p>
+                  <p className="text-xs uppercase tracking-[0.18em] text-amber-300">Customer price</p>
                   <button
                     type="button"
                     onClick={() => setEditingOverride(v => !v)}
@@ -1917,14 +1917,19 @@ export function QuoteBuilderPage() {
                   </button>
                 </div>
                 <p className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
-                  ${pricing.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </p>
-                <p className="mt-1.5 text-xs font-medium text-amber-300/90">
-                  Customer sees ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })} via share link
+                <p className="mt-1 text-[11px] font-medium uppercase tracking-wider text-amber-200/90">
                   {parsedOverride != null
-                    ? ' (custom total — markup/discount/tax bypassed)'
-                    : ` (${parsedMarkup}×${parsedDiscount > 0 ? `, −${parsedDiscount}%` : ''}${applyTaxes ? ', +7.75% tax' : ''})`}
+                    ? 'Custom total — markup/discount/tax bypassed'
+                    : `Via share link · ${parsedMarkup}×${parsedDiscount > 0 ? `, −${parsedDiscount}%` : ''}${applyTaxes ? ', +7.75% tax' : ''}`}
                 </p>
+                <div className="mt-3 flex items-baseline justify-between gap-3 rounded-xl bg-black/20 px-3 py-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Our cost</span>
+                  <span className="text-lg font-semibold tabular-nums text-white">
+                    ${pricing.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
                 {parsedOverride != null && customerPriceOverrideReason.trim() !== '' && (
                   <p className="mt-1 text-[11px] text-amber-200/80">
                     Reason: <span className="text-white">{customerPriceOverrideReason}</span>
