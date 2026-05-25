@@ -56,6 +56,34 @@ export function InboxPage() {
     }
   }, [])
 
+  /**
+   * Silent refresh: swap the messages array without flipping the loading
+   * spinner. Used by websocket-driven updates and post-send so the chat
+   * pane doesn't flash "Loading…" every time a status callback arrives.
+   */
+  const refreshMessagesSilent = useCallback(async (threadId: number) => {
+    try {
+      const list = await inboxService.listMessages(threadId)
+      setMessages(prev => {
+        // Reconciliation: keep prev refs for unchanged rows so React's
+        // diff stays cheap and existing bubbles don't repaint.
+        const byId = new Map(prev.map(m => [m.id, m]))
+        return list.map(m => {
+          const existing = byId.get(m.id)
+          if (!existing) return m
+          // Same row, same payload → keep the existing object reference.
+          if (
+            existing.status === m.status
+            && existing.error === m.error
+            && existing.body === m.body
+          ) return existing
+          return m
+        })
+      })
+    } catch { /* non-fatal */ }
+  }, [])
+
+  /** Loud refresh: shows the loading state. Use only on explicit thread switches. */
   const refreshMessages = useCallback(async (threadId: number) => {
     setLoadingMessages(true)
     try {
@@ -88,9 +116,12 @@ export function InboxPage() {
     token,
     enabled: isAuthenticated,
     onMessage: (evt) => {
+      // Silent refresh — these events fire on every status callback
+      // (sent → delivered → read), so flashing a loading spinner each
+      // time would make the chat pane jitter constantly.
       void refreshThreads()
       if (activeId != null && evt.threadId === activeId) {
-        void refreshMessages(activeId)
+        void refreshMessagesSilent(activeId)
       }
     },
   })
@@ -124,14 +155,42 @@ export function InboxPage() {
 
   const handleSend = async () => {
     if (!activeThread || !draft.trim()) return
+    const body = draft.trim()
+    const threadId = activeThread.id
+    const channel = activeThread.channel
     setSending(true); setSendError(null)
+    // Optimistically clear the input and append a placeholder bubble so
+    // the message appears instantly. The real row replaces it once the
+    // server responds (matched by twilio_sid / id when the silent refresh
+    // arrives — until then we use a negative id sentinel).
+    const optimisticId = -Date.now()
+    setDraft('')
+    setMessages(prev => [
+      ...prev,
+      {
+        id: optimisticId,
+        threadId,
+        direction: 'OUTBOUND',
+        channel,
+        fromNumber: '',
+        toNumber: '',
+        body,
+        status: 'sending',
+        error: null,
+        sentByUserName: null,
+        createdAt: new Date().toISOString(),
+      },
+    ])
     try {
-      await inboxService.reply(activeThread.id, draft.trim())
-      setDraft('')
-      await refreshMessages(activeThread.id)
-      await refreshThreads()
+      await inboxService.reply(threadId, body)
+      // Silent refresh — avoids the loading flash. The optimistic row
+      // disappears when this replaces the array with the server's view.
+      await refreshMessagesSilent(threadId)
+      void refreshThreads()
     } catch (e) {
       setSendError(e instanceof Error ? e.message : 'Failed to send the message.')
+      // Drop the optimistic row on failure.
+      setMessages(prev => prev.filter(m => m.id !== optimisticId))
     } finally {
       setSending(false)
     }
