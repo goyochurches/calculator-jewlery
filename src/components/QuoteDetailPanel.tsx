@@ -215,20 +215,32 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
   }, [quote.id])
   const config = useQuoteConfig()
   const expiration = formatExpiration(quote.publicTokenExpiresAt)
-  // Customer-facing price = ((cost - engraving) × markup + engraving) × (1 - discount/100).
+  // Customer-facing price = ((cost - engraving - customMainPool) × markup
+  //   + customMainPool×customMarkup + engraving) × (1 - discount/100).
   // Falls back to the legacy 2.5× / 0% for quotes saved before V22 / V27.
+  // A non-null customerPriceOverride short-circuits the entire pipeline.
   const ENGRAVING_FEE = 150
   const markup = quote.markupMultiplier ?? 2.5
   const discount = Math.max(0, Math.min(100, quote.discountPercent ?? 0))
   const engraveFee = quote.engraving ? ENGRAVING_FEE : 0
-  const customerPriceBeforeDiscount = (quote.total - engraveFee) * markup + engraveFee
+  let _customMainRaw = 0
+  let _customMainMarkedUp = 0
+  for (const s of (quote.stones ?? [])) {
+    if (s.markupMultiplier == null || s.contribution == null) continue
+    _customMainRaw      += s.contribution
+    _customMainMarkedUp += s.contribution * s.markupMultiplier
+  }
+  const _genericPool = quote.total - engraveFee - _customMainRaw
+  const customerPriceBeforeDiscount = _genericPool * markup + _customMainMarkedUp + engraveFee
   const discountAmount = customerPriceBeforeDiscount * (discount / 100)
   const customerPriceAfterDiscount = customerPriceBeforeDiscount - discountAmount
   // 7.75% sales tax applied on top when the seller toggled it on.
   const SALES_TAX_RATE = 0.0775
   const applyTaxes = !!quote.applyTaxes
   const taxAmount = applyTaxes ? customerPriceAfterDiscount * SALES_TAX_RATE : 0
-  const customerPrice = customerPriceAfterDiscount + taxAmount
+  const customerPrice = quote.customerPriceOverride != null
+    ? quote.customerPriceOverride
+    : customerPriceAfterDiscount + taxAmount
 
   const handleRefresh = async () => {
     if (!onRefreshToken) return
@@ -352,16 +364,27 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
               <strong className="font-semibold text-amber-300">
                 ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </strong>
-              {' '}via share link · markup {markup}×{discount > 0 ? `, −${discount}%` : ''}{applyTaxes ? ', +7.75% tax' : ''}
+              {' '}via share link · {quote.customerPriceOverride != null
+                ? 'custom total (markup/discount/tax bypassed)'
+                : `markup ${markup}×${discount > 0 ? `, −${discount}%` : ''}${applyTaxes ? ', +7.75% tax' : ''}`}
             </p>
           )}
-          {discount > 0 && (
+          {quote.customerPriceOverride != null && (
+            <p className="mt-2 inline-flex max-w-full items-start gap-1.5 rounded-2xl border border-amber-300/40 bg-amber-500/15 px-3 py-1.5 text-[11px] font-medium text-amber-100">
+              <span className="shrink-0 font-bold uppercase tracking-wider text-amber-200">Custom total</span>
+              {quote.customerPriceOverrideReason && (
+                <span className="break-words text-amber-100/90">— {quote.customerPriceOverrideReason}</span>
+              )}
+            </p>
+          )}
+          {quote.customerPriceOverride == null && discount > 0 && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 px-2.5 py-1 text-[11px] font-medium text-emerald-200">
               Discount −${discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ({discount}% off ${customerPriceBeforeDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })})
             </p>
           )}
           {/* Tax status block — always visible, shows ON or OFF so the
               jeweler knows at a glance whether sales tax is applied. */}
+          {quote.customerPriceOverride == null && (
           <div className={`mt-2 rounded-xl border px-3 py-2 text-[11px] ${
             applyTaxes
               ? 'bg-emerald-500/15 border-emerald-300/40'
@@ -385,6 +408,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
               </div>
             )}
           </div>
+          )}
         </div>
 
         {/* Share link */}

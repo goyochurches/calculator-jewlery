@@ -80,6 +80,13 @@ export interface QuoteStone {
   color?: string | null
   manualPrice?: number | null
   comments?: string | null
+  /** Per-stone markup override. When non-null this stone's (cost + setting
+   *  labor) gets marked up by this multiplier instead of the quote-level
+   *  markup. Only surfaced on MAIN stones in the UI today. */
+  markupMultiplier?: number | null
+  /** Pre-computed cost + setting labor in dollars at save time. Stored so the
+   *  backend can apply `markupMultiplier` without doing repo lookups. */
+  contribution?: number | null
 }
 
 export interface QuoteCustomerStone {
@@ -142,6 +149,12 @@ export interface SavedQuote {
    *  markup. 0 (or null) = no discount. Quotes above 15% are saved as
    *  PENDING (manager approval); ≤ 15% are auto-approved. */
   discountPercent?: number | null
+  /** Manual override for the customer-facing total in dollars. When non-null
+   *  the markup/discount/tax pipeline is bypassed — this IS the total. */
+  customerPriceOverride?: number | null
+  /** Required reason explaining the override. Stored for audit; never shown
+   *  to the client on the public share link. */
+  customerPriceOverrideReason?: string | null
   /** Free-form internal notes for the jeweler — surfaced only on the
    *  authenticated detail view, NEVER on the public share link. */
   internalNotes?: string | null

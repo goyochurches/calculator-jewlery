@@ -14,6 +14,8 @@ interface ApiStone {
   color?: string | null
   manualPrice?: number | null
   comments?: string | null
+  markupMultiplier?: number | null
+  contribution?: number | null
 }
 
 interface ApiAttachment {
@@ -59,6 +61,8 @@ interface ApiQuote {
   total: number
   markupMultiplier?: number | null
   discountPercent?: number | null
+  customerPriceOverride?: number | null
+  customerPriceOverrideReason?: string | null
   internalNotes?: string | null
   photo?: string | null   // base64 o URL devuelta por el backend
   engraving?: boolean | null
@@ -136,6 +140,8 @@ function mapQuote(q: ApiQuote): SavedQuote {
     total: q.total,
     markupMultiplier: q.markupMultiplier ?? null,
     discountPercent: q.discountPercent ?? null,
+    customerPriceOverride: q.customerPriceOverride ?? null,
+    customerPriceOverrideReason: q.customerPriceOverrideReason ?? null,
     internalNotes: q.internalNotes ?? null,
     photo: q.photo ?? null,
     engraving: q.engraving ?? false,
@@ -188,6 +194,8 @@ function mapStone(s: ApiStone): QuoteStone {
     color: s.color ?? null,
     manualPrice: s.manualPrice ?? null,
     comments: s.comments ?? null,
+    markupMultiplier: s.markupMultiplier ?? null,
+    contribution: s.contribution ?? null,
   }
 }
 

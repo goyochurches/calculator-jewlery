@@ -111,6 +111,12 @@ export function QuoteBuilderPage() {
   // Optional customer discount (percent). Stored as a string so the user can
   // type "10" or "12." without the input collapsing. Empty / 0 = no discount.
   const [discountText, setDiscountText] = useState('')
+  // Manual override for the customer-facing total. Empty = use computed price.
+  // When set, requires a non-empty reason — surfaced in the save validation.
+  const [customerPriceOverrideText, setCustomerPriceOverrideText] = useState('')
+  const [customerPriceOverrideReason, setCustomerPriceOverrideReason] = useState('')
+  const [editingOverride, setEditingOverride] = useState(false)
+  const [overrideError, setOverrideError] = useState<string | null>(null)
 
   // Multi-stone breakdown: 0 or 1 MAIN, plus 0..N SIDE and 0..N MELEE.
   // amount lives in UI state so the user can override it independently of
@@ -136,6 +142,10 @@ export function QuoteBuilderPage() {
     // Free-form notes the jeweler wants to attach to this stone (rendered on
     // the MAIN row only for now).
     comments: string
+    /** Optional per-stone markup. Surfaced on MAIN stones only — overrides
+     *  the quote-level markup just for this stone's (cost + setting labor).
+     *  Empty string = use the generic markup. */
+    markup: string
     /** Whether the form for this stone is folded into a compact summary card.
      *  New stones start expanded; clicking "Done" collapses; chevron toggles. */
     collapsed: boolean
@@ -271,9 +281,12 @@ export function QuoteBuilderPage() {
         color: s.color ?? '',
         manualPrice: s.manualPrice != null ? String(s.manualPrice) : '',
         comments: s.comments ?? '',
+        markup: s.markupMultiplier != null ? String(s.markupMultiplier) : '',
         collapsed: true,
       }
     }))
+    setCustomerPriceOverrideText(dup.customerPriceOverride != null ? String(dup.customerPriceOverride) : '')
+    setCustomerPriceOverrideReason(dup.customerPriceOverrideReason ?? '')
 
     setCustomerStones((dup.customerStones ?? []).map(cs => ({
       uid: crypto.randomUUID(),
@@ -381,6 +394,7 @@ export function QuoteBuilderPage() {
       color: '',
       manualPrice: '',
       comments: '',
+      markup: '',
       collapsed: false,
     }
   }
@@ -393,7 +407,6 @@ export function QuoteBuilderPage() {
   }
 
   const addStone = (role: StoneRole) => {
-    if (role === 'MAIN' && stones.some(s => s.role === 'MAIN')) return
     setStones(prev => [...prev, defaultStoneFor(role)])
   }
   const removeStone = (uid: string) => {
@@ -453,7 +466,7 @@ export function QuoteBuilderPage() {
     }))
   }
 
-  const mainStone   = stones.find(s => s.role === 'MAIN') ?? null
+  const mainStones  = stones.filter(s => s.role === 'MAIN')
   const sideStones  = stones.filter(s => s.role === 'SIDE')
   const meleeStones = stones.filter(s => s.role === 'MELEE')
 
@@ -705,6 +718,23 @@ export function QuoteBuilderPage() {
             </p>
           </div>
 
+          {stone.role === 'MAIN' && (
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Markup for this stone <span className="font-normal normal-case text-slate-400">(optional — overrides the quote-level {parsedMarkup}× markup for this stone's cost + setting labor)</span>
+              </label>
+              <div className="relative">
+                <input type="text" inputMode="decimal" value={stone.markup} placeholder={`Leave empty to use ${parsedMarkup}×`}
+                  onChange={e => patchStone(stone.uid, { markup: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 pr-9 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">×</span>
+              </div>
+              <p className="text-[10px] text-slate-400">
+                Useful when the center stone has a different margin than the rest of the piece.
+              </p>
+            </div>
+          )}
+
           {stone.role !== 'MELEE' && (
             <div className="space-y-1 md:col-span-2">
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -876,16 +906,48 @@ export function QuoteBuilderPage() {
     if (!Number.isFinite(n) || n <= 0) return 0
     return Math.min(n, 100)
   })()
+  // Per-stone markup override pool: MAIN stones with a non-empty markup get
+  // their (cost + setting labor) marked up at their own rate; the rest of
+  // the quote uses the generic markup. Mirrors the backend logic in
+  // SavedQuote.computeCustomerPrice() and SavedQuoteStone.markupMultiplier.
+  const stoneBreakdownByUid: Record<string, { cost: number; labor: number }> = {}
+  pricing.stoneBreakdown.forEach(b => { stoneBreakdownByUid[b.uid] = { cost: b.cost, labor: b.labor } })
+  let customMainRaw = 0
+  let customMainMarkedUp = 0
+  stones.forEach(s => {
+    if (s.role !== 'MAIN') return
+    const txt = s.markup.trim()
+    if (txt === '') return
+    const n = Number(txt)
+    if (!Number.isFinite(n) || n <= 0) return
+    const b = stoneBreakdownByUid[s.uid]
+    if (!b) return
+    const contrib = b.cost + b.labor
+    customMainRaw += contrib
+    customMainMarkedUp += contrib * n
+  })
   // Price shown to the customer (markup applied to cost, leaving engraving
-  // as a flat pass-through). Used in the right-column "Quote total" card.
-  const customerPriceBeforeDiscount = (pricing.total - pricing.engravingFee) * parsedMarkup + pricing.engravingFee
+  // as a flat pass-through). Main stones with their own markup are pulled
+  // out of the generic-markup pool and marked up at their own rate.
+  const genericPool = pricing.total - pricing.engravingFee - customMainRaw
+  const customerPriceBeforeDiscount = genericPool * parsedMarkup + customMainMarkedUp + pricing.engravingFee
   const discountAmount = customerPriceBeforeDiscount * (parsedDiscount / 100)
   const customerPriceAfterDiscount = customerPriceBeforeDiscount - discountAmount
   // 7.75% sales tax — only when the seller toggled it on. Mirrors the
   // backend SavedQuote.SALES_TAX_RATE constant.
   const SALES_TAX_RATE = 0.0775
   const taxAmount = applyTaxes ? customerPriceAfterDiscount * SALES_TAX_RATE : 0
-  const customerPrice = customerPriceAfterDiscount + taxAmount
+  const computedCustomerPrice = customerPriceAfterDiscount + taxAmount
+  // Manual override short-circuits the entire pipeline — what the user
+  // typed IS the final customer-facing price. Discount and tax are surfaced
+  // as zero so the breakdown card doesn't double-count them.
+  const parsedOverride = (() => {
+    const t = customerPriceOverrideText.trim()
+    if (t === '') return null
+    const n = Number(t)
+    return Number.isFinite(n) && n > 0 ? n : null
+  })()
+  const customerPrice = parsedOverride != null ? parsedOverride : computedCustomerPrice
 
   const handleQuoteReady = async () => {
     if (!user) return
@@ -894,12 +956,19 @@ export function QuoteBuilderPage() {
     if (!client) errors.client = 'Please select or create a client.'
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
+    // Override requires a reason — bail out and surface the error in the
+    // override panel so the user fixes it before we hit the API.
+    if (parsedOverride != null && customerPriceOverrideReason.trim() === '') {
+      setOverrideError('Please type a short reason for the override.')
+      setEditingOverride(true)
+      return
+    }
     setSaving(true)
     setSaveError(null)
     try {
       // Legacy fields are populated with aggregates so older list views keep
       // rendering until they're rewritten to consume `stones` directly.
-      const firstStone = mainStone ?? sideStones[0] ?? meleeStones[0] ?? null
+      const firstStone = mainStones[0] ?? sideStones[0] ?? meleeStones[0] ?? null
       // Approval rule: discounts ≤ 15% are auto-approved (covers "no discount"
       // and the everyday range). Anything above 15% lands in PENDING so a
       // manager has to sign it off before the client sees it.
@@ -944,19 +1013,36 @@ export function QuoteBuilderPage() {
         applyTaxes,
         setterType: firstStone?.setterType ?? '',
         jewelryType,
-        stones: stones.map((s, idx) => ({
-          role: s.role,
-          stoneType: s.stoneType,
-          sizeKey: s.sizeKey,
-          carats: parseNum(s.carats),
-          setterType: s.setterType,
-          labReport: s.role === 'MELEE' ? null : (s.labReport || null),
-          sortOrder: idx,
-          shape: s.shape || null,
-          color: s.color || null,
-          manualPrice: s.manualPrice.trim() === '' ? null : parseNum(s.manualPrice),
-          comments: s.comments.trim() === '' ? null : s.comments.trim(),
-        })),
+        stones: stones.map((s, idx) => {
+          const breakdown = stoneBreakdownByUid[s.uid]
+          const contribution = breakdown ? breakdown.cost + breakdown.labor : 0
+          const markupNum = (() => {
+            if (s.role !== 'MAIN') return null
+            const txt = s.markup.trim()
+            if (txt === '') return null
+            const n = Number(txt)
+            return Number.isFinite(n) && n > 0 ? n : null
+          })()
+          return {
+            role: s.role,
+            stoneType: s.stoneType,
+            sizeKey: s.sizeKey,
+            carats: parseNum(s.carats),
+            setterType: s.setterType,
+            labReport: s.role === 'MELEE' ? null : (s.labReport || null),
+            sortOrder: idx,
+            shape: s.shape || null,
+            color: s.color || null,
+            manualPrice: s.manualPrice.trim() === '' ? null : parseNum(s.manualPrice),
+            comments: s.comments.trim() === '' ? null : s.comments.trim(),
+            markupMultiplier: markupNum,
+            contribution,
+          }
+        }),
+        customerPriceOverride: parsedOverride,
+        customerPriceOverrideReason: parsedOverride != null
+          ? (customerPriceOverrideReason.trim() === '' ? null : customerPriceOverrideReason.trim())
+          : null,
         attachments: attachments.map((a, idx) => ({
           photo: a.photo,
           caption: a.caption.trim() === '' ? null : a.caption.trim(),
@@ -993,6 +1079,10 @@ export function QuoteBuilderPage() {
       setApplyTaxes(false)
       setMarkupText(String(DEFAULT_MARKUP))
       setDiscountText('')
+      setCustomerPriceOverrideText('')
+      setCustomerPriceOverrideReason('')
+      setEditingOverride(false)
+      setOverrideError(null)
       setStones([])
       setCustomerStones([])
       setAttachments([])
@@ -1480,10 +1570,10 @@ export function QuoteBuilderPage() {
             <CardContent className="space-y-4 pt-6">
               {renderStoneSection({
                 role: 'MAIN',
-                title: 'Main stone',
-                hint: 'The center stone. Pick one or skip.',
-                items: mainStone ? [mainStone] : [],
-                canAdd: !mainStone,
+                title: 'Main stones',
+                hint: 'Center stones. Add one or several — each can have its own markup.',
+                items: mainStones,
+                canAdd: true,
                 addLabel: 'Add main',
                 onAdd: () => addStone('MAIN'),
               })}
@@ -1812,18 +1902,98 @@ export function QuoteBuilderPage() {
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
               <div className="rounded-2xl p-5 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}>
-                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Quote total</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Quote total</p>
+                  <button
+                    type="button"
+                    onClick={() => setEditingOverride(v => !v)}
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider transition ${
+                      editingOverride
+                        ? 'bg-white text-slate-900'
+                        : 'bg-white/10 text-amber-200 hover:bg-white/20'
+                    }`}
+                  >
+                    {editingOverride ? 'Close' : (parsedOverride != null ? 'Edit override' : 'Edit total')}
+                  </button>
+                </div>
                 <p className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
                   ${pricing.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </p>
                 <p className="mt-1.5 text-xs font-medium text-amber-300/90">
-                  Customer sees ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })} via share link ({parsedMarkup}×{parsedDiscount > 0 ? `, −${parsedDiscount}%` : ''}{applyTaxes ? ', +7.75% tax' : ''})
+                  Customer sees ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })} via share link
+                  {parsedOverride != null
+                    ? ' (custom total — markup/discount/tax bypassed)'
+                    : ` (${parsedMarkup}×${parsedDiscount > 0 ? `, −${parsedDiscount}%` : ''}${applyTaxes ? ', +7.75% tax' : ''})`}
                 </p>
-                {parsedDiscount > 0 && (
+                {parsedOverride != null && customerPriceOverrideReason.trim() !== '' && (
+                  <p className="mt-1 text-[11px] text-amber-200/80">
+                    Reason: <span className="text-white">{customerPriceOverrideReason}</span>
+                  </p>
+                )}
+                {editingOverride && (
+                  <div className="mt-3 space-y-2 rounded-xl border border-white/15 bg-black/20 p-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-semibold uppercase tracking-wider text-amber-200/90">
+                        Custom customer total <span className="font-normal normal-case text-slate-300">(empty = computed price)</span>
+                      </label>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">$</span>
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={customerPriceOverrideText}
+                          placeholder={computedCustomerPrice.toFixed(2)}
+                          onChange={e => { setCustomerPriceOverrideText(e.target.value); setOverrideError(null) }}
+                          className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 pl-7 text-sm text-white placeholder:text-slate-400 outline-none focus:border-amber-300"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-semibold uppercase tracking-wider text-amber-200/90">
+                        Reason {parsedOverride != null && <span className="text-rose-300">(required)</span>}
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={customerPriceOverrideReason}
+                        onChange={e => { setCustomerPriceOverrideReason(e.target.value); setOverrideError(null) }}
+                        placeholder="e.g. Matched competitor quote, goodwill discount, rounded for cash deal…"
+                        className="w-full resize-y rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-400 outline-none focus:border-amber-300"
+                      />
+                    </div>
+                    {overrideError && (
+                      <p className="text-[11px] font-medium text-rose-300">{overrideError}</p>
+                    )}
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => { setCustomerPriceOverrideText(''); setCustomerPriceOverrideReason(''); setOverrideError(null) }}
+                        className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-200 transition hover:bg-white/20"
+                      >
+                        Clear override
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (customerPriceOverrideText.trim() !== '' && customerPriceOverrideReason.trim() === '') {
+                            setOverrideError('Please type a short reason for the override.')
+                            return
+                          }
+                          setOverrideError(null)
+                          setEditingOverride(false)
+                        }}
+                        className="ml-auto rounded-full bg-amber-400 px-3 py-1 text-[11px] font-semibold text-slate-900 transition hover:bg-amber-300"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {parsedOverride == null && parsedDiscount > 0 && (
                   <p className="mt-1 text-xs text-emerald-300/90">
                     Discount −${discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} ({parsedDiscount}% off ${customerPriceBeforeDiscount.toLocaleString('en-US', { minimumFractionDigits: 2 })})
                   </p>
                 )}
+                {parsedOverride == null && (
                 <div className={`mt-2 rounded-xl border px-3 py-2 text-[11px] ${
                   applyTaxes
                     ? 'bg-emerald-500/15 border-emerald-300/40'
@@ -1847,6 +2017,7 @@ export function QuoteBuilderPage() {
                     </div>
                   )}
                 </div>
+                )}
                 <p className="mt-2 text-sm text-slate-300">
                   <span className="font-semibold text-white">{jewelryTypeLabel}</span> · {selectedMetalConfig.label} · {ringLaborLabel}
                 </p>
