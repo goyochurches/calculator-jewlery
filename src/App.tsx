@@ -15,6 +15,7 @@ import QuotesList from '@/pages/QuotesList'
 import { ProfilePage } from '@/pages/Profile'
 import { ClientsPage } from '@/pages/Clients'
 import { ClientDetailPage } from '@/pages/ClientDetail'
+import { InboxPage } from '@/pages/Inbox'
 import { PublicQuotePage } from '@/pages/PublicQuote'
 import { ApprovalPage } from '@/pages/Approval'
 import { PaymentSuccessPage } from '@/pages/PaymentSuccess'
@@ -97,6 +98,9 @@ export default function App() {
                 </Route>
                 <Route element={<RequirePermission permission="quotes-list" />}>
                   <Route path="/quotes-list" element={<QuotesList />} />
+                </Route>
+                <Route element={<RequirePermission permission="messages" />}>
+                  <Route path="/messages" element={<InboxPage />} />
                 </Route>
                 <Route element={<RequirePermission permission="gemstones" />}>
                   <Route path="/gemstones" element={<GemstonesPage />} />

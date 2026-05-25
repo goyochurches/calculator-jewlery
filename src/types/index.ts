@@ -224,3 +224,40 @@ export interface Client {
   email: string | null
   createdAt?: string | null
 }
+
+/** ── Shared inbox (WhatsApp + SMS) ───────────────────────────────────── */
+
+export type InboxChannel = 'WHATSAPP' | 'SMS'
+export type InboxDirection = 'INBOUND' | 'OUTBOUND'
+
+export interface InboxThread {
+  id: number
+  channel: InboxChannel
+  peerPhone: string
+  peerClientId: number | null
+  peerClientName: string | null
+  lastMessageAt: string
+  lastMessagePreview: string | null
+  lastMessageDirection: InboxDirection | null
+  unreadCount: number
+}
+
+export interface InboxMessage {
+  id: number
+  threadId: number
+  direction: InboxDirection
+  channel: InboxChannel
+  fromNumber: string
+  toNumber: string
+  body: string | null
+  status: string | null
+  error: string | null
+  sentByUserName: string | null
+  createdAt: string
+}
+
+export interface InboxCapabilities {
+  canSendWhatsapp: boolean
+  canSendSms: boolean
+}
+

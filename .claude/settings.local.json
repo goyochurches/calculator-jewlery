@@ -41,7 +41,10 @@
       "Bash(curl -i -s \"https://price-calculator-latest.onrender.com/api/public/installments/999999\")",
       "Bash(curl -i -s \"https://price-calculator-latest.onrender.com/api/public/installments/1\")",
       "Bash(curl -i -s \"https://price-calculator-latest.onrender.com/api/public/quotes/this-token-does-not-exist\")",
-      "Bash(curl -s -i \"https://price-calculator-latest.onrender.com/api/payments/by-client/1\")"
+      "Bash(curl -s -i \"https://price-calculator-latest.onrender.com/api/payments/by-client/1\")",
+      "Bash(xargs grep -l \"stompjs\\\\|@stomp\")",
+      "Bash(where mvn *)",
+      "Bash(mvn -q -DskipTests -f D:/wamp64/www/price-calculator/pom.xml compile)"
     ]
   }
 }

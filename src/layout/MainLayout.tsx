@@ -39,6 +39,10 @@ const pageCopy: Record<string, { title: string; subtitle: string }> = {
     title: 'All quotes',
     subtitle: 'Browse every saved quote, see who created it and review the full breakdown.',
   },
+  '/messages': {
+    title: 'Messages',
+    subtitle: 'WhatsApp and SMS conversations with your clients — all in one inbox.',
+  },
   '/master-tables': {
     title: 'Master tables',
     subtitle: 'Reference data for metals, gemstones and price history.',

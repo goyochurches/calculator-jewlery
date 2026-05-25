@@ -4,6 +4,7 @@ import { useBrand } from '@/context/BrandContext'
 import { canAccess, type NavKey } from '@/constants/permissions'
 import { FEATURES } from '@/lib/featureFlags'
 import { canSeePayments } from '@/lib/paymentsAccess'
+import { useInboxUnread } from '@/hooks/useInboxUnread'
 import {
   Calculator,
   ClipboardList,
@@ -14,6 +15,7 @@ import {
   LayoutDashboard,
   LineChart,
   LogOut,
+  MessageCircle,
   Menu,
   Settings,
   ShieldCheck,
@@ -26,6 +28,7 @@ const navItems: { to: string; label: string; icon: typeof LayoutDashboard; key: 
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' },
   { to: '/quotes', label: 'Quote Builder', icon: Calculator, key: 'quotes' },
   { to: '/quotes-list', label: 'Quotes', icon: FileText, key: 'quotes-list' },
+  { to: '/messages', label: 'Messages', icon: MessageCircle, key: 'messages' },
   { to: '/clients', label: 'Clients', icon: Contact, key: 'clients' },
   { to: '/gemstones', label: 'Gemstones', icon: Diamond, key: 'gemstones' },
   { to: '/charts', label: 'Charts', icon: LineChart, key: 'charts' },
@@ -124,7 +127,7 @@ function SidebarContent({
           </p>
         )}
         <nav className={cn('flex flex-col gap-1.5', !collapsed && 'mt-4')}>
-          {visibleNavItems.map(({ to, label, icon: Icon }) => (
+          {visibleNavItems.map(({ to, label, icon: Icon, key }) => (
             <NavLink
               key={to}
               to={to}
@@ -141,10 +144,12 @@ function SidebarContent({
                 )
               }
             >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5 transition group-hover:bg-white/10 group-[.active]:bg-slate-100">
+              <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5 transition group-hover:bg-white/10 group-[.active]:bg-slate-100">
                 <Icon className="h-4 w-4" />
+                {key === 'messages' && <InboxBadge collapsed={collapsed} />}
               </span>
               {!collapsed && <span className="font-medium">{label}</span>}
+              {key === 'messages' && !collapsed && <InboxBadgeInline />}
             </NavLink>
           ))}
         </nav>
@@ -266,5 +271,27 @@ export function Sidebar({
         </div>
       </aside>
     </>
+  )
+}
+
+/** Small dot on top of the icon when the sidebar is collapsed. */
+function InboxBadge({ collapsed }: { collapsed: boolean }) {
+  const { unread } = useInboxUnread()
+  if (!collapsed || unread <= 0) return null
+  return (
+    <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white ring-2 ring-[var(--theme-primary)]">
+      {unread > 99 ? '99+' : unread}
+    </span>
+  )
+}
+
+/** Numeric chip aligned at the end of the row when sidebar is expanded. */
+function InboxBadgeInline() {
+  const { unread } = useInboxUnread()
+  if (unread <= 0) return null
+  return (
+    <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white">
+      {unread > 99 ? '99+' : unread}
+    </span>
   )
 }
