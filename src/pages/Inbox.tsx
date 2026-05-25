@@ -602,7 +602,10 @@ function Composer({
           value={draft}
           onChange={e => onChange(e.target.value)}
           onKeyDown={e => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            // Enter sends; Shift+Enter inserts a newline (chat-standard UX).
+            // We also keep Ctrl/Cmd+Enter as a no-shift alternative so people
+            // muscle-memoried to the old shortcut don't get caught.
+            if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
               e.preventDefault()
               onSend()
             }
@@ -610,7 +613,7 @@ function Composer({
           rows={2}
           disabled={!canReply || sending}
           placeholder={canReply
-            ? `Reply via ${channel === 'WHATSAPP' ? 'WhatsApp' : 'SMS'}… (⌘/Ctrl + Enter to send)`
+            ? `Reply via ${channel === 'WHATSAPP' ? 'WhatsApp' : 'SMS'}… (Shift+Enter for newline)`
             : 'Replies disabled — sender not configured.'}
           className="flex-1 resize-none rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 shadow-inner outline-none transition focus:border-slate-400 disabled:bg-slate-100 disabled:text-slate-400"
         />
