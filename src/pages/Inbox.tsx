@@ -276,6 +276,159 @@ export function InboxPage() {
   )
 }
 
+function NewConversationDialog({
+  capabilities,
+  onClose,
+  onCreated,
+}: {
+  capabilities: InboxCapabilities | null
+  onClose: () => void
+  onCreated: (thread: InboxThread) => void
+}) {
+  const canWa = capabilities?.canSendWhatsapp ?? false
+  const canSms = capabilities?.canSendSms ?? false
+
+  const [client, setClient] = useState<Client | null>(null)
+  const [phone, setPhone] = useState('')
+  const [channel, setChannel] = useState<'WHATSAPP' | 'SMS'>(
+    canWa ? 'WHATSAPP' : canSms ? 'SMS' : 'WHATSAPP',
+  )
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Auto-fill the phone field when the user picks a client that has one.
+  useEffect(() => {
+    if (client?.phone) setPhone(client.phone)
+  }, [client])
+
+  const channelEnabled = channel === 'WHATSAPP' ? canWa : canSms
+
+  const submit = async () => {
+    const trimmed = phone.trim()
+    if (!trimmed) { setError('Phone number is required.'); return }
+    setSubmitting(true); setError(null)
+    try {
+      const thread = await inboxService.openOrCreate({
+        channel,
+        peerPhone: trimmed,
+        clientId: client?.id ?? null,
+      })
+      onCreated(thread)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to start the conversation.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-3xl bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+          <h3 className="text-base font-semibold text-slate-900">Start a new conversation</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </header>
+
+        <div className="space-y-4 px-5 py-5">
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Channel</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setChannel('WHATSAPP')}
+                disabled={!canWa}
+                className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                  channel === 'WHATSAPP'
+                    ? 'border-emerald-500 bg-emerald-50 text-emerald-800'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                } ${!canWa ? 'cursor-not-allowed opacity-50' : ''}`}
+              >
+                <MessageCircle className="h-4 w-4" />
+                WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={() => setChannel('SMS')}
+                disabled={!canSms}
+                className={`flex items-center justify-center gap-2 rounded-2xl border px-3 py-2.5 text-sm font-semibold transition ${
+                  channel === 'SMS'
+                    ? 'border-sky-500 bg-sky-50 text-sky-800'
+                    : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                } ${!canSms ? 'cursor-not-allowed opacity-50' : ''}`}
+              >
+                <MessageCircle className="h-4 w-4" />
+                SMS
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Client (optional)</p>
+            <ClientPicker value={client} onChange={setClient} />
+          </div>
+
+          <div>
+            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Phone number *</p>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+34 600 000 000"
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-slate-400"
+            />
+            <p className="mt-1 text-[11px] text-slate-400">
+              Use E.164 format with country code (e.g. +34…).
+            </p>
+          </div>
+
+          {!channelEnabled && (
+            <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              {channel === 'WHATSAPP'
+                ? 'WhatsApp sender is not configured — set TWILIO_WHATSAPP_FROM to send the first message.'
+                : 'SMS sender is not configured — set TWILIO_SMS_FROM (and buy a Twilio SMS number) to send the first message.'}
+            </p>
+          )}
+
+          {error && (
+            <p className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</p>
+          )}
+        </div>
+
+        <footer className="flex justify-end gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="rounded-2xl px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={submitting || !phone.trim()}
+            className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {submitting ? 'Starting…' : 'Start conversation'}
+          </button>
+        </footer>
+      </div>
+    </div>
+  )
+}
+
 function MessageBubble({ m }: { m: InboxMessage }) {
   const isOut = m.direction === 'OUTBOUND'
   const failed = isOut && (m.status === 'FAILED' || m.status === 'failed' || (m.error != null && m.error !== ''))
