@@ -254,7 +254,8 @@ export const quotesService = {
     return mapQuote(data)
   },
 
-  async updateStatus(id: string, status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED'): Promise<SavedQuote> {
+  async updateStatus(id: string, status: 'DRAFTclaude
+      ' | 'PENDING' | 'APPROVED' | 'REJECTED'): Promise<SavedQuote> {
     const data = await api.patch<ApiQuote>(`/api/quotes/${id}/status?status=${status}`)
     return mapQuote(data)
   },

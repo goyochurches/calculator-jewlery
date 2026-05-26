@@ -501,7 +501,19 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
         {quote.clientName && (
           <div className="rounded-2xl bg-slate-50 px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Client</p>
-            <p className="mt-1.5 text-sm font-semibold text-slate-900">{quote.clientName}</p>
+            {quote.client?.id != null ? (
+              <button
+                type="button"
+                onClick={() => { onClose(); navigate(`/clients/${quote.client!.id}`) }}
+                title="Open client detail"
+                className="mt-1.5 inline-flex items-center gap-1 text-left text-sm font-semibold text-indigo-600 underline underline-offset-2 decoration-indigo-300 transition hover:text-indigo-700 hover:decoration-indigo-500"
+              >
+                {quote.clientName}
+                <span aria-hidden className="text-xs">→</span>
+              </button>
+            ) : (
+              <p className="mt-1.5 text-sm font-semibold text-slate-900">{quote.clientName}</p>
+            )}
           </div>
         )}
 
