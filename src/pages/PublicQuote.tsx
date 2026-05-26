@@ -50,7 +50,7 @@ export function PublicQuotePage() {
   if (!quote)      return <PublicShell><NotFoundState /></PublicShell>
 
   return (
-    <PublicShell companyName={quote.companyName} companyLogo={quote.companyLogo}>
+    <PublicShell companyName={quote.companyName}>
       <QuoteView quote={quote} />
     </PublicShell>
   )
@@ -166,15 +166,12 @@ function LoadingState() {
 function PublicShell({
   children,
   companyName,
-  companyLogo,
 }: {
   children: React.ReactNode
   companyName?: string | null
-  companyLogo?: string | null
 }) {
-  // When the team hasn't uploaded a company logo we fall back to the brand
-  // PNG shipped in /public. If that file is missing or fails to load (older
-  // deploys), drop back to the inline SVG mark.
+  // The brand PNG lives in /public. If it ever fails to load, fall back to
+  // the inline SVG mark so the header is never blank.
   const [brandLogoFailed, setBrandLogoFailed] = useState(false)
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-stone-50 via-white to-amber-50/40 px-4 py-10 sm:py-16">
@@ -186,13 +183,7 @@ function PublicShell({
 
       <div className="relative mx-auto max-w-3xl">
         <header className="mb-10 flex flex-col items-center gap-3 text-center">
-          {companyLogo ? (
-            <img
-              src={companyLogo}
-              alt={companyName ?? 'Company logo'}
-              className="h-16 w-16 rounded-2xl object-contain bg-white p-2 shadow-[0_10px_30px_rgba(15,23,42,0.08)] ring-1 ring-slate-200 sm:h-20 sm:w-20"
-            />
-          ) : brandLogoFailed ? (
+          {brandLogoFailed ? (
             <SimoneAndSonLogo size={80} className="drop-shadow-[0_10px_30px_rgba(245,158,11,0.18)]" />
           ) : (
             <img
