@@ -1106,7 +1106,12 @@ export function QuoteBuilderPage() {
     }
   }
 
-  const ringLaborLabel = config.ringLaborMap[ringLabor]?.label ?? ringLabor
+  // CAD/Ring labor tiers are surfaced as "Level N" using sortOrder rather
+  // than the raw "Small Piece" / "Medium Piece" labels — the workshop reasons
+  // about difficulty by level, the descriptive label is only kept in
+  // MasterTables for the admin's reference.
+  const ringLaborTier = config.ringLaborMap[ringLabor]
+  const ringLaborLabel = ringLaborTier ? `Level ${ringLaborTier.sortOrder}` : ringLabor
   const jewelryTypeLabel = JEWELRY_TYPE_OPTIONS.find(j => j.key === jewelryType)?.label ?? jewelryType
 
   if (config.loading) return <QuoteBuilderSkeleton />
@@ -1382,7 +1387,7 @@ export function QuoteBuilderPage() {
                 <select value={ringLabor} onChange={e => setRingLabor(e.target.value)}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
                   {config.ringLaborTiers.map(t => (
-                    <option key={t.tierKey} value={t.tierKey}>{t.label} — ${t.fee}</option>
+                    <option key={t.tierKey} value={t.tierKey}>Level {t.sortOrder} — ${t.fee}</option>
                   ))}
                 </select>
                 <p className="text-xs text-slate-400">

@@ -355,7 +355,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </p>
           <p className="mt-1.5 text-sm text-white/70">
-            {metalCfg.label} · {ringLaborCfg?.label ?? quote.ringLabor}
+            {metalCfg.label} · {ringLaborCfg ? `Level ${ringLaborCfg.sortOrder}` : quote.ringLabor}
           </p>
           {quote.publicToken && (
             <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/85">
@@ -558,7 +558,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
           <div className="space-y-2">
             <LineItem label="Metal" value={metalCfg.label} />
             <LineItem label="Weight" value={`${quote.weightGrams ?? 0} g`} />
-            <LineItem label="CAD & Jeweler's time" value={ringLaborCfg ? `${ringLaborCfg.label} — $${ringLaborCfg.fee}` : (quote.ringLabor ?? '—')} />
+            <LineItem label="CAD & Jeweler's time" value={ringLaborCfg ? `Level ${ringLaborCfg.sortOrder} — $${ringLaborCfg.fee}` : (quote.ringLabor ?? '—')} />
           </div>
         </div>
 
