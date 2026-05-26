@@ -17,7 +17,6 @@ import {
 import { AlertCircle, Clock, Diamond, Gem, HelpCircle, Quote as QuoteIcon, Ruler, Scissors, Sparkles, Wrench } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { SimoneAndSonLogo } from '@/components/SimoneAndSonLogo'
 
 export function PublicQuotePage() {
   const { token } = useParams<{ token: string }>()
@@ -170,9 +169,6 @@ function PublicShell({
   children: React.ReactNode
   companyName?: string | null
 }) {
-  // The brand PNG lives in /public. If it ever fails to load, fall back to
-  // the inline SVG mark so the header is never blank.
-  const [brandLogoFailed, setBrandLogoFailed] = useState(false)
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-stone-50 via-white to-amber-50/40 px-4 py-10 sm:py-16">
       {/* Soft decorative blobs in the background */}
@@ -183,16 +179,11 @@ function PublicShell({
 
       <div className="relative mx-auto max-w-3xl">
         <header className="mb-10 flex flex-col items-center gap-3 text-center">
-          {brandLogoFailed ? (
-            <SimoneAndSonLogo size={80} className="drop-shadow-[0_10px_30px_rgba(245,158,11,0.18)]" />
-          ) : (
-            <img
-              src="/s%26s_logo.png"
-              alt={companyName ?? 'Simone & Son'}
-              className="h-20 w-20 object-contain drop-shadow-[0_10px_30px_rgba(245,158,11,0.18)] sm:h-24 sm:w-24"
-              onError={() => setBrandLogoFailed(true)}
-            />
-          )}
+          <img
+            src="/s%26s_logo.png"
+            alt={companyName ?? 'Simone & Son'}
+            className="h-20 w-20 object-contain drop-shadow-[0_10px_30px_rgba(245,158,11,0.18)] sm:h-24 sm:w-24"
+          />
           <p className="font-serif text-xl tracking-wide text-slate-900 sm:text-2xl">
             {companyName ?? 'Simone & Son'}
           </p>
