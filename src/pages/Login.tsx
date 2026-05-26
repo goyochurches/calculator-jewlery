@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
-import { SimoneAndSonLogo } from '@/components/SimoneAndSonLogo'
 
 const DEFAULT_LOGO_URL = '/s%26s_logo.png'
 
@@ -12,7 +11,6 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [defaultLogoFailed, setDefaultLogoFailed] = useState(false)
 
   // Drop a stale "Invalid email or password" the second the user starts
   // typing again — otherwise the error sticks visually even though the
@@ -50,20 +48,15 @@ export default function Login() {
       style={{ backgroundColor: 'var(--theme-tertiary)' }}
     >
       <div className="w-full max-w-md">
-        {/* Logo / Brand — prefer /public/default-logo.png if present, otherwise the inline SVG mark */}
+        {/* Logo / Brand */}
         <div className="flex flex-col items-center mb-8 text-center">
-          {defaultLogoFailed ? (
-            <SimoneAndSonLogo size={84} className="mb-4" />
-          ) : (
-            <img
-              src={DEFAULT_LOGO_URL}
-              alt="Simone & Son"
-              width={84}
-              height={84}
-              className="mb-4 object-contain"
-              onError={() => setDefaultLogoFailed(true)}
-            />
-          )}
+          <img
+            src={DEFAULT_LOGO_URL}
+            alt="Simone & Son"
+            width={84}
+            height={84}
+            className="mb-4 object-contain"
+          />
           <h1 className="font-serif text-2xl font-semibold text-slate-900">Simone &amp; Son</h1>
           <p className="text-sm text-slate-500 mt-1">Jewelry Software</p>
         </div>
