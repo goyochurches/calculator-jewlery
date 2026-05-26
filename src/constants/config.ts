@@ -94,7 +94,7 @@ export const CAD_DESIGN_OPTIONS = {
 // por lo que el multiplicador siempre es 1 — se mantiene en el objeto por
 // compatibilidad con quotes históricas.
 export const DIAMOND_TYPE_OPTIONS = {
-  natural: { label: 'Diamond', multiplier: 1 },
+  natural: { label: 'Natural', multiplier: 1 },
   'lab-grown': { label: 'Lab', multiplier: 1 },
 } as const
 
