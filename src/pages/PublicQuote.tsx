@@ -172,6 +172,10 @@ function PublicShell({
   companyName?: string | null
   companyLogo?: string | null
 }) {
+  // When the team hasn't uploaded a company logo we fall back to the brand
+  // PNG shipped in /public. If that file is missing or fails to load (older
+  // deploys), drop back to the inline SVG mark.
+  const [brandLogoFailed, setBrandLogoFailed] = useState(false)
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-stone-50 via-white to-amber-50/40 px-4 py-10 sm:py-16">
       {/* Soft decorative blobs in the background */}
@@ -188,8 +192,15 @@ function PublicShell({
               alt={companyName ?? 'Company logo'}
               className="h-16 w-16 rounded-2xl object-contain bg-white p-2 shadow-[0_10px_30px_rgba(15,23,42,0.08)] ring-1 ring-slate-200 sm:h-20 sm:w-20"
             />
-          ) : (
+          ) : brandLogoFailed ? (
             <SimoneAndSonLogo size={80} className="drop-shadow-[0_10px_30px_rgba(245,158,11,0.18)]" />
+          ) : (
+            <img
+              src="/s%26s_logo.png"
+              alt={companyName ?? 'Simone & Son'}
+              className="h-20 w-20 object-contain drop-shadow-[0_10px_30px_rgba(245,158,11,0.18)] sm:h-24 sm:w-24"
+              onError={() => setBrandLogoFailed(true)}
+            />
           )}
           <p className="font-serif text-xl tracking-wide text-slate-900 sm:text-2xl">
             {companyName ?? 'Simone & Son'}
