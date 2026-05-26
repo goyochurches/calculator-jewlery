@@ -836,6 +836,22 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
           )}
         </div>
 
+        {quote.customerNotes && quote.customerNotes.trim() !== '' && (
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                Customer-facing notes
+              </p>
+              <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                Shown to client
+              </span>
+            </div>
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-3">
+              <p className="whitespace-pre-wrap text-sm text-slate-700">{quote.customerNotes}</p>
+            </div>
+          </div>
+        )}
+
         {quote.internalNotes && quote.internalNotes.trim() !== '' && (
           <div>
             <div className="mb-2 flex items-center justify-between">
