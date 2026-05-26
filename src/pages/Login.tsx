@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { SimoneAndSonLogo } from '@/components/SimoneAndSonLogo'
 
-const DEFAULT_LOGO_URL = '/default-logo.png'
+const DEFAULT_LOGO_URL = '/s%26s_logo.png'
 
 export default function Login() {
   const { login } = useAuth()
