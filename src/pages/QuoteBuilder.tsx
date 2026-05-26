@@ -192,6 +192,9 @@ export function QuoteBuilderPage() {
   // Free-form internal notes the jeweler keeps with the quote. Never shown
   // to the client; surfaced only on the authenticated detail panel.
   const [internalNotes, setInternalNotes] = useState('')
+  // Customer-facing description / notes — rendered on the public share link
+  // so the client reads a short personal message from the jeweler.
+  const [customerNotes, setCustomerNotes] = useState('')
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const attachmentCameraRef = useRef<HTMLInputElement>(null)
 
@@ -263,6 +266,7 @@ export function QuoteBuilderPage() {
     setMarkupText(String(dup.markupMultiplier ?? DEFAULT_MARKUP))
     setDiscountText(dup.discountPercent && dup.discountPercent > 0 ? String(dup.discountPercent) : '')
     setInternalNotes(dup.internalNotes ?? '')
+    setCustomerNotes(dup.customerNotes ?? '')
 
     setStones((dup.stones ?? []).map(s => {
       const ct = config.diamondSizeMap[s.sizeKey]?.ctPerStone ?? 0
@@ -1007,6 +1011,7 @@ export function QuoteBuilderPage() {
         markupMultiplier: parsedMarkup,
         discountPercent: parsedDiscount,
         internalNotes: internalNotes.trim() === '' ? null : internalNotes.trim(),
+        customerNotes: customerNotes.trim() === '' ? null : customerNotes.trim(),
         parentQuote: parentQuoteRef,
         photo: photo ?? undefined,
         engraving,
@@ -1087,6 +1092,7 @@ export function QuoteBuilderPage() {
       setCustomerStones([])
       setAttachments([])
       setInternalNotes('')
+      setCustomerNotes('')
       setPhoto(null)
       setFieldErrors({})
       setSaveError(null)
@@ -1309,6 +1315,25 @@ export function QuoteBuilderPage() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-semibold text-slate-900">
+                  Customer-facing notes
+                  <span className="ml-2 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                    Shown to client
+                  </span>
+                </label>
+                <textarea
+                  rows={4}
+                  value={customerNotes}
+                  onChange={e => setCustomerNotes(e.target.value)}
+                  placeholder="Short description for the client — process, sourcing, sentimental details, anything you'd like them to read on the share link."
+                  className="w-full resize-y rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+                />
+                <p className="text-[11px] text-slate-400">
+                  Appears on the public quote link the customer opens. Leave empty to skip.
+                </p>
               </div>
             </CardContent>
           </Card>

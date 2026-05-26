@@ -44,7 +44,14 @@
       "Bash(curl -s -i \"https://price-calculator-latest.onrender.com/api/payments/by-client/1\")",
       "Bash(xargs grep -l \"stompjs\\\\|@stomp\")",
       "Bash(where mvn *)",
-      "Bash(mvn -q -DskipTests -f D:/wamp64/www/price-calculator/pom.xml compile)"
+      "Bash(mvn -q -DskipTests -f D:/wamp64/www/price-calculator/pom.xml compile)",
+      "Bash(curl *)",
+      "PowerShell(& \"D:\\\\wamp64\\\\www\\\\price-calculator\\\\mvnw.cmd\" -q -DskipTests compile -f D:\\\\wamp64\\\\www\\\\price-calculator\\\\pom.xml 2>&1 | Select-Object -Last 60)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(& \"C:\\\\Program Files\\\\apache-maven-3.9.2\\\\bin\\\\mvn.cmd\" -q -DskipTests compile -f D:\\\\wamp64\\\\www\\\\price-calculator\\\\pom.xml 2>&1 | Select-Object -Last 60)",
+      "PowerShell([Environment]::GetEnvironmentVariable\\('TWILIO_SMS_FROM','User'\\); [Environment]::GetEnvironmentVariable\\('TWILIO_SMS_FROM','Machine'\\); $env:TWILIO_SMS_FROM)",
+      "PowerShell(try { $r = Invoke-WebRequest -Uri 'http://localhost:8080/api/inbox/capabilities' -Method GET -Headers @{Authorization=\"Bearer test\"} -TimeoutSec 3 -SkipHttpErrorCheck; \"HTTP $\\($r.StatusCode\\)\"; $r.Content } catch { \"ERROR: $\\($_.Exception.Message\\)\" })",
+      "Bash(cmd /c \"npx tsc --noEmit 2>&1\")"
     ]
   }
 }

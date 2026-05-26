@@ -64,6 +64,7 @@ interface ApiQuote {
   customerPriceOverride?: number | null
   customerPriceOverrideReason?: string | null
   internalNotes?: string | null
+  customerNotes?: string | null
   photo?: string | null   // base64 o URL devuelta por el backend
   engraving?: boolean | null
   setterType?: string | null
@@ -143,6 +144,7 @@ function mapQuote(q: ApiQuote): SavedQuote {
     customerPriceOverride: q.customerPriceOverride ?? null,
     customerPriceOverrideReason: q.customerPriceOverrideReason ?? null,
     internalNotes: q.internalNotes ?? null,
+    customerNotes: q.customerNotes ?? null,
     photo: q.photo ?? null,
     engraving: q.engraving ?? false,
     setterType: q.setterType ?? null,

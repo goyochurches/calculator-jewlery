@@ -17,6 +17,7 @@ import {
 import { AlertCircle, Clock, Diamond, Gem, HelpCircle, Quote as QuoteIcon, Ruler, Scissors, Sparkles, Wrench } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import { SimoneAndSonLogo } from '@/components/SimoneAndSonLogo'
 
 export function PublicQuotePage() {
   const { token } = useParams<{ token: string }>()
@@ -188,12 +189,10 @@ function PublicShell({
               className="h-16 w-16 rounded-2xl object-contain bg-white p-2 shadow-[0_10px_30px_rgba(15,23,42,0.08)] ring-1 ring-slate-200 sm:h-20 sm:w-20"
             />
           ) : (
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-100 via-yellow-50 to-orange-100 text-amber-700 shadow-[0_10px_30px_rgba(245,158,11,0.18)] sm:h-20 sm:w-20">
-              <Sparkles className="h-7 w-7" />
-            </div>
+            <SimoneAndSonLogo size={80} className="drop-shadow-[0_10px_30px_rgba(245,158,11,0.18)]" />
           )}
           <p className="font-serif text-xl tracking-wide text-slate-900 sm:text-2xl">
-            {companyName ?? 'Jewelry Quote'}
+            {companyName ?? 'Simone & Son'}
           </p>
           <GoldOrnament />
         </header>
@@ -243,11 +242,18 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
     year: 'numeric', month: 'long', day: 'numeric',
   }) : null
 
+  const stoneCount = quote.diamondAmount ?? 0
+  const totalCt    = Number(quote.diamondCarats ?? 0)
+  // Trim trailing zeros so "0.5000" → "0.5", but keep "0.04" / "0.0095" intact.
+  const formatCt = (n: number) => n.toFixed(4).replace(/\.?0+$/, '')
+
   const specs: { icon: React.ElementType; label: string; value: string }[] = [
     { icon: Gem,      label: 'Metal',          value: metal },
     { icon: Wrench,   label: "Jeweler's time", value: labor },
     { icon: Sparkles, label: 'CAD design',     value: cad },
-    { icon: Diamond,  label: 'Diamonds',       value: `${quote.diamondAmount ?? 0} × ${diamondTypeLabel} ${diamondSizeLabel}` },
+    { icon: Diamond,  label: 'Diamonds',       value: `${diamondTypeLabel} ${diamondSizeLabel}` },
+    ...(stoneCount > 0 ? [{ icon: Diamond, label: 'Stone count', value: `${stoneCount} ${stoneCount === 1 ? 'stone' : 'stones'}` }] : []),
+    ...(totalCt > 0 ? [{ icon: Diamond, label: 'Carat weight', value: `${formatCt(totalCt)} ct tw` }] : []),
     { icon: Ruler,    label: 'Finger size',    value: `Size ${quote.fingerSize ?? '—'}` },
     { icon: Ruler,    label: 'Ring width',     value: `${quote.ringWidth ?? 0} mm` },
   ]
@@ -358,6 +364,25 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
                 </>
               )}
             </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── About this piece: jeweler's description for the customer ────── */}
+      {quote.customerNotes && quote.customerNotes.trim() !== '' && (
+        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+          <div className="border-b border-slate-100 px-6 py-5 text-center sm:px-8">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-amber-700">
+              <GoldDot /> About this piece <GoldDot />
+            </p>
+            <h2 className="mt-1.5 font-serif text-xl font-medium tracking-tight text-slate-900 sm:text-2xl">
+              A word from the jeweler
+            </h2>
+          </div>
+          <div className="px-6 py-6 sm:px-8 sm:py-8">
+            <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-slate-700">
+              {quote.customerNotes}
+            </p>
           </div>
         </section>
       )}

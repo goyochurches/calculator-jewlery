@@ -158,6 +158,9 @@ export interface SavedQuote {
   /** Free-form internal notes for the jeweler — surfaced only on the
    *  authenticated detail view, NEVER on the public share link. */
   internalNotes?: string | null
+  /** Optional customer-facing description / notes — rendered on the public
+   *  share link as a short personal message from the jeweler. */
+  customerNotes?: string | null
   photo?: string | null
   engraving?: boolean | null
   setterType?: string | null

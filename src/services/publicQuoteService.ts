@@ -33,6 +33,8 @@ export interface PublicQuote {
   fingerSize: number
   engraving: boolean | null
   setterType: string | null
+  /** Optional customer-facing description / notes written by the jeweler. */
+  customerNotes: string | null
   photo: string | null
   companyName: string | null
   companyLogo: string | null

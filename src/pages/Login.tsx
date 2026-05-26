@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
+import { SimoneAndSonLogo } from '@/components/SimoneAndSonLogo'
 
 export default function Login() {
   const { login } = useAuth()
@@ -47,17 +48,9 @@ export default function Login() {
     >
       <div className="w-full max-w-md">
         {/* Logo / Brand */}
-        <div className="text-center mb-8">
-          <div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-3xl mb-4 shadow-lg"
-            style={{ backgroundColor: 'var(--theme-primary)' }}
-          >
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M16 4L28 10V22L16 28L4 22V10L16 4Z" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/>
-              <path d="M16 4L16 28M4 10L28 22M28 10L4 22" stroke="white" strokeWidth="1" strokeOpacity="0.5"/>
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900">Simone &amp; Son</h1>
+        <div className="flex flex-col items-center mb-8 text-center">
+          <SimoneAndSonLogo size={84} className="mb-4" />
+          <h1 className="font-serif text-2xl font-semibold text-slate-900">Simone &amp; Son</h1>
           <p className="text-sm text-slate-500 mt-1">Jewelry Software</p>
         </div>
 
