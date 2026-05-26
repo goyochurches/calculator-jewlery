@@ -269,7 +269,7 @@ export function QuoteBuilderPage() {
     setCustomerNotes(dup.customerNotes ?? '')
 
     setStones((dup.stones ?? []).map(s => {
-      const ct = config.diamondSizeMap[s.sizeKey]?.ctPerStone ?? 0
+      const ct = config.diamondSizeFor(s.stoneType, s.sizeKey)?.ctPerStone ?? 0
       const carats = s.carats ?? 0
       const amount = ct > 0 && carats > 0 ? String(Math.round(carats / ct)) : ''
       return {
@@ -312,7 +312,7 @@ export function QuoteBuilderPage() {
     })))
 
     navigate(location.pathname, { replace: true, state: null })
-  }, [config.loading, config.diamondSizeMap, location.pathname, location.state, navigate])
+  }, [config.loading, config.diamondSizeFor, location.pathname, location.state, navigate])
 
   // Setters allowed for customer-supplied stones — narrowed to the subset the
   // user wants to expose in the Customer Stones section.
@@ -437,7 +437,7 @@ export function QuoteBuilderPage() {
   const onStoneCaratsChange = (uid: string, caratsText: string) => {
     setStones(prev => prev.map(s => {
       if (s.uid !== uid) return s
-      const ct = config.diamondSizeMap[s.sizeKey]?.ctPerStone ?? 0
+      const ct = config.diamondSizeFor(s.stoneType, s.sizeKey)?.ctPerStone ?? 0
       if (caratsText === '') return { ...s, carats: '', amount: '' }
       const carats = parseNum(caratsText)
       const amount = ct > 0 ? String(Math.round(carats / ct)) : s.amount
@@ -447,7 +447,7 @@ export function QuoteBuilderPage() {
   const onStoneAmountChange = (uid: string, amountText: string) => {
     setStones(prev => prev.map(s => {
       if (s.uid !== uid) return s
-      const ct = config.diamondSizeMap[s.sizeKey]?.ctPerStone ?? 0
+      const ct = config.diamondSizeFor(s.stoneType, s.sizeKey)?.ctPerStone ?? 0
       if (amountText === '') return { ...s, amount: '', carats: '' }
       const amount = parseNum(amountText)
       const carats = ct > 0
@@ -535,7 +535,7 @@ export function QuoteBuilderPage() {
 
   const renderStoneRow = (stone: StoneRow, index: number) => {
     const sizes = stone.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
-    const sizeCfg = config.diamondSizeMap[stone.sizeKey]
+    const sizeCfg = config.diamondSizeFor(stone.stoneType, stone.sizeKey)
     const pricePerCarat = (sizeCfg?.basePrice ?? 0) * DIAMOND_TYPE_OPTIONS[stone.stoneType].multiplier
     const caratsNum = parseNum(stone.carats)
     const amountNum = parseNum(stone.amount)
@@ -843,7 +843,7 @@ export function QuoteBuilderPage() {
     let totalCarats = 0
     let totalAmount = 0
     const stoneBreakdown = stones.map(s => {
-      const sizeCfg = config.diamondSizeMap[s.sizeKey]
+      const sizeCfg = config.diamondSizeFor(s.stoneType, s.sizeKey)
       const mult = DIAMOND_TYPE_OPTIONS[s.stoneType].multiplier
       const pricePerCarat = (sizeCfg?.basePrice ?? 0) * mult
       const carats = parseNum(s.carats)

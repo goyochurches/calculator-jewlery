@@ -4,8 +4,18 @@ import {
   type FingerSizeConfig,
   type PricingTier,
   type SetterConfig,
+  type StoneType,
 } from '@/services/configService'
 import { useEffect, useState } from 'react'
+
+// Quote stones use lowercase 'natural' / 'lab-grown' (with a legacy
+// 'grunberger' on old quotes); the config rows are keyed by the backend
+// enum 'NATURAL' / 'LAB'. Normalize so the helper accepts either.
+function normalizeStoneType(t: string | undefined | null): StoneType {
+  const u = (t ?? '').toUpperCase()
+  if (u === 'LAB' || u === 'LAB-GROWN') return 'LAB'
+  return 'NATURAL'
+}
 
 export interface QuoteConfig {
   diamondSizes: DiamondSizeConfig[]
@@ -13,7 +23,12 @@ export interface QuoteConfig {
   cadTiers: PricingTier[]
   ringLaborTiers: PricingTier[]
   setters: SetterConfig[]
-  diamondSizeMap: Record<string, DiamondSizeConfig>
+  /** Look up the diamond-size row for a (stoneType, sizeKey) pair. The
+   *  backend stores one row per stone_type AND size, so callers must pass
+   *  the stone's type to get the right basePrice / ctPerStone — using
+   *  sizeKey alone silently picked whichever row loaded last and made the
+   *  carats↔amount sync wrong for LAB stones. */
+  diamondSizeFor: (stoneType: string | undefined | null, sizeKey: string) => DiamondSizeConfig | undefined
   fingerSizeMap: Record<number, FingerSizeConfig>
   cadMap: Record<string, PricingTier>
   ringLaborMap: Record<string, PricingTier>
@@ -23,7 +38,8 @@ export interface QuoteConfig {
 
 const EMPTY: QuoteConfig = {
   diamondSizes: [], fingerSizes: [], cadTiers: [], ringLaborTiers: [], setters: [],
-  diamondSizeMap: {}, fingerSizeMap: {}, cadMap: {}, ringLaborMap: {}, setterMap: {},
+  diamondSizeFor: () => undefined,
+  fingerSizeMap: {}, cadMap: {}, ringLaborMap: {}, setterMap: {},
   loading: true,
 }
 
@@ -39,13 +55,17 @@ export function useQuoteConfig(): QuoteConfig {
       configService.getSetters(),
     ])
       .then(([diamondSizes, fingerSizes, cadTiers, ringLaborTiers, setters]) => {
+        const byTypeAndKey: Record<string, DiamondSizeConfig> = Object.fromEntries(
+          diamondSizes.map(d => [`${d.stoneType}|${d.sizeKey}`, d])
+        )
         setConfig({
           diamondSizes,
           fingerSizes,
           cadTiers,
           ringLaborTiers,
           setters,
-          diamondSizeMap: Object.fromEntries(diamondSizes.map(d => [d.sizeKey, d])),
+          diamondSizeFor: (stoneType, sizeKey) =>
+            byTypeAndKey[`${normalizeStoneType(stoneType)}|${sizeKey}`],
           fingerSizeMap: Object.fromEntries(fingerSizes.map(f => [f.size, f])),
           cadMap: Object.fromEntries(cadTiers.map(t => [t.tierKey, t])),
           ringLaborMap: Object.fromEntries(ringLaborTiers.map(t => [t.tierKey, t])),

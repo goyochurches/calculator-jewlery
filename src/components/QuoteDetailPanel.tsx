@@ -282,7 +282,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
   // the legacy diamondCarats/diamondType/diamondSize fields if a quote was
   // saved before the multi-stone refactor.
   const stoneTotals = stones.reduce((acc, s) => {
-    const sizeCfg = config.diamondSizeMap[s.sizeKey]
+    const sizeCfg = config.diamondSizeFor(s.stoneType, s.sizeKey)
     const mult = DIAMOND_TYPE_OPTIONS[s.stoneType as keyof typeof DIAMOND_TYPE_OPTIONS]?.multiplier ?? 1
     const pricePerCarat = (sizeCfg?.basePrice ?? 0) * mult
     const setterFee = config.setterMap[s.setterType]?.fee ?? 0
@@ -586,7 +586,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                   : 'Pavé / melee stones.'
                 // Per-section subtotals so the customer sees cost rolled up by role.
                 const sectionTotal = items.reduce((acc, s) => {
-                  const sizeCfg = config.diamondSizeMap[s.sizeKey]
+                  const sizeCfg = config.diamondSizeFor(s.stoneType, s.sizeKey)
                   const mult = DIAMOND_TYPE_OPTIONS[s.stoneType as keyof typeof DIAMOND_TYPE_OPTIONS]?.multiplier ?? 1
                   const ppc = (sizeCfg?.basePrice ?? 0) * mult
                   const ct = sizeCfg?.ctPerStone ?? 0
@@ -621,7 +621,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                       <p className="rounded-xl border border-dashed border-slate-200 px-3 py-2 text-xs text-slate-400">None.</p>
                     )}
                     {items.map((s, idx) => {
-                      const sizeCfg = config.diamondSizeMap[s.sizeKey]
+                      const sizeCfg = config.diamondSizeFor(s.stoneType, s.sizeKey)
                       const setter = config.setterMap[s.setterType]
                       const mult = DIAMOND_TYPE_OPTIONS[s.stoneType as keyof typeof DIAMOND_TYPE_OPTIONS]?.multiplier ?? 1
                       const ppc = (sizeCfg?.basePrice ?? 0) * mult
