@@ -536,9 +536,9 @@ export function QuoteBuilderPage() {
   const renderStoneRow = (stone: StoneRow, index: number) => {
     const sizes = stone.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
     const sizeCfg = config.diamondSizeFor(stone.stoneType, stone.sizeKey)
-    // À la carte = no preset mm size: carats are free-typed and the cost comes
+    // Custom = no preset mm size: carats are free-typed and the cost comes
     // from the custom price (there is no per-carat base to multiply against).
-    const aLaCarte = stone.sizeKey === ''
+    const customSize = stone.sizeKey === ''
     const pricePerCarat = (sizeCfg?.basePrice ?? 0) * DIAMOND_TYPE_OPTIONS[stone.stoneType].multiplier
     const caratsNum = parseNum(stone.carats)
     const amountNum = parseNum(stone.amount)
@@ -549,7 +549,7 @@ export function QuoteBuilderPage() {
     const stoneTotal = stoneCost + stoneLabor
     const theme = themeForRole(stone.role)
     const typeLabel = DIAMOND_TYPE_OPTIONS[stone.stoneType].label
-    const sizeLabel = sizeCfg?.label ?? (stone.sizeKey || 'À la carte')
+    const sizeLabel = sizeCfg?.label ?? (stone.sizeKey || 'Custom')
     const setterLabel = config.setterMap[stone.setterType]?.label ?? stone.setterType
 
     // ── Collapsed (summary) view ────────────────────────────────────────
@@ -651,9 +651,9 @@ export function QuoteBuilderPage() {
             <select value={stone.sizeKey}
               onChange={e => patchStone(stone.uid, { sizeKey: e.target.value })}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
-              {/* À la carte: no preset mm size — the jeweler types carats and a
-                  custom price directly (e.g. "one 3 ct center stone, $X"). */}
-              <option value="">À la carte — enter carats & price</option>
+              {/* Custom: no preset mm size — the jeweler types carats and a
+                  price directly (e.g. "one 3 ct center stone, $X"). */}
+              <option value="">Custom — enter carats &amp; price</option>
               {sizes.map(d => (
                 <option key={d.id} value={d.sizeKey}>
                   {d.label} — ${d.basePrice}{d.ctPerStone != null ? '/ct' : ''}
@@ -717,15 +717,15 @@ export function QuoteBuilderPage() {
 
           <div className="space-y-1 md:col-span-2">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {aLaCarte ? 'Stone price' : 'Custom price'}{' '}
+              {customSize ? 'Stone price' : 'Custom price'}{' '}
               <span className="font-normal normal-case text-slate-400">
-                {aLaCarte
+                {customSize
                   ? '(enter the price for this stone directly)'
                   : `(optional — overrides carats × $${pricePerCarat.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct)`}
               </span>
             </label>
             <input type="number" min={0} step="0.01" value={stone.manualPrice}
-              placeholder={aLaCarte ? 'e.g. 4500' : 'Leave empty to use calculated price'}
+              placeholder={customSize ? 'e.g. 4500' : 'Leave empty to use calculated price'}
               onChange={e => onStoneManualPriceChange(stone.uid, e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
             <p className="text-[10px] text-slate-400">
