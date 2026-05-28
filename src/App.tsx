@@ -10,6 +10,7 @@ import { Charts } from '@/pages/Graphics'
 import { HistoryPage } from '@/pages/Historial'
 import { UsersPage } from '@/pages/Users'
 import { Configuration } from '@/pages/Configuration'
+import { ReviewsPage } from '@/pages/Reviews'
 import MasterTables from '@/pages/MasterTables'
 import QuotesList from '@/pages/QuotesList'
 import { ProfilePage } from '@/pages/Profile'
@@ -123,6 +124,9 @@ export default function App() {
                     <Route path="/payments" element={<PaymentsPage />} />
                   </Route>
                 )}
+                <Route element={<RequirePermission permission="reviews" />}>
+                  <Route path="/reviews" element={<ReviewsPage />} />
+                </Route>
                 <Route element={<RequirePermission permission="configuration" />}>
                   <Route path="/configuration" element={<Configuration />} />
                 </Route>
