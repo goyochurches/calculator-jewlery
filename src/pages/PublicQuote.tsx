@@ -434,10 +434,10 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
                 Artisan touch included
               </p>
               <p className="mt-1 font-serif text-lg font-medium tracking-tight text-slate-900">
-                Hand engraving · milgrain
+                Hand engraving
               </p>
               <p className="mt-1 text-sm text-slate-600">
-                Adds <strong>${quote.engravingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong> of fine bench work, already reflected in the total.
+                Fine hand bench work, already included in your total.
               </p>
             </div>
           </div>

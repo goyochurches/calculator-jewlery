@@ -53,7 +53,12 @@
       "PowerShell(try { $r = Invoke-WebRequest -Uri 'http://localhost:8080/api/inbox/capabilities' -Method GET -Headers @{Authorization=\"Bearer test\"} -TimeoutSec 3 -SkipHttpErrorCheck; \"HTTP $\\($r.StatusCode\\)\"; $r.Content } catch { \"ERROR: $\\($_.Exception.Message\\)\" })",
       "Bash(cmd /c \"npx tsc --noEmit 2>&1\")",
       "PowerShell($b64 = Get-Content 'D:\\\\wamp64\\\\www\\\\calculator-jewlery\\\\public\\\\default-logo.b64' -Raw; try { $bytes = [System.Convert]::FromBase64String\\($b64.Trim\\(\\)\\); [System.IO.File]::WriteAllBytes\\('D:\\\\wamp64\\\\www\\\\calculator-jewlery\\\\public\\\\default-logo.png', $bytes\\); Write-Output \"decoded $\\($bytes.Length\\) bytes\"; $last4 = $bytes[-4..-1] | ForEach-Object { '{0:X2}' -f $_ }; Write-Output \"last 4 bytes: $\\($last4 -join ' '\\)\" } catch { Write-Output \"ERROR: $_\" })",
-      "Bash(grep -vE \"^\\\\s*$\")"
+      "Bash(grep -vE \"^\\\\s*$\")",
+      "Bash(/d/wamp64/www/apache-maven-3.6.3/bin/mvn -q -o compile)",
+      "Bash(/d/wamp64/www/apache-maven-3.6.3/bin/mvn -q compile)",
+      "Bash(/d/wamp64/www/apache-maven-3.6.3/bin/mvn -o compile -q)",
+      "Bash(echo \"EXIT CODE: $?\")",
+      "Bash(ls -la target/classes/com/pricecalculator/dto/PublicQuoteResponse.class)"
     ]
   }
 }
