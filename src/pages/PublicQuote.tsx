@@ -232,11 +232,7 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
   const cad = PUBLIC_RING_LABOR_LEVELS[quote.cadDesign]
     ?? CAD_DESIGN_OPTIONS[quote.cadDesign as keyof typeof CAD_DESIGN_OPTIONS]?.label
     ?? quote.cadDesign
-  // When the client supplies the stone themselves we only charge setting labor,
-  // so the diamond type row reads "Supply by customer" instead of a stone type.
-  const diamondTypeLabel = quote.customerSuppliedStone
-    ? 'Supply by customer'
-    : DIAMOND_TYPE_OPTIONS[quote.diamondType as keyof typeof DIAMOND_TYPE_OPTIONS]?.label ?? quote.diamondType
+  const diamondTypeLabel = DIAMOND_TYPE_OPTIONS[quote.diamondType as keyof typeof DIAMOND_TYPE_OPTIONS]?.label ?? quote.diamondType
   const diamondSizeLabel = DIAMOND_SIZE_OPTIONS[quote.diamondSize as keyof typeof DIAMOND_SIZE_OPTIONS]?.label ?? quote.diamondSize
 
   const issuedDate = quote.createdAt ? new Date(quote.createdAt).toLocaleDateString('en-US', {
@@ -254,6 +250,9 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
     { icon: Sparkles, label: 'CAD design',     value: cad },
     { icon: Diamond,  label: 'Diamond type',   value: diamondTypeLabel },
     { icon: Ruler,    label: 'Stone size',     value: diamondSizeLabel },
+    // Dedicated row when the client brings their own stone — makes it explicit
+    // on the customer-facing quote that we only set a stone they supplied.
+    ...(quote.customerSuppliedStone ? [{ icon: Gem, label: 'Stone', value: 'Supplied by customer' }] : []),
     ...(stoneCount > 0 ? [{ icon: Diamond, label: 'Stone count', value: `${stoneCount} ${stoneCount === 1 ? 'stone' : 'stones'}` }] : []),
     ...(totalCt > 0 ? [{ icon: Diamond, label: 'Carat weight', value: `${formatCt(totalCt)} ct tw` }] : []),
     { icon: Ruler,    label: 'Finger size',    value: `Size ${quote.fingerSize ?? '—'}` },

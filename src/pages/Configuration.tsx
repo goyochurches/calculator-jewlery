@@ -43,9 +43,11 @@ export function Configuration() {
   const [draft, setDraft] = useState<ThemeColors>(colors)
 
   // Branding — sync when context finishes loading from API
-  const { companyName, logo, save: saveBrand } = useBrand()
+  const { companyName, logo, googleReviewUrl, googlePlaceId, save: saveBrand } = useBrand()
   const [brandName, setBrandName] = useState(companyName)
   const [logoPreview, setLogoPreview] = useState<string | null>(logo)
+  const [reviewUrl, setReviewUrl] = useState<string>(googleReviewUrl ?? '')
+  const [placeId, setPlaceId] = useState<string>(googlePlaceId ?? '')
 
   const [brandSaved, setBrandSaved] = useState(false)
   const [brandSaving, setBrandSaving] = useState(false)
@@ -54,7 +56,9 @@ export function Configuration() {
   useEffect(() => {
     setBrandName(companyName)
     setLogoPreview(logo)
-  }, [companyName, logo])
+    setReviewUrl(googleReviewUrl ?? '')
+    setPlaceId(googlePlaceId ?? '')
+  }, [companyName, logo, googleReviewUrl, googlePlaceId])
 
   const handleLogoFile = (file: File) => {
     const reader = new FileReader()
@@ -71,7 +75,12 @@ export function Configuration() {
   const handleSaveBrand = async () => {
     setBrandSaving(true)
     try {
-      await saveBrand(brandName, logoPreview)
+      await saveBrand(
+        brandName,
+        logoPreview,
+        reviewUrl.trim() === '' ? null : reviewUrl.trim(),
+        placeId.trim() === '' ? null : placeId.trim(),
+      )
       setBrandSaved(true)
       setTimeout(() => setBrandSaved(false), 2500)
     } catch (err) {
@@ -149,6 +158,20 @@ export function Configuration() {
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoFile(f) }}
               />
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">Google review link</label>
+            <input
+              type="url"
+              value={reviewUrl}
+              onChange={(e) => setReviewUrl(e.target.value)}
+              className={inputClass}
+              placeholder="https://g.page/r/…/review"
+            />
+            <p className="text-xs text-slate-400">
+              When set, clients are texted this link on WhatsApp once they fully pay a quote. Leave empty to disable.
+            </p>
           </div>
 
           <div className="flex items-center gap-3">

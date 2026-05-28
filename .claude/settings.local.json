@@ -58,7 +58,10 @@
       "Bash(/d/wamp64/www/apache-maven-3.6.3/bin/mvn -q compile)",
       "Bash(/d/wamp64/www/apache-maven-3.6.3/bin/mvn -o compile -q)",
       "Bash(echo \"EXIT CODE: $?\")",
-      "Bash(ls -la target/classes/com/pricecalculator/dto/PublicQuoteResponse.class)"
+      "Bash(ls -la target/classes/com/pricecalculator/dto/PublicQuoteResponse.class)",
+      "Bash(ls src/main/java/com/pricecalculator/service/)",
+      "Bash(ls src/main/java/com/pricecalculator/controller/)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }
