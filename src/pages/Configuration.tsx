@@ -174,6 +174,23 @@ export function Configuration() {
             </p>
           </div>
 
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">Google Place ID</label>
+            <input
+              type="text"
+              value={placeId}
+              onChange={(e) => setPlaceId(e.target.value)}
+              className={inputClass}
+              placeholder="ChIJ…"
+            />
+            <p className="text-xs text-slate-400">
+              Used to show your Google rating and latest reviews on the Reviews page. Find it at{' '}
+              <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noreferrer" className="underline">
+                Google's Place ID finder
+              </a>. Leave empty to disable.
+            </p>
+          </div>
+
           <div className="flex items-center gap-3">
             <Button
               size="lg"

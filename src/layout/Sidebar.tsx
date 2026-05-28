@@ -19,6 +19,7 @@ import {
   Menu,
   Settings,
   ShieldCheck,
+  Star,
   Users,
   X,
 } from 'lucide-react'
@@ -37,6 +38,7 @@ const navItems: { to: string; label: string; icon: typeof LayoutDashboard; key: 
   // Gated by the payments feature flag — drops out of the list entirely
   // when disabled so the link doesn't show even to admins.
   { to: '/payments', label: 'Payments', icon: CreditCard, key: 'payments', hidden: !FEATURES.payments },
+  { to: '/reviews', label: 'Reviews', icon: Star, key: 'reviews' },
   { to: '/configuration', label: 'Configuration', icon: Settings, key: 'configuration' },
   { to: '/master-tables', label: 'Master Tables', icon: ClipboardList, key: 'master-tables' },
 ]

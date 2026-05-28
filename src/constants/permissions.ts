@@ -15,6 +15,7 @@ export type NavKey =
   | 'master-tables'
   | 'payments'
   | 'messages'
+  | 'reviews'
 
 export const ROLE_PERMISSIONS: Record<Role, NavKey[]> = {
   ADMIN: [
@@ -30,6 +31,7 @@ export const ROLE_PERMISSIONS: Record<Role, NavKey[]> = {
     'master-tables',
     'payments',
     'messages',
+    'reviews',
   ],
   MANAGER: ['quotes', 'quotes-list', 'gemstones', 'messages'],
   JEWELER: ['quotes', 'quotes-list', 'gemstones', 'messages'],
