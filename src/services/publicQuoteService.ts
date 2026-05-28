@@ -28,6 +28,9 @@ export interface PublicQuote {
   diamondType: string
   diamondSize: string
   diamondAmount: number
+  /** True when the client supplies the stone(s). Replaces the diamond type
+   *  with a "Supply by customer" label on the public quote. */
+  customerSuppliedStone: boolean | null
   weightGrams: number
   ringWidth: number
   fingerSize: number

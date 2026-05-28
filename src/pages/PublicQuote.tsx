@@ -232,7 +232,11 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
   const cad = PUBLIC_RING_LABOR_LEVELS[quote.cadDesign]
     ?? CAD_DESIGN_OPTIONS[quote.cadDesign as keyof typeof CAD_DESIGN_OPTIONS]?.label
     ?? quote.cadDesign
-  const diamondTypeLabel = DIAMOND_TYPE_OPTIONS[quote.diamondType as keyof typeof DIAMOND_TYPE_OPTIONS]?.label ?? quote.diamondType
+  // When the client supplies the stone themselves we only charge setting labor,
+  // so the diamond type row reads "Supply by customer" instead of a stone type.
+  const diamondTypeLabel = quote.customerSuppliedStone
+    ? 'Supply by customer'
+    : DIAMOND_TYPE_OPTIONS[quote.diamondType as keyof typeof DIAMOND_TYPE_OPTIONS]?.label ?? quote.diamondType
   const diamondSizeLabel = DIAMOND_SIZE_OPTIONS[quote.diamondSize as keyof typeof DIAMOND_SIZE_OPTIONS]?.label ?? quote.diamondSize
 
   const issuedDate = quote.createdAt ? new Date(quote.createdAt).toLocaleDateString('en-US', {
