@@ -59,8 +59,10 @@ export function Configuration() {
   const [voiceApiKeySid, setVoiceApiKeySid] = useState(settings.voiceApiKeySid ?? '')
   const [voiceApiKeySecret, setVoiceApiKeySecret] = useState(settings.voiceApiKeySecret ?? '')
   const [firebaseJson, setFirebaseJson] = useState(settings.firebaseCredentialsJson ?? '')
-  const [intSaved, setIntSaved] = useState(false)
-  const [intSaving, setIntSaving] = useState(false)
+  const [twilioSaved, setTwilioSaved] = useState(false)
+  const [twilioSaving, setTwilioSaving] = useState(false)
+  const [fbSaved, setFbSaved] = useState(false)
+  const [fbSaving, setFbSaving] = useState(false)
 
   useEffect(() => {
     setBrandName(companyName)
@@ -104,23 +106,36 @@ export function Configuration() {
     }
   }
 
-  const handleSaveIntegrations = async () => {
-    setIntSaving(true)
+  const trimOrNull = (v: string) => (v.trim() === '' ? null : v.trim())
+
+  const handleSaveTwilio = async () => {
+    setTwilioSaving(true)
     try {
-      const trim = (v: string) => (v.trim() === '' ? null : v.trim())
       await saveBrand({
-        voiceFrom: trim(voiceFrom),
-        voiceTwimlAppSid: trim(voiceTwimlAppSid),
-        voiceApiKeySid: trim(voiceApiKeySid),
-        voiceApiKeySecret: trim(voiceApiKeySecret),
-        firebaseCredentialsJson: trim(firebaseJson),
+        voiceFrom: trimOrNull(voiceFrom),
+        voiceTwimlAppSid: trimOrNull(voiceTwimlAppSid),
+        voiceApiKeySid: trimOrNull(voiceApiKeySid),
+        voiceApiKeySecret: trimOrNull(voiceApiKeySecret),
       })
-      setIntSaved(true)
-      setTimeout(() => setIntSaved(false), 2500)
+      setTwilioSaved(true)
+      setTimeout(() => setTwilioSaved(false), 2500)
     } catch (err) {
       console.error(err)
     } finally {
-      setIntSaving(false)
+      setTwilioSaving(false)
+    }
+  }
+
+  const handleSaveFirebase = async () => {
+    setFbSaving(true)
+    try {
+      await saveBrand({ firebaseCredentialsJson: trimOrNull(firebaseJson) })
+      setFbSaved(true)
+      setTimeout(() => setFbSaved(false), 2500)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setFbSaving(false)
     }
   }
 
@@ -240,17 +255,13 @@ export function Configuration() {
         </CardContent>
       </Card>
 
-      {/* Integrations — Twilio Voice (calls) + Firebase (push) */}
+      {/* Twilio — in-app calls */}
       <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
         <CardHeader className="border-b border-slate-100">
-          <CardTitle className="text-base font-semibold text-slate-900">Integrations · Calls &amp; Push</CardTitle>
-          <p className="text-sm text-slate-500">
-            Twilio Voice powers in-app calls; Firebase sends push notifications to the mobile app.
-          </p>
+          <CardTitle className="text-base font-semibold text-slate-900">Twilio · Calls</CardTitle>
+          <p className="text-sm text-slate-500">Powers in-app phone calls with the shop's number as caller ID.</p>
         </CardHeader>
         <CardContent className="space-y-5 px-6 py-6">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Twilio Voice (calls)</p>
-
           <div className="space-y-2">
             <label className="text-sm font-semibold text-slate-900">Shop phone number (caller ID)</label>
             <input
@@ -301,7 +312,28 @@ export function Configuration() {
             </div>
           </div>
 
-          <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Firebase (push notifications)</p>
+          <div className="flex items-center gap-3">
+            <Button
+              size="lg"
+              className="rounded-2xl px-5 text-white"
+              style={{ backgroundColor: draft.primary }}
+              onClick={handleSaveTwilio}
+              disabled={twilioSaving}
+            >
+              {twilioSaving ? 'Saving…' : 'Save Twilio'}
+            </Button>
+            {twilioSaved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Firebase — push notifications */}
+      <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <CardHeader className="border-b border-slate-100">
+          <CardTitle className="text-base font-semibold text-slate-900">Firebase · Push</CardTitle>
+          <p className="text-sm text-slate-500">Sends push notifications to the mobile app.</p>
+        </CardHeader>
+        <CardContent className="space-y-5 px-6 py-6">
           <div className="space-y-2">
             <label className="text-sm font-semibold text-slate-900">Service account JSON</label>
             <textarea
@@ -321,12 +353,12 @@ export function Configuration() {
               size="lg"
               className="rounded-2xl px-5 text-white"
               style={{ backgroundColor: draft.primary }}
-              onClick={handleSaveIntegrations}
-              disabled={intSaving}
+              onClick={handleSaveFirebase}
+              disabled={fbSaving}
             >
-              {intSaving ? 'Saving…' : 'Save integrations'}
+              {fbSaving ? 'Saving…' : 'Save Firebase'}
             </Button>
-            {intSaved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
+            {fbSaved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
           </div>
         </CardContent>
       </Card>
