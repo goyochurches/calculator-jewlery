@@ -61,7 +61,18 @@
       "Bash(ls -la target/classes/com/pricecalculator/dto/PublicQuoteResponse.class)",
       "Bash(ls src/main/java/com/pricecalculator/service/)",
       "Bash(ls src/main/java/com/pricecalculator/controller/)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(npm --version)",
+      "Bash(npm create *)",
+      "Bash(npx cap *)",
+      "Bash(cp \"calculator-jewlery/public/s&s_logo.png\" \"simone-mobile/public/simone-and-son-logo.png\")",
+      "Bash(file \"simone-mobile/public/simone-and-son-logo.png\")",
+      "Bash(Get-ChildItem -Recurse -Filter \"*.yml\" -o File)",
+      "Bash(Select-Object -First 20)",
+      "Bash(Get-ChildItem -Path \"D:\\\\wamp64\\\\www\\\\price-calculator\" -Recurse -Directory)",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(xargs grep -l \"@Async\")",
+      "Bash(xargs grep -l \"ApplicationEventPublisher\")"
     ]
   }
 }

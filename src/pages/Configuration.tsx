@@ -43,7 +43,7 @@ export function Configuration() {
   const [draft, setDraft] = useState<ThemeColors>(colors)
 
   // Branding — sync when context finishes loading from API
-  const { companyName, logo, googleReviewUrl, googlePlaceId, save: saveBrand } = useBrand()
+  const { companyName, logo, googleReviewUrl, googlePlaceId, settings, save: saveBrand } = useBrand()
   const [brandName, setBrandName] = useState(companyName)
   const [logoPreview, setLogoPreview] = useState<string | null>(logo)
   const [reviewUrl, setReviewUrl] = useState<string>(googleReviewUrl ?? '')
@@ -53,12 +53,26 @@ export function Configuration() {
   const [brandSaving, setBrandSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Integrations — Twilio Voice + Firebase FCM
+  const [voiceFrom, setVoiceFrom] = useState(settings.voiceFrom ?? '')
+  const [voiceTwimlAppSid, setVoiceTwimlAppSid] = useState(settings.voiceTwimlAppSid ?? '')
+  const [voiceApiKeySid, setVoiceApiKeySid] = useState(settings.voiceApiKeySid ?? '')
+  const [voiceApiKeySecret, setVoiceApiKeySecret] = useState(settings.voiceApiKeySecret ?? '')
+  const [firebaseJson, setFirebaseJson] = useState(settings.firebaseCredentialsJson ?? '')
+  const [intSaved, setIntSaved] = useState(false)
+  const [intSaving, setIntSaving] = useState(false)
+
   useEffect(() => {
     setBrandName(companyName)
     setLogoPreview(logo)
     setReviewUrl(googleReviewUrl ?? '')
     setPlaceId(googlePlaceId ?? '')
-  }, [companyName, logo, googleReviewUrl, googlePlaceId])
+    setVoiceFrom(settings.voiceFrom ?? '')
+    setVoiceTwimlAppSid(settings.voiceTwimlAppSid ?? '')
+    setVoiceApiKeySid(settings.voiceApiKeySid ?? '')
+    setVoiceApiKeySecret(settings.voiceApiKeySecret ?? '')
+    setFirebaseJson(settings.firebaseCredentialsJson ?? '')
+  }, [companyName, logo, googleReviewUrl, googlePlaceId, settings])
 
   const handleLogoFile = (file: File) => {
     const reader = new FileReader()
@@ -75,18 +89,38 @@ export function Configuration() {
   const handleSaveBrand = async () => {
     setBrandSaving(true)
     try {
-      await saveBrand(
-        brandName,
-        logoPreview,
-        reviewUrl.trim() === '' ? null : reviewUrl.trim(),
-        placeId.trim() === '' ? null : placeId.trim(),
-      )
+      await saveBrand({
+        companyName: brandName,
+        logoBase64: logoPreview,
+        googleReviewUrl: reviewUrl.trim() === '' ? null : reviewUrl.trim(),
+        googlePlaceId: placeId.trim() === '' ? null : placeId.trim(),
+      })
       setBrandSaved(true)
       setTimeout(() => setBrandSaved(false), 2500)
     } catch (err) {
       console.error(err)
     } finally {
       setBrandSaving(false)
+    }
+  }
+
+  const handleSaveIntegrations = async () => {
+    setIntSaving(true)
+    try {
+      const trim = (v: string) => (v.trim() === '' ? null : v.trim())
+      await saveBrand({
+        voiceFrom: trim(voiceFrom),
+        voiceTwimlAppSid: trim(voiceTwimlAppSid),
+        voiceApiKeySid: trim(voiceApiKeySid),
+        voiceApiKeySecret: trim(voiceApiKeySecret),
+        firebaseCredentialsJson: trim(firebaseJson),
+      })
+      setIntSaved(true)
+      setTimeout(() => setIntSaved(false), 2500)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIntSaving(false)
     }
   }
 
@@ -205,6 +239,98 @@ export function Configuration() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Integrations — Twilio Voice (calls) + Firebase (push) */}
+      <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <CardHeader className="border-b border-slate-100">
+          <CardTitle className="text-base font-semibold text-slate-900">Integrations · Calls &amp; Push</CardTitle>
+          <p className="text-sm text-slate-500">
+            Twilio Voice powers in-app calls; Firebase sends push notifications to the mobile app.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-5 px-6 py-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Twilio Voice (calls)</p>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">Shop phone number (caller ID)</label>
+            <input
+              type="text"
+              value={voiceFrom}
+              onChange={(e) => setVoiceFrom(e.target.value)}
+              className={inputClass}
+              placeholder="+1 213 460 5897"
+            />
+            <p className="text-xs text-slate-400">The voice-capable Twilio number customers see when the app calls them.</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">TwiML App SID</label>
+            <input
+              type="text"
+              value={voiceTwimlAppSid}
+              onChange={(e) => setVoiceTwimlAppSid(e.target.value)}
+              className={inputClass}
+              placeholder="AP…"
+            />
+            <p className="text-xs text-slate-400">
+              Twilio Console → Voice → TwiML Apps. Its Voice Request URL must be{' '}
+              <code className="rounded bg-slate-100 px-1">/api/public/webhooks/twilio/voice</code>.
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-900">API Key SID</label>
+              <input
+                type="text"
+                value={voiceApiKeySid}
+                onChange={(e) => setVoiceApiKeySid(e.target.value)}
+                className={inputClass}
+                placeholder="SK…"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-900">API Key Secret</label>
+              <input
+                type="password"
+                value={voiceApiKeySecret}
+                onChange={(e) => setVoiceApiKeySecret(e.target.value)}
+                className={inputClass}
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+
+          <p className="pt-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Firebase (push notifications)</p>
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">Service account JSON</label>
+            <textarea
+              value={firebaseJson}
+              onChange={(e) => setFirebaseJson(e.target.value)}
+              className={`${inputClass} h-40 font-mono text-xs`}
+              placeholder='{ "type": "service_account", "project_id": "…", … }'
+            />
+            <p className="text-xs text-slate-400">
+              Firebase Console → Project settings → Service accounts → Generate new private key. Paste the whole JSON.
+              Leave empty to disable push.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              size="lg"
+              className="rounded-2xl px-5 text-white"
+              style={{ backgroundColor: draft.primary }}
+              onClick={handleSaveIntegrations}
+              disabled={intSaving}
+            >
+              {intSaving ? 'Saving…' : 'Save integrations'}
+            </Button>
+            {intSaved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Theme colors */}
       <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
         <CardHeader className="border-b border-slate-100">

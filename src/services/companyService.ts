@@ -10,6 +10,18 @@ export interface CompanySettings {
   /** Google Maps Place ID of the shop — used to pull the rating + reviews
    *  into the Reviews page. Blank = reviews panel disabled. */
   googlePlaceId: string | null
+  // ── Twilio Voice (in-app calls) ──
+  /** Shop's voice-capable Twilio number (E.164) — outbound caller ID. */
+  voiceFrom?: string | null
+  /** Twilio TwiML App SID for Voice. */
+  voiceTwimlAppSid?: string | null
+  /** Twilio Standard API Key SID (signs Voice tokens). */
+  voiceApiKeySid?: string | null
+  /** Twilio API Key secret. */
+  voiceApiKeySecret?: string | null
+  // ── Firebase Cloud Messaging (push) ──
+  /** Full Firebase service-account JSON. Blank = push disabled. */
+  firebaseCredentialsJson?: string | null
 }
 
 export const companyService = {
