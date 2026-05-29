@@ -22,6 +22,10 @@ export interface CompanySettings {
   // ── Firebase Cloud Messaging (push) ──
   /** Full Firebase service-account JSON. Blank = push disabled. */
   firebaseCredentialsJson?: string | null
+  // ── Theme colors (shared with the mobile app) ──
+  themePrimary?: string | null
+  themeSecondary?: string | null
+  themeTertiary?: string | null
 }
 
 export const companyService = {

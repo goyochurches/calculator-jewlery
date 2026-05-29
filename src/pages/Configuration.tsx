@@ -74,6 +74,17 @@ export function Configuration() {
     setVoiceApiKeySid(settings.voiceApiKeySid ?? '')
     setVoiceApiKeySecret(settings.voiceApiKeySecret ?? '')
     setFirebaseJson(settings.firebaseCredentialsJson ?? '')
+    // Hydrate theme colors from the backend (source of truth shared with mobile).
+    if (settings.themePrimary || settings.themeSecondary || settings.themeTertiary) {
+      const fromApi = {
+        primary: settings.themePrimary ?? colors.primary,
+        secondary: settings.themeSecondary ?? colors.secondary,
+        tertiary: settings.themeTertiary ?? colors.tertiary,
+      }
+      setColors(fromApi)
+      setDraft(fromApi)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyName, logo, googleReviewUrl, googlePlaceId, settings])
 
   const handleLogoFile = (file: File) => {
@@ -141,6 +152,12 @@ export function Configuration() {
 
   const handleSave = () => {
     setColors(draft)
+    // Persist to the backend too so the mobile app uses the same colors.
+    saveBrand({
+      themePrimary: draft.primary,
+      themeSecondary: draft.secondary,
+      themeTertiary: draft.tertiary,
+    }).catch((err) => console.error(err))
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
