@@ -665,8 +665,8 @@ function InstallmentRow({
             onClick={onSendWhatsApp}
             disabled={!clientPhone || sending || loading}
             title={clientPhone
-              ? `Send the payment link to ${clientPhone} via WhatsApp`
-              : 'Client has no WhatsApp phone on file — set one on the client record to enable this'}
+              ? `Send the payment link to ${clientPhone} via their preferred channel (SMS / WhatsApp)`
+              : 'Client has no phone on file — set one on the client record to enable this'}
             className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2 text-[11px] font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
           >
             {sending  ? <Loader2 className="h-3 w-3 animate-spin" />
