@@ -87,15 +87,20 @@ export function ClientsPage() {
   const saveEdit = async () => {
     if (!editDraft) return
     if (!editDraft.name?.trim()) return
-    const updated = await clientService.update(editDraft.id, {
-      name: editDraft.name.trim(),
-      surname: editDraft.surname?.trim() || null,
-      phone: editDraft.phone?.trim() || null,
-      email: editDraft.email?.trim() || null,
-      preferredChannel: editDraft.preferredChannel || 'SMS',
-    })
-    setClients(prev => prev.map(c => c.id === updated.id ? updated : c))
-    setEditId(null); setEditDraft(null)
+    try {
+      const updated = await clientService.update(editDraft.id, {
+        name: editDraft.name.trim(),
+        surname: editDraft.surname?.trim() || null,
+        phone: editDraft.phone?.trim() || null,
+        email: editDraft.email?.trim() || null,
+        preferredChannel: editDraft.preferredChannel || 'SMS',
+      })
+      setClients(prev => prev.map(c => c.id === updated.id ? updated : c))
+      setEditId(null); setEditDraft(null)
+    } catch (e) {
+      // Most likely a duplicate phone/email — surface the backend message.
+      alert(e instanceof Error ? e.message : 'Failed to save client')
+    }
   }
 
   const remove = async (id: number) => {
