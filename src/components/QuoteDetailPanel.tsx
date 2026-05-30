@@ -330,6 +330,13 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
 
   return (
     <div className="flex flex-col">
+      <NoticeDialog
+        open={notice !== null}
+        title={notice?.title ?? ''}
+        description={notice?.description}
+        variant={notice?.variant ?? 'info'}
+        onClose={() => setNotice(null)}
+      />
       <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
         <div>
           <div className="flex flex-wrap items-center gap-2">

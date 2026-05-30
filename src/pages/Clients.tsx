@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { clientService } from '@/services/clientService'
+import { NoticeDialog } from '@/components/NoticeDialog'
 import type { Client } from '@/types'
 import {
   Check, ChevronRight, Loader2, Mail, Pencil, Phone,
@@ -29,6 +30,7 @@ export function ClientsPage() {
   // Per-row edit
   const [editId, setEditId] = useState<number | null>(null)
   const [editDraft, setEditDraft] = useState<Client | null>(null)
+  const [notice, setNotice] = useState<{ title: string; description?: string } | null>(null)
 
   const reqIdRef = useRef(0)
 
@@ -99,7 +101,7 @@ export function ClientsPage() {
       setEditId(null); setEditDraft(null)
     } catch (e) {
       // Most likely a duplicate phone/email — surface the backend message.
-      alert(e instanceof Error ? e.message : 'Failed to save client')
+      setNotice({ title: "Couldn't save the client", description: e instanceof Error ? e.message : 'Failed to save client' })
     }
   }
 
@@ -111,6 +113,13 @@ export function ClientsPage() {
 
   return (
     <div className="space-y-6">
+      <NoticeDialog
+        open={notice !== null}
+        title={notice?.title ?? ''}
+        description={notice?.description}
+        variant="error"
+        onClose={() => setNotice(null)}
+      />
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
