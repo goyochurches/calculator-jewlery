@@ -30,6 +30,7 @@ interface ThreadGroup {
   latestAt: string
   latestPreview: string | null
   latestDirection: 'INBOUND' | 'OUTBOUND' | null
+  latestSenderName: string | null
   totalUnread: number
 }
 
@@ -432,7 +433,13 @@ function ThreadRow({
           {subline && <p className="truncate text-[11px] text-slate-400">{subline}</p>}
           <div className="mt-0.5 flex items-center justify-between gap-2">
             <p className="truncate text-xs text-slate-500">
-              {group.latestDirection === 'OUTBOUND' && <span className="text-slate-400">You: </span>}
+              {group.latestSenderName ? (
+                <span className="mr-1 inline-flex items-center rounded bg-slate-100 px-1 py-0.5 align-middle text-[9px] font-semibold text-slate-500">
+                  {group.latestSenderName}
+                </span>
+              ) : group.latestDirection === 'OUTBOUND' ? (
+                <span className="text-slate-400">You: </span>
+              ) : null}
               {group.latestPreview ?? <span className="italic text-slate-300">(no message)</span>}
             </p>
             <div className="flex shrink-0 items-center gap-1">
@@ -1072,6 +1079,7 @@ function groupThreads(threads: InboxThread[]): ThreadGroup[] {
         latestAt: t.lastMessageAt,
         latestPreview: t.lastMessagePreview,
         latestDirection: t.lastMessageDirection,
+        latestSenderName: t.lastMessageSenderName,
         totalUnread: t.unreadCount,
       })
     } else {
@@ -1081,6 +1089,7 @@ function groupThreads(threads: InboxThread[]): ThreadGroup[] {
         existing.latestAt = t.lastMessageAt
         existing.latestPreview = t.lastMessagePreview
         existing.latestDirection = t.lastMessageDirection
+        existing.latestSenderName = t.lastMessageSenderName
       }
       existing.totalUnread += t.unreadCount
     }

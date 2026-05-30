@@ -246,6 +246,8 @@ export interface InboxThread {
   lastMessageAt: string
   lastMessagePreview: string | null
   lastMessageDirection: InboxDirection | null
+  /** Team member who sent the last outbound message; null otherwise. */
+  lastMessageSenderName: string | null
   unreadCount: number
 }
 
