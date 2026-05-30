@@ -27,6 +27,11 @@ export const inboxService = {
     return api.post<InboxMessage>(`/api/inbox/threads/${threadId}/reply`, { body })
   },
 
+  /** Re-send a failed outbound message. Returns the updated row. */
+  retryMessage(messageId: number): Promise<InboxMessage> {
+    return api.post<InboxMessage>(`/api/inbox/messages/${messageId}/retry`, {})
+  },
+
   markRead(threadId: number): Promise<void> {
     return api.post<void>(`/api/inbox/threads/${threadId}/mark-read`, {})
   },

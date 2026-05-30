@@ -4,8 +4,8 @@ import { getBrokerUrl, useWebSocket } from '@/hooks/useWebSocket'
 import { inboxService } from '@/services/inboxService'
 import type { Client, InboxCapabilities, InboxEvent, InboxMessage, InboxThread } from '@/types'
 import {
-  Check, CheckCheck, MessageCircle, MessageSquare, Phone, PhoneIncoming,
-  PhoneMissed, PhoneOutgoing, Plus, Search, Send, Smartphone, X,
+  Check, CheckCheck, Loader2, MessageCircle, MessageSquare, Phone, PhoneIncoming,
+  PhoneMissed, PhoneOutgoing, Plus, RotateCcw, Search, Send, Smartphone, X,
 } from 'lucide-react'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -119,6 +119,14 @@ export function InboxPage() {
       setEvents(list)
     } catch { /* non-fatal — the chat still renders without events */ }
   }, [])
+
+  /** Re-send a failed message; refresh so the bubble flips red → normal on success. */
+  const handleRetry = useCallback(async (messageId: number) => {
+    try {
+      await inboxService.retryMessage(messageId)
+    } catch { /* the refresh below still reflects the latest status */ }
+    if (activeId != null) await refreshMessagesSilent(activeId)
+  }, [activeId, refreshMessagesSilent])
 
   useEffect(() => { void refreshThreads() }, [refreshThreads])
   useEffect(() => {
@@ -361,6 +369,7 @@ export function InboxPage() {
                   events={events}
                   channel={activeThread.channel as Channel}
                   peerLabel={activeGroup.clientName ?? activeGroup.peerName ?? activeGroup.phone}
+                  onRetry={handleRetry}
                 />
               )}
               <div ref={messagesEndRef} />
@@ -594,12 +603,13 @@ function buildTimeline(messages: InboxMessage[], events: InboxEvent[]): Timeline
 }
 
 function Timeline({
-  messages, events, channel, peerLabel,
+  messages, events, channel, peerLabel, onRetry,
 }: {
   messages: InboxMessage[]
   events: InboxEvent[]
   channel: Channel
   peerLabel: string
+  onRetry: (messageId: number) => void
 }) {
   const items = buildTimeline(messages, events)
   let lastDay = ''
@@ -613,7 +623,7 @@ function Timeline({
           <Fragment key={item.key}>
             {sep && <DateSeparator day={day} />}
             {item.kind === 'message'
-              ? <MessageBubble m={item.message} channel={channel} />
+              ? <MessageBubble m={item.message} channel={channel} onRetry={onRetry} />
               : <EventRow event={item.event} peerLabel={peerLabel} />}
           </Fragment>
         )
@@ -731,9 +741,19 @@ function DateSeparator({ day }: { day: string }) {
   )
 }
 
-function MessageBubble({ m, channel }: { m: InboxMessage; channel: Channel }) {
+function MessageBubble({ m, channel, onRetry }: {
+  m: InboxMessage
+  channel: Channel
+  onRetry: (messageId: number) => void
+}) {
   const isOut = m.direction === 'OUTBOUND'
-  const failed = isOut && (m.status === 'FAILED' || m.status === 'failed' || (m.error != null && m.error !== ''))
+  const failed = isOut && (m.status === 'FAILED' || m.status === 'failed' || m.status === 'undelivered' || (m.error != null && m.error !== ''))
+  const canRetry = failed && m.id > 0
+  const [retrying, setRetrying] = useState(false)
+  const doRetry = async () => {
+    setRetrying(true)
+    try { await onRetry(m.id) } finally { setRetrying(false) }
+  }
 
   const outboundBg = channel === 'WHATSAPP' ? 'bg-emerald-600' : 'bg-sky-600'
   const outboundFailedBg = 'bg-rose-100 text-rose-900 border border-rose-200'
@@ -761,6 +781,20 @@ function MessageBubble({ m, channel }: { m: InboxMessage; channel: Channel }) {
           {failed && m.error ? <span>· {m.error}</span> : null}
           {isOut && !failed && <DeliveryTick status={m.status} />}
         </p>
+        {canRetry && (
+          <div className="mt-1 flex items-center justify-end gap-2">
+            <span className="text-[10px] font-semibold text-rose-700">Not delivered</span>
+            <button
+              type="button"
+              onClick={doRetry}
+              disabled={retrying}
+              className="inline-flex items-center gap-1 rounded-full border border-rose-300 bg-white px-2 py-0.5 text-[10px] font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60"
+            >
+              {retrying ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+              {retrying ? 'Retrying…' : 'Retry'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
