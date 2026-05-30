@@ -1,6 +1,6 @@
 import { RefundDialog } from '@/components/RefundDialog'
-import { paymentPlanService, quoteEventsService, type PaymentInstallment, type PlanRow, type QuoteEvent } from '@/services/paymentPlanService'
-import { AlertTriangle, Bell, Check, Clock, Copy, CreditCard, Link as LinkIcon, Loader2, MessageCircle, Plus, RefreshCw, RotateCcw, Trash2, XCircle } from 'lucide-react'
+import { paymentPlanService, quoteEventsService, type PaymentInstallment, type PaymentMethodChoice, type PlanRow, type QuoteEvent } from '@/services/paymentPlanService'
+import { AlertTriangle, Bell, Check, Clock, Copy, CreditCard, Landmark, Link as LinkIcon, Loader2, MessageCircle, Plus, RefreshCw, RotateCcw, Trash2, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 interface Props {
@@ -47,6 +47,9 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone, quoteTitle, onPa
   const [refundState, setRefundState] = useState<Record<number, 'requesting' | 'awaiting' | 'completed'>>({})
   /** Installment selected for the refund dialog. null = closed. */
   const [refundDialogFor, setRefundDialogFor] = useState<PaymentInstallment | null>(null)
+  /** Per-installment payment-method choice for the link (defaults to CARD). */
+  const [methodById, setMethodById] = useState<Record<number, PaymentMethodChoice>>({})
+  const methodFor = (id: number): PaymentMethodChoice => methodById[id] ?? 'CARD'
 
   useEffect(() => {
     let alive = true
@@ -121,7 +124,7 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone, quoteTitle, onPa
     setLinkLoadingId(installment.id)
     setError(null)
     try {
-      const url = await paymentPlanService.getCheckoutLink(quoteId, installment.id)
+      const url = await paymentPlanService.getCheckoutLink(quoteId, installment.id, methodFor(installment.id))
       await navigator.clipboard.writeText(url)
       // Reflect the new URL on the current plan row so the UI doesn't show stale state.
       setPlan(p => p?.map(i => i.id === installment.id ? { ...i, stripeSessionUrl: url } : i) ?? null)
@@ -139,7 +142,7 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone, quoteTitle, onPa
     setSendingId(installment.id)
     setError(null)
     try {
-      const res = await paymentPlanService.sendCheckoutLinkViaWhatsApp(quoteId, installment.id)
+      const res = await paymentPlanService.sendCheckoutLinkViaWhatsApp(quoteId, installment.id, methodFor(installment.id))
       if (!res.ok) {
         setError(res.error ?? 'WhatsApp send failed')
       } else {
@@ -268,6 +271,8 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone, quoteTitle, onPa
               sent={sentId === p.id}
               refundPhase={refundState[p.id] ?? null}
               clientPhone={clientPhone ?? null}
+              method={methodFor(p.id)}
+              onMethodChange={(m) => setMethodById(prev => ({ ...prev, [p.id]: m }))}
               onCopy={() => handleCopyLink(p)}
               onSendWhatsApp={() => handleSendWhatsApp(p)}
               onRefund={() => handleRefund(p)}
@@ -516,9 +521,44 @@ function statusChip(status: string): string {
   return 'bg-slate-100 text-slate-600'
 }
 
+/** 3-way segmented control letting the jeweler pick which payment method(s)
+ *  the link offers: card, ACH (US bank debit), or both. */
+function MethodSelector({ value, onChange, disabled }: {
+  value: PaymentMethodChoice
+  onChange: (m: PaymentMethodChoice) => void
+  disabled?: boolean
+}) {
+  const opts: { key: PaymentMethodChoice; label: string; Icon?: typeof CreditCard }[] = [
+    { key: 'CARD', label: 'Card', Icon: CreditCard },
+    { key: 'ACH', label: 'ACH', Icon: Landmark },
+    { key: 'BOTH', label: 'Both' },
+  ]
+  return (
+    <div className="inline-flex items-center gap-0.5 rounded-xl border border-slate-200 bg-slate-50 p-0.5">
+      <span className="px-1.5 text-[9px] font-semibold uppercase tracking-wider text-slate-400">Pay by</span>
+      {opts.map(o => {
+        const active = value === o.key
+        return (
+          <button
+            key={o.key}
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange(o.key)}
+            className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-bold transition disabled:opacity-50 ${
+              active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {o.Icon && <o.Icon className="h-3 w-3" />} {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 function InstallmentRow({
   installment, index, total, copied, loading, sending, sent, refundPhase,
-  clientPhone, onCopy, onSendWhatsApp, onRefund,
+  clientPhone, method, onMethodChange, onCopy, onSendWhatsApp, onRefund,
 }: {
   installment: PaymentInstallment
   index: number
@@ -529,20 +569,24 @@ function InstallmentRow({
   sent: boolean
   refundPhase: 'requesting' | 'awaiting' | 'completed' | null
   clientPhone: string | null
+  method: PaymentMethodChoice
+  onMethodChange: (m: PaymentMethodChoice) => void
   onCopy: () => void
   onSendWhatsApp: () => void
   onRefund: () => void
 }) {
   const isPaid = installment.status === 'PAID'
+  const isProcessing = installment.status === 'PROCESSING'
   const isCanceled = installment.status === 'CANCELED'
   const isRefunded = installment.status === 'REFUNDED'  // legacy rows that may pre-date the change
   const wasRefunded = installment.refundAmount != null  // history flag — works regardless of current status
   const refunding = refundPhase === 'requesting' || refundPhase === 'awaiting'
 
-  const statusTone = isPaid     ? 'border-emerald-200 bg-emerald-50'
-                   : isCanceled ? 'border-slate-200 bg-slate-50'
-                   : isRefunded ? 'border-violet-200 bg-violet-50/60'
-                   :              'border-amber-100 bg-amber-50/40'
+  const statusTone = isPaid       ? 'border-emerald-200 bg-emerald-50'
+                   : isProcessing ? 'border-sky-200 bg-sky-50/60'
+                   : isCanceled   ? 'border-slate-200 bg-slate-50'
+                   : isRefunded   ? 'border-violet-200 bg-violet-50/60'
+                   :                'border-amber-100 bg-amber-50/40'
 
   return (
     <div className={`rounded-2xl border ${statusTone} px-3 py-2.5`}>
@@ -593,8 +637,18 @@ function InstallmentRow({
         </div>
       )}
 
-      {!isPaid && !isCanceled && !isRefunded && (
-        <div className="mt-2 flex items-center gap-2">
+      {/* ACH clears asynchronously — show a calm "processing" notice and hide
+          the link actions so the jeweler doesn't re-issue mid-clearing. */}
+      {isProcessing && (
+        <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-1 text-[10px] font-semibold text-sky-700">
+          <Loader2 className="h-3 w-3 animate-spin" /> Payment processing (ACH) · clears in 3–5 business days
+        </div>
+      )}
+
+      {!isPaid && !isProcessing && !isCanceled && !isRefunded && (
+        <div className="mt-2 space-y-2">
+          <MethodSelector value={method} onChange={onMethodChange} disabled={loading || sending} />
+          <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onCopy}
@@ -631,6 +685,7 @@ function InstallmentRow({
               <LinkIcon className="h-3.5 w-3.5" />
             </a>
           )}
+          </div>
         </div>
       )}
       {isPaid && (
@@ -655,6 +710,11 @@ function StatusChip({ status }: { status: PaymentInstallment['status'] }) {
   if (status === 'PAID') return (
     <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-700">
       <Check className="h-2.5 w-2.5" /> Paid
+    </span>
+  )
+  if (status === 'PROCESSING') return (
+    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-sky-100 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-sky-700">
+      <Loader2 className="h-2.5 w-2.5 animate-spin" /> Processing
     </span>
   )
   if (status === 'CANCELED') return (

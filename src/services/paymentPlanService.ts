@@ -1,6 +1,9 @@
 import { api } from '@/api/apiClient'
 
-export type InstallmentStatus = 'PENDING' | 'PAID' | 'CANCELED' | 'REFUNDED'
+export type InstallmentStatus = 'PENDING' | 'PROCESSING' | 'PAID' | 'CANCELED' | 'REFUNDED'
+
+/** Which payment methods a checkout link offers. The jeweler picks per link. */
+export type PaymentMethodChoice = 'CARD' | 'ACH' | 'BOTH'
 
 export interface PaymentInstallment {
   id: number
@@ -34,10 +37,15 @@ export const paymentPlanService = {
     return api.put<PaymentInstallment[]>(`/api/quotes/${quoteId}/payment-plan`, { rows })
   },
 
-  /** Asks the backend for (or generates) a fresh Stripe Checkout URL. */
-  async getCheckoutLink(quoteId: string | number, installmentId: number): Promise<string> {
+  /** Asks the backend for (or generates) a fresh Stripe Checkout URL,
+   *  offering the chosen payment method(s) (defaults to CARD). */
+  async getCheckoutLink(
+    quoteId: string | number,
+    installmentId: number,
+    method: PaymentMethodChoice = 'CARD',
+  ): Promise<string> {
     const res = await api.post<{ url: string }>(
-      `/api/quotes/${quoteId}/payment-plan/${installmentId}/checkout-link`,
+      `/api/quotes/${quoteId}/payment-plan/${installmentId}/checkout-link?method=${method}`,
       {},
     )
     return res.url
@@ -48,8 +56,9 @@ export const paymentPlanService = {
   async sendCheckoutLinkViaWhatsApp(
     quoteId: string | number,
     installmentId: number,
+    method: PaymentMethodChoice = 'CARD',
   ): Promise<{ ok: boolean; status: string | null; error: string | null; sid: string | null }> {
-    return api.post(`/api/quotes/${quoteId}/payment-plan/${installmentId}/send-whatsapp`, {})
+    return api.post(`/api/quotes/${quoteId}/payment-plan/${installmentId}/send-whatsapp?method=${method}`, {})
   },
 
   /** Issues a refund on Stripe. Pass `amount` (USD) for partial,

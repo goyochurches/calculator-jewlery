@@ -7,6 +7,7 @@ import { useSearchParams } from 'react-router-dom'
 type Phase =
   | { kind: 'loading' }
   | { kind: 'paid'; installment: PaymentInstallment }
+  | { kind: 'processing'; installment: PaymentInstallment }
   | { kind: 'pending'; attempts: number }
   | { kind: 'notFound' }
   | { kind: 'error'; message: string }
@@ -45,6 +46,12 @@ export function PaymentSuccessPage() {
           setPhase({ kind: 'paid', installment: inst })
           return
         }
+        // ACH (us_bank_account): authorised but clearing over 3–5 business
+        // days. No point polling — show the dedicated notice and stop.
+        if (inst.status === 'PROCESSING') {
+          setPhase({ kind: 'processing', installment: inst })
+          return
+        }
         if (attempt >= MAX_ATTEMPTS) {
           setPhase({ kind: 'pending', attempts: attempt })
           return
@@ -73,6 +80,7 @@ export function PaymentSuccessPage() {
       <div className="mx-auto max-w-md">
         {phase.kind === 'loading'  && <LoadingState />}
         {phase.kind === 'paid'     && <PaidState installment={phase.installment} />}
+        {phase.kind === 'processing' && <ProcessingAchState installment={phase.installment} />}
         {phase.kind === 'pending'  && <PendingState />}
         {phase.kind === 'notFound' && <NotFoundState />}
         {phase.kind === 'error'    && <ErrorState message={phase.message} />}
@@ -110,6 +118,42 @@ function PaidState({ installment }: { installment: PaymentInstallment }) {
         <p className="text-sm text-slate-500">
           A confirmation has been sent to the jeweler. You'll receive an
           email receipt from Stripe shortly.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ProcessingAchState({ installment }: { installment: PaymentInstallment }) {
+  return (
+    <Card className="rounded-[28px] border border-sky-200 bg-white shadow-[0_30px_80px_rgba(15,23,42,0.12)]">
+      <CardContent className="space-y-5 p-8 text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sky-100 text-sky-700">
+          <Clock className="h-7 w-7" />
+        </div>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-sky-700">
+            Bank payment processing
+          </p>
+          <h1 className="mt-2 font-serif text-2xl font-semibold text-slate-900">
+            Your payment is on its way
+          </h1>
+        </div>
+        <div className="rounded-2xl bg-sky-50 px-6 py-4">
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-sky-700">
+            Amount authorized
+          </p>
+          <p className="mt-1 font-serif text-3xl font-bold tabular-nums text-slate-900">
+            ${installment.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+          </p>
+          <p className="mt-1 text-xs text-sky-700/80">
+            {installment.currency.toUpperCase()} · Installment {installment.sortOrder + 1}
+          </p>
+        </div>
+        <p className="text-sm text-slate-500">
+          Bank transfers (ACH) take <strong>3–5 business days</strong> to clear.
+          You're all set — no further action needed. The jeweler will be
+          notified automatically once the funds settle.
         </p>
       </CardContent>
     </Card>
