@@ -1,3 +1,4 @@
+import { DashboardAnalytics } from '@/components/DashboardAnalytics'
 import { GoldChart } from '@/components/GoldChart'
 import { MetricCard } from '@/components/MetricCard'
 import { PriceTable } from '@/components/PriceTable'
@@ -571,6 +572,9 @@ export function Dashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Business analytics — money, funnel, calls, clients, reviews. */}
+      <DashboardAnalytics />
+
       <section>
         <Card className="overflow-hidden rounded-[32px] border-0 text-white shadow-[0_30px_80px_rgba(15,23,42,0.24)]" style={{ backgroundColor: 'var(--theme-primary)' }}>
           <CardContent className="relative p-8">
