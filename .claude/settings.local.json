@@ -91,7 +91,8 @@
       "Bash(node -e \"const p=require\\('./package.json'\\); const d={...p.dependencies,...p.devDependencies}; console.log\\(Object.keys\\(d\\).filter\\(k=>/toast|sonner|notif|hot|snackbar/i.test\\(k\\)\\).join\\('\\\\n'\\)||'\\(ninguna\\)'\\)\")",
       "Bash(cd D:/wamp64/www/price-calculator)",
       "Bash(cat src/main/resources/db/migration/V59__client_preferred_channel.sql)",
-      "Bash(grep -rln \"preferredChannel\\\\|preferred_channel\" --include=*.java src)"
+      "Bash(grep -rln \"preferredChannel\\\\|preferred_channel\" --include=*.java src)",
+      "Bash(grep -rln \"setVoiceFrom\\\\|getVoiceFrom\\\\|voiceFrom\" src/main/java/com/pricecalculator/service src/main/java/com/pricecalculator/controller)"
     ]
   }
 }

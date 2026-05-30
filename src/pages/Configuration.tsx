@@ -58,6 +58,7 @@ export function Configuration() {
   const [voiceTwimlAppSid, setVoiceTwimlAppSid] = useState(settings.voiceTwimlAppSid ?? '')
   const [voiceApiKeySid, setVoiceApiKeySid] = useState(settings.voiceApiKeySid ?? '')
   const [voiceApiKeySecret, setVoiceApiKeySecret] = useState(settings.voiceApiKeySecret ?? '')
+  const [voiceForwardTo, setVoiceForwardTo] = useState(settings.voiceForwardTo ?? '')
   const [firebaseJson, setFirebaseJson] = useState(settings.firebaseCredentialsJson ?? '')
   const [twilioSaved, setTwilioSaved] = useState(false)
   const [twilioSaving, setTwilioSaving] = useState(false)
@@ -73,6 +74,7 @@ export function Configuration() {
     setVoiceTwimlAppSid(settings.voiceTwimlAppSid ?? '')
     setVoiceApiKeySid(settings.voiceApiKeySid ?? '')
     setVoiceApiKeySecret(settings.voiceApiKeySecret ?? '')
+    setVoiceForwardTo(settings.voiceForwardTo ?? '')
     setFirebaseJson(settings.firebaseCredentialsJson ?? '')
     // Hydrate theme colors from the backend (source of truth shared with mobile).
     if (settings.themePrimary || settings.themeSecondary || settings.themeTertiary) {
@@ -127,6 +129,7 @@ export function Configuration() {
         voiceTwimlAppSid: trimOrNull(voiceTwimlAppSid),
         voiceApiKeySid: trimOrNull(voiceApiKeySid),
         voiceApiKeySecret: trimOrNull(voiceApiKeySecret),
+        voiceForwardTo: trimOrNull(voiceForwardTo),
       })
       setTwilioSaved(true)
       setTimeout(() => setTwilioSaved(false), 2500)
@@ -289,6 +292,20 @@ export function Configuration() {
               placeholder="+1 213 460 5897"
             />
             <p className="text-xs text-slate-400">The voice-capable Twilio number customers see when the app calls them.</p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">Forward incoming calls to</label>
+            <input
+              type="text"
+              value={voiceForwardTo}
+              onChange={(e) => setVoiceForwardTo(e.target.value)}
+              className={inputClass}
+              placeholder="+1 213 000 0000"
+            />
+            <p className="text-xs text-slate-400">
+              Optional. When set, inbound calls ring this real phone. Leave blank to ring the app (simone-mobile) instead. Either way the call is logged in the chat.
+            </p>
           </div>
 
           <div className="space-y-2">

@@ -19,6 +19,8 @@ export interface CompanySettings {
   voiceApiKeySid?: string | null
   /** Twilio API Key secret. */
   voiceApiKeySecret?: string | null
+  /** Optional phone (E.164) to forward inbound calls to. Blank → ring the app. */
+  voiceForwardTo?: string | null
   // ── Firebase Cloud Messaging (push) ──
   /** Full Firebase service-account JSON. Blank = push disabled. */
   firebaseCredentialsJson?: string | null
