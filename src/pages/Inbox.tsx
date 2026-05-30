@@ -23,6 +23,8 @@ interface ThreadGroup {
   key: string
   clientId: number | null
   clientName: string | null
+  /** WhatsApp profile name when there's no linked client. */
+  peerName: string | null
   phone: string
   channels: { channel: Channel; thread: InboxThread }[]
   latestAt: string
@@ -357,6 +359,8 @@ export function InboxPage() {
                   messages={messages}
                   events={events}
                   channel={activeThread.channel as Channel}
+                  peerLabel={activeGroup.clientName ?? activeGroup.peerName ?? activeGroup.phone}
+                  peerKey={activeGroup.key}
                 />
               )}
               <div ref={messagesEndRef} />
@@ -394,8 +398,8 @@ function ThreadRow({
   onSelect: (threadId: number) => void
 }) {
   const isActive = group.channels.some(c => c.thread.id === activeThreadId)
-  const displayName = group.clientName ?? group.phone
-  const subline = group.clientName ? group.phone : null
+  const displayName = group.clientName ?? group.peerName ?? group.phone
+  const subline = (group.clientName ?? group.peerName) ? group.phone : null
   const palette = avatarColor(group.key)
 
   const handleClick = () => {
@@ -500,7 +504,7 @@ function ConversationHeader({
   activeThreadId: number
   onSwitchChannel: (threadId: number) => void
 }) {
-  const displayName = group.clientName ?? group.phone
+  const displayName = group.clientName ?? group.peerName ?? group.phone
   const palette = avatarColor(group.key)
   const hasMultipleChannels = group.channels.length > 1
 
@@ -581,11 +585,13 @@ function buildTimeline(messages: InboxMessage[], events: InboxEvent[]): Timeline
 }
 
 function Timeline({
-  messages, events, channel,
+  messages, events, channel, peerLabel, peerKey,
 }: {
   messages: InboxMessage[]
   events: InboxEvent[]
   channel: Channel
+  peerLabel: string
+  peerKey: string
 }) {
   const items = buildTimeline(messages, events)
   let lastDay = ''
@@ -599,8 +605,8 @@ function Timeline({
           <Fragment key={item.key}>
             {sep && <DateSeparator day={day} />}
             {item.kind === 'message'
-              ? <MessageBubble m={item.message} channel={channel} />
-              : <EventRow event={item.event} />}
+              ? <MessageBubble m={item.message} channel={channel} peerLabel={peerLabel} peerKey={peerKey} />
+              : <EventRow event={item.event} peerLabel={peerLabel} />}
           </Fragment>
         )
       })}
@@ -609,13 +615,13 @@ function Timeline({
 }
 
 /** Centered, system-style row for a call or payment inside the timeline. */
-function EventRow({ event }: { event: InboxEvent }) {
-  if (event.type === 'CALL') return <CallEventRow event={event} />
+function EventRow({ event, peerLabel }: { event: InboxEvent; peerLabel: string }) {
+  if (event.type === 'CALL') return <CallEventRow event={event} peerLabel={peerLabel} />
   if (event.type === 'PAYMENT') return <PaymentEventRow event={event} />
   return null
 }
 
-function CallEventRow({ event }: { event: InboxEvent }) {
+function CallEventRow({ event, peerLabel }: { event: InboxEvent; peerLabel: string }) {
   const out = event.direction === 'OUTBOUND'
   const status = (event.status ?? '').toLowerCase()
   const answered = status === 'completed'
@@ -627,11 +633,12 @@ function CallEventRow({ event }: { event: InboxEvent }) {
       ? { Icon: PhoneOutgoing, tone: 'text-sky-600 bg-sky-50 border-sky-200' }
       : { Icon: PhoneIncoming, tone: 'text-emerald-600 bg-emerald-50 border-emerald-200' }
 
+  // Direction phrased with the contact: "Call to María" / "Call from María".
   const label = missed
-    ? 'Missed call'
+    ? `Missed call from ${peerLabel}`
     : out
-      ? (answered ? 'Outgoing call' : callOutcome(status, 'No answer'))
-      : 'Incoming call'
+      ? (answered ? `Call to ${peerLabel}` : `${callOutcome(status, 'No answer')} · ${peerLabel}`)
+      : `Call from ${peerLabel}`
 
   const detail = answered && event.durationSeconds != null
     ? formatDuration(event.durationSeconds)
@@ -700,20 +707,35 @@ function DateSeparator({ day }: { day: string }) {
   )
 }
 
-function MessageBubble({ m, channel }: { m: InboxMessage; channel: Channel }) {
+function MessageBubble({ m, channel, peerLabel, peerKey }: {
+  m: InboxMessage
+  channel: Channel
+  peerLabel: string
+  peerKey: string
+}) {
   const isOut = m.direction === 'OUTBOUND'
   const failed = isOut && (m.status === 'FAILED' || m.status === 'failed' || (m.error != null && m.error !== ''))
 
   const outboundBg = channel === 'WHATSAPP' ? 'bg-emerald-600' : 'bg-sky-600'
   const outboundFailedBg = 'bg-rose-100 text-rose-900 border border-rose-200'
+  const palette = avatarColor(peerKey)
 
   return (
-    <div className={`flex ${isOut ? 'justify-end' : 'justify-start'}`}>
+    <div className={`flex items-end gap-2 ${isOut ? 'justify-end' : 'justify-start'}`}>
+      {/* Inbound: who wrote — initials avatar so an unknown number still has a face/name. */}
+      {!isOut && (
+        <span className={`mb-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${palette.bg} ${palette.text}`}>
+          {getInitials(peerLabel)}
+        </span>
+      )}
       <div className={`max-w-[78%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
         isOut
           ? (failed ? outboundFailedBg : `${outboundBg} text-white`)
           : 'bg-white text-slate-900 border border-slate-200'
       }`}>
+        {!isOut && (
+          <p className="mb-0.5 text-[11px] font-semibold text-slate-500">{peerLabel}</p>
+        )}
         <p className="whitespace-pre-wrap break-words">{m.body ?? ''}</p>
         <p className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${
           isOut ? (failed ? 'text-rose-800' : 'text-white/70') : 'text-slate-400'
@@ -1051,6 +1073,7 @@ function groupThreads(threads: InboxThread[]): ThreadGroup[] {
         key,
         clientId: t.peerClientId,
         clientName: t.peerClientName,
+        peerName: t.peerName,
         phone: t.peerPhone,
         channels: [entry],
         latestAt: t.lastMessageAt,
@@ -1060,6 +1083,7 @@ function groupThreads(threads: InboxThread[]): ThreadGroup[] {
       })
     } else {
       existing.channels.push(entry)
+      if (!existing.peerName && t.peerName) existing.peerName = t.peerName
       if (new Date(t.lastMessageAt) > new Date(existing.latestAt)) {
         existing.latestAt = t.lastMessageAt
         existing.latestPreview = t.lastMessagePreview

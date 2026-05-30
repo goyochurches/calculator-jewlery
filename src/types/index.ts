@@ -239,6 +239,8 @@ export interface InboxThread {
   peerPhone: string
   peerClientId: number | null
   peerClientName: string | null
+  /** WhatsApp profile name for unlinked peers (no Client). Null otherwise. */
+  peerName: string | null
   lastMessageAt: string
   lastMessagePreview: string | null
   lastMessageDirection: InboxDirection | null
