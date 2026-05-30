@@ -266,6 +266,15 @@ export const quotesService = {
   },
 
   /**
+   * Send the public share link of an APPROVED quote to its client via their
+   * preferred channel (SMS / WhatsApp). The send is recorded in the inbox.
+   * Returns the outcome so the UI can show success / failure inline.
+   */
+  async sendLinkToClient(id: string): Promise<{ ok: boolean; channel: string; status: string | null; error: string | null }> {
+    return api.post(`/api/quotes/${id}/send-link`, {})
+  },
+
+  /**
    * Downloads the branded PDF for an authenticated user. Opens in a new
    * tab — the customer-facing share-link PDF is a separate public endpoint
    * (see publicQuoteService). We use raw fetch here because we need a Blob,

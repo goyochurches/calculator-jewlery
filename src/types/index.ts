@@ -225,6 +225,8 @@ export interface Client {
   surname: string | null
   phone: string | null
   email: string | null
+  /** Preferred channel for sending links: "WHATSAPP" | "SMS". */
+  preferredChannel?: string | null
   createdAt?: string | null
 }
 

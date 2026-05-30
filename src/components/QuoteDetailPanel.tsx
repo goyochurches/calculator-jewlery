@@ -182,6 +182,24 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
       alert(msg)
     } finally { setPdfLoading(false) }
   }
+  // Send the public quote link to the client via their preferred channel.
+  const [sendingLink, setSendingLink] = useState<'idle' | 'sending' | 'sent'>('idle')
+  const handleSendLink = async () => {
+    setSendingLink('sending')
+    try {
+      const r = await quotesService.sendLinkToClient(quote.id)
+      if (r.ok) {
+        setSendingLink('sent')
+        setTimeout(() => setSendingLink('idle'), 3000)
+      } else {
+        alert(r.error ?? 'Could not send the link.')
+        setSendingLink('idle')
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to send the link')
+      setSendingLink('idle')
+    }
+  }
   // Per-stone expand/collapse state. Keys are `${role}-${index}`. We seed the
   // set with every stone so the detail view shows the full information by
   // default — the user can still collapse individual rows with the chevron.
@@ -322,6 +340,21 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
           </p>
         </div>
         <div className="ml-4 flex shrink-0 items-center gap-1.5">
+          {quote.status === 'approved' && (
+            <button
+              onClick={handleSendLink}
+              disabled={sendingLink === 'sending'}
+              title="Send the quote link to the client via their preferred channel (SMS / WhatsApp)"
+              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60"
+            >
+              {sendingLink === 'sending'
+                ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                : sendingLink === 'sent'
+                  ? <Check className="h-3.5 w-3.5" />
+                  : <MessageCircle className="h-3.5 w-3.5" />}
+              {sendingLink === 'sending' ? 'Sending…' : sendingLink === 'sent' ? 'Sent!' : 'Send to client'}
+            </button>
+          )}
           <button
             onClick={handleDownloadPdf}
             disabled={pdfLoading}

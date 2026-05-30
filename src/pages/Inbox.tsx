@@ -360,7 +360,6 @@ export function InboxPage() {
                   events={events}
                   channel={activeThread.channel as Channel}
                   peerLabel={activeGroup.clientName ?? activeGroup.peerName ?? activeGroup.phone}
-                  peerKey={activeGroup.key}
                 />
               )}
               <div ref={messagesEndRef} />
@@ -398,9 +397,12 @@ function ThreadRow({
   onSelect: (threadId: number) => void
 }) {
   const isActive = group.channels.some(c => c.thread.id === activeThreadId)
-  const displayName = group.clientName ?? group.peerName ?? group.phone
-  const subline = (group.clientName ?? group.peerName) ? group.phone : null
+  const knownName = group.clientName ?? group.peerName
+  const displayName = knownName ?? group.phone
+  const subline = knownName ? group.phone : null
   const palette = avatarColor(group.key)
+  // 2 initials when we know who it is; "A" (anonymous) for a bare number.
+  const initials = knownName ? getInitials(knownName) : 'A'
 
   const handleClick = () => {
     // Open the most recently active channel for this person.
@@ -418,7 +420,7 @@ function ThreadRow({
         }`}
       >
         <span className={`mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${palette.bg} ${palette.text}`}>
-          {getInitials(displayName)}
+          {initials}
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline justify-between gap-2">
@@ -585,13 +587,12 @@ function buildTimeline(messages: InboxMessage[], events: InboxEvent[]): Timeline
 }
 
 function Timeline({
-  messages, events, channel, peerLabel, peerKey,
+  messages, events, channel, peerLabel,
 }: {
   messages: InboxMessage[]
   events: InboxEvent[]
   channel: Channel
   peerLabel: string
-  peerKey: string
 }) {
   const items = buildTimeline(messages, events)
   let lastDay = ''
@@ -605,7 +606,7 @@ function Timeline({
           <Fragment key={item.key}>
             {sep && <DateSeparator day={day} />}
             {item.kind === 'message'
-              ? <MessageBubble m={item.message} channel={channel} peerLabel={peerLabel} peerKey={peerKey} />
+              ? <MessageBubble m={item.message} channel={channel} />
               : <EventRow event={item.event} peerLabel={peerLabel} />}
           </Fragment>
         )
@@ -707,40 +708,32 @@ function DateSeparator({ day }: { day: string }) {
   )
 }
 
-function MessageBubble({ m, channel, peerLabel, peerKey }: {
-  m: InboxMessage
-  channel: Channel
-  peerLabel: string
-  peerKey: string
-}) {
+function MessageBubble({ m, channel }: { m: InboxMessage; channel: Channel }) {
   const isOut = m.direction === 'OUTBOUND'
   const failed = isOut && (m.status === 'FAILED' || m.status === 'failed' || (m.error != null && m.error !== ''))
 
   const outboundBg = channel === 'WHATSAPP' ? 'bg-emerald-600' : 'bg-sky-600'
   const outboundFailedBg = 'bg-rose-100 text-rose-900 border border-rose-200'
-  const palette = avatarColor(peerKey)
 
   return (
-    <div className={`flex items-end gap-2 ${isOut ? 'justify-end' : 'justify-start'}`}>
-      {/* Inbound: who wrote — initials avatar so an unknown number still has a face/name. */}
-      {!isOut && (
-        <span className={`mb-1 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${palette.bg} ${palette.text}`}>
-          {getInitials(peerLabel)}
-        </span>
-      )}
+    <div className={`flex ${isOut ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-[78%] rounded-2xl px-4 py-2 text-sm shadow-sm ${
         isOut
           ? (failed ? outboundFailedBg : `${outboundBg} text-white`)
           : 'bg-white text-slate-900 border border-slate-200'
       }`}>
-        {!isOut && (
-          <p className="mb-0.5 text-[11px] font-semibold text-slate-500">{peerLabel}</p>
+        {/* Outbound only: which team member sent it (shared inbox). The
+            inbound sender is obvious from the conversation header, so we
+            don't repeat it on every incoming bubble. */}
+        {isOut && m.sentByUserName && (
+          <p className={`mb-0.5 text-[11px] font-semibold ${failed ? 'text-rose-700' : 'text-white/85'}`}>
+            {m.sentByUserName}
+          </p>
         )}
         <p className="whitespace-pre-wrap break-words">{m.body ?? ''}</p>
         <p className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${
           isOut ? (failed ? 'text-rose-800' : 'text-white/70') : 'text-slate-400'
         }`}>
-          {isOut && m.sentByUserName ? <span>{m.sentByUserName} ·</span> : null}
           <span>{formatTime(m.createdAt)}</span>
           {failed && m.error ? <span>· {m.error}</span> : null}
           {isOut && !failed && <DeliveryTick status={m.status} />}

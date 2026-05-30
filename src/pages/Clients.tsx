@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 type Draft = Omit<Client, 'id' | 'createdAt'>
-const BLANK: Draft = { name: '', surname: '', phone: '', email: '' }
+const BLANK: Draft = { name: '', surname: '', phone: '', email: '', preferredChannel: 'SMS' }
 
 export function ClientsPage() {
   const navigate = useNavigate()
@@ -72,6 +72,7 @@ export function ClientsPage() {
         surname: createDraft.surname?.trim() || null,
         phone: createDraft.phone?.trim() || null,
         email: createDraft.email?.trim() || null,
+        preferredChannel: createDraft.preferredChannel || 'SMS',
       })
       setClients(prev => [created, ...prev])
       setCreateDraft({ ...BLANK })
@@ -91,6 +92,7 @@ export function ClientsPage() {
       surname: editDraft.surname?.trim() || null,
       phone: editDraft.phone?.trim() || null,
       email: editDraft.email?.trim() || null,
+      preferredChannel: editDraft.preferredChannel || 'SMS',
     })
     setClients(prev => prev.map(c => c.id === updated.id ? updated : c))
     setEditId(null); setEditDraft(null)
@@ -166,6 +168,17 @@ export function ClientsPage() {
               <Field label="Surname" value={createDraft.surname ?? ''} onChange={v => setCreateDraft(d => ({ ...d, surname: v }))} placeholder="García" />
               <Field label="Phone" value={createDraft.phone ?? ''} onChange={v => setCreateDraft(d => ({ ...d, phone: v }))} placeholder="+34 600 000 000" />
               <Field label="Email" value={createDraft.email ?? ''} onChange={v => setCreateDraft(d => ({ ...d, email: v }))} placeholder="maria@example.com" type="email" />
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Preferred channel</span>
+                <select
+                  value={createDraft.preferredChannel ?? 'SMS'}
+                  onChange={e => setCreateDraft(d => ({ ...d, preferredChannel: e.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400"
+                >
+                  <option value="SMS">SMS</option>
+                  <option value="WHATSAPP">WhatsApp</option>
+                </select>
+              </label>
             </div>
             <div className="flex gap-2">
               <Button size="sm" className="rounded-xl text-white" style={{ backgroundColor: 'var(--theme-primary)' }} onClick={submitNew} disabled={saving}>
@@ -229,6 +242,15 @@ export function ClientsPage() {
                               placeholder="+34…"
                               className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-slate-400"
                             />
+                            <select
+                              value={editDraft.preferredChannel ?? 'SMS'}
+                              onChange={e => setEditDraft(p => p && { ...p, preferredChannel: e.target.value })}
+                              title="Preferred channel for links"
+                              className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 outline-none focus:border-slate-400"
+                            >
+                              <option value="SMS">SMS</option>
+                              <option value="WHATSAPP">WhatsApp</option>
+                            </select>
                           </td>
                           <td className="px-3 py-2">
                             <input

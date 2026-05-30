@@ -74,6 +74,7 @@ export function ClientPicker({ value, onChange, hasError = false }: ClientPicker
         surname: draft.surname.trim() || null,
         phone: draft.phone.trim() || null,
         email: draft.email.trim() || null,
+        preferredChannel: 'SMS',
       })
       setDraft({ name: '', surname: '', phone: '', email: '' })
       select(created)
