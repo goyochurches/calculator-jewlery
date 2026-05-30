@@ -10,6 +10,7 @@ import { useAuth } from '@/context/AuthContext'
 import { canSeePayments } from '@/lib/paymentsAccess'
 import { displayStatusFor } from '@/lib/quoteStatusDisplay'
 import { quotesService } from '@/services/quotesService'
+import { NoticeDialog } from '@/components/NoticeDialog'
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Copy, Eye, FileDown, MessageCircle, RefreshCw, X, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -174,12 +175,13 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
     onClose()
     navigate('/quotes', { state: { duplicateFrom: quote } })
   }
+  /** One-button modal replacing native alert() for errors/notices. */
+  const [notice, setNotice] = useState<{ title: string; description?: string; variant?: 'error' | 'success' | 'info' } | null>(null)
   const handleDownloadPdf = async () => {
     setPdfLoading(true)
     try { await quotesService.downloadPdf(quote.id) }
     catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to download PDF'
-      alert(msg)
+      setNotice({ title: 'Could not download the PDF', description: err instanceof Error ? err.message : undefined, variant: 'error' })
     } finally { setPdfLoading(false) }
   }
   // Send the public quote link to the client via their preferred channel.
@@ -192,11 +194,11 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
         setSendingLink('sent')
         setTimeout(() => setSendingLink('idle'), 3000)
       } else {
-        alert(r.error ?? 'Could not send the link.')
+        setNotice({ title: 'The link could not be sent', description: r.error ?? 'Please try again.', variant: 'error' })
         setSendingLink('idle')
       }
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to send the link')
+      setNotice({ title: 'The link could not be sent', description: err instanceof Error ? err.message : undefined, variant: 'error' })
       setSendingLink('idle')
     }
   }
