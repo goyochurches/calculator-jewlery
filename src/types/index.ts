@@ -264,3 +264,19 @@ export interface InboxCapabilities {
   canSendSms: boolean
 }
 
+export type InboxEventType = 'CALL' | 'PAYMENT'
+
+/** A non-message event (call / payment) shown inline in a contact's timeline. */
+export interface InboxEvent {
+  id: number
+  type: InboxEventType
+  peerPhone: string
+  direction: InboxDirection | null
+  /** CALL: completed/no-answer/busy/failed/canceled. PAYMENT: "paid". */
+  status: string | null
+  durationSeconds: number | null
+  amountCents: number | null
+  currency: string | null
+  createdAt: string
+}
+

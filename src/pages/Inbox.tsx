@@ -2,18 +2,20 @@ import { ClientPicker } from '@/components/ClientPicker'
 import { useAuth } from '@/context/AuthContext'
 import { getBrokerUrl, useWebSocket } from '@/hooks/useWebSocket'
 import { inboxService } from '@/services/inboxService'
-import type { Client, InboxCapabilities, InboxMessage, InboxThread } from '@/types'
+import type { Client, InboxCapabilities, InboxEvent, InboxMessage, InboxThread } from '@/types'
 import {
-  Check, CheckCheck, MessageCircle, MessageSquare, Phone, Plus,
-  Search, Send, Smartphone, X,
+  Check, CheckCheck, MessageCircle, MessageSquare, Phone, PhoneIncoming,
+  PhoneMissed, PhoneOutgoing, Plus, Search, Send, Smartphone, X,
 } from 'lucide-react'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 type Channel = 'WHATSAPP' | 'SMS'
 
 interface InboxPushEvent {
-  kind: 'inbound' | 'outbound' | 'read' | 'status' | 'thread'
-  threadId: number
+  kind: 'inbound' | 'outbound' | 'read' | 'status' | 'thread' | 'event'
+  threadId?: number
+  /** Set on 'event' (call / payment) broadcasts — events are contact-level. */
+  peerPhone?: string
 }
 
 /** All threads for the same person (linked Client OR same phone if no client). */
@@ -36,6 +38,7 @@ export function InboxPage() {
   const [threads, setThreads] = useState<InboxThread[]>([])
   const [activeId, setActiveId] = useState<number | null>(null)
   const [messages, setMessages] = useState<InboxMessage[]>([])
+  const [events, setEvents] = useState<InboxEvent[]>([])
   const [capabilities, setCapabilities] = useState<InboxCapabilities | null>(null)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
@@ -106,17 +109,26 @@ export function InboxPage() {
     }
   }, [])
 
+  /** Contact-level events (calls, payments) for the active thread's peer. */
+  const refreshEvents = useCallback(async (threadId: number) => {
+    try {
+      const list = await inboxService.listEvents(threadId)
+      setEvents(list)
+    } catch { /* non-fatal — the chat still renders without events */ }
+  }, [])
+
   useEffect(() => { void refreshThreads() }, [refreshThreads])
   useEffect(() => {
     inboxService.capabilities().then(setCapabilities).catch(() => setCapabilities(null))
   }, [])
 
   useEffect(() => {
-    if (activeId == null) { setMessages([]); return }
+    if (activeId == null) { setMessages([]); setEvents([]); return }
     void refreshMessages(activeId)
+    void refreshEvents(activeId)
     inboxService.markRead(activeId).catch(() => { /* non-fatal */ })
     setThreads(prev => prev.map(t => t.id === activeId ? { ...t, unreadCount: 0 } : t))
-  }, [activeId, refreshMessages])
+  }, [activeId, refreshMessages, refreshEvents])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: 'end' })
@@ -150,6 +162,11 @@ export function InboxPage() {
       void refreshThreads()
       if (activeId != null && evt.threadId === activeId) {
         void refreshMessagesSilent(activeId)
+      }
+      // Call / payment events are contact-level (no threadId); refresh the
+      // open conversation's events so the new row appears live.
+      if (evt.kind === 'event' && activeId != null) {
+        void refreshEvents(activeId)
       }
     },
   })
@@ -331,12 +348,16 @@ export function InboxPage() {
             <div className="flex-1 overflow-y-auto px-5 py-6">
               {loadingMessages ? (
                 <p className="text-center text-sm text-slate-400">Loading messages…</p>
-              ) : messages.length === 0 ? (
+              ) : messages.length === 0 && events.length === 0 ? (
                 <p className="mt-12 text-center text-sm text-slate-400">
                   No messages yet in this thread.
                 </p>
               ) : (
-                <MessageList messages={messages} channel={activeThread.channel as Channel} />
+                <Timeline
+                  messages={messages}
+                  events={events}
+                  channel={activeThread.channel as Channel}
+                />
               )}
               <div ref={messagesEndRef} />
             </div>
@@ -545,23 +566,128 @@ function ConversationHeader({
 // Message list + bubbles
 // ───────────────────────────────────────────────────────────────────
 
-function MessageList({ messages, channel }: { messages: InboxMessage[]; channel: Channel }) {
+/** A message or a contact-level event, tagged for the merged timeline. */
+type TimelineItem =
+  | { kind: 'message'; at: string; key: string; message: InboxMessage }
+  | { kind: 'event'; at: string; key: string; event: InboxEvent }
+
+/** Merge messages + events into one chronological list (oldest first). */
+function buildTimeline(messages: InboxMessage[], events: InboxEvent[]): TimelineItem[] {
+  const items: TimelineItem[] = [
+    ...messages.map((m): TimelineItem => ({ kind: 'message', at: m.createdAt, key: `m${m.id}`, message: m })),
+    ...events.map((e): TimelineItem => ({ kind: 'event', at: e.createdAt, key: `e${e.id}`, event: e })),
+  ]
+  return items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
+}
+
+function Timeline({
+  messages, events, channel,
+}: {
+  messages: InboxMessage[]
+  events: InboxEvent[]
+  channel: Channel
+}) {
+  const items = buildTimeline(messages, events)
   let lastDay = ''
   return (
     <div className="space-y-2.5">
-      {messages.map(m => {
-        const day = formatDay(m.createdAt)
+      {items.map(item => {
+        const day = formatDay(item.at)
         const sep = day !== lastDay
         lastDay = day
         return (
-          <Fragment key={m.id}>
+          <Fragment key={item.key}>
             {sep && <DateSeparator day={day} />}
-            <MessageBubble m={m} channel={channel} />
+            {item.kind === 'message'
+              ? <MessageBubble m={item.message} channel={channel} />
+              : <EventRow event={item.event} />}
           </Fragment>
         )
       })}
     </div>
   )
+}
+
+/** Centered, system-style row for a call or payment inside the timeline. */
+function EventRow({ event }: { event: InboxEvent }) {
+  if (event.type === 'CALL') return <CallEventRow event={event} />
+  if (event.type === 'PAYMENT') return <PaymentEventRow event={event} />
+  return null
+}
+
+function CallEventRow({ event }: { event: InboxEvent }) {
+  const out = event.direction === 'OUTBOUND'
+  const status = (event.status ?? '').toLowerCase()
+  const answered = status === 'completed'
+  const missed = !out && !answered
+
+  const { Icon, tone } = missed
+    ? { Icon: PhoneMissed, tone: 'text-rose-600 bg-rose-50 border-rose-200' }
+    : out
+      ? { Icon: PhoneOutgoing, tone: 'text-sky-600 bg-sky-50 border-sky-200' }
+      : { Icon: PhoneIncoming, tone: 'text-emerald-600 bg-emerald-50 border-emerald-200' }
+
+  const label = missed
+    ? 'Missed call'
+    : out
+      ? (answered ? 'Outgoing call' : callOutcome(status, 'No answer'))
+      : 'Incoming call'
+
+  const detail = answered && event.durationSeconds != null
+    ? formatDuration(event.durationSeconds)
+    : (!answered ? callOutcome(status, '') : null)
+
+  return (
+    <div className="my-1 flex justify-center">
+      <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${tone}`}>
+        <Icon className="h-3.5 w-3.5" strokeWidth={2.5} />
+        <span>{label}</span>
+        {detail && <span className="opacity-70">· {detail}</span>}
+        <span className="opacity-60">· {formatTime(event.createdAt)}</span>
+      </span>
+    </div>
+  )
+}
+
+function PaymentEventRow({ event }: { event: InboxEvent }) {
+  const amount = event.amountCents != null
+    ? formatMoney(event.amountCents, event.currency ?? 'EUR')
+    : null
+  return (
+    <div className="my-1 flex justify-center">
+      <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
+        <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
+        <span>Payment received</span>
+        {amount && <span className="font-semibold">· {amount}</span>}
+        <span className="opacity-60">· {formatTime(event.createdAt)}</span>
+      </span>
+    </div>
+  )
+}
+
+/** Map a non-answered Twilio DialCallStatus to a short human label. */
+function callOutcome(status: string, fallback: string): string {
+  switch (status) {
+    case 'busy': return 'Busy'
+    case 'no-answer': return 'No answer'
+    case 'failed': return 'Failed'
+    case 'canceled': return 'Canceled'
+    default: return fallback
+  }
+}
+
+function formatDuration(totalSeconds: number): string {
+  const m = Math.floor(totalSeconds / 60)
+  const s = totalSeconds % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+function formatMoney(amountCents: number, currency: string): string {
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency }).format(amountCents / 100)
+  } catch {
+    return `${(amountCents / 100).toFixed(2)} ${currency}`
+  }
 }
 
 function DateSeparator({ day }: { day: string }) {

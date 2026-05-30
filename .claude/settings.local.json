@@ -72,7 +72,26 @@
       "Bash(Get-ChildItem -Path \"D:\\\\wamp64\\\\www\\\\price-calculator\" -Recurse -Directory)",
       "Bash(Select-Object -ExpandProperty FullName)",
       "Bash(xargs grep -l \"@Async\")",
-      "Bash(xargs grep -l \"ApplicationEventPublisher\")"
+      "Bash(xargs grep -l \"ApplicationEventPublisher\")",
+      "Bash(npm uninstall *)",
+      "Bash(mvn -q compile)",
+      "Bash(mvn compile *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\(p.scripts,null,2\\)\\)\")",
+      "Bash(ls -la android/app/google-services.json)",
+      "Bash(ls android/gradlew*)",
+      "Bash(grep -n \"applicationId\\\\|namespace\" android/app/build.gradle)",
+      "Bash([ -f \"$F\" ])",
+      "Bash(node -e 'const j=require\\('\\\\''/d/wamp64/www/simone-mobile/android/app/google-services.json'\\\\''\\); console.log\\(j.client.map\\(c=>c.client_info.android_client_info.package_name\\).join\\('\\\\''\\\\n'\\\\''\\)\\); console.log\\('\\\\''project_id:'\\\\'', j.project_info.project_id\\)')",
+      "Bash(cat .env)",
+      "Bash(cat .env.local)",
+      "Bash(cat .env.production)",
+      "Bash(grep -rn \"VITE_API_URL\\\\|baseURL\\\\|API_URL\\\\|localhost\\\\|onrender\" src/api/apiClient.ts)",
+      "Bash(echo \"exit:$?\")",
+      "Bash(awk '{print $6, $7}')",
+      "Bash(node -e \"const p=require\\('./package.json'\\); const d={...p.dependencies,...p.devDependencies}; console.log\\(Object.keys\\(d\\).filter\\(k=>/toast|sonner|notif|hot|snackbar/i.test\\(k\\)\\).join\\('\\\\n'\\)||'\\(ninguna\\)'\\)\")",
+      "Bash(cd D:/wamp64/www/price-calculator)",
+      "Bash(cat src/main/resources/db/migration/V59__client_preferred_channel.sql)",
+      "Bash(grep -rln \"preferredChannel\\\\|preferred_channel\" --include=*.java src)"
     ]
   }
 }

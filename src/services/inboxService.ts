@@ -1,5 +1,5 @@
 import { api } from '@/api/apiClient'
-import type { InboxCapabilities, InboxMessage, InboxThread } from '@/types'
+import type { InboxCapabilities, InboxEvent, InboxMessage, InboxThread } from '@/types'
 
 export const inboxService = {
   listThreads(): Promise<InboxThread[]> {
@@ -16,6 +16,11 @@ export const inboxService = {
 
   listMessages(threadId: number): Promise<InboxMessage[]> {
     return api.get<InboxMessage[]>(`/api/inbox/threads/${threadId}/messages`)
+  },
+
+  /** Contact-level events (calls, payments) for the thread's peer. */
+  listEvents(threadId: number): Promise<InboxEvent[]> {
+    return api.get<InboxEvent[]>(`/api/inbox/threads/${threadId}/events`)
   },
 
   reply(threadId: number, body: string): Promise<InboxMessage> {
