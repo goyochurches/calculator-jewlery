@@ -270,7 +270,7 @@ export interface InboxCapabilities {
   canSendSms: boolean
 }
 
-export type InboxEventType = 'CALL' | 'PAYMENT'
+export type InboxEventType = 'CALL' | 'PAYMENT' | 'REFUND'
 
 /** A non-message event (call / payment) shown inline in a contact's timeline. */
 export interface InboxEvent {

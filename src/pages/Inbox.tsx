@@ -626,7 +626,23 @@ function Timeline({
 function EventRow({ event, peerLabel }: { event: InboxEvent; peerLabel: string }) {
   if (event.type === 'CALL') return <CallEventRow event={event} peerLabel={peerLabel} />
   if (event.type === 'PAYMENT') return <PaymentEventRow event={event} />
+  if (event.type === 'REFUND') return <RefundEventRow event={event} />
   return null
+}
+
+function RefundEventRow({ event }: { event: InboxEvent }) {
+  const amount = event.amountCents != null
+    ? formatMoney(event.amountCents, event.currency ?? 'EUR')
+    : null
+  return (
+    <div className="my-1 flex justify-center">
+      <span className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700">
+        <span>↩️ Refund issued</span>
+        {amount && <span className="font-semibold">· {amount}</span>}
+        <span className="opacity-60">· {formatTime(event.createdAt)}</span>
+      </span>
+    </div>
+  )
 }
 
 function CallEventRow({ event, peerLabel }: { event: InboxEvent; peerLabel: string }) {
