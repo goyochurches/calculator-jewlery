@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CONFIG } from '@/constants/config'
 import { useBrand } from '@/context/BrandContext'
 import { useTheme, type ThemeColors } from '@/context/ThemeContext'
+import { userService } from '@/services/userService'
+import type { Usuario } from '@/types'
 import { Upload, X } from 'lucide-react'
 
 const COLOR_ROLES = [
@@ -65,6 +67,24 @@ export function Configuration() {
   const [fbSaved, setFbSaved] = useState(false)
   const [fbSaving, setFbSaving] = useState(false)
 
+  // Message routing — TEST mode (reroute all WhatsApp + SMS to a test phone)
+  const [testMode, setTestMode] = useState<boolean>(settings.testMode ?? false)
+  const [testPhone, setTestPhone] = useState(settings.testRedirectPhone ?? '')
+  const [routingSaved, setRoutingSaved] = useState(false)
+  const [routingSaving, setRoutingSaving] = useState(false)
+
+  // Quote approvers — which users get the approval link on WhatsApp
+  const [users, setUsers] = useState<Usuario[]>([])
+  const [approverIds, setApproverIds] = useState<string[]>(
+    (settings.approvalUserIds ?? '').split(',').map((s) => s.trim()).filter(Boolean),
+  )
+  const [approversSaved, setApproversSaved] = useState(false)
+  const [approversSaving, setApproversSaving] = useState(false)
+
+  useEffect(() => {
+    userService.getAll().then(setUsers).catch(() => {})
+  }, [])
+
   useEffect(() => {
     setBrandName(companyName)
     setLogoPreview(logo)
@@ -76,6 +96,9 @@ export function Configuration() {
     setVoiceApiKeySecret(settings.voiceApiKeySecret ?? '')
     setVoiceForwardTo(settings.voiceForwardTo ?? '')
     setFirebaseJson(settings.firebaseCredentialsJson ?? '')
+    setTestMode(settings.testMode ?? false)
+    setTestPhone(settings.testRedirectPhone ?? '')
+    setApproverIds((settings.approvalUserIds ?? '').split(',').map((s) => s.trim()).filter(Boolean))
     // Hydrate theme colors from the backend (source of truth shared with mobile).
     if (settings.themePrimary || settings.themeSecondary || settings.themeTertiary) {
       const fromApi = {
@@ -137,6 +160,35 @@ export function Configuration() {
       console.error(err)
     } finally {
       setTwilioSaving(false)
+    }
+  }
+
+  const handleSaveRouting = async () => {
+    setRoutingSaving(true)
+    try {
+      await saveBrand({ testMode, testRedirectPhone: trimOrNull(testPhone) })
+      setRoutingSaved(true)
+      setTimeout(() => setRoutingSaved(false), 2500)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setRoutingSaving(false)
+    }
+  }
+
+  const toggleApprover = (id: string) =>
+    setApproverIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+
+  const handleSaveApprovers = async () => {
+    setApproversSaving(true)
+    try {
+      await saveBrand({ approvalUserIds: approverIds.length ? approverIds.join(',') : null })
+      setApproversSaved(true)
+      setTimeout(() => setApproversSaved(false), 2500)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setApproversSaving(false)
     }
   }
 
@@ -357,6 +409,114 @@ export function Configuration() {
               {twilioSaving ? 'Saving…' : 'Save Twilio'}
             </Button>
             {twilioSaved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Message routing · TEST mode */}
+      <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <CardHeader className="border-b border-slate-100">
+          <CardTitle className="text-base font-semibold text-slate-900">Message routing · TEST mode</CardTitle>
+          <p className="text-sm text-slate-500">
+            While ON, every outbound WhatsApp <strong>and</strong> SMS goes to your test phone instead of the real client. Turn OFF to send to real clients.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-5 px-6 py-6">
+          <label className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <span>
+              <span className="block text-sm font-semibold text-slate-900">Test mode</span>
+              <span className="block text-xs text-slate-400">Reroute all outbound WhatsApp + SMS to the test phone below.</span>
+            </span>
+            <input
+              type="checkbox"
+              checked={testMode}
+              onChange={(e) => setTestMode(e.target.checked)}
+              className="h-5 w-5 cursor-pointer rounded border-slate-300"
+            />
+          </label>
+
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-900">Test phone</label>
+            <input
+              type="text"
+              value={testPhone}
+              onChange={(e) => setTestPhone(e.target.value)}
+              className={inputClass}
+              placeholder="+34664577327"
+            />
+            <p className="text-xs text-slate-400">
+              Receives all messages while test mode is on.{' '}
+              {testMode && testPhone.trim() === '' && (
+                <span className="font-semibold text-rose-500">Set a phone, or messages will still go to real clients.</span>
+              )}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              size="lg"
+              className="rounded-2xl px-5 text-white"
+              style={{ backgroundColor: draft.primary }}
+              onClick={handleSaveRouting}
+              disabled={routingSaving}
+            >
+              {routingSaving ? 'Saving…' : 'Save routing'}
+            </Button>
+            {routingSaved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quote approvers */}
+      <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <CardHeader className="border-b border-slate-100">
+          <CardTitle className="text-base font-semibold text-slate-900">Quote approvers</CardTitle>
+          <p className="text-sm text-slate-500">
+            Users who receive a pending quote's approval link on WhatsApp. Pick one or more.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-5 px-6 py-6">
+          <div className="space-y-2">
+            {users.length === 0 && <p className="text-sm text-slate-400">No users found.</p>}
+            {users.map((u) => {
+              const noPhone = !u.phone || u.phone.trim() === ''
+              return (
+                <label
+                  key={u.id}
+                  className="flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                >
+                  <input
+                    type="checkbox"
+                    checked={approverIds.includes(u.id)}
+                    onChange={() => toggleApprover(u.id)}
+                    className="h-5 w-5 cursor-pointer rounded border-slate-300"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-slate-900">{u.name}</span>
+                    <span className="block truncate text-xs text-slate-400">
+                      {u.email}{noPhone ? ' · no WhatsApp phone' : ` · ${u.phone}`}
+                    </span>
+                  </span>
+                  {noPhone && <span className="shrink-0 text-[10px] font-semibold text-rose-500">no phone</span>}
+                </label>
+              )
+            })}
+            <p className="text-xs text-slate-400">
+              A selected user only gets the link if they have a WhatsApp phone in their Profile.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <Button
+              size="lg"
+              className="rounded-2xl px-5 text-white"
+              style={{ backgroundColor: draft.primary }}
+              onClick={handleSaveApprovers}
+              disabled={approversSaving}
+            >
+              {approversSaving ? 'Saving…' : 'Save approvers'}
+            </Button>
+            {approversSaved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
           </div>
         </CardContent>
       </Card>
