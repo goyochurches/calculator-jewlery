@@ -21,6 +21,14 @@ export interface CompanySettings {
   voiceApiKeySecret?: string | null
   /** Optional phone (E.164) to forward inbound calls to. Blank → ring the app. */
   voiceForwardTo?: string | null
+  // ── Message routing / TEST mode ──
+  /** When true, ALL outbound WhatsApp + SMS go to testRedirectPhone instead of
+   *  the real client. False → real recipients. */
+  testMode?: boolean | null
+  /** Phone (E.164) that receives all messages while testMode is on. */
+  testRedirectPhone?: string | null
+  /** Comma-separated app_user ids who receive a quote's approval link. */
+  approvalUserIds?: string | null
   // ── Firebase Cloud Messaging (push) ──
   /** Full Firebase service-account JSON. Blank = push disabled. */
   firebaseCredentialsJson?: string | null
