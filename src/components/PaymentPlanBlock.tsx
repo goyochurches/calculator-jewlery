@@ -72,14 +72,9 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone, quoteTitle, onPa
         dueDate: p.dueDate ?? '',
       })))
     } else {
-      // Default scaffold: 3 equal installments, monthly.
-      const today = new Date()
-      const each = Math.round((total / 3) * 100) / 100
-      setDrafts([0, 1, 2].map(i => {
-        const d = new Date(today)
-        d.setMonth(d.getMonth() + i)
-        return { amount: each, dueDate: toIso(d) }
-      }))
+      // Default: a single installment for the full amount, ready to create.
+      // The jeweler can still add more rows to split it into a plan.
+      setDrafts([{ amount: total, dueDate: '' }])
     }
     setEditing(true)
     setError(null)
