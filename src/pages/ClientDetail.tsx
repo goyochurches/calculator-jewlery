@@ -18,11 +18,12 @@ const STATUS_STYLES: Record<QuoteStatus, string> = {
   draft:      'bg-slate-100 text-slate-600',
   pending:    'bg-amber-50 text-amber-700',
   approved:   'bg-emerald-50 text-emerald-700',
+  processing: 'bg-sky-50 text-sky-700',
   rejected:   'bg-rose-50 text-rose-700',
   fully_paid: 'bg-emerald-100 text-emerald-800',
 }
 const STATUS_LABELS: Record<QuoteStatus, string> = {
-  draft: 'Draft', pending: 'Pending', approved: 'Approved', rejected: 'Rejected', fully_paid: 'Fully paid',
+  draft: 'Draft', pending: 'Pending', approved: 'Approved', processing: 'Processing', rejected: 'Rejected', fully_paid: 'Fully paid',
 }
 
 export function ClientDetailPage() {
