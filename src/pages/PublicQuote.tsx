@@ -374,7 +374,7 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
               <GoldDot /> Additional details <GoldDot />
             </p>
             <h2 className="mt-1.5 font-serif text-xl font-medium tracking-tight text-slate-900 sm:text-2xl">
-              A word from the jeweler
+              Comments
             </h2>
           </div>
           <div className="px-6 py-6 sm:px-8 sm:py-8">
