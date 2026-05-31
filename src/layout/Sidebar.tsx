@@ -13,7 +13,6 @@ import {
   Diamond,
   FileText,
   LayoutDashboard,
-  LineChart,
   LogOut,
   MessageCircle,
   Menu,
@@ -32,8 +31,6 @@ const navItems: { to: string; label: string; icon: typeof LayoutDashboard; key: 
   { to: '/messages', label: 'Messages', icon: MessageCircle, key: 'messages' },
   { to: '/clients', label: 'Clients', icon: Contact, key: 'clients' },
   { to: '/gemstones', label: 'Gemstones', icon: Diamond, key: 'gemstones' },
-  { to: '/charts', label: 'Charts', icon: LineChart, key: 'charts' },
-  { to: '/history', label: 'History', icon: ClipboardList, key: 'history' },
   { to: '/users', label: 'Users', icon: Users, key: 'users' },
   // Gated by the payments feature flag — drops out of the list entirely
   // when disabled so the link doesn't show even to admins.

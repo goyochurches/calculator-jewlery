@@ -6,8 +6,6 @@ import { MainLayout } from '@/layout/MainLayout'
 import { GemstonesPage } from '@/pages/Gemstones'
 import { QuoteBuilderPage } from '@/pages/QuoteBuilder'
 import { Dashboard } from '@/pages/Dashboard'
-import { Charts } from '@/pages/Graphics'
-import { HistoryPage } from '@/pages/Historial'
 import { UsersPage } from '@/pages/Users'
 import { Configuration } from '@/pages/Configuration'
 import { ReviewsPage } from '@/pages/Reviews'
@@ -109,12 +107,6 @@ export default function App() {
                 <Route element={<RequirePermission permission="clients" />}>
                   <Route path="/clients" element={<ClientsPage />} />
                   <Route path="/clients/:id" element={<ClientDetailPage />} />
-                </Route>
-                <Route element={<RequirePermission permission="charts" />}>
-                  <Route path="/charts" element={<Charts />} />
-                </Route>
-                <Route element={<RequirePermission permission="history" />}>
-                  <Route path="/history" element={<HistoryPage />} />
                 </Route>
                 <Route element={<RequirePermission permission="users" />}>
                   <Route path="/users" element={<UsersPage />} />

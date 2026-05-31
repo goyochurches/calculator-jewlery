@@ -92,7 +92,15 @@
       "Bash(cd D:/wamp64/www/price-calculator)",
       "Bash(cat src/main/resources/db/migration/V59__client_preferred_channel.sql)",
       "Bash(grep -rln \"preferredChannel\\\\|preferred_channel\" --include=*.java src)",
-      "Bash(grep -rln \"setVoiceFrom\\\\|getVoiceFrom\\\\|voiceFrom\" src/main/java/com/pricecalculator/service src/main/java/com/pricecalculator/controller)"
+      "Bash(grep -rln \"setVoiceFrom\\\\|getVoiceFrom\\\\|voiceFrom\" src/main/java/com/pricecalculator/service src/main/java/com/pricecalculator/controller)",
+      "WebFetch(domain:www.twilio.com)",
+      "Bash(gh --version)",
+      "Bash(gh run *)",
+      "PowerShell($gh = Get-Command gh -ErrorAction SilentlyContinue; if \\($gh\\) { Write-Output \"gh OK: $\\($gh.Source\\)\"; gh auth status 2>&1 | Select-Object -First 3 } else { Write-Output \"gh NO instalado\" })",
+      "PowerShell(Remove-Item *)",
+      "PowerShell(Copy-Item *)",
+      "Bash(echo \"=== EXIT: $? \\(vacio arriba = OK\\) ===\")",
+      "Bash(grep -v \"TS6305\\\\|is in the program\\\\|Matched by\\\\|default include\\\\|^$\")"
     ]
   }
 }

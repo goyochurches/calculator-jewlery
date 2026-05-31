@@ -10,7 +10,7 @@ const TRAILING = /[.,!?;:)\]]+$/
 /** A short, friendly word for the chip, guessed from the URL; else its domain. */
 function linkLabel(url: string): string {
   const lower = url.toLowerCase()
-  if (/pay|checkout|stripe/.test(lower)) return 'Pay'
+  if (/pay|checkout|stripe/.test(lower)) return 'View payment'
   if (/quote|presupuesto/.test(lower)) return 'View quote'
   if (/review/.test(lower)) return 'Leave a review'
   try {

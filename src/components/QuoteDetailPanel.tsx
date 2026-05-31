@@ -349,21 +349,6 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
           </p>
         </div>
         <div className="ml-4 flex shrink-0 items-center gap-1.5">
-          {quote.status === 'approved' && (
-            <button
-              onClick={handleSendLink}
-              disabled={sendingLink === 'sending'}
-              title="Send the quote link to the client via their preferred channel (SMS / WhatsApp)"
-              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60"
-            >
-              {sendingLink === 'sending'
-                ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                : sendingLink === 'sent'
-                  ? <Check className="h-3.5 w-3.5" />
-                  : <MessageCircle className="h-3.5 w-3.5" />}
-              {sendingLink === 'sending' ? 'Sending…' : sendingLink === 'sent' ? 'Sent!' : 'Send to client'}
-            </button>
-          )}
           <button
             onClick={handleDownloadPdf}
             disabled={pdfLoading}
@@ -470,6 +455,21 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <CopyShareLinkButton token={quote.publicToken} iconOnly={false} />
+              {quote.status === 'approved' && (
+                <button
+                  onClick={handleSendLink}
+                  disabled={sendingLink === 'sending'}
+                  title="Send the quote link to the client via their preferred channel (SMS / WhatsApp)"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60"
+                >
+                  {sendingLink === 'sending'
+                    ? <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    : sendingLink === 'sent'
+                      ? <Check className="h-3.5 w-3.5" />
+                      : <MessageCircle className="h-3.5 w-3.5" />}
+                  {sendingLink === 'sending' ? 'Sending…' : sendingLink === 'sent' ? 'Sent!' : 'Send to client'}
+                </button>
+              )}
               {isAdmin && onRefreshToken && (
                 <button
                   type="button"
