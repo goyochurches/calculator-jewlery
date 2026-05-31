@@ -294,9 +294,6 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
 
           {/* Price centerpiece */}
           <div className="relative mx-auto mt-10 max-w-md rounded-3xl border border-white/15 bg-white/10 px-6 py-7 backdrop-blur-md">
-            <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-amber-400 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.28em] text-slate-900 shadow-md">
-              Your investment
-            </span>
             {quote.discountPercent > 0 && (
               <p className="mb-2 font-serif text-2xl text-white/40 line-through tabular-nums">
                 ${(quote.total + quote.discountAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })}
