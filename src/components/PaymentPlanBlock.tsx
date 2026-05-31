@@ -72,9 +72,9 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone, quoteTitle, onPa
         dueDate: p.dueDate ?? '',
       })))
     } else {
-      // Default: a single installment for the full amount, ready to create.
-      // The jeweler can still add more rows to split it into a plan.
-      setDrafts([{ amount: total, dueDate: '' }])
+      // Default: a single installment for the full amount due today, ready to
+      // create. The jeweler can still add rows / change the date.
+      setDrafts([{ amount: total, dueDate: toIso(new Date()) }])
     }
     setEditing(true)
     setError(null)

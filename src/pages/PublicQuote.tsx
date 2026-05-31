@@ -371,7 +371,7 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
         <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
           <div className="border-b border-slate-100 px-6 py-5 text-center sm:px-8">
             <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-amber-700">
-              <GoldDot /> About this piece <GoldDot />
+              <GoldDot /> Additional details <GoldDot />
             </p>
             <h2 className="mt-1.5 font-serif text-xl font-medium tracking-tight text-slate-900 sm:text-2xl">
               A word from the jeweler
