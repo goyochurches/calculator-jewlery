@@ -249,7 +249,7 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
     { icon: Wrench,   label: "Jeweler's time", value: labor },
     { icon: Sparkles, label: 'CAD design',     value: cad },
     { icon: Diamond,  label: 'Diamond type',   value: diamondTypeLabel },
-    { icon: Ruler,    label: 'Stone size',     value: diamondSizeLabel },
+    { icon: Ruler,    label: 'Stone size',     value: diamondSizeLabel ? `${diamondSizeLabel} mm` : '—' },
     // Dedicated row when the client brings their own stone — makes it explicit
     // on the customer-facing quote that we only set a stone they supplied.
     ...(quote.customerSuppliedStone ? [{ icon: Gem, label: 'Stone', value: 'Supplied by customer' }] : []),
