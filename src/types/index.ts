@@ -63,7 +63,7 @@ export type JewelryMetalOption =
   | 'gold-18k'
   | 'silver'
 
-export type QuoteStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'fully_paid'
+export type QuoteStatus = 'draft' | 'pending' | 'approved' | 'processing' | 'rejected' | 'fully_paid'
 
 export type StoneRole = 'MAIN' | 'SIDE' | 'MELEE'
 
