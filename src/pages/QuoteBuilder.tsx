@@ -873,10 +873,12 @@ export function QuoteBuilderPage() {
     // Customer-supplied stones: we don't price the stone itself (the client
     // brings it), only the setter labor scaled by quantity.
     let customerSettingFee = 0
+    let customerStoneCount = 0
     customerStones.forEach(cs => {
       const qty = parseNum(cs.quantity || '1') || 1
       const fee = config.setterMap[cs.setterType]?.fee ?? 0
       customerSettingFee += qty * fee
+      customerStoneCount += qty
     })
 
     const total =
@@ -896,6 +898,7 @@ export function QuoteBuilderPage() {
       cadFee,
       settingFee,
       customerSettingFee,
+      customerStoneCount,
       diamondCost,
       engravingFee,
       totalCarats: Math.round((Number(totalCarats) || 0) * 10000) / 10000,
@@ -1799,7 +1802,7 @@ export function QuoteBuilderPage() {
                   <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-amber-300/90">Setting labor</p>
                   <p className="mt-0.5 text-xs text-slate-300">
                     {pricing.totalAmount} stone{pricing.totalAmount === 1 ? '' : 's'} · {pricing.totalCarats} ct
-                    {customerStones.length > 0 ? ` + ${customerStones.length} customer` : ''}
+                    {customerStones.length > 0 ? ` + ${pricing.customerStoneCount} customer` : ''}
                   </p>
                 </div>
                 <strong className="relative text-2xl font-semibold tracking-tight tabular-nums">
@@ -2076,7 +2079,7 @@ export function QuoteBuilderPage() {
                   // an empty "Setting customer diamonds (0 stones)" line is noise.
                   ...(customerStones.length > 0
                     ? [[
-                        `Setting customer diamonds (${customerStones.length} stone${customerStones.length === 1 ? '' : 's'})`,
+                        `Setting customer diamonds (${pricing.customerStoneCount} stone${pricing.customerStoneCount === 1 ? '' : 's'})`,
                         pricing.customerSettingFee,
                       ] as [string, number]]
                     : []),
@@ -2150,7 +2153,7 @@ export function QuoteBuilderPage() {
               </div>
               <p className="mt-3 text-sm text-slate-500">
                 Aggregated across {pricing.totalAmount} stone{pricing.totalAmount === 1 ? '' : 's'}
-                {customerStones.length > 0 ? ` + ${customerStones.length} customer stone${customerStones.length === 1 ? '' : 's'}` : ''}.
+                {customerStones.length > 0 ? ` + ${pricing.customerStoneCount} customer stone${customerStones.length === 1 ? '' : 's'}` : ''}.
               </p>
             </CardContent>
           </Card>
