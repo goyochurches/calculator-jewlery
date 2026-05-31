@@ -1,4 +1,5 @@
 import { ClientPicker } from '@/components/ClientPicker'
+import { MessageText } from '@/components/MessageText'
 import { useAuth } from '@/context/AuthContext'
 import { getBrokerUrl, useWebSocket } from '@/hooks/useWebSocket'
 import { inboxService } from '@/services/inboxService'
@@ -773,7 +774,7 @@ function MessageBubble({ m, channel, onRetry }: {
             {m.sentByUserName}
           </p>
         )}
-        <p className="whitespace-pre-wrap break-words">{m.body ?? ''}</p>
+        <MessageText body={m.body ?? ''} out={isOut} />
         <p className={`mt-1 flex items-center justify-end gap-1 text-[10px] ${
           isOut ? (failed ? 'text-rose-800' : 'text-white/70') : 'text-slate-400'
         }`}>
