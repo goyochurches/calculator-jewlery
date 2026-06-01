@@ -1,24 +1,11 @@
 import { DashboardAnalytics } from '@/components/DashboardAnalytics'
-import { GoldChart } from '@/components/GoldChart'
-import { MetricCard } from '@/components/MetricCard'
-import { PriceTable } from '@/components/PriceTable'
-import { SilverChart } from '@/components/SilverChart'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useHistory } from '@/hooks/useHistorial'
-import { useMetals } from '@/hooks/useMetals'
 import { clientService } from '@/services/clientService'
 import { quotesService, type UserQuoteStats } from '@/services/quotesService'
-import type { ChartDataPoint } from '@/types'
-import { DollarSign, FileText, ShieldCheck, TrendingUp, Users } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { DollarSign, FileText, TrendingUp, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
-
-const MONTH = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-function fmtDate(iso: string): string {
-  const [, m, d] = iso.split('-')
-  return `${MONTH[+m - 1]} ${+d}`
-}
 
 interface ChartDay { day: string; value: number; isToday: boolean }
 
@@ -550,78 +537,10 @@ function TeamQuotesWidget() {
 }
 
 export function Dashboard() {
-  const { metals, loading, error } = useMetals()
-  const { historyEntries } = useHistory()
-
-  const chartWeekData = useMemo<ChartDataPoint[]>(() => {
-    const byDate = new Map<string, ChartDataPoint>()
-    for (const e of historyEntries) {
-      if (!byDate.has(e.date)) byDate.set(e.date, { label: fmtDate(e.date), gold: 0, silver: 0 })
-      const d = byDate.get(e.date)!
-      if (e.metal === 'gold')   d.gold   = e.price
-      if (e.metal === 'silver') d.silver = e.price
-    }
-    return Array.from(byDate.values()).reverse().slice(-7)
-  }, [historyEntries])
-
-  if (loading) return <DashboardSkeleton />
-  if (error) return <p className="text-sm text-red-500">{error}</p>
-
-  const gold = metals.find((m) => m.symbol === 'XAU')
-  const silver = metals.find((m) => m.symbol === 'XAG')
-
   return (
     <div className="space-y-6">
       {/* Business analytics — money, funnel, calls, clients, reviews. */}
       <DashboardAnalytics />
-
-      <section>
-        <Card className="overflow-hidden rounded-[32px] border-0 text-white shadow-[0_30px_80px_rgba(15,23,42,0.24)]" style={{ backgroundColor: 'var(--theme-primary)' }}>
-          <CardContent className="relative p-8">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.24),transparent_25%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.20),transparent_28%)]" />
-            <div className="relative">
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.24em] text-amber-300/90">
-                <ShieldCheck className="h-4 w-4" />
-                Executive snapshot
-              </div>
-              <h2 className="mt-4 max-w-xl text-4xl font-semibold tracking-tight text-white">
-                Keep your metals desk readable at a glance.
-              </h2>
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300">
-                Live pricing, directional signals and core market context now sit in a cleaner
-                panel designed to feel like a proper operations workspace.
-              </p>
-
-              <div className="mt-8 grid gap-4 sm:grid-cols-3">
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Gold spot</p>
-                  <p className="mt-2 text-2xl font-semibold">
-                    ${gold?.price.toLocaleString('en-US', { minimumFractionDigits: 2 }) ?? '--'}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Silver spot</p>
-                  <p className="mt-2 text-2xl font-semibold">
-                    ${silver?.price.toLocaleString('en-US', { minimumFractionDigits: 2 }) ?? '--'}
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
-                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Au/Ag ratio</p>
-                  <p className="mt-2 text-2xl font-semibold">
-                    {gold && silver ? (gold.price / silver.price).toFixed(1) : '--'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {metals.map((m) => (
-          <MetricCard key={m.symbol} metal={m} />
-        ))}
-      </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
         <QuotesWidget />
@@ -635,14 +554,7 @@ export function Dashboard() {
 
       <QuoteStatusWidget />
 
-      <section className="grid gap-4 xl:grid-cols-2">
-        {gold && <GoldChart data={chartWeekData} changePercent={gold.changePercent} />}
-        {silver && <SilverChart data={chartWeekData} changePercent={silver.changePercent} />}
-      </section>
-
       <TeamQuotesWidget />
-
-      <PriceTable metals={metals} />
     </div>
   )
 }
