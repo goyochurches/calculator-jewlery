@@ -53,6 +53,11 @@ export interface PublicQuote {
   createdByName: string | null
   createdByBio: string | null
   createdByPhoto: string | null
+  /** Shop theme colors from Configuration — applied to the public share link
+   *  so it matches the brand palette. Optional: older backends omit them. */
+  themePrimary?: string | null
+  themeSecondary?: string | null
+  themeTertiary?: string | null
 }
 
 export class PublicQuoteNotFoundError extends Error {
