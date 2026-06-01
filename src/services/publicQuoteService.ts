@@ -28,6 +28,8 @@ export interface PublicQuote {
   diamondType: string
   diamondSize: string
   diamondAmount: number
+  /** Total carat weight across the in-house stones. */
+  diamondCarats?: number | null
   /** True when the client supplies the stone(s). Replaces the diamond type
    *  with a "Supply by customer" label on the public quote. */
   customerSuppliedStone: boolean | null

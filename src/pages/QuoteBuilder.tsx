@@ -2146,13 +2146,15 @@ export function QuoteBuilderPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Diamonds</p>
-                  <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{pricing.totalAmount}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Total stones</p>
+                  <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{pricing.totalAmount + pricing.customerStoneCount}</p>
                 </div>
                 <div className="rounded-2xl bg-fuchsia-50 p-3 text-fuchsia-600"><Diamond className="h-5 w-5" /></div>
               </div>
               <p className="mt-3 text-sm text-slate-500">
-                {stones.length} stone{stones.length === 1 ? '' : 's'} · {pricing.totalCarats} ct total · ${pricing.diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                {pricing.totalAmount} supplied by S&amp;S
+                {pricing.customerStoneCount > 0 ? ` · ${pricing.customerStoneCount} supplied by customer` : ''}
+                {' · '}{pricing.totalCarats} ct · ${pricing.diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </p>
             </CardContent>
           </Card>
