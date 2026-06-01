@@ -325,6 +325,11 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
     const fee = config.setterMap[cs.setterType]?.fee ?? 0
     return acc + qty * fee
   }, 0)
+  // Summed quantity (not row count) so the cost breakdown reflects how many
+  // customer stones are actually being set.
+  const customerStoneQty = (quote.customerStones ?? []).reduce(
+    (acc, cs: QuoteCustomerStone) => acc + Math.max(1, cs.quantity ?? 1), 0,
+  )
 
   const showAdminActions = isAdmin
     && onStatusChange
@@ -963,7 +968,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
               value={`$${(stoneTotals.cost + stoneTotals.labor).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
             {(quote.customerStones?.length ?? 0) > 0 && (
               <LineItem
-                label={`Setting customer diamonds (${quote.customerStones!.length} stone${quote.customerStones!.length === 1 ? '' : 's'})`}
+                label={`Setting customer diamonds (${customerStoneQty} stone${customerStoneQty === 1 ? '' : 's'})`}
                 value={`$${customerStoneFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
             )}
             <LineItem label="Hand engraving (milgrain)" value={quote.engraving ? '$150.00' : '$0.00'} />
