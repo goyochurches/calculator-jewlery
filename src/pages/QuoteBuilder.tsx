@@ -95,7 +95,9 @@ export function QuoteBuilderPage() {
   //           before we made it sticky). User toggles with the pin button.
   const [pinSummary, setPinSummary] = useState(true)
   const [selectedMetal, setSelectedMetal] = useState<JewelryMetalOption>('gold-18k-white')
-  const [ringLabor, setRingLabor] = useState('medium')
+  // Empty by default so a fresh quote carries no CAD/Jeweler's-time fee — the
+  // builder starts fully zeroed until the user picks a difficulty level.
+  const [ringLabor, setRingLabor] = useState('')
   // Numeric factors start at 0 so a fresh quote begins empty — and the
   // post-save reset below returns them to these same 0 values, so the
   // builder starts and ends in an identical zeroed state.
@@ -1109,7 +1111,7 @@ export function QuoteBuilderPage() {
       setClient(null)
       setJewelryType('ring')
       setSelectedMetal('gold-18k-white')
-      setRingLabor('medium')
+      setRingLabor('')
       setWeightGrams(0)
       setRingWidth(0)
       setFingerSize(0)
@@ -1415,6 +1417,7 @@ export function QuoteBuilderPage() {
                 </label>
                 <select value={ringLabor} onChange={e => setRingLabor(e.target.value)}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
+                  <option value="">— Select a difficulty level</option>
                   {config.ringLaborTiers.map(t => (
                     <option key={t.tierKey} value={t.tierKey}>{t.label} — ${t.fee}</option>
                   ))}
