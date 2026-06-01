@@ -200,9 +200,6 @@ function PublicShell({
             alt={companyName ?? 'Simone & Son'}
             className="h-20 w-20 object-contain drop-shadow-[0_10px_30px_rgba(245,158,11,0.18)] sm:h-24 sm:w-24"
           />
-          <p className="font-serif text-xl tracking-wide text-slate-900 sm:text-2xl">
-            {companyName ?? 'Simone & Son'}
-          </p>
           <GoldOrnament />
         </header>
 
@@ -492,8 +489,8 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
         <div className="flex flex-col items-center gap-4 px-6 py-7 sm:px-8">
           <p className="text-sm text-slate-500">
             Reach the store directly at{' '}
-            <a href={`tel:${STORE_PHONE_TEL}`} className="font-semibold text-slate-900 underline-offset-2 hover:underline">
-              {STORE_PHONE_DISPLAY}
+            <a href={`tel:${STORE_PHONE_TEL}`} dir="ltr" className="font-semibold text-slate-900 underline-offset-2 hover:underline">
+              <bdi dir="ltr">{STORE_PHONE_DISPLAY}</bdi>
             </a>
           </p>
           <div className="flex w-full max-w-md flex-col gap-3 sm:flex-row">
