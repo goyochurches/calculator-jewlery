@@ -196,7 +196,7 @@ function PublicShell({
       <div className="relative mx-auto max-w-3xl">
         <header className="mb-10 flex flex-col items-center gap-3 text-center">
           <img
-            src="/s%26s_logo.png"
+            src="/s%26s_logo_black.svg"
             alt={companyName ?? 'Simone & Son'}
             className="h-20 w-20 object-contain drop-shadow-[0_10px_30px_rgba(245,158,11,0.18)] sm:h-24 sm:w-24"
           />
