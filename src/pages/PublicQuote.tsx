@@ -14,9 +14,14 @@ import {
   PublicQuoteUnavailableError,
   type PublicQuote,
 } from '@/services/publicQuoteService'
-import { AlertCircle, Clock, Diamond, Gem, HelpCircle, Quote as QuoteIcon, Ruler, Scissors, Sparkles, Wrench } from 'lucide-react'
+import { AlertCircle, Clock, Diamond, Gem, HelpCircle, MessageCircle, Phone, Quote as QuoteIcon, Ruler, Scissors, Sparkles, Wrench } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+
+// Store contact line shown at the bottom of every public quote so the
+// customer can call or text us directly about their piece.
+const STORE_PHONE_DISPLAY = '+1 741 964 4012'
+const STORE_PHONE_TEL = '+17419644012'
 
 export function PublicQuotePage() {
   const { token } = useParams<{ token: string }>()
@@ -454,6 +459,42 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
           </div>
         </section>
       )}
+
+      {/* ── Contact the store: call or send a direct message ─────────────── */}
+      <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+        <div className="border-b border-slate-100 px-6 py-5 text-center sm:px-8">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-amber-700">
+            <GoldDot /> Questions about your piece? <GoldDot />
+          </p>
+          <h2 className="mt-1.5 font-serif text-xl font-medium tracking-tight text-slate-900 sm:text-2xl">
+            Call or message us
+          </h2>
+        </div>
+        <div className="flex flex-col items-center gap-4 px-6 py-7 sm:px-8">
+          <p className="text-sm text-slate-500">
+            Reach the store directly at{' '}
+            <a href={`tel:${STORE_PHONE_TEL}`} className="font-semibold text-slate-900 underline-offset-2 hover:underline">
+              {STORE_PHONE_DISPLAY}
+            </a>
+          </p>
+          <div className="flex w-full max-w-md flex-col gap-3 sm:flex-row">
+            <a
+              href={`tel:${STORE_PHONE_TEL}`}
+              className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              <Phone className="h-4 w-4" />
+              Call the store
+            </a>
+            <a
+              href={`sms:${STORE_PHONE_TEL}`}
+              className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Send a message
+            </a>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }
