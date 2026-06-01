@@ -252,7 +252,13 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
     return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   })() : null
 
-  const stoneCount = quote.diamondAmount ?? 0
+  // Stone counts split by source. Falls back gracefully if the backend
+  // predates the explicit count fields: in-house count from diamondAmount,
+  // customer count from the boolean flag (treated as 1).
+  const suppliedCount = quote.suppliedStoneCount ?? quote.diamondAmount ?? 0
+  const customerCount = quote.customerStoneCount ?? (quote.customerSuppliedStone ? 1 : 0)
+  const totalStones   = quote.totalStoneCount ?? (suppliedCount + customerCount)
+  const plural = (n: number) => (n === 1 ? 'stone' : 'stones')
   const totalCt    = Number(quote.diamondCarats ?? 0)
   // Trim trailing zeros so "0.5000" → "0.5", but keep "0.04" / "0.0095" intact.
   const formatCt = (n: number) => n.toFixed(4).replace(/\.?0+$/, '')
@@ -263,10 +269,12 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
     { icon: Sparkles, label: 'CAD design',     value: cad },
     { icon: Diamond,  label: 'Diamond type',   value: diamondTypeLabel },
     { icon: Ruler,    label: 'Stone size',     value: diamondSizeLabel ? `${diamondSizeLabel} mm` : '—' },
-    // Dedicated row when the client brings their own stone — makes it explicit
-    // on the customer-facing quote that we only set a stone they supplied.
-    ...(quote.customerSuppliedStone ? [{ icon: Gem, label: 'Stone', value: 'Supplied by customer' }] : []),
-    ...(stoneCount > 0 ? [{ icon: Diamond, label: 'Stone count', value: `${stoneCount} ${stoneCount === 1 ? 'stone' : 'stones'}` }] : []),
+    // Stone sourcing — show the count for each source on the piece. When the
+    // stones are all from one source only that line renders; mixed pieces show
+    // both, plus a grand total so the customer knows how many stones there are.
+    ...(suppliedCount > 0 ? [{ icon: Diamond, label: 'Supplied by S&S', value: `${suppliedCount} ${plural(suppliedCount)}` }] : []),
+    ...(customerCount > 0 ? [{ icon: Gem, label: 'Supplied by customer', value: `${customerCount} ${plural(customerCount)}` }] : []),
+    ...(totalStones > 0 ? [{ icon: Diamond, label: 'Total stones', value: `${totalStones} ${plural(totalStones)}` }] : []),
     ...(totalCt > 0 ? [{ icon: Diamond, label: 'Carat weight', value: `${formatCt(totalCt)} ct tw` }] : []),
     { icon: Ruler,    label: 'Finger size',    value: `Size ${quote.fingerSize ?? '—'}` },
     { icon: Ruler,    label: 'Ring width',     value: `${quote.ringWidth ?? 0} mm` },
@@ -341,7 +349,7 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
           {availableUntil && (
             <p className="mx-auto mt-4 inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-amber-400/15 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100">
               <Clock className="h-3.5 w-3.5" />
-              This quote is only available until {availableUntil}
+              The price of this quote is available until {availableUntil}
             </p>
           )}
         </div>

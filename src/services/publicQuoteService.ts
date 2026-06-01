@@ -31,6 +31,13 @@ export interface PublicQuote {
   /** True when the client supplies the stone(s). Replaces the diamond type
    *  with a "Supply by customer" label on the public quote. */
   customerSuppliedStone: boolean | null
+  /** Stones we supply in-house (S&S), summed. Optional — older backends that
+   *  predate this field omit it, so guard with `?? 0`. */
+  suppliedStoneCount?: number | null
+  /** Stones the customer brought, summed across quantities. */
+  customerStoneCount?: number | null
+  /** suppliedStoneCount + customerStoneCount — total stones in the piece. */
+  totalStoneCount?: number | null
   weightGrams: number
   ringWidth: number
   fingerSize: number
