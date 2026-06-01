@@ -379,11 +379,18 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
 
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
         <div className="rounded-2xl p-5 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}>
-          <p className="text-xs uppercase tracking-[0.18em] text-white/60">Quote total</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-white/60">Customer price</p>
           <p className="mt-2 text-4xl font-semibold tracking-tight">
-            ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
           </p>
-          <p className="mt-1.5 text-sm text-white/70">
+          {/* Our cost sits below the customer price, mirroring the quote builder. */}
+          <div className="mt-3 flex items-baseline justify-between gap-3 rounded-xl bg-black/20 px-3 py-2">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/50">Our cost</span>
+            <span className="text-lg font-semibold tabular-nums text-white">
+              ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+          <p className="mt-2 text-sm text-white/70">
             {metalCfg.label} · {ringLaborCfg?.label ?? quote.ringLabor}
           </p>
           {quote.publicToken && (
