@@ -85,6 +85,37 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone, quoteTitle, onPa
     setError(null)
   }
 
+  /** Direct "Pay in full" — creates a single installment for the whole amount
+   *  due today, no editor step. The jeweler can still switch to installments
+   *  later via "Edit plan". */
+  const handlePayInFull = async () => {
+    setSaving(true)
+    setError(null)
+    try {
+      const updated = await paymentPlanService.upsert(quoteId, [{ amount: total, dueDate: toIso(new Date()) }])
+      setPlan(updated)
+      setEditing(false)
+      onPaymentChanged?.()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save plan')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  /** Opens the editor seeded with two installments (split as evenly as the
+   *  cents allow) so "pay in installments" starts as an actual plan to tweak. */
+  const startInstallments = () => {
+    const half = Math.round((total / 2) * 100) / 100
+    const rest = Math.round((total - half) * 100) / 100
+    setDrafts([
+      { amount: half, dueDate: toIso(new Date()) },
+      { amount: rest, dueDate: '' },
+    ])
+    setEditing(true)
+    setError(null)
+  }
+
   const addRow = () => setDrafts([...drafts, { amount: '', dueDate: '' }])
   const removeRow = (i: number) => setDrafts(drafts.filter((_, idx) => idx !== i))
   const updateRow = (i: number, patch: Partial<Draft>) =>
@@ -240,13 +271,13 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone, quoteTitle, onPa
           </span>
           <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Payment plan</p>
         </div>
-        {!editing && (
+        {!editing && plan && plan.length > 0 && (
           <button
             type="button"
             onClick={startEditing}
             className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
           >
-            {plan && plan.length > 0 ? <><RefreshCw className="h-3 w-3" /> Edit plan</> : <><Plus className="h-3 w-3" /> Create plan</>}
+            <RefreshCw className="h-3 w-3" /> Edit plan
           </button>
         )}
       </div>
@@ -277,9 +308,30 @@ export function PaymentPlanBlock({ quoteId, total, clientPhone, quoteTitle, onPa
         </div>
       )}
       {!editing && (!plan || plan.length === 0) && (
-        <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-xs text-slate-400">
-          No payment plan yet. Click <strong>Create plan</strong> to split this quote in installments.
-        </p>
+        <div className="space-y-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-4">
+          <p className="text-center text-xs text-slate-400">
+            How would the client like to pay?
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={handlePayInFull}
+              disabled={saving}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CreditCard className="h-3.5 w-3.5" />}
+              Pay in full · ${total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            </button>
+            <button
+              type="button"
+              onClick={startInstallments}
+              disabled={saving}
+              className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 disabled:opacity-50"
+            >
+              <Plus className="h-3.5 w-3.5" /> Pay in installments
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Edit mode */}
