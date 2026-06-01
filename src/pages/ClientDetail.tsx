@@ -184,7 +184,7 @@ export function ClientDetailPage() {
             <Button
               className="rounded-2xl text-white"
               style={{ backgroundColor: 'var(--theme-primary)' }}
-              onClick={() => navigate('/quotes')}
+              onClick={() => navigate('/quotes', { state: { presetClient: client } })}
             >
               <FileText className="mr-1.5 h-4 w-4" /> New quote
             </Button>

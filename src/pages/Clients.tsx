@@ -5,7 +5,7 @@ import { clientService } from '@/services/clientService'
 import { NoticeDialog } from '@/components/NoticeDialog'
 import type { Client } from '@/types'
 import {
-  Check, ChevronRight, Loader2, Mail, Pencil, Phone,
+  Check, ChevronRight, FileText, Loader2, Mail, Pencil, Phone,
   Plus, Search, Trash2, UserPlus, X,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -335,6 +335,13 @@ export function ClientsPage() {
                         </td>
                         <td className="px-3 py-3.5 text-right">
                           <div className="flex justify-end gap-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); navigate('/quotes', { state: { presetClient: c } }) }}
+                              className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:bg-emerald-50 hover:text-emerald-600"
+                              title="New quote for this client"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                            </button>
                             <button
                               onClick={(e) => { e.stopPropagation(); setEditId(c.id); setEditDraft({ ...c }) }}
                               className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 hover:bg-violet-50 hover:text-violet-600"

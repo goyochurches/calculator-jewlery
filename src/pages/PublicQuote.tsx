@@ -239,6 +239,14 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
     year: 'numeric', month: 'long', day: 'numeric',
   }) : null
 
+  // This quote is valid for 7 days from when it was issued. Shown to the
+  // customer as a gentle urgency cue ("available until …").
+  const availableUntil = quote.createdAt ? (() => {
+    const d = new Date(quote.createdAt)
+    d.setDate(d.getDate() + 7)
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+  })() : null
+
   const stoneCount = quote.diamondAmount ?? 0
   const totalCt    = Number(quote.diamondCarats ?? 0)
   // Trim trailing zeros so "0.5000" → "0.5", but keep "0.04" / "0.0095" intact.
@@ -322,6 +330,13 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
           {issuedDate && (
             <p className="mt-7 text-xs uppercase tracking-[0.28em] text-white/55">
               Issued · {issuedDate}
+            </p>
+          )}
+
+          {availableUntil && (
+            <p className="mx-auto mt-4 inline-flex items-center gap-2 rounded-full border border-amber-300/40 bg-amber-400/15 px-4 py-1.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-100">
+              <Clock className="h-3.5 w-3.5" />
+              This quote is only available until {availableUntil}
             </p>
           )}
         </div>

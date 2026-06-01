@@ -314,6 +314,23 @@ export function QuoteBuilderPage() {
     navigate(location.pathname, { replace: true, state: null })
   }, [config.loading, config.diamondSizeFor, location.pathname, location.state, navigate])
 
+  // ── Preset client ────────────────────────────────────────────────────
+  // When the user lands here via "New quote" from the Clients page (or a
+  // client's detail view), the chosen client is passed in router state. We
+  // prefill the client picker once, then clear the nav state so a reload
+  // doesn't re-apply it on top of changes. Independent of the duplicate
+  // flow above — only one of the two is ever present.
+  const presetClientAppliedRef = useRef(false)
+  useEffect(() => {
+    if (presetClientAppliedRef.current) return
+    const navState = location.state as { presetClient?: Client } | null
+    const preset = navState?.presetClient
+    if (!preset) return
+    presetClientAppliedRef.current = true
+    setClient(preset)
+    navigate(location.pathname, { replace: true, state: null })
+  }, [location.pathname, location.state, navigate])
+
   // Setters allowed for customer-supplied stones — narrowed to the subset the
   // user wants to expose in the Customer Stones section.
   const customerSetters = useMemo(
