@@ -996,6 +996,13 @@ export function QuoteBuilderPage() {
     if (!client) errors.client = 'Please select or create a client.'
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
+    // Can't create an empty quote: require a non-zero total (some metal
+    // weight, labor, a stone, engraving or extra cost). Blocks saving a
+    // brand-new quote while everything is still at 0.
+    if (pricing.total <= 0) {
+      setSaveError("This quote is still $0 — add metal weight, a CAD/Jeweler's-time level, a stone or an extra cost before creating it.")
+      return
+    }
     // Override requires a reason — bail out and surface the error in the
     // override panel so the user fixes it before we hit the API.
     if (parsedOverride != null && customerPriceOverrideReason.trim() === '') {
