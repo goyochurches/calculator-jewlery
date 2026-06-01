@@ -32,6 +32,17 @@ export function PublicQuotePage() {
   const [unavailable, setUnavailable] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Apply the shop's configured theme colors (from the quote payload) so the
+  // public link matches the brand palette. The customer's browser has no
+  // stored theme, so without this it would fall back to the app defaults.
+  useEffect(() => {
+    if (!quote) return
+    const root = document.documentElement
+    if (quote.themePrimary)   root.style.setProperty('--theme-primary', quote.themePrimary)
+    if (quote.themeSecondary) root.style.setProperty('--theme-secondary', quote.themeSecondary)
+    if (quote.themeTertiary)  root.style.setProperty('--theme-tertiary', quote.themeTertiary)
+  }, [quote])
+
   useEffect(() => {
     if (!token) { setNotFound(true); setLoading(false); return }
     setLoading(true)
