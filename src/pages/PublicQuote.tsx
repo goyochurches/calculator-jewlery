@@ -280,8 +280,8 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
     // Stone sourcing — show the count for each source on the piece. When the
     // stones are all from one source only that line renders; mixed pieces show
     // both, plus a grand total so the customer knows how many stones there are.
-    ...(suppliedCount > 0 ? [{ icon: Diamond, label: 'Supplied by S&S', value: `${suppliedCount} ${plural(suppliedCount)}` }] : []),
-    ...(customerCount > 0 ? [{ icon: Gem, label: 'Supplied by customer', value: `${customerCount} ${plural(customerCount)}` }] : []),
+    ...(suppliedCount > 0 ? [{ icon: Diamond, label: 'Stones supplied by S&S', value: `${suppliedCount} ${plural(suppliedCount)}` }] : []),
+    ...(customerCount > 0 ? [{ icon: Gem, label: 'Stones supplied by customer', value: `${customerCount} ${plural(customerCount)}` }] : []),
     ...(totalStones > 0 ? [{ icon: Diamond, label: 'Total stones', value: `${totalStones} ${plural(totalStones)}` }] : []),
     ...(totalCt > 0 ? [{ icon: Diamond, label: 'Carat weight', value: `${formatCt(totalCt)} ct tw` }] : []),
     { icon: Ruler,    label: 'Finger size',    value: `Size ${quote.fingerSize ?? '—'}` },
