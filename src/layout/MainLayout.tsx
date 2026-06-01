@@ -8,8 +8,12 @@ import { Sidebar } from './Sidebar'
 
 const pageCopy: Record<string, { title: string; subtitle: string }> = {
   '/': {
+    title: 'Dashboard',
+    subtitle: 'Reports and activity across your business at a glance.',
+  },
+  '/metals': {
     title: 'Metals overview',
-    subtitle: 'Track pricing, momentum and activity across your desk.',
+    subtitle: 'Track pricing, momentum and market context across your desk.',
   },
   '/quotes': {
     title: 'Quote builder',

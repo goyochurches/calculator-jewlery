@@ -8,6 +8,7 @@ import { useInboxUnread } from '@/hooks/useInboxUnread'
 import {
   Calculator,
   ClipboardList,
+  CircleDollarSign,
   Contact,
   CreditCard,
   Diamond,
@@ -26,6 +27,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 
 const navItems: { to: string; label: string; icon: typeof LayoutDashboard; key: NavKey; hidden?: boolean }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' },
+  { to: '/metals', label: 'Metals', icon: CircleDollarSign, key: 'metals' },
   { to: '/quotes', label: 'Quote Builder', icon: Calculator, key: 'quotes' },
   { to: '/quotes-list', label: 'Quotes', icon: FileText, key: 'quotes-list' },
   { to: '/messages', label: 'Messages', icon: MessageCircle, key: 'messages' },

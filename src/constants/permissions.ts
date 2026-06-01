@@ -4,6 +4,7 @@ export type Role = AuthUser['role']
 
 export type NavKey =
   | 'dashboard'
+  | 'metals'
   | 'quotes'
   | 'quotes-list'
   | 'clients'
@@ -20,6 +21,7 @@ export type NavKey =
 export const ROLE_PERMISSIONS: Record<Role, NavKey[]> = {
   ADMIN: [
     'dashboard',
+    'metals',
     'quotes',
     'quotes-list',
     'clients',

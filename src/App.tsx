@@ -6,6 +6,7 @@ import { MainLayout } from '@/layout/MainLayout'
 import { GemstonesPage } from '@/pages/Gemstones'
 import { QuoteBuilderPage } from '@/pages/QuoteBuilder'
 import { Dashboard } from '@/pages/Dashboard'
+import { Metals } from '@/pages/Metals'
 import { UsersPage } from '@/pages/Users'
 import { Configuration } from '@/pages/Configuration'
 import { ReviewsPage } from '@/pages/Reviews'
@@ -92,6 +93,9 @@ export default function App() {
                 {/* Profile is available to every authenticated user — no
                  *  permission gate, since it only edits your own record. */}
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route element={<RequirePermission permission="metals" />}>
+                  <Route path="/metals" element={<Metals />} />
+                </Route>
                 <Route element={<RequirePermission permission="quotes" />}>
                   <Route path="/quotes" element={<QuoteBuilderPage />} />
                 </Route>
