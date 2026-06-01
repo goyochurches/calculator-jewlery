@@ -96,9 +96,12 @@ export function QuoteBuilderPage() {
   const [pinSummary, setPinSummary] = useState(true)
   const [selectedMetal, setSelectedMetal] = useState<JewelryMetalOption>('gold-18k-white')
   const [ringLabor, setRingLabor] = useState('medium')
-  const [weightGrams, setWeightGrams] = useState(12)
-  const [ringWidth, setRingWidth] = useState(2.5)
-  const [fingerSize, setFingerSize] = useState(7)
+  // Numeric factors start at 0 so a fresh quote begins empty — and the
+  // post-save reset below returns them to these same 0 values, so the
+  // builder starts and ends in an identical zeroed state.
+  const [weightGrams, setWeightGrams] = useState(0)
+  const [ringWidth, setRingWidth] = useState(0)
+  const [fingerSize, setFingerSize] = useState(0)
   const [extraCosts, setExtraCosts] = useState(0)
   const [engraving, setEngraving] = useState(false)
   // Optional 7.75% sales tax. When ON, the customer-facing total adds the
@@ -1432,6 +1435,7 @@ export function QuoteBuilderPage() {
                 <label className="text-sm font-semibold text-slate-900">Finger size</label>
                 <select value={fingerSize} onChange={e => setFingerSize(Number(e.target.value))}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
+                  <option value={0}>— Select a size</option>
                   {FINGER_SIZE_OPTIONS.map(s => (
                     <option key={s} value={s}>{s}</option>
                   ))}
