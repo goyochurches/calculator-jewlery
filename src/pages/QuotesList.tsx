@@ -918,7 +918,7 @@ function QuoteRow({
       </td>
       <td className="px-3 py-4">
         <div className="flex items-center justify-end gap-1.5">
-          <CopyShareLinkButton token={quote.publicToken} iconOnly={false} />
+          <CopyShareLinkButton token={quote.publicToken} iconOnly />
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onDuplicate() }}

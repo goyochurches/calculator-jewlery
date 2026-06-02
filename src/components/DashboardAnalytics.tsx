@@ -1,4 +1,5 @@
 import { Card, CardContent } from '@/components/ui/card'
+import { useFeatures } from '@/hooks/useFeatures'
 import { dashboardService, type DashboardAnalytics as Analytics } from '@/services/dashboardService'
 import { reviewsService, type GoogleReviews } from '@/services/reviewsService'
 import {
@@ -21,6 +22,7 @@ function duration(totalSeconds: number): string {
 /** Analyst-grade KPIs: money collected vs outstanding/overdue, the quote
  *  funnel, call activity, client channel split and Google rating. */
 export function DashboardAnalytics() {
+  const { isEnabled } = useFeatures()
   const [a, setA] = useState<Analytics | null>(null)
   const [reviews, setReviews] = useState<GoogleReviews | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -63,18 +65,20 @@ export function DashboardAnalytics() {
     <section className="space-y-4">
       <h2 className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-400">Business analytics</h2>
 
-      {/* ── Money ── */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi icon={<Wallet className="h-4 w-4" />} tone="emerald" label="Collected" value={money(a.collected)}
-          hint={a.processing > 0 ? `${money(a.processing)} processing (ACH)` : undefined} />
-        <Kpi icon={<BanknoteIcon className="h-4 w-4" />} tone="amber" label="Outstanding" value={money(a.outstanding)} />
-        <Kpi icon={<AlertTriangle className="h-4 w-4" />} tone="rose" label="Overdue" value={money(a.overdue)}
-          hint={`${a.overdueCount} installment${a.overdueCount === 1 ? '' : 's'} past due`} />
-        <Kpi icon={<RotateCcw className="h-4 w-4" />} tone="violet" label="Refunded" value={money(a.refunded)} />
-      </div>
+      {/* ── Money ── gated by the payments feature flag */}
+      {isEnabled('payments') && (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <Kpi icon={<Wallet className="h-4 w-4" />} tone="emerald" label="Collected" value={money(a.collected)}
+            hint={a.processing > 0 ? `${money(a.processing)} processing (ACH)` : undefined} />
+          <Kpi icon={<BanknoteIcon className="h-4 w-4" />} tone="amber" label="Outstanding" value={money(a.outstanding)} />
+          <Kpi icon={<AlertTriangle className="h-4 w-4" />} tone="rose" label="Overdue" value={money(a.overdue)}
+            hint={`${a.overdueCount} installment${a.overdueCount === 1 ? '' : 's'} past due`} />
+          <Kpi icon={<RotateCcw className="h-4 w-4" />} tone="violet" label="Refunded" value={money(a.refunded)} />
+        </div>
+      )}
 
-      {/* ── Funnel + activity ── */}
-      <div className="grid gap-3 lg:grid-cols-2">
+      {/* ── Funnel + activity ── (call activity gated by the messages flag) */}
+      <div className={`grid gap-3 ${isEnabled('messages') ? 'lg:grid-cols-2' : ''}`}>
         <Card className="rounded-[24px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
           <CardContent className="space-y-3 p-5">
             <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Quote funnel</p>
@@ -92,36 +96,50 @@ export function DashboardAnalytics() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-[24px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-          <CardContent className="space-y-4 p-5">
-            <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Call activity</p>
-            <div className="grid grid-cols-3 gap-3">
-              <MiniStat icon={<Phone className="h-4 w-4 text-sky-600" />} label="Total" value={a.callsTotal} />
-              <MiniStat icon={<Phone className="h-4 w-4 text-emerald-600" />} label="Answered" value={a.callsAnswered} sub={`${answerRate}%`} />
-              <MiniStat icon={<PhoneMissed className="h-4 w-4 text-rose-600" />} label="Missed" value={a.callsMissed} />
-            </div>
-            <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
-              <Clock className="h-3.5 w-3.5" />
-              Total talk time: <span className="font-semibold text-slate-800">{duration(a.callDurationSeconds)}</span>
-            </div>
-          </CardContent>
-        </Card>
+        {isEnabled('messages') && (
+          <Card className="rounded-[24px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+            <CardContent className="space-y-4 p-5">
+              <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Call activity</p>
+              <div className="grid grid-cols-3 gap-3">
+                <MiniStat icon={<Phone className="h-4 w-4 text-sky-600" />} label="Total" value={a.callsTotal} />
+                <MiniStat icon={<Phone className="h-4 w-4 text-emerald-600" />} label="Answered" value={a.callsAnswered} sub={`${answerRate}%`} />
+                <MiniStat icon={<PhoneMissed className="h-4 w-4 text-rose-600" />} label="Missed" value={a.callsMissed} />
+              </div>
+              <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                <Clock className="h-3.5 w-3.5" />
+                Total talk time: <span className="font-semibold text-slate-800">{duration(a.callDurationSeconds)}</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* ── Clients channel split · reviews · unread ── */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi icon={<MessageCircle className="h-4 w-4" />} tone="emerald" label="Clients · WhatsApp" value={String(a.clientsWhatsapp)}
-          hint={`${a.clientsTotal} total clients`} />
-        <Kpi icon={<Smartphone className="h-4 w-4" />} tone="sky" label="Clients · SMS" value={String(a.clientsSms)} />
-        <Kpi icon={<MessageCircle className="h-4 w-4" />} tone="rose" label="Unread messages" value={String(a.unreadMessages)} />
-        <Kpi
-          icon={<Star className="h-4 w-4" />}
-          tone="amber"
-          label="Google rating"
-          value={reviews?.rating != null ? `${reviews.rating.toFixed(1)} ★` : '—'}
-          hint={reviews?.total != null ? `${reviews.total} reviews` : (reviews && !reviews.configured ? 'Not configured' : undefined)}
-        />
-      </div>
+      {/* ── Clients channel split · reviews · unread ── (per-flag) */}
+      {(() => {
+        const kpis: React.ReactNode[] = []
+        if (isEnabled('messages')) {
+          kpis.push(
+            <Kpi key="wa" icon={<MessageCircle className="h-4 w-4" />} tone="emerald" label="Clients · WhatsApp" value={String(a.clientsWhatsapp)}
+              hint={`${a.clientsTotal} total clients`} />,
+            <Kpi key="sms" icon={<Smartphone className="h-4 w-4" />} tone="sky" label="Clients · SMS" value={String(a.clientsSms)} />,
+            <Kpi key="unread" icon={<MessageCircle className="h-4 w-4" />} tone="rose" label="Unread messages" value={String(a.unreadMessages)} />,
+          )
+        }
+        if (isEnabled('reviews')) {
+          kpis.push(
+            <Kpi
+              key="rating"
+              icon={<Star className="h-4 w-4" />}
+              tone="amber"
+              label="Google rating"
+              value={reviews?.rating != null ? `${reviews.rating.toFixed(1)} ★` : '—'}
+              hint={reviews?.total != null ? `${reviews.total} reviews` : (reviews && !reviews.configured ? 'Not configured' : undefined)}
+            />,
+          )
+        }
+        if (kpis.length === 0) return null
+        return <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{kpis}</div>
+      })()}
     </section>
   )
 }
