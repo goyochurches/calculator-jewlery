@@ -58,6 +58,11 @@ export interface PublicQuote {
   themePrimary?: string | null
   themeSecondary?: string | null
   themeTertiary?: string | null
+  /** JSON-encoded runtime feature flags (see lib/featureFlags). Embedded by
+   *  the backend the same way theme colors are, so toggles set in
+   *  Configuration also apply to this public page. Optional: when omitted
+   *  every feature reads as enabled. */
+  featureFlags?: string | null
 }
 
 export class PublicQuoteNotFoundError extends Error {

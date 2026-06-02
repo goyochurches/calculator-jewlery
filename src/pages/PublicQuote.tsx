@@ -15,6 +15,7 @@ import {
   type PublicQuote,
 } from '@/services/publicQuoteService'
 import { copyToClipboard } from '@/lib/share'
+import { parseFeatureFlags } from '@/lib/featureFlags'
 import { AlertCircle, Check, Clock, Copy, Diamond, Gem, HelpCircle, MessageCircle, Phone, Quote as QuoteIcon, Ruler, Scissors, Sparkles, Wrench } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -322,6 +323,11 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
     { icon: Ruler,    label: 'Finger size',    value: `Size ${quote.fingerSize ?? '—'}` },
     { icon: Ruler,    label: 'Ring width',     value: `${quote.ringWidth ?? 0} mm` },
   ]
+
+  // Whether the "Copy details to share" button is shown — driven by the
+  // runtime feature flag embedded in the public payload (defaults to ON when
+  // the backend doesn't send the flag).
+  const quoteCopyEnabled = parseFeatureFlags(quote.featureFlags)['quote-copy-text']
 
   // Plain-text version of the whole quote, formatted for pasting into an
   // SMS / WhatsApp message. Built from the same values rendered on the page so
