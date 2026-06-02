@@ -106,7 +106,8 @@
       "PowerShell(Set-Location D:\\\\wamp64\\\\www\\\\calculator-jewlery; Write-Output \"=== HEAD has Metals.tsx? ===\"; git cat-file -e HEAD:src/pages/Metals.tsx 2>&1; Write-Output \"\\(exit: $LASTEXITCODE — 0 means HEAD already has it\\)\"; Write-Output \"=== last commit ===\"; git log -1 --format=\"%H %s %cd\"; Write-Output \"=== HEAD Dashboard line count vs disk ===\"; \\(git show HEAD:src/pages/Dashboard.tsx | Measure-Object -Line\\).Lines; \\(Get-Content src\\\\pages\\\\Dashboard.tsx | Measure-Object -Line\\).Lines)",
       "PowerShell(Set-Location D:\\\\wamp64\\\\www\\\\price-calculator; if \\(Test-Path .\\\\mvnw.cmd\\) { .\\\\mvnw.cmd -q -o compile 2>&1 | Select-Object -Last 25 } else { mvn -q -o compile 2>&1 | Select-Object -Last 25 }; Write-Output \"=== exit $LASTEXITCODE ===\")",
       "PowerShell(Set-Location D:\\\\wamp64\\\\www\\\\price-calculator; .\\\\mvnw.cmd -q -o compile 2>&1 | Select-Object -Last 20; Write-Output \"=== exit $LASTEXITCODE ===\")",
-      "PowerShell(mvn *)"
+      "PowerShell(mvn *)",
+      "Bash(npx eslint *)"
     ]
   }
 }

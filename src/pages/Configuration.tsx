@@ -405,7 +405,7 @@ export function Configuration() {
             >
               {flagsSaving ? 'Saving…' : 'Save features'}
             </Button>
-            {flagsSaved && <span className="text-sm font-medium text-emerald-600">Saved — applies after reload</span>}
+            {flagsSaved && <span className="text-sm font-medium text-emerald-600">Saved</span>}
           </div>
         </CardContent>
       </Card>
