@@ -14,7 +14,8 @@ import {
   PublicQuoteUnavailableError,
   type PublicQuote,
 } from '@/services/publicQuoteService'
-import { AlertCircle, Clock, Diamond, Gem, HelpCircle, MessageCircle, Phone, Quote as QuoteIcon, Ruler, Scissors, Sparkles, Wrench } from 'lucide-react'
+import { copyToClipboard } from '@/lib/share'
+import { AlertCircle, Check, Clock, Copy, Diamond, Gem, HelpCircle, MessageCircle, Phone, Quote as QuoteIcon, Ruler, Scissors, Sparkles, Wrench } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 
@@ -87,6 +88,40 @@ function GoldOrnament({ className = '' }: { className?: string }) {
 /** Tiny inline gold bullet — used in column headers and footer signatures. */
 function GoldDot() {
   return <span className="inline-block h-1.5 w-1.5 rounded-full bg-gradient-to-br from-amber-300 to-amber-600 align-middle" aria-hidden />
+}
+
+/**
+ * Copies the full quote as nicely formatted plain text so the customer (or the
+ * team) can paste it into an SMS / WhatsApp message. Shows a brief "Copied!"
+ * confirmation after a successful copy.
+ */
+function CopyQuoteTextButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const onClick = async () => {
+    try {
+      await copyToClipboard(text)
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    } catch (err) {
+      console.error('Copy failed', err)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-2 rounded-2xl border px-5 py-2.5 text-sm font-semibold transition ${
+        copied
+          ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
+          : 'border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100'
+      }`}
+    >
+      {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+      {copied ? 'Copied to clipboard' : 'Copy details to share'}
+    </button>
+  )
 }
 
 // ── Error / empty states ────────────────────────────────────────────────────
@@ -288,6 +323,32 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
     { icon: Ruler,    label: 'Ring width',     value: `${quote.ringWidth ?? 0} mm` },
   ]
 
+  // Plain-text version of the whole quote, formatted for pasting into an
+  // SMS / WhatsApp message. Built from the same values rendered on the page so
+  // the two never drift apart.
+  const fmtMoney = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+  const shareText = [
+    quote.companyName ?? 'Simone & Son',
+    quote.title,
+    quote.clientName ? `Prepared for ${quote.clientName}` : null,
+    '',
+    `PRICE: ${fmtMoney(quote.total)} USD`,
+    quote.applyTaxes ? `  Subtotal: ${fmtMoney(quote.subtotal)}` : null,
+    quote.applyTaxes ? `  Sales tax (7.75%): ${fmtMoney(quote.taxAmount)}` : null,
+    quote.discountPercent > 0 ? `  You save ${fmtMoney(quote.discountAmount)} (${quote.discountPercent}% off)` : null,
+    quote.applyTaxes ? 'Includes 7.75% sales tax' : 'All-inclusive',
+    '',
+    'SPECIFICATIONS',
+    ...specs.map(s => `• ${s.label}: ${s.value}`),
+    quote.engraving ? '• Hand engraving: included' : null,
+    quote.customerNotes && quote.customerNotes.trim() !== '' ? `\nNOTES\n${quote.customerNotes.trim()}` : null,
+    issuedDate ? `\nIssued: ${issuedDate}` : null,
+    availableUntil ? `Price available until: ${availableUntil}` : null,
+    `\nQuestions? Call or text ${STORE_PHONE_DISPLAY}`,
+  ]
+    .filter(line => line !== null)
+    .join('\n')
+
   return (
     <div className="space-y-8">
       {/* ── Hero ─────────────────────────────────────────────────────────── */}
@@ -362,6 +423,11 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
           )}
         </div>
       </section>
+
+      {/* ── Copy-to-share: lets the customer/team paste the full quote into SMS ── */}
+      <div className="flex justify-center">
+        <CopyQuoteTextButton text={shareText} />
+      </div>
 
       {/* ── Personal note from the jeweler ──────────────────────────────── */}
       {(quote.createdByName || quote.createdByBio || quote.createdByPhoto) && (
