@@ -391,15 +391,17 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
           </p>
         </div>
         <div className="ml-4 flex shrink-0 items-center gap-1.5">
-          <button
-            onClick={handleDownloadPdf}
-            disabled={pdfLoading}
-            title="Download branded PDF (same layout as the customer share link)"
-            className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:border-amber-300 hover:bg-amber-100 disabled:cursor-wait disabled:opacity-60"
-          >
-            <FileDown className="h-3.5 w-3.5" />
-            {pdfLoading ? 'Opening…' : 'PDF'}
-          </button>
+          {isEnabled('quote-pdf') && (
+            <button
+              onClick={handleDownloadPdf}
+              disabled={pdfLoading}
+              title="Download branded PDF (same layout as the customer share link)"
+              className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:border-amber-300 hover:bg-amber-100 disabled:cursor-wait disabled:opacity-60"
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              {pdfLoading ? 'Opening…' : 'PDF'}
+            </button>
+          )}
           <button
             onClick={handleDuplicate}
             title="Duplicate this quote and adjust"
@@ -514,7 +516,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <CopyShareLinkButton token={quote.publicToken} iconOnly={false} />
-              {quote.status === 'approved' && (
+              {quote.status === 'approved' && isEnabled('quote-send-link') && (
                 <button
                   onClick={handleSendLink}
                   disabled={sendingLink === 'sending'}

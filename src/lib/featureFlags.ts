@@ -45,6 +45,7 @@ export type FeatureKey =
   | 'quote-delete'
   | 'quote-copy-text'
   | 'quote-pdf'
+  | 'quote-send-link'
 
 export interface FeatureDef {
   key: FeatureKey
@@ -70,6 +71,8 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   { key: 'master-tables', group: 'modules', label: 'Master Tables', description: 'Pricing master tables.' },
   { key: 'quote-delete',    group: 'features', label: 'Delete quotes',   description: 'Show the Delete button in the quote detail (admin only).' },
   { key: 'quote-copy-text', group: 'features', label: 'Copy quote text', description: 'Show the "Copy details to share" button on the public quote page.' },
+  { key: 'quote-pdf',       group: 'features', label: 'Quote PDF',       description: 'Show the "PDF" download button in the quote detail.', defaultOn: false },
+  { key: 'quote-send-link', group: 'features', label: 'Send quote to client', description: 'Show the "Send to client" button that texts the share link via SMS / WhatsApp.', defaultOn: false },
 ]
 
 export type FeatureFlags = Record<FeatureKey, boolean>
