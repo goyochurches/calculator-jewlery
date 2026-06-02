@@ -719,7 +719,7 @@ function QuotesListSkeleton() {
 function QuoteRow({
   quote, kind, isSelected, onSelect, onDuplicate,
   childCount, expanded, canToggle, onToggle, isLastChild, viewerUser,
-  revisionIndex, totalRevisions,
+  revisionIndex, totalRevisions, onDelete,
 }: {
   quote: SavedQuote
   kind: 'parent' | 'parent-ghost' | 'child'
@@ -738,6 +738,8 @@ function QuoteRow({
    *  for child rows so the title cell can show a "Rev 2 of 3" badge. */
   revisionIndex?: number
   totalRevisions?: number
+  /** When provided, an admin Delete button shows in the Actions cell. */
+  onDelete?: () => void
 }) {
   const isChild = kind === 'child'
   const isGhost = kind === 'parent-ghost'
@@ -891,8 +893,28 @@ function QuoteRow({
       <td className={`px-6 py-4 ${isSelected ? 'text-slate-400' : 'text-slate-400'}`}>
         {quote.createdAt}
       </td>
-      <td className={`px-6 py-4 text-right font-semibold ${isSelected ? 'text-amber-300' : 'text-slate-900'}`}>
-        ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+      <td className="px-6 py-4 text-right">
+        {(() => {
+          const { customerPrice, discountAmount } = computeCustomerPrice(quote)
+          const hasDiscount = (quote.discountPercent ?? 0) > 0
+          return (
+            <div className="flex flex-col items-end gap-1">
+              <span className={`text-base font-bold tabular-nums leading-none ${isSelected ? 'text-amber-300' : 'text-slate-900'}`}>
+                ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </span>
+              {hasDiscount && (
+                <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
+                  isSelected ? 'bg-white/15 text-emerald-200' : 'bg-emerald-50 text-emerald-700'
+                }`}>
+                  −${discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} · {quote.discountPercent}% off
+                </span>
+              )}
+              <span className={`text-[10px] font-medium tabular-nums ${isSelected ? 'text-white/45' : 'text-slate-400'}`}>
+                Cost ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          )
+        })()}
       </td>
       <td className="px-3 py-4">
         <div className="flex items-center justify-end gap-1.5">
@@ -910,6 +932,21 @@ function QuoteRow({
           >
             <Copy className="h-3.5 w-3.5" />
           </button>
+          {onDelete && (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onDelete() }}
+              title="Delete this quote"
+              aria-label="Delete quote"
+              className={`inline-flex h-7 w-7 items-center justify-center rounded-full border transition ${
+                isSelected
+                  ? 'border-white/30 bg-white/10 text-white hover:bg-rose-500/30'
+                  : 'border-rose-200 bg-rose-50 text-rose-500 hover:border-rose-300 hover:bg-rose-100 hover:text-rose-700'
+              }`}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </td>
     </tr>
