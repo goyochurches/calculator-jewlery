@@ -383,7 +383,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-base font-semibold text-slate-900">{quote.title}</h2>
-            {canSeePayments_ && <PaymentSummaryBadge quote={quote} />}
+            {canSeePayments_ && isEnabled('payments') && <PaymentSummaryBadge quote={quote} />}
           </div>
           <p className="mt-0.5 text-xs text-slate-400">
             Quote #{quote.id} · {quote.createdAt}
