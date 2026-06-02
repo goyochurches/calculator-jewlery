@@ -483,6 +483,7 @@ export function QuotesListPage() {
                             viewerUser={user}
                             revisionIndex={idx + 1}
                             totalRevisions={group.children.length}
+                            onDelete={canDelete ? () => setDeleteTarget(child) : undefined}
                           />,
                         )
                       })
@@ -533,6 +534,20 @@ export function QuotesListPage() {
             </div>
           </div>
         )}
+
+        <ConfirmDialog
+          open={deleteTarget !== null}
+          title="Delete this quote?"
+          description={
+            <>This permanently deletes <strong>{deleteTarget?.title}</strong> (Quote #{deleteTarget?.id}) and cannot be undone.</>
+          }
+          confirmLabel="Delete quote"
+          cancelLabel="Keep it"
+          variant="danger"
+          loading={deleting}
+          onConfirm={handleConfirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+        />
       </div>
     </div>
   )
