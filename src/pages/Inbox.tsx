@@ -1,6 +1,7 @@
 import { ClientPicker } from '@/components/ClientPicker'
 import { MessageText } from '@/components/MessageText'
 import { useAuth } from '@/context/AuthContext'
+import { useFeatures } from '@/hooks/useFeatures'
 import { getBrokerUrl, useWebSocket } from '@/hooks/useWebSocket'
 import { inboxService } from '@/services/inboxService'
 import type { Client, InboxCapabilities, InboxEvent, InboxMessage, InboxThread } from '@/types'
@@ -635,7 +636,11 @@ function Timeline({
 
 /** Centered, system-style row for a call or payment inside the timeline. */
 function EventRow({ event, peerLabel }: { event: InboxEvent; peerLabel: string }) {
+  const { isEnabled } = useFeatures()
   if (event.type === 'CALL') return <CallEventRow event={event} peerLabel={peerLabel} />
+  // Payment + refund timeline events are part of the payments feature — hide
+  // them from the chat when payments is turned off.
+  if (!isEnabled('payments')) return null
   if (event.type === 'PAYMENT') return <PaymentEventRow event={event} />
   if (event.type === 'REFUND') return <RefundEventRow event={event} />
   return null
