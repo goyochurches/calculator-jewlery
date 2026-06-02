@@ -259,6 +259,11 @@ export const quotesService = {
     return mapQuote(data)
   },
 
+  /** Permanently delete a quote (admin-only). Returns nothing on success. */
+  async remove(id: string): Promise<void> {
+    await api.delete<void>(`/api/quotes/${id}`)
+  },
+
   /** Admin-only. Returns the quote with a fresh publicToken + expiration. */
   async refreshPublicToken(id: string): Promise<SavedQuote> {
     const data = await api.post<ApiQuote>(`/api/quotes/${id}/refresh-token`, {})

@@ -11,7 +11,8 @@ import { canSeePayments } from '@/lib/paymentsAccess'
 import { displayStatusFor } from '@/lib/quoteStatusDisplay'
 import { quotesService } from '@/services/quotesService'
 import { NoticeDialog } from '@/components/NoticeDialog'
-import { AlertTriangle, Check, ChevronDown, ChevronUp, Copy, Eye, FileDown, MessageCircle, RefreshCw, X, XCircle } from 'lucide-react'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { AlertTriangle, Check, ChevronDown, ChevronUp, Copy, Eye, FileDown, MessageCircle, RefreshCw, Trash2, X, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -110,6 +111,9 @@ interface QuoteDetailPanelProps {
   onStatusChange?: (id: string, status: 'APPROVED' | 'REJECTED' | 'PENDING') => void
   /** Admin-only callback to rotate the share token + reset 3-month expiration. */
   onRefreshToken?: (id: string) => Promise<void> | void
+  /** Admin-only callback to permanently delete the quote. When provided (and
+   *  the viewer is an admin) a Delete button shows in the header. */
+  onDelete?: (id: string) => Promise<void> | void
   isAdmin?: boolean
   /** Fires when the embedded PaymentPlanBlock detects a change that may
    *  have moved the parent quote's status (refund completed, payment
@@ -167,12 +171,16 @@ const ROLE_THEME: Record<StoneRole, { label: string; dot: string; ring: string; 
   MELEE: { label: 'Melee', dot: 'bg-emerald-500', ring: 'border-emerald-200', tint: 'bg-emerald-50/40', chip: 'bg-emerald-100 text-emerald-800' },
 }
 
-export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToken, isAdmin = false, onPaymentChanged }: QuoteDetailPanelProps) {
+export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToken, onDelete, isAdmin = false, onPaymentChanged }: QuoteDetailPanelProps) {
   const navigate = useNavigate()
   const { user } = useAuth()
   const canSeePayments_ = canSeePayments(user)
   const [refreshing, setRefreshing] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
+  // Delete confirmation flow — gated behind a two-button ConfirmDialog so a
+  // misclick can't wipe a quote (the action is irreversible).
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const handleDuplicate = () => {
     onClose()
     navigate('/quotes', { state: { duplicateFrom: quote } })
@@ -269,6 +277,20 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
     setRefreshing(true)
     try { await onRefreshToken(quote.id) }
     finally { setRefreshing(false) }
+  }
+
+  const handleDelete = async () => {
+    if (!onDelete) return
+    setDeleting(true)
+    try {
+      await onDelete(quote.id)
+      // Host closes the drawer + drops the row from its list; nothing else to do.
+    } catch (err) {
+      setConfirmDelete(false)
+      setNotice({ title: 'Could not delete the quote', description: err instanceof Error ? err.message : undefined, variant: 'error' })
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const metalCfg = JEWELRY_METAL_OPTIONS[quote.metal] ?? { label: quote.metal }
