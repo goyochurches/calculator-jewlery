@@ -44,6 +44,7 @@ export type FeatureKey =
   // In-page features — finer-grained controls inside individual pages.
   | 'quote-delete'
   | 'quote-copy-text'
+  | 'quote-pdf'
 
 export interface FeatureDef {
   key: FeatureKey
