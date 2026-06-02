@@ -50,6 +50,8 @@ export interface FeatureDef {
   label: string
   description: string
   group: 'modules' | 'features'
+  /** Default state when nothing has been configured yet. Omitted = ON. */
+  defaultOn?: boolean
 }
 
 /** The catalog rendered as toggles in Configuration. Order = display order. */
@@ -62,7 +64,7 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   { key: 'clients',       group: 'modules', label: 'Clients',       description: 'Client directory.' },
   { key: 'gemstones',     group: 'modules', label: 'Gemstones',     description: 'Gemstone catalog.' },
   { key: 'users',         group: 'modules', label: 'Users',         description: 'Team members & roles.' },
-  { key: 'payments',      group: 'modules', label: 'Payments',      description: 'Payments page + the payment plan block inside quotes.' },
+  { key: 'payments',      group: 'modules', label: 'Payments',      description: 'Payments page + the payment plan block inside quotes.', defaultOn: false },
   { key: 'reviews',       group: 'modules', label: 'Reviews',       description: 'Google reviews page.' },
   { key: 'master-tables', group: 'modules', label: 'Master Tables', description: 'Pricing master tables.' },
   { key: 'quote-delete',    group: 'features', label: 'Delete quotes',   description: 'Show the Delete button in the quote detail (admin only).' },
@@ -79,9 +81,10 @@ export function isFeatureKey(key: string): key is FeatureKey {
   return FEATURE_KEY_SET.has(key)
 }
 
-/** Every feature on (the safe default when nothing has been configured yet). */
+/** Per-feature defaults used when nothing has been configured yet. Most
+ *  features default ON; any with `defaultOn: false` (e.g. payments) start hidden. */
 export function defaultFeatureFlags(): FeatureFlags {
-  return Object.fromEntries(FEATURE_CATALOG.map((f) => [f.key, true])) as FeatureFlags
+  return Object.fromEntries(FEATURE_CATALOG.map((f) => [f.key, f.defaultOn !== false])) as FeatureFlags
 }
 
 /** Parse the persisted JSON string into a complete flag map, falling back to
