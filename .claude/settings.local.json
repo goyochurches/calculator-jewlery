@@ -107,7 +107,11 @@
       "PowerShell(Set-Location D:\\\\wamp64\\\\www\\\\price-calculator; if \\(Test-Path .\\\\mvnw.cmd\\) { .\\\\mvnw.cmd -q -o compile 2>&1 | Select-Object -Last 25 } else { mvn -q -o compile 2>&1 | Select-Object -Last 25 }; Write-Output \"=== exit $LASTEXITCODE ===\")",
       "PowerShell(Set-Location D:\\\\wamp64\\\\www\\\\price-calculator; .\\\\mvnw.cmd -q -o compile 2>&1 | Select-Object -Last 20; Write-Output \"=== exit $LASTEXITCODE ===\")",
       "PowerShell(mvn *)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Read(//d/wamp64/www/**)",
+      "Bash(./mvnw -q -o compile)",
+      "Bash(./mvnw -q compile)",
+      "Bash(./mvnw -o compile)"
     ]
   }
 }

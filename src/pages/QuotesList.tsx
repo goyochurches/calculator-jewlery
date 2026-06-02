@@ -2,12 +2,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import { useAuth } from '@/context/AuthContext'
+import { useFeatures } from '@/hooks/useFeatures'
 import { displayStatusFor } from '@/lib/quoteStatusDisplay'
+import { computeCustomerPrice } from '@/lib/quotePricing'
 import { quotesService } from '@/services/quotesService'
 import type { QuoteStatus, SavedQuote } from '@/types'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { QuoteDetailPanel } from '@/components/QuoteDetailPanel'
-import { Bell, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CornerDownRight, Copy, ImageOff, Search, X } from 'lucide-react'
+import { Bell, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CornerDownRight, Copy, ImageOff, Search, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
@@ -85,9 +88,16 @@ const DEFAULT_PAGE_SIZE = 10
 
 export function QuotesListPage() {
   const { user } = useAuth()
+  const { isEnabled } = useFeatures()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const isAdmin = user?.role === 'ADMIN'
+  const canDelete = isAdmin && isEnabled('quote-delete')
+  // Row-level delete confirmation (Actions column). Kept separate from the
+  // detail-drawer delete so deleting straight from the list never needs the
+  // drawer open.
+  const [deleteTarget, setDeleteTarget] = useState<SavedQuote | null>(null)
+  const [deleting, setDeleting] = useState(false)
   const [quotes, setQuotes] = useState<SavedQuote[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -172,6 +182,22 @@ export function QuotesListPage() {
     await quotesService.remove(id)
     setQuotes((prev) => prev.filter((q) => q.id !== id))
     setSelectedId(null)
+  }
+
+  // Confirmed delete straight from a table row (Actions column).
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await quotesService.remove(deleteTarget.id)
+      setQuotes((prev) => prev.filter((q) => q.id !== deleteTarget.id))
+      if (selectedId === deleteTarget.id) setSelectedId(null)
+      setDeleteTarget(null)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   // ── Group quotes into parent + revisions ────────────────────────────
@@ -440,6 +466,7 @@ export function QuotesListPage() {
                         canToggle={group.parentMatches && childCount > 0}
                         onToggle={() => toggleGroup(group.parent.id)}
                         viewerUser={user}
+                        onDelete={canDelete ? () => setDeleteTarget(group.parent) : undefined}
                       />,
                     )
                     if (expanded) {
