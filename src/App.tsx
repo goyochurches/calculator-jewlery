@@ -21,7 +21,8 @@ import { ApprovalPage } from '@/pages/Approval'
 import { PaymentSuccessPage } from '@/pages/PaymentSuccess'
 import { PaymentCancelPage } from '@/pages/PaymentCancel'
 import { PaymentsPage } from '@/pages/Payments'
-import { FEATURES } from '@/lib/featureFlags'
+import { FEATURES, isFeatureKey } from '@/lib/featureFlags'
+import { useFeatures } from '@/hooks/useFeatures'
 import { canSeePayments } from '@/lib/paymentsAccess'
 import Login from '@/pages/Login'
 import SetupPassword from '@/pages/SetupPassword'
@@ -52,7 +53,12 @@ function PrivateRoutes() {
 
 function RequirePermission({ permission }: { permission: NavKey }) {
   const { user } = useAuth()
+  const { isEnabled } = useFeatures()
   if (!canAccess(user?.role, permission)) return <Navigate to={defaultRouteFor(user?.role)} replace />
+  // Runtime feature flag — a disabled module can't be reached by URL either.
+  // Redirect to /profile (never feature-gated) so we can't loop on a default
+  // route that is itself disabled.
+  if (isFeatureKey(permission) && !isEnabled(permission)) return <Navigate to="/profile" replace />
   return <Outlet />
 }
 
@@ -61,13 +67,18 @@ function RequirePermission({ permission }: { permission: NavKey }) {
  *  by typing the URL directly. */
 function RequirePaymentsAccess() {
   const { user } = useAuth()
+  const { isEnabled } = useFeatures()
   if (!canSeePayments(user)) return <Navigate to={defaultRouteFor(user?.role)} replace />
+  if (!isEnabled('payments')) return <Navigate to="/profile" replace />
   return <Outlet />
 }
 
 function HomeRedirect() {
   const { user } = useAuth()
-  if (!canAccess(user?.role, 'dashboard')) return <Navigate to={defaultRouteFor(user?.role)} replace />
+  const { isEnabled } = useFeatures()
+  if (!canAccess(user?.role, 'dashboard') || !isEnabled('dashboard')) {
+    return <Navigate to={defaultRouteFor(user?.role)} replace />
+  }
   return <Dashboard />
 }
 
