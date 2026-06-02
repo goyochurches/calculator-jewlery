@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/context/AuthContext'
+import { useFeatures } from '@/hooks/useFeatures'
 import { canSeePayments } from '@/lib/paymentsAccess'
 import { displayStatusFor } from '@/lib/quoteStatusDisplay'
 import { clientService } from '@/services/clientService'
@@ -30,6 +31,7 @@ export function ClientDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { isEnabled } = useFeatures()
   const isAdmin = user?.role === 'ADMIN'
   const [client, setClient] = useState<Client | null>(null)
   const [quotes, setQuotes] = useState<SavedQuote[]>([])
