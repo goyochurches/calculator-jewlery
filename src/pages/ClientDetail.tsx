@@ -272,7 +272,7 @@ export function ClientDetailPage() {
 
       {/* Client-scoped payment activity — shown only to the shop-owner
           account, gated by the payments feature flag. */}
-      {canSeePayments(user) && id && (
+      {canSeePayments(user) && isEnabled('payments') && id && (
         <ClientPaymentsBlock clientId={id} />
       )}
     </div>
