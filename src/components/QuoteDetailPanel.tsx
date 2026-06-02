@@ -4,6 +4,7 @@ import {
 } from '@/constants/config'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
+import { useFeatures } from '@/hooks/useFeatures'
 import type { QuoteCustomerStone, QuoteStatus, QuoteStone, SavedQuote } from '@/types'
 import { PaymentPlanBlock } from '@/components/PaymentPlanBlock'
 import { useAuth } from '@/context/AuthContext'
@@ -174,6 +175,7 @@ const ROLE_THEME: Record<StoneRole, { label: string; dot: string; ring: string; 
 export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToken, onDelete, isAdmin = false, onPaymentChanged }: QuoteDetailPanelProps) {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { isEnabled } = useFeatures()
   const canSeePayments_ = canSeePayments(user)
   const [refreshing, setRefreshing] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
@@ -406,7 +408,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             <Copy className="h-3.5 w-3.5" />
             Duplicate
           </button>
-          {isAdmin && onDelete && (
+          {isAdmin && onDelete && isEnabled('quote-delete') && (
             <button
               onClick={() => setConfirmDelete(true)}
               title="Permanently delete this quote"
@@ -1031,7 +1033,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             checkout sessions the jeweler can copy and paste. Admin-only
             and gated by the FEATURES.payments flag. Also hidden on
             REJECTED quotes — the deal is dead, no payments to collect. */}
-        {canSeePayments_ && quote.status !== 'rejected' && (
+        {canSeePayments_ && isEnabled('payments') && quote.status !== 'rejected' && (
           <PaymentPlanBlock
             quoteId={quote.id}
             total={customerPrice}

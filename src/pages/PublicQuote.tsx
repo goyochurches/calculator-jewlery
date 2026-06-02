@@ -425,9 +425,11 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
       </section>
 
       {/* ── Copy-to-share: lets the customer/team paste the full quote into SMS ── */}
-      <div className="flex justify-center">
-        <CopyQuoteTextButton text={shareText} />
-      </div>
+      {quoteCopyEnabled && (
+        <div className="flex justify-center">
+          <CopyQuoteTextButton text={shareText} />
+        </div>
+      )}
 
       {/* ── Personal note from the jeweler ──────────────────────────────── */}
       {(quote.createdByName || quote.createdByBio || quote.createdByPhoto) && (
