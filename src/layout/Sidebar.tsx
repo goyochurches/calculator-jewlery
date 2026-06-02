@@ -2,8 +2,9 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/context/AuthContext'
 import { useBrand } from '@/context/BrandContext'
 import { canAccess, type NavKey } from '@/constants/permissions'
-import { FEATURES } from '@/lib/featureFlags'
+import { FEATURES, isFeatureKey } from '@/lib/featureFlags'
 import { canSeePayments } from '@/lib/paymentsAccess'
+import { useFeatures } from '@/hooks/useFeatures'
 import { useInboxUnread } from '@/hooks/useInboxUnread'
 import {
   Calculator,
@@ -68,9 +69,13 @@ function SidebarContent({
 }) {
   const { user, logout } = useAuth()
   const { companyName, logo } = useBrand()
+  const { isEnabled } = useFeatures()
   const navigate = useNavigate()
   const visibleNavItems = navItems.filter((item) => {
     if (item.hidden) return false
+    // Runtime feature flag — keys outside the catalog (e.g. configuration)
+    // are always allowed so the Configuration page can't be hidden.
+    if (isFeatureKey(item.key) && !isEnabled(item.key)) return false
     // Payments is gated on the specific shop-owner email, not on role.
     // Hide the sidebar entry for anyone else, even other ADMIN accounts.
     if (item.key === 'payments' && !canSeePayments(user)) return false

@@ -36,6 +36,11 @@ export interface CompanySettings {
   themePrimary?: string | null
   themeSecondary?: string | null
   themeTertiary?: string | null
+  // ── Runtime feature flags ──
+  /** JSON-encoded map of FeatureKey → boolean. Toggled from Configuration to
+   *  show/hide sidebar modules and in-page features for the whole team.
+   *  Blank/null = every feature enabled (the default). */
+  featureFlags?: string | null
 }
 
 export const companyService = {

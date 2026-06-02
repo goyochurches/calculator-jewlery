@@ -12,6 +12,7 @@ const DEFAULTS: CompanySettings = {
   voiceApiKeySid: null,
   voiceApiKeySecret: null,
   firebaseCredentialsJson: null,
+  featureFlags: null,
 }
 
 interface BrandCtx {
