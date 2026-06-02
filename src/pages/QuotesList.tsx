@@ -166,6 +166,14 @@ export function QuotesListPage() {
     }
   }
 
+  const handleDelete = async (id: string) => {
+    // Throws on failure so the panel can surface the error in its own dialog
+    // and keep the drawer open. On success we drop the row and close the drawer.
+    await quotesService.remove(id)
+    setQuotes((prev) => prev.filter((q) => q.id !== id))
+    setSelectedId(null)
+  }
+
   // ── Group quotes into parent + revisions ────────────────────────────
   // A "group" is one top-level (parent) quote plus any revisions created by
   // duplicating it with the same client. Children always show under their
@@ -486,6 +494,7 @@ export function QuotesListPage() {
                 onClose={() => setSelectedId(null)}
                 onStatusChange={handleStatusChange}
                 onRefreshToken={isAdmin ? handleRefreshToken : undefined}
+                onDelete={isAdmin ? handleDelete : undefined}
                 isAdmin={isAdmin}
                 onPaymentChanged={() => {
                   // Refetch the full list so the status badge of the
