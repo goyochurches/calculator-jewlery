@@ -6,6 +6,13 @@ import { useBrand } from '@/context/BrandContext'
 import { useTheme, type ThemeColors } from '@/context/ThemeContext'
 import { userService } from '@/services/userService'
 import type { Usuario } from '@/types'
+import {
+  FEATURE_CATALOG,
+  parseFeatureFlags,
+  serializeFeatureFlags,
+  type FeatureFlags,
+  type FeatureKey,
+} from '@/lib/featureFlags'
 import { Upload, X } from 'lucide-react'
 
 const COLOR_ROLES = [
@@ -81,6 +88,11 @@ export function Configuration() {
   const [approversSaved, setApproversSaved] = useState(false)
   const [approversSaving, setApproversSaving] = useState(false)
 
+  // Feature flags — show/hide modules + in-page features for the whole team.
+  const [flags, setFlags] = useState<FeatureFlags>(() => parseFeatureFlags(settings.featureFlags))
+  const [flagsSaved, setFlagsSaved] = useState(false)
+  const [flagsSaving, setFlagsSaving] = useState(false)
+
   useEffect(() => {
     userService.getAll().then(setUsers).catch(() => {})
   }, [])
@@ -99,6 +111,7 @@ export function Configuration() {
     setTestMode(settings.testMode ?? false)
     setTestPhone(settings.testRedirectPhone ?? '')
     setApproverIds((settings.approvalUserIds ?? '').split(',').map((s) => s.trim()).filter(Boolean))
+    setFlags(parseFeatureFlags(settings.featureFlags))
     // Hydrate theme colors from the backend (source of truth shared with mobile).
     if (settings.themePrimary || settings.themeSecondary || settings.themeTertiary) {
       const fromApi = {
@@ -189,6 +202,21 @@ export function Configuration() {
       console.error(err)
     } finally {
       setApproversSaving(false)
+    }
+  }
+
+  const toggleFlag = (key: FeatureKey) => setFlags((prev) => ({ ...prev, [key]: !prev[key] }))
+
+  const handleSaveFlags = async () => {
+    setFlagsSaving(true)
+    try {
+      await saveBrand({ featureFlags: serializeFeatureFlags(flags) })
+      setFlagsSaved(true)
+      setTimeout(() => setFlagsSaved(false), 2500)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setFlagsSaving(false)
     }
   }
 
@@ -323,6 +351,61 @@ export function Configuration() {
               {brandSaving ? 'Saving…' : 'Save branding'}
             </Button>
             {brandSaved && <span className="text-sm font-medium text-emerald-600">Saved — sidebar updated</span>}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Features & modules — runtime feature flags */}
+      <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <CardHeader className="border-b border-slate-100">
+          <CardTitle className="text-base font-semibold text-slate-900">Features &amp; modules</CardTitle>
+          <p className="text-sm text-slate-500">
+            Show or hide sections of the app and individual features. Changes apply to the whole team after saving.
+          </p>
+        </CardHeader>
+        <CardContent className="p-6 space-y-6">
+          {(['modules', 'features'] as const).map((group) => {
+            const items = FEATURE_CATALOG.filter((f) => f.group === group)
+            if (items.length === 0) return null
+            return (
+              <div key={group} className="space-y-3">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                  {group === 'modules' ? 'Menu modules' : 'In-page features'}
+                </p>
+                <div className="space-y-2">
+                  {items.map((f) => (
+                    <label
+                      key={f.key}
+                      className="flex cursor-pointer items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-slate-900">{f.label}</span>
+                        <span className="block text-xs text-slate-400">{f.description}</span>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={flags[f.key]}
+                        onChange={() => toggleFlag(f.key)}
+                        className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+
+          <div className="flex items-center gap-3">
+            <Button
+              size="lg"
+              className="rounded-2xl px-5 text-white"
+              style={{ backgroundColor: draft.primary }}
+              onClick={handleSaveFlags}
+              disabled={flagsSaving}
+            >
+              {flagsSaving ? 'Saving…' : 'Save features'}
+            </Button>
+            {flagsSaved && <span className="text-sm font-medium text-emerald-600">Saved — applies after reload</span>}
           </div>
         </CardContent>
       </Card>
