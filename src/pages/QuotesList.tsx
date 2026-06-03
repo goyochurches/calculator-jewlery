@@ -899,9 +899,15 @@ function QuoteRow({
           const hasDiscount = (quote.discountPercent ?? 0) > 0
           return (
             <div className="flex flex-col items-end gap-1">
-              <span className={`text-base font-bold tabular-nums leading-none ${isSelected ? 'text-amber-300' : 'text-slate-900'}`}>
-                ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-              </span>
+              {/* Retail (customer-facing) price — the prominent figure. */}
+              <div className="flex items-baseline gap-1.5">
+                <span className={`text-[9px] font-bold uppercase tracking-wide ${isSelected ? 'text-white/45' : 'text-slate-400'}`}>
+                  Retail
+                </span>
+                <span className={`text-base font-bold tabular-nums leading-none ${isSelected ? 'text-amber-300' : 'text-slate-900'}`}>
+                  ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
               {hasDiscount && (
                 <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${
                   isSelected ? 'bg-white/15 text-emerald-200' : 'bg-emerald-50 text-emerald-700'
@@ -909,6 +915,7 @@ function QuoteRow({
                   −${discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })} · {quote.discountPercent}% off
                 </span>
               )}
+              {/* Internal cost — smaller, secondary. */}
               <span className={`text-[10px] font-medium tabular-nums ${isSelected ? 'text-white/45' : 'text-slate-400'}`}>
                 Cost ${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </span>
