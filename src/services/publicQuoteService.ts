@@ -4,6 +4,18 @@
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
+/** One stone on the piece as shown on the public share link. Customer-safe
+ *  subset of the internal stone — no pricing/markup/setter fields. */
+export interface PublicQuoteStone {
+  role: 'MAIN' | 'SIDE' | 'MELEE'
+  stoneType: string
+  /** mm range, e.g. "0.7-0.74". */
+  sizeKey: string
+  carats?: number | null
+  shape?: string | null
+  color?: string | null
+}
+
 export interface PublicQuote {
   publicToken: string
   title: string
@@ -30,6 +42,10 @@ export interface PublicQuote {
   diamondAmount: number
   /** Total carat weight across the in-house stones. */
   diamondCarats?: number | null
+  /** Per-stone breakdown (MAIN / SIDE / MELEE) so every stone's size is shown,
+   *  not just the legacy single `diamondSize`. Empty/absent for older quotes
+   *  saved before the multi-stone refactor — fall back to `diamondSize`. */
+  stones?: PublicQuoteStone[] | null
   /** True when the client supplies the stone(s). Replaces the diamond type
    *  with a "Supply by customer" label on the public quote. */
   customerSuppliedStone: boolean | null

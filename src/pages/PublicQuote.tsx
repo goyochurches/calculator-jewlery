@@ -13,6 +13,7 @@ import {
   PublicQuoteNotFoundError,
   PublicQuoteUnavailableError,
   type PublicQuote,
+  type PublicQuoteStone,
 } from '@/services/publicQuoteService'
 import { copyToClipboard } from '@/lib/share'
 import { parseFeatureFlags } from '@/lib/featureFlags'
@@ -307,12 +308,38 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
   // Trim trailing zeros so "0.5000" → "0.5", but keep "0.04" / "0.0095" intact.
   const formatCt = (n: number) => n.toFixed(4).replace(/\.?0+$/, '')
 
+  // Per-stone sizes, one row per role (Main / Side / Accent). Newer quotes
+  // carry the full stones[] breakdown so every stone's size is shown; older
+  // quotes predate it and only have the single legacy diamondSize, so we fall
+  // back to one "Stone size" row in that case.
+  const STONE_ROLE_LABELS: Record<PublicQuoteStone['role'], string> = {
+    MAIN: 'Main stone size', SIDE: 'Side stone size', MELEE: 'Accent stone size',
+  }
+  const sizeLabelFor = (key: string) =>
+    DIAMOND_SIZE_OPTIONS[key as keyof typeof DIAMOND_SIZE_OPTIONS]?.label ?? key
+  const stoneList = quote.stones ?? []
+  const stoneSizeSpecs: { icon: React.ElementType; label: string; value: string }[] =
+    stoneList.length > 0
+      ? (['MAIN', 'SIDE', 'MELEE'] as const).flatMap(role => {
+          const group = stoneList.filter(s => s.role === role)
+          if (group.length === 0) return []
+          // Collapse identical sizes into "n × size" segments, in stone order.
+          const counts = new Map<string, number>()
+          for (const s of group) {
+            const label = `${sizeLabelFor(s.sizeKey)} mm`
+            counts.set(label, (counts.get(label) ?? 0) + 1)
+          }
+          const value = Array.from(counts, ([label, n]) => (n > 1 ? `${n} × ${label}` : label)).join(', ')
+          return [{ icon: Ruler, label: STONE_ROLE_LABELS[role], value }]
+        })
+      : [{ icon: Ruler, label: 'Stone size', value: diamondSizeLabel ? `${diamondSizeLabel} mm` : '—' }]
+
   const specs: { icon: React.ElementType; label: string; value: string }[] = [
     { icon: Gem,      label: 'Metal',          value: metal },
     { icon: Wrench,   label: "Jeweler's time", value: labor },
     { icon: Sparkles, label: 'CAD design',     value: cad },
     { icon: Diamond,  label: 'Diamond type',   value: diamondTypeLabel },
-    { icon: Ruler,    label: 'Stone size',     value: diamondSizeLabel ? `${diamondSizeLabel} mm` : '—' },
+    ...stoneSizeSpecs,
     // Stone sourcing — show the count for each source on the piece. When the
     // stones are all from one source only that line renders; mixed pieces show
     // both, plus a grand total so the customer knows how many stones there are.
