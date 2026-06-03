@@ -303,6 +303,10 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
   const suppliedCount = quote.suppliedStoneCount ?? quote.diamondAmount ?? 0
   const customerCount = quote.customerStoneCount ?? (quote.customerSuppliedStone ? 1 : 0)
   const totalStones   = quote.totalStoneCount ?? (suppliedCount + customerCount)
+  // Only worth splitting the count by source when the piece genuinely mixes
+  // S&S-supplied and customer-supplied stones; single-source pieces just show
+  // the total.
+  const isMixedSource = suppliedCount > 0 && customerCount > 0
   const plural = (n: number) => (n === 1 ? 'stone' : 'stones')
   const totalCt    = Number(quote.diamondCarats ?? 0)
   // Trim trailing zeros so "0.5000" → "0.5", but keep "0.04" / "0.0095" intact.
@@ -357,11 +361,12 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
     { icon: Sparkles, label: 'CAD design',     value: cad },
     { icon: Diamond,  label: 'Diamond type',   value: diamondTypeLabel },
     ...stoneSpecs,
-    // Stone sourcing — show the count for each source on the piece. When the
-    // stones are all from one source only that line renders; mixed pieces show
-    // both, plus a grand total so the customer knows how many stones there are.
-    ...(suppliedCount > 0 ? [{ icon: Diamond, label: 'Stones supplied by S&S', value: `${suppliedCount} ${plural(suppliedCount)}` }] : []),
-    ...(customerCount > 0 ? [{ icon: Gem, label: 'Stones supplied by customer', value: `${customerCount} ${plural(customerCount)}` }] : []),
+    // Stone sourcing — the per-source split is only meaningful when the piece
+    // mixes stones from both sources (S&S + customer). When every stone comes
+    // from a single source the "supplied by …" line is redundant with the
+    // total, so we hide it and show just the grand total.
+    ...(isMixedSource ? [{ icon: Diamond, label: 'Stones supplied by S&S', value: `${suppliedCount} ${plural(suppliedCount)}` }] : []),
+    ...(isMixedSource ? [{ icon: Gem, label: 'Stones supplied by customer', value: `${customerCount} ${plural(customerCount)}` }] : []),
     ...(totalStones > 0 ? [{ icon: Diamond, label: 'Total stones', value: `${totalStones} ${plural(totalStones)}` }] : []),
     ...(totalCt > 0 ? [{ icon: Diamond, label: 'Carat weight', value: `${formatCt(totalCt)} ct tw` }] : []),
     { icon: Ruler,    label: 'Finger size',    value: `Size ${quote.fingerSize ?? '—'}` },
