@@ -111,7 +111,16 @@
       "Read(//d/wamp64/www/**)",
       "Bash(./mvnw -q -o compile)",
       "Bash(./mvnw -q compile)",
-      "Bash(./mvnw -o compile)"
+      "Bash(./mvnw -o compile)",
+      "Bash(mvn -q -o compile)",
+      "Bash(command -v psql)",
+      "Read(//c/Program Files/**)",
+      "Read(//d/wamp64/bin/**)",
+      "Bash(node -e \"try{require\\('pg'\\);console.log\\('pg-global-ok'\\)}catch\\(e\\){console.log\\('no-pg'\\)}\")",
+      "Bash(mkdir -p /tmp/dbq)",
+      "Read(//tmp/**)",
+      "Bash(npm init *)",
+      "Bash(npm i *)"
     ]
   }
 }

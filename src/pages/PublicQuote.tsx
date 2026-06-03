@@ -308,30 +308,45 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
   // Trim trailing zeros so "0.5000" → "0.5", but keep "0.04" / "0.0095" intact.
   const formatCt = (n: number) => n.toFixed(4).replace(/\.?0+$/, '')
 
-  // Per-stone sizes, one row per role (Main / Side / Accent). Newer quotes
-  // carry the full stones[] breakdown so every stone's size is shown; older
-  // quotes predate it and only have the single legacy diamondSize, so we fall
-  // back to one "Stone size" row in that case.
-  const STONE_ROLE_LABELS: Record<PublicQuoteStone['role'], string> = {
-    MAIN: 'Main stone size', SIDE: 'Side stone size', MELEE: 'Accent stone size',
+  // Full per-stone breakdown: one row per stone the jeweler added in the
+  // builder, showing every customer-facing detail (count × size · shape ·
+  // color · carats · certification). Newer quotes carry the stones[] array;
+  // older quotes predate it and only have the single legacy diamondSize, so we
+  // fall back to one "Stone size" row in that case.
+  const STONE_ROLE_NOUNS: Record<PublicQuoteStone['role'], string> = {
+    MAIN: 'Main stone', SIDE: 'Side stone', MELEE: 'Accent stone',
+  }
+  const STONE_TYPE_LABELS: Record<string, string> = {
+    natural: 'Natural', 'lab-grown': 'Lab-grown', lab: 'Lab-grown',
   }
   const sizeLabelFor = (key: string) =>
     DIAMOND_SIZE_OPTIONS[key as keyof typeof DIAMOND_SIZE_OPTIONS]?.label ?? key
+  // Build a "18 × 1.30 mm · Round · color D · 0.171 ct · GIA1234" line from a
+  // stone, skipping any field the jeweler left blank.
+  const describeStone = (s: PublicQuoteStone): string => {
+    const parts: string[] = []
+    const size = `${sizeLabelFor(s.sizeKey)} mm`
+    parts.push(s.amount && s.amount > 0 ? `${s.amount} × ${size}` : size)
+    if (s.shape) parts.push(s.shape)
+    if (s.color) parts.push(`color ${s.color}`)
+    const ct = Number(s.carats ?? 0)
+    if (ct > 0) parts.push(`${formatCt(ct)} ct`)
+    // Only repeat the stone type per-row when it differs from the quote's
+    // headline diamond type (mixed natural / lab pieces), to avoid noise.
+    if (s.stoneType && s.stoneType !== quote.diamondType) {
+      parts.push(STONE_TYPE_LABELS[s.stoneType] ?? s.stoneType)
+    }
+    if (s.labReport) parts.push(s.labReport)
+    return parts.join(' · ')
+  }
   const stoneList = quote.stones ?? []
-  const stoneSizeSpecs: { icon: React.ElementType; label: string; value: string }[] =
+  const stoneSpecs: { icon: React.ElementType; label: string; value: string }[] =
     stoneList.length > 0
-      ? (['MAIN', 'SIDE', 'MELEE'] as const).flatMap(role => {
-          const group = stoneList.filter(s => s.role === role)
-          if (group.length === 0) return []
-          // Collapse identical sizes into "n × size" segments, in stone order.
-          const counts = new Map<string, number>()
-          for (const s of group) {
-            const label = `${sizeLabelFor(s.sizeKey)} mm`
-            counts.set(label, (counts.get(label) ?? 0) + 1)
-          }
-          const value = Array.from(counts, ([label, n]) => (n > 1 ? `${n} × ${label}` : label)).join(', ')
-          return [{ icon: Ruler, label: STONE_ROLE_LABELS[role], value }]
-        })
+      ? (['MAIN', 'SIDE', 'MELEE'] as const).flatMap(role =>
+          stoneList
+            .filter(s => s.role === role)
+            .map(s => ({ icon: Ruler, label: STONE_ROLE_NOUNS[role], value: describeStone(s) })),
+        )
       : [{ icon: Ruler, label: 'Stone size', value: diamondSizeLabel ? `${diamondSizeLabel} mm` : '—' }]
 
   const specs: { icon: React.ElementType; label: string; value: string }[] = [
@@ -339,7 +354,7 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
     { icon: Wrench,   label: "Jeweler's time", value: labor },
     { icon: Sparkles, label: 'CAD design',     value: cad },
     { icon: Diamond,  label: 'Diamond type',   value: diamondTypeLabel },
-    ...stoneSizeSpecs,
+    ...stoneSpecs,
     // Stone sourcing — show the count for each source on the piece. When the
     // stones are all from one source only that line renders; mixed pieces show
     // both, plus a grand total so the customer knows how many stones there are.

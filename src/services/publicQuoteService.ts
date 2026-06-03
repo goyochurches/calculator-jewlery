@@ -9,11 +9,15 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 export interface PublicQuoteStone {
   role: 'MAIN' | 'SIDE' | 'MELEE'
   stoneType: string
-  /** mm range, e.g. "0.7-0.74". */
+  /** mm size, e.g. "1.3" or "1.6-1.7". */
   sizeKey: string
+  /** Number of physical stones of this size (carats ÷ ctPerStone). 0 = unknown. */
+  amount?: number | null
   carats?: number | null
   shape?: string | null
   color?: string | null
+  /** Certification id (GIA / IGI / ...). */
+  labReport?: string | null
 }
 
 export interface PublicQuote {
