@@ -361,12 +361,13 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
     { icon: Sparkles, label: 'CAD design',     value: cad },
     { icon: Diamond,  label: 'Diamond type',   value: diamondTypeLabel },
     ...stoneSpecs,
-    // Stone sourcing — the per-source split is only meaningful when the piece
-    // mixes stones from both sources (S&S + customer). When every stone comes
-    // from a single source the "supplied by …" line is redundant with the
-    // total, so we hide it and show just the grand total.
+    // Stone sourcing. The "supplied by S&S" line only appears on mixed pieces
+    // (when it's the sole source it's redundant with the total). The
+    // "supplied by customer" line always appears when the customer brought
+    // stones — that's a meaningful distinction worth surfacing even when it's
+    // the only source.
     ...(isMixedSource ? [{ icon: Diamond, label: 'Stones supplied by S&S', value: `${suppliedCount} ${plural(suppliedCount)}` }] : []),
-    ...(isMixedSource ? [{ icon: Gem, label: 'Stones supplied by customer', value: `${customerCount} ${plural(customerCount)}` }] : []),
+    ...(customerCount > 0 ? [{ icon: Gem, label: 'Stones supplied by customer', value: `${customerCount} ${plural(customerCount)}` }] : []),
     ...(totalStones > 0 ? [{ icon: Diamond, label: 'Total stones', value: `${totalStones} ${plural(totalStones)}` }] : []),
     ...(totalCt > 0 ? [{ icon: Diamond, label: 'Carat weight', value: `${formatCt(totalCt)} ct tw` }] : []),
     { icon: Ruler,    label: 'Finger size',    value: `Size ${quote.fingerSize ?? '—'}` },
