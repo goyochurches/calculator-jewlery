@@ -16,6 +16,10 @@ export interface PublicQuoteStone {
   carats?: number | null
   shape?: string | null
   color?: string | null
+  /** GIA cut grade (Excellent … Poor). MAIN stone only. */
+  cut?: string | null
+  /** GIA clarity grade (FL … I3). MAIN stone only. */
+  clarity?: string | null
   /** Certification id (GIA / IGI / ...). */
   labReport?: string | null
 }

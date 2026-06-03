@@ -78,6 +78,10 @@ export interface QuoteStone {
   sortOrder?: number | null
   shape?: string | null
   color?: string | null
+  /** GIA cut grade (Excellent … Poor). Entered on the MAIN stone. */
+  cut?: string | null
+  /** GIA clarity grade (FL … I3). Entered on the MAIN stone. */
+  clarity?: string | null
   manualPrice?: number | null
   comments?: string | null
   /** Per-stone markup override. When non-null this stone's (cost + setting
@@ -163,6 +167,10 @@ export interface SavedQuote {
   customerNotes?: string | null
   photo?: string | null
   engraving?: boolean | null
+  /** Per-quote hand-engraving surcharge chosen via the builder slider (USD).
+   *  Null on legacy quotes — pricing falls back to the flat $150 when
+   *  `engraving` is true. 0 = no engraving. */
+  engravingFee?: number | null
   setterType?: string | null
   jewelryType?: string | null
   /** When true, adds 7.75% sales tax on top of the customer price. The

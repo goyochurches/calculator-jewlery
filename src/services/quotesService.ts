@@ -12,6 +12,8 @@ interface ApiStone {
   sortOrder?: number | null
   shape?: string | null
   color?: string | null
+  cut?: string | null
+  clarity?: string | null
   manualPrice?: number | null
   comments?: string | null
   markupMultiplier?: number | null
@@ -67,6 +69,7 @@ interface ApiQuote {
   customerNotes?: string | null
   photo?: string | null   // base64 o URL devuelta por el backend
   engraving?: boolean | null
+  engravingFee?: number | null
   setterType?: string | null
   jewelryType?: string | null
   applyTaxes?: boolean | null
@@ -147,6 +150,7 @@ function mapQuote(q: ApiQuote): SavedQuote {
     customerNotes: q.customerNotes ?? null,
     photo: q.photo ?? null,
     engraving: q.engraving ?? false,
+    engravingFee: q.engravingFee ?? null,
     setterType: q.setterType ?? null,
     jewelryType: q.jewelryType ?? null,
     applyTaxes: q.applyTaxes ?? false,
@@ -194,6 +198,8 @@ function mapStone(s: ApiStone): QuoteStone {
     sortOrder: s.sortOrder ?? null,
     shape: s.shape ?? null,
     color: s.color ?? null,
+    cut: s.cut ?? null,
+    clarity: s.clarity ?? null,
     manualPrice: s.manualPrice ?? null,
     comments: s.comments ?? null,
     markupMultiplier: s.markupMultiplier ?? null,

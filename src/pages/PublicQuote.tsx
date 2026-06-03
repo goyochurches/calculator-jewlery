@@ -335,6 +335,8 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
     parts.push(s.amount && s.amount > 0 ? `${s.amount} × ${size}` : size)
     if (s.shape) parts.push(s.shape)
     if (s.color) parts.push(`color ${s.color}`)
+    if (s.cut) parts.push(`${s.cut} cut`)
+    if (s.clarity) parts.push(s.clarity)
     const ct = Number(s.carats ?? 0)
     if (ct > 0) parts.push(`${formatCt(ct)} ct`)
     // Only repeat the stone type per-row when it differs from the quote's

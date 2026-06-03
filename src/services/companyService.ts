@@ -41,7 +41,20 @@ export interface CompanySettings {
    *  show/hide sidebar modules and in-page features for the whole team.
    *  Blank/null = every feature enabled (the default). */
   featureFlags?: string | null
+  // ── Hand-engraving slider bounds (Master Tables) ──
+  /** Lowest selectable engraving fee on the builder slider (dollars). */
+  engravingMin?: number | null
+  /** Highest selectable engraving fee on the builder slider (dollars). */
+  engravingMax?: number | null
+  /** Slider increment in dollars. */
+  engravingStep?: number | null
+  /** Pre-selected engraving fee for a fresh quote (dollars). */
+  engravingDefault?: number | null
 }
+
+/** Fallback engraving slider bounds when the backend hasn't been configured
+ *  yet (older settings rows). Mirrors the seed in migration V70. */
+export const ENGRAVING_SLIDER_DEFAULTS = { min: 0, max: 600, step: 25, default: 150 } as const
 
 export const companyService = {
   async get(): Promise<CompanySettings> {

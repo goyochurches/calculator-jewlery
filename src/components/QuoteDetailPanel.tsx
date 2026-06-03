@@ -823,6 +823,18 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                                 <dt className="font-semibold uppercase tracking-wide text-slate-400">Color</dt>
                                 <dd className={s.color ? 'text-slate-900' : 'text-slate-400'}>{s.color || '—'}</dd>
                               </div>
+                              {s.cut && (
+                                <div>
+                                  <dt className="font-semibold uppercase tracking-wide text-slate-400">Cut</dt>
+                                  <dd className="text-slate-900">{s.cut}</dd>
+                                </div>
+                              )}
+                              {s.clarity && (
+                                <div>
+                                  <dt className="font-semibold uppercase tracking-wide text-slate-400">Clarity</dt>
+                                  <dd className="text-slate-900">{s.clarity}</dd>
+                                </div>
+                              )}
                               <div>
                                 <dt className="font-semibold uppercase tracking-wide text-slate-400">Carats</dt>
                                 <dd className="text-slate-900">{s.carats ?? 0} ct</dd>

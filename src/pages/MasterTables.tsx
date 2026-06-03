@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useHistory } from '@/hooks/useHistorial'
 import { gemstoneService } from '@/services/gemstoneService'
+import { companyService, ENGRAVING_SLIDER_DEFAULTS, type CompanySettings } from '@/services/companyService'
 import {
   configService,
   type DiamondSizeConfig,
@@ -115,6 +116,46 @@ export function MasterTablesPage() {
     setGemstones(prev => [...prev, created])
     setShowNewGem(false)
     setNewGemDraft({ ...BLANK_GEM })
+  }
+
+  // ── Hand Engraving slider bounds (company settings) ─────────────────────────
+  // The whole settings object is kept so the PUT (which replaces the row) does
+  // not wipe theme/flags/etc — we only override the four engraving fields.
+  const [engSettings, setEngSettings] = useState<CompanySettings | null>(null)
+  const [engDraft, setEngDraft] = useState({ min: '', max: '', step: '', default: '' })
+  const [engSaving, setEngSaving] = useState(false)
+  const [engSaved, setEngSaved] = useState(false)
+
+  useEffect(() => {
+    companyService.get().then(s => {
+      setEngSettings(s)
+      setEngDraft({
+        min: String(s.engravingMin ?? ENGRAVING_SLIDER_DEFAULTS.min),
+        max: String(s.engravingMax ?? ENGRAVING_SLIDER_DEFAULTS.max),
+        step: String(s.engravingStep ?? ENGRAVING_SLIDER_DEFAULTS.step),
+        default: String(s.engravingDefault ?? ENGRAVING_SLIDER_DEFAULTS.default),
+      })
+    }).catch(console.error)
+  }, [])
+
+  const saveEngraving = async () => {
+    if (!engSettings) return
+    const num = (v: string, fb: number) => { const n = Number(v); return Number.isFinite(n) ? n : fb }
+    setEngSaving(true)
+    try {
+      const updated = await companyService.save({
+        ...engSettings,
+        engravingMin: num(engDraft.min, ENGRAVING_SLIDER_DEFAULTS.min),
+        engravingMax: num(engDraft.max, ENGRAVING_SLIDER_DEFAULTS.max),
+        engravingStep: num(engDraft.step, ENGRAVING_SLIDER_DEFAULTS.step),
+        engravingDefault: num(engDraft.default, ENGRAVING_SLIDER_DEFAULTS.default),
+      })
+      setEngSettings(updated)
+      setEngSaved(true)
+      setTimeout(() => setEngSaved(false), 2000)
+    } finally {
+      setEngSaving(false)
+    }
   }
 
   // ── Diamond Sizes ──────────────────────────────────────────────────────────
@@ -908,6 +949,32 @@ export function MasterTablesPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Hand Engraving ── */}
+      <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <CardHeader className="border-b border-slate-100">
+          <CardTitle className="text-base font-semibold text-slate-900">Hand Engraving</CardTitle>
+          <p className="text-sm text-slate-500">Bounds for the engraving-fee slider in the quote builder (dollars). $0 = no engraving.</p>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            {([['Min', 'min'], ['Max', 'max'], ['Step', 'step'], ['Default', 'default']] as const).map(([label, key]) => (
+              <div key={key} className="space-y-1">
+                <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</label>
+                <TInput type="number" min={0} step="1" value={engDraft[key]}
+                  onChange={e => setEngDraft(d => ({ ...d, [key]: e.target.value }))} />
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex items-center gap-3">
+            <Button size="sm" className="text-white" style={{ backgroundColor: 'var(--theme-primary)' }}
+              onClick={saveEngraving} disabled={engSaving || !engSettings}>
+              {engSaving ? 'Saving…' : 'Save'}
+            </Button>
+            {engSaved && <span className="text-xs font-medium text-emerald-600">Saved</span>}
           </div>
         </CardContent>
       </Card>

@@ -120,7 +120,8 @@
       "Bash(mkdir -p /tmp/dbq)",
       "Read(//tmp/**)",
       "Bash(npm init *)",
-      "Bash(npm i *)"
+      "Bash(npm i *)",
+      "WebFetch(domain:gialaboratory.github.io)"
     ]
   }
 }

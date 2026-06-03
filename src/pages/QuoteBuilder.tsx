@@ -8,6 +8,7 @@ import {
 import { useAuth } from '@/context/AuthContext'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { gemstoneService } from '@/services/gemstoneService'
+import { companyService, ENGRAVING_SLIDER_DEFAULTS } from '@/services/companyService'
 import { quotesService } from '@/services/quotesService'
 import type { Client, GemstonePrice, JewelryMetalOption, SavedQuote } from '@/types'
 import { ClientPicker } from '@/components/ClientPicker'
@@ -54,6 +55,9 @@ const STONE_SHAPES = [
 
 // GIA color grades for white diamonds. Fancy colors fall back to "unspecified".
 const STONE_COLORS = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'] as const
+// GIA grading scales for the MAIN (center) stone.
+const STONE_CUTS = ['Excellent', 'Very Good', 'Good', 'Fair', 'Poor'] as const
+const STONE_CLARITIES = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'I1', 'I2', 'I3'] as const
 
 // Only these setter types make sense for customer-supplied stones.
 const CUSTOMER_STONE_SETTER_KEYS = ['customer_melee', 'channel', 'bezel', 'fancy', 'center'] as const
@@ -105,7 +109,13 @@ export function QuoteBuilderPage() {
   const [ringWidth, setRingWidth] = useState(0)
   const [fingerSize, setFingerSize] = useState(0)
   const [extraCosts, setExtraCosts] = useState(0)
-  const [engraving, setEngraving] = useState(false)
+  // Hand-engraving surcharge (dollars) chosen on the slider. 0 = no engraving.
+  // Replaces the old fixed-$150 yes/no toggle.
+  const [engravingFee, setEngravingFee] = useState<number>(ENGRAVING_SLIDER_DEFAULTS.default)
+  // Slider bounds, configurable from Master Tables (company settings).
+  const [engravingBounds, setEngravingBounds] = useState<{ min: number; max: number; step: number; default: number }>(
+    { ...ENGRAVING_SLIDER_DEFAULTS },
+  )
   // Optional 7.75% sales tax. When ON, the customer-facing total adds the
   // tax and the PDF / share link surface it as a separate line.
   const [applyTaxes, setApplyTaxes] = useState(false)
@@ -141,6 +151,9 @@ export function QuoteBuilderPage() {
     labReport: string
     shape: string
     color: string
+    /** GIA cut + clarity grades. Surfaced on the MAIN stone only. */
+    cut: string
+    clarity: string
     // Raw input. When non-empty, overrides carats × pricePerCarat for this
     // stone's cost. Setting labor is unaffected.
     manualPrice: string
@@ -240,6 +253,29 @@ export function QuoteBuilderPage() {
     gemstoneService.getAll().then(setGemstones).catch(console.error)
   }, [])
 
+  // Whether this builder was opened to duplicate an existing quote. Captured
+  // once at first render (before the dup effect clears the nav state) so the
+  // settings fetch below knows not to clobber a duplicated engraving fee.
+  const isDuplicateRef = useRef<boolean>(
+    !!(location.state as { duplicateFrom?: SavedQuote } | null)?.duplicateFrom,
+  )
+
+  // Load the hand-engraving slider bounds (min/max/step/default) configured in
+  // Master Tables. On a fresh quote we also seat the slider at the configured
+  // default; on a duplicate we leave it to the dup prefill below.
+  useEffect(() => {
+    companyService.get().then(s => {
+      const bounds = {
+        min: s.engravingMin ?? ENGRAVING_SLIDER_DEFAULTS.min,
+        max: s.engravingMax ?? ENGRAVING_SLIDER_DEFAULTS.max,
+        step: s.engravingStep ?? ENGRAVING_SLIDER_DEFAULTS.step,
+        default: s.engravingDefault ?? ENGRAVING_SLIDER_DEFAULTS.default,
+      }
+      setEngravingBounds(bounds)
+      if (!isDuplicateRef.current) setEngravingFee(bounds.default)
+    }).catch(console.error)
+  }, [])
+
   // ── Duplicate prefill ────────────────────────────────────────────────
   // When the user lands here via "Duplicate" on a saved quote, the source
   // quote is passed in router state. We prefill every field once (after
@@ -265,7 +301,7 @@ export function QuoteBuilderPage() {
     setRingWidth(dup.ringWidth ?? 0)
     setFingerSize(dup.fingerSize ?? 7)
     setExtraCosts(dup.extraCosts ?? 0)
-    setEngraving(!!dup.engraving)
+    setEngravingFee(dup.engravingFee ?? (dup.engraving ? HAND_ENGRAVING_FEE : 0))
     setApplyTaxes(!!dup.applyTaxes)
     setPhoto(dup.photo ?? null)
     setMarkupText(String(dup.markupMultiplier ?? DEFAULT_MARKUP))
@@ -288,6 +324,8 @@ export function QuoteBuilderPage() {
         labReport: s.labReport ?? '',
         shape: s.shape ?? '',
         color: s.color ?? '',
+        cut: s.cut ?? '',
+        clarity: s.clarity ?? '',
         manualPrice: s.manualPrice != null ? String(s.manualPrice) : '',
         comments: s.comments ?? '',
         markup: s.markupMultiplier != null ? String(s.markupMultiplier) : '',
@@ -418,6 +456,8 @@ export function QuoteBuilderPage() {
       labReport: '',
       shape: '',
       color: '',
+      cut: '',
+      clarity: '',
       manualPrice: '',
       comments: '',
       markup: '',
@@ -565,7 +605,12 @@ export function QuoteBuilderPage() {
     const caratsNum = parseNum(stone.carats)
     const amountNum = parseNum(stone.amount)
     const hasManualPrice = stone.manualPrice.trim() !== ''
-    const stoneCost = hasManualPrice ? parseNum(stone.manualPrice) : caratsNum * pricePerCarat
+    // The MAIN (center) stone is always priced from the typed custom price —
+    // size never drives its cost. Other roles keep the size-based calc unless
+    // a manual price is entered.
+    const stoneCost = stone.role === 'MAIN'
+      ? parseNum(stone.manualPrice)
+      : (hasManualPrice ? parseNum(stone.manualPrice) : caratsNum * pricePerCarat)
     const stoneSetterFee = config.setterMap[stone.setterType]?.fee ?? 0
     const stoneLabor = amountNum * stoneSetterFee
     const stoneTotal = stoneCost + stoneLabor
@@ -737,19 +782,58 @@ export function QuoteBuilderPage() {
             </select>
           </div>
 
+          {/* Cut + clarity grades — only the center (MAIN) stone is graded. */}
+          {stone.role === 'MAIN' && (
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Cut <span className="font-normal normal-case text-slate-400">(optional)</span>
+              </label>
+              <select value={stone.cut}
+                onChange={e => patchStone(stone.uid, { cut: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+                <option value="">—</option>
+                {STONE_CUTS.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {stone.role === 'MAIN' && (
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Clarity <span className="font-normal normal-case text-slate-400">(optional)</span>
+              </label>
+              <select value={stone.clarity}
+                onChange={e => patchStone(stone.uid, { clarity: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+                <option value="">—</option>
+                {STONE_CLARITIES.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="space-y-1 md:col-span-2">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {customSize ? 'Stone price' : 'Custom price'}{' '}
-              <span className="font-normal normal-case text-slate-400">
-                {customSize
-                  ? '(enter the price for this stone directly)'
-                  : `(optional — overrides carats × $${pricePerCarat.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct)`}
+              {stone.role === 'MAIN'
+                ? 'Stone price'
+                : (customSize ? 'Stone price' : 'Custom price')}{' '}
+              <span className={`font-normal normal-case ${stone.role === 'MAIN' ? 'text-rose-500' : 'text-slate-400'}`}>
+                {stone.role === 'MAIN'
+                  ? '(required — this drives the piece price)'
+                  : customSize
+                    ? '(enter the price for this stone directly)'
+                    : `(optional — overrides carats × $${pricePerCarat.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct)`}
               </span>
             </label>
             <input type="number" min={0} step="0.01" value={stone.manualPrice}
-              placeholder={customSize ? 'e.g. 4500' : 'Leave empty to use calculated price'}
+              placeholder={stone.role === 'MAIN' ? 'e.g. 4500 (required)' : customSize ? 'e.g. 4500' : 'Leave empty to use calculated price'}
               onChange={e => onStoneManualPriceChange(stone.uid, e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+              className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 ${
+                stone.role === 'MAIN' && stone.manualPrice.trim() === '' ? 'border-rose-300' : 'border-slate-200'
+              }`} />
             <p className="text-[10px] text-slate-400">
               Setting labor (amount × setter fee) is added on top of this price.
             </p>
@@ -867,7 +951,7 @@ export function QuoteBuilderPage() {
     const materialCost = metalPricePerGram * weightGrams
     const ringLaborFee = config.ringLaborMap[ringLabor]?.fee ?? 0
     const cadFee = 0
-    const engravingFee = engraving ? HAND_ENGRAVING_FEE : 0
+    const engravingFeeVal = Math.max(0, engravingFee)
 
     // Per-stone cost = carats × pricePerCarat (× type multiplier).
     // Per-stone setting labor = amount × setter fee.
@@ -882,7 +966,10 @@ export function QuoteBuilderPage() {
       const carats = parseNum(s.carats)
       const amount = parseNum(s.amount)
       const hasManualPrice = s.manualPrice.trim() !== ''
-      const cost = hasManualPrice ? parseNum(s.manualPrice) : carats * pricePerCarat
+      // MAIN stone is always priced from its custom price (size never drives it).
+      const cost = s.role === 'MAIN'
+        ? parseNum(s.manualPrice)
+        : (hasManualPrice ? parseNum(s.manualPrice) : carats * pricePerCarat)
       const setterFee = config.setterMap[s.setterType]?.fee ?? 0
       const labor = amount * setterFee
       diamondCost += cost
@@ -910,7 +997,7 @@ export function QuoteBuilderPage() {
       settingFee +
       customerSettingFee +
       diamondCost +
-      engravingFee +
+      engravingFeeVal +
       extraCosts
 
     return {
@@ -922,14 +1009,14 @@ export function QuoteBuilderPage() {
       customerSettingFee,
       customerStoneCount,
       diamondCost,
-      engravingFee,
+      engravingFee: engravingFeeVal,
       totalCarats: Math.round((Number(totalCarats) || 0) * 10000) / 10000,
       totalAmount,
       stoneBreakdown,
       total,
     }
   }, [
-    config, customerStones, engraving, extraCosts, ringLabor, ringWidth,
+    config, customerStones, engravingFee, extraCosts, ringLabor, ringWidth,
     selectedMetalConfig, stones, weightGrams,
   ])
 
@@ -996,6 +1083,13 @@ export function QuoteBuilderPage() {
     if (!client) errors.client = 'Please select or create a client.'
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
+    // The center (MAIN) stone must carry an explicit custom price — it is what
+    // drives the piece's price, so the creator has to type it in.
+    const mainMissingPrice = stones.some(s => s.role === 'MAIN' && s.manualPrice.trim() === '')
+    if (mainMissingPrice) {
+      setSaveError('Enter the center (main) stone price before creating the quote.')
+      return
+    }
     // Can't create an empty quote: require a non-zero total (some metal
     // weight, labor, a stone, engraving or extra cost). Blocks saving a
     // brand-new quote while everything is still at 0.
@@ -1057,7 +1151,8 @@ export function QuoteBuilderPage() {
         customerNotes: customerNotes.trim() === '' ? null : customerNotes.trim(),
         parentQuote: parentQuoteRef,
         photo: photo ?? undefined,
-        engraving,
+        engraving: engravingFee > 0,
+        engravingFee,
         applyTaxes,
         setterType: firstStone?.setterType ?? '',
         jewelryType,
@@ -1081,6 +1176,8 @@ export function QuoteBuilderPage() {
             sortOrder: idx,
             shape: s.shape || null,
             color: s.color || null,
+            cut: s.role === 'MAIN' ? (s.cut || null) : null,
+            clarity: s.role === 'MAIN' ? (s.clarity || null) : null,
             manualPrice: s.manualPrice.trim() === '' ? null : parseNum(s.manualPrice),
             comments: s.comments.trim() === '' ? null : s.comments.trim(),
             markupMultiplier: markupNum,
@@ -1123,7 +1220,7 @@ export function QuoteBuilderPage() {
       setRingWidth(0)
       setFingerSize(0)
       setExtraCosts(0)
-      setEngraving(false)
+      setEngravingFee(engravingBounds.default)
       setApplyTaxes(false)
       setMarkupText(String(DEFAULT_MARKUP))
       setDiscountText('')
@@ -1453,12 +1550,27 @@ export function QuoteBuilderPage() {
               </div>
 
               <div className="space-y-2 md:col-span-2">
-                <label className="text-sm font-semibold text-slate-900">Hand Engraving (milgrain) — ${HAND_ENGRAVING_FEE}</label>
-                <select value={engraving ? 'yes' : 'no'} onChange={e => setEngraving(e.target.value === 'yes')}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
-                  <option value="no">No</option>
-                  <option value="yes">Yes</option>
-                </select>
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <label className="text-sm font-semibold text-slate-900">Hand Engraving (milgrain)</label>
+                  <span className="text-sm font-bold tabular-nums text-slate-900">
+                    {engravingFee > 0 ? `$${engravingFee.toLocaleString('en-US')}` : 'None'}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={engravingBounds.min}
+                  max={engravingBounds.max}
+                  step={engravingBounds.step}
+                  value={Math.min(engravingBounds.max, Math.max(engravingBounds.min, engravingFee))}
+                  onChange={e => setEngravingFee(Number(e.target.value))}
+                  className="w-full accent-slate-900"
+                  aria-label="Hand engraving fee"
+                />
+                <div className="flex justify-between text-[11px] font-medium text-slate-400">
+                  <span>${engravingBounds.min.toLocaleString('en-US')}</span>
+                  <span>Drag to set the engraving fee · $0 = none</span>
+                  <span>${engravingBounds.max.toLocaleString('en-US')}</span>
+                </div>
               </div>
 
               <div className="space-y-2 md:col-span-2">

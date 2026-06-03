@@ -31,7 +31,11 @@ export interface CustomerPrice {
 export function computeCustomerPrice(quote: SavedQuote): CustomerPrice {
   const markup = quote.markupMultiplier ?? 2.5
   const discount = Math.max(0, Math.min(100, quote.discountPercent ?? 0))
-  const engraveFee = quote.engraving ? ENGRAVING_FEE : 0
+  // Prefer the per-quote slider amount; fall back to the legacy flat fee for
+  // quotes saved before the slider (engravingFee == null).
+  const engraveFee = quote.engravingFee != null
+    ? quote.engravingFee
+    : (quote.engraving ? ENGRAVING_FEE : 0)
 
   // Stones with a per-stone markup are priced separately from the generic pool.
   let customMainRaw = 0
