@@ -605,12 +605,10 @@ export function QuoteBuilderPage() {
     const caratsNum = parseNum(stone.carats)
     const amountNum = parseNum(stone.amount)
     const hasManualPrice = stone.manualPrice.trim() !== ''
-    // The MAIN (center) stone is always priced from the typed custom price —
-    // size never drives its cost. Other roles keep the size-based calc unless
-    // a manual price is entered.
-    const stoneCost = stone.role === 'MAIN'
-      ? parseNum(stone.manualPrice)
-      : (hasManualPrice ? parseNum(stone.manualPrice) : caratsNum * pricePerCarat)
+    // A custom (no-preset) size has no per-carat base, so its cost comes from
+    // the typed price. A preset size computes carats × pricePerCarat unless a
+    // manual price overrides it.
+    const stoneCost = hasManualPrice ? parseNum(stone.manualPrice) : caratsNum * pricePerCarat
     const stoneSetterFee = config.setterMap[stone.setterType]?.fee ?? 0
     const stoneLabor = amountNum * stoneSetterFee
     const stoneTotal = stoneCost + stoneLabor
@@ -817,22 +815,18 @@ export function QuoteBuilderPage() {
 
           <div className="space-y-1 md:col-span-2">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {stone.role === 'MAIN'
-                ? 'Stone price'
-                : (customSize ? 'Stone price' : 'Custom price')}{' '}
-              <span className={`font-normal normal-case ${stone.role === 'MAIN' ? 'text-rose-500' : 'text-slate-400'}`}>
-                {stone.role === 'MAIN'
-                  ? '(required — this drives the piece price)'
-                  : customSize
-                    ? '(enter the price for this stone directly)'
-                    : `(optional — overrides carats × $${pricePerCarat.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct)`}
+              {customSize ? 'Stone price' : 'Custom price'}{' '}
+              <span className={`font-normal normal-case ${customSize ? 'text-rose-500' : 'text-slate-400'}`}>
+                {customSize
+                  ? '(required — enter the price for this stone directly)'
+                  : `(optional — overrides carats × $${pricePerCarat.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct)`}
               </span>
             </label>
             <input type="number" min={0} step="0.01" value={stone.manualPrice}
-              placeholder={stone.role === 'MAIN' ? 'e.g. 4500 (required)' : customSize ? 'e.g. 4500' : 'Leave empty to use calculated price'}
+              placeholder={customSize ? 'e.g. 4500 (required)' : 'Leave empty to use calculated price'}
               onChange={e => onStoneManualPriceChange(stone.uid, e.target.value)}
               className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 ${
-                stone.role === 'MAIN' && stone.manualPrice.trim() === '' ? 'border-rose-300' : 'border-slate-200'
+                customSize && stone.manualPrice.trim() === '' ? 'border-rose-300' : 'border-slate-200'
               }`} />
             <p className="text-[10px] text-slate-400">
               Setting labor (amount × setter fee) is added on top of this price.
@@ -966,10 +960,9 @@ export function QuoteBuilderPage() {
       const carats = parseNum(s.carats)
       const amount = parseNum(s.amount)
       const hasManualPrice = s.manualPrice.trim() !== ''
-      // MAIN stone is always priced from its custom price (size never drives it).
-      const cost = s.role === 'MAIN'
-        ? parseNum(s.manualPrice)
-        : (hasManualPrice ? parseNum(s.manualPrice) : carats * pricePerCarat)
+      // Custom (no preset) size → price comes from the typed amount; a preset
+      // size computes carats × pricePerCarat unless a manual price overrides it.
+      const cost = hasManualPrice ? parseNum(s.manualPrice) : carats * pricePerCarat
       const setterFee = config.setterMap[s.setterType]?.fee ?? 0
       const labor = amount * setterFee
       diamondCost += cost
@@ -1083,11 +1076,12 @@ export function QuoteBuilderPage() {
     if (!client) errors.client = 'Please select or create a client.'
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
-    // The center (MAIN) stone must carry an explicit custom price — it is what
-    // drives the piece's price, so the creator has to type it in.
-    const mainMissingPrice = stones.some(s => s.role === 'MAIN' && s.manualPrice.trim() === '')
-    if (mainMissingPrice) {
-      setSaveError('Enter the center (main) stone price before creating the quote.')
+    // A "Custom" (no-preset) size has no per-carat base, so its price must be
+    // typed in — otherwise the stone would contribute $0. Only required for
+    // custom-size stones; preset sizes price themselves.
+    const customMissingPrice = stones.some(s => s.sizeKey === '' && s.manualPrice.trim() === '')
+    if (customMissingPrice) {
+      setSaveError('Enter the stone price for any “Custom” size stone before creating the quote.')
       return
     }
     // Can't create an empty quote: require a non-zero total (some metal
