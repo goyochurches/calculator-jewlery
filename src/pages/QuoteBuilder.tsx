@@ -64,24 +64,38 @@ const CUSTOMER_STONE_SETTER_KEYS = ['customer_melee', 'channel', 'bezel', 'fancy
 
 // Turn a free-text lab report like "GIA 1234567890" into a deep-link to the
 // issuing lab's online verification page, so the user can confirm the stone's
-// certificate is real. Returns null when we can't confidently pull a report
-// number — the UI then just hides the "Verify" link instead of opening a
-// broken page.
-function labReportVerifyUrl(raw: string): { url: string; lab: string } | null {
+// certificate is real. Returns null only when the field is empty — otherwise it
+// always returns a target plus a `valid` flag so the UI can show a GREEN button
+// when the report number is well-formed and a RED one when it isn't.
+//
+// NOTE: `valid` is a FORMAT check only (right lab + plausible report-number
+// length). We can't query GIA's database from the browser (no public API +
+// CORS), so the button still opens the official report-check for the real
+// lookup; the colour is just an at-a-glance "does this look like a real number".
+function labReportVerifyUrl(raw: string): { url: string; lab: string; valid: boolean } | null {
   const text = (raw ?? '').trim()
   if (!text) return null
   const upper = text.toUpperCase()
   // Longest run of digits = the report number on every lab's slip.
-  const number = text.replace(/[\s-]/g, '').match(/\d{5,}/)?.[0]
+  const number = text.replace(/[\s-]/g, '').match(/\d{4,}/)?.[0]
 
   if (upper.includes('IGI')) {
     // IGI's lookup is a form (no documented query param) — open the verify page.
-    return { url: 'https://www.igi.org/verify-your-report/', lab: 'IGI' }
+    // IGI report numbers are long numeric strings (≈ 8–13 digits).
+    const valid = !!number && number.length >= 7
+    return { url: 'https://www.igi.org/verify-your-report/', lab: 'IGI', valid }
   }
-  if (!number) return null
   // Default to GIA — by far the most common, and its report-check accepts the
-  // report number straight off the query string.
-  return { url: `https://www.gia.edu/report-check?reportno=${number}`, lab: 'GIA' }
+  // report number straight off the query string. Modern GIA report numbers are
+  // 10 digits; older full reports run 7–8 digits.
+  const valid = !!number && number.length >= 7 && number.length <= 11
+  return {
+    url: number
+      ? `https://www.gia.edu/report-check?reportno=${number}`
+      : 'https://www.gia.edu/report-check',
+    lab: 'GIA',
+    valid,
+  }
 }
 
 // Catalogue of jewelry piece types. Stored as the key, label is for display.
@@ -885,13 +899,27 @@ export function QuoteBuilderPage() {
                     href={verify.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-100"
-                    title={`Open ${verify.lab}'s report check in a new tab to verify this certificate`}
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                      verify.valid
+                        ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                        : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                    }`}
+                    title={
+                      verify.valid
+                        ? `Looks like a valid ${verify.lab} number — opens ${verify.lab}'s report check in a new tab to confirm`
+                        : `This doesn't look like a valid ${verify.lab} report number yet — opens ${verify.lab}'s report check anyway`
+                    }
                   >
-                    Verify on {verify.lab}
-                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                      <path d="M7 17 17 7M7 7h10v10" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    {verify.valid ? `Verify on ${verify.lab}` : `Check ${verify.lab} #`}
+                    {verify.valid ? (
+                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                        <path d="m5 13 4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    ) : (
+                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                        <path d="M12 9v4m0 4h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.42 0Z" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
                   </a>
                 )}
               </div>
@@ -899,8 +927,10 @@ export function QuoteBuilderPage() {
                 onChange={e => patchStone(stone.uid, { labReport: e.target.value })}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
               {verify && (
-                <p className="text-[10px] text-slate-400">
-                  Opens {verify.lab}'s official report check in a new tab so you can confirm the certificate.
+                <p className={`text-[10px] ${verify.valid ? 'text-slate-400' : 'text-rose-500'}`}>
+                  {verify.valid
+                    ? `Looks like a valid ${verify.lab} number — click “Verify on ${verify.lab}” to confirm it on the official report check.`
+                    : `This doesn't look like a complete ${verify.lab} report number yet.`}
                 </p>
               )}
             </div>
