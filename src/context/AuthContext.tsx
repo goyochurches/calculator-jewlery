@@ -14,10 +14,12 @@ export interface AuthUser {
    *  (e.g. "+34612345678"). Used by backend to send WhatsApp
    *  notifications when one of the user's quotes is approved. */
   phone?: string | null
+  /** Whether this account has two-factor (TOTP) enabled. */
+  twoFactorEnabled?: boolean
 }
 
 interface LoginResponse {
-  token: string
+  token?: string
   id: number
   name: string
   email: string
@@ -27,12 +29,21 @@ interface LoginResponse {
   bio?: string | null
   photo?: string | null
   phone?: string | null
+  twoFactorEnabled?: boolean
+  /** True when the password was correct but a TOTP code is still needed. */
+  twoFactorRequired?: boolean
+}
+
+/** Result of a login attempt: `{ twoFactorRequired: true }` means the caller
+ *  must collect a 6-digit code and call login again with it. */
+export interface LoginResult {
+  twoFactorRequired?: boolean
 }
 
 interface AuthContextType {
   user: AuthUser | null
   token: string | null
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string, code?: string) => Promise<LoginResult>
   logout: () => void
   /** Refresh from /api/users/me — call after self-editing the profile. */
   refreshUser: () => Promise<void>
@@ -64,8 +75,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setIsLoading(false))
   }, [])
 
-  async function login(email: string, password: string) {
-    const data = await api.post<LoginResponse>('/api/auth/login', { email, password })
+  async function login(email: string, password: string, code?: string): Promise<LoginResult> {
+    const data = await api.post<LoginResponse>('/api/auth/login', { email, password, code })
+    // Password was correct but the account needs a 2FA code — let the caller
+    // prompt for it and call login again with `code`. No session is set yet.
+    if (data.twoFactorRequired || !data.token) {
+      return { twoFactorRequired: true }
+    }
     localStorage.setItem(TOKEN_KEY, data.token)
     setToken(data.token)
     setUser({
@@ -78,7 +94,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       bio: data.bio ?? null,
       photo: data.photo ?? null,
       phone: data.phone ?? null,
+      twoFactorEnabled: data.twoFactorEnabled ?? false,
     })
+    return {}
   }
 
   async function refreshUser() {

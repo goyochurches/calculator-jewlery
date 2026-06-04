@@ -122,7 +122,8 @@
       "Bash(npm init *)",
       "Bash(npm i *)",
       "WebFetch(domain:gialaboratory.github.io)",
-      "Bash(node *)"
+      "Bash(node *)",
+      "Bash(mvn -v)"
     ]
   }
 }
