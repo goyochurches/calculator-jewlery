@@ -565,8 +565,11 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
         )}
 
         {/* WhatsApp notifications — visible to admins so they can verify the
-            approval flow worked (or diagnose why a message didn't go out). */}
-        <WhatsAppNotificationsBlock quote={quote} />
+            approval flow worked (or diagnose why a message didn't go out).
+            Gated behind the same WhatsApp/SMS flag as the "Send to client"
+            button: when that feature is off, the whole notifications timeline
+            is hidden too. */}
+        {isEnabled('quote-send-link') && <WhatsAppNotificationsBlock quote={quote} />}
 
         <PhotoDetail src={quote.photo} />
 
