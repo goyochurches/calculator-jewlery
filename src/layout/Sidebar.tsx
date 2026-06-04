@@ -157,6 +157,11 @@ function SidebarContent({
                 {key === 'messages' && <InboxBadge collapsed={collapsed} />}
               </span>
               {!collapsed && <span className="font-medium">{label}</span>}
+              {key === 'quotes-wizard' && !collapsed && (
+                <span className="ml-auto inline-flex items-center rounded-full bg-amber-400/90 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-900">
+                  Beta
+                </span>
+              )}
               {key === 'messages' && !collapsed && <InboxBadgeInline />}
             </NavLink>
           ))}

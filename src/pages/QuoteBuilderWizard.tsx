@@ -81,6 +81,7 @@ export function QuoteBuilderWizardPage() {
             <div>
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-amber-300">
                 <Sparkles className="h-4 w-4" /> Quote Wizard
+                <span className="rounded-full bg-amber-400/90 px-2 py-0.5 text-[9px] font-bold text-slate-900">Beta</span>
               </div>
               <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">
                 Build a quote, one step at a time.
