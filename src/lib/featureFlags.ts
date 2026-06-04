@@ -33,7 +33,6 @@ export type FeatureKey =
   | 'dashboard'
   | 'metals'
   | 'quotes'
-  | 'quotes-wizard'
   | 'quotes-list'
   | 'messages'
   | 'clients'
@@ -62,7 +61,6 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   { key: 'dashboard',     group: 'modules', label: 'Dashboard',     description: 'Home dashboard with analytics.' },
   { key: 'metals',        group: 'modules', label: 'Metals',        description: 'Live metal prices page.' },
   { key: 'quotes',        group: 'modules', label: 'Quote Builder', description: 'Create and edit quotes.' },
-  { key: 'quotes-wizard', group: 'modules', label: 'Quote Builder (Wizard)', description: 'Beta — the new step-by-step Quote Builder. Same engine, guided UI.', defaultOn: false },
   { key: 'quotes-list',   group: 'modules', label: 'Quotes',        description: 'List of all saved quotes.' },
   { key: 'messages',      group: 'modules', label: 'Messages',      description: 'Client inbox (SMS / WhatsApp).' },
   { key: 'clients',       group: 'modules', label: 'Clients',       description: 'Client directory.' },
