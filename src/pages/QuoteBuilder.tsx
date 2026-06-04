@@ -283,9 +283,9 @@ export function QuoteBuilderPage() {
     !!(location.state as { duplicateFrom?: SavedQuote } | null)?.duplicateFrom,
   )
 
-  // Load the hand-engraving slider bounds (min/max/step/default) configured in
-  // Master Tables. On a fresh quote we also seat the slider at the configured
-  // default; on a duplicate we leave it to the dup prefill below.
+  // Load the hand-engraving slider bounds (min/max/step) configured in Master
+  // Tables. The slider always starts at 0 (None) on a fresh quote — we no longer
+  // seat it at the configured default; the user opts in by dragging it.
   useEffect(() => {
     companyService.get().then(s => {
       const bounds = {
@@ -295,7 +295,6 @@ export function QuoteBuilderPage() {
         default: s.engravingDefault ?? ENGRAVING_SLIDER_DEFAULTS.default,
       }
       setEngravingBounds(bounds)
-      if (!isDuplicateRef.current) setEngravingFee(bounds.default)
     }).catch(console.error)
   }, [])
 
