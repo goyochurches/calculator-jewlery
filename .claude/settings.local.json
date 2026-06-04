@@ -123,7 +123,8 @@
       "Bash(npm i *)",
       "WebFetch(domain:gialaboratory.github.io)",
       "Bash(node *)",
-      "Bash(mvn -v)"
+      "Bash(mvn -v)",
+      "Bash(gh pr create --base main --head feat/two-factor-auth --title 'feat\\(auth\\): two-factor authentication \\(TOTP\\)' --body ' *)"
     ]
   }
 }
