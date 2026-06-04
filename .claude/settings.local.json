@@ -124,7 +124,8 @@
       "WebFetch(domain:gialaboratory.github.io)",
       "Bash(node *)",
       "Bash(mvn -v)",
-      "Bash(gh pr create --base main --head feat/two-factor-auth --title 'feat\\(auth\\): two-factor authentication \\(TOTP\\)' --body ' *)"
+      "Bash(gh pr create --base main --head feat/two-factor-auth --title 'feat\\(auth\\): two-factor authentication \\(TOTP\\)' --body ' *)",
+      "Bash(python3 -c \"import bcrypt; print\\(bcrypt.hashpw\\(b'Simone2026!', bcrypt.gensalt\\(rounds=10\\)\\).decode\\(\\)\\)\")"
     ]
   }
 }

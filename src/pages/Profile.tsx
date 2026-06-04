@@ -2,7 +2,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/context/AuthContext'
 import { userService } from '@/services/userService'
-import { TwoFactorSettings } from '@/components/TwoFactorSettings'
 import { Camera, Check, ImagePlus, User, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -219,9 +218,6 @@ export function ProfilePage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Security — two-factor authentication */}
-      <TwoFactorSettings />
     </div>
   )
 }

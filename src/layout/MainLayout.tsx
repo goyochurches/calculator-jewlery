@@ -1,5 +1,4 @@
 import { NotificationPanel } from '@/components/NotificationPanel'
-import { TwoFactorNudge } from '@/components/TwoFactorNudge'
 import { Toast } from '@/components/Toast'
 import { useNotifications } from '@/hooks/useNotifications'
 import { Bell, Menu, Sparkles } from 'lucide-react'
@@ -152,7 +151,6 @@ export function MainLayout() {
 
           <main className="flex-1">
             <div className="mx-auto w-full max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
-              <TwoFactorNudge />
               <Outlet />
             </div>
           </main>
