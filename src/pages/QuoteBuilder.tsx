@@ -290,13 +290,6 @@ export function QuoteBuilderPage() {
     gemstoneService.getAll().then(setGemstones).catch(console.error)
   }, [])
 
-  // Whether this builder was opened to duplicate an existing quote. Captured
-  // once at first render (before the dup effect clears the nav state) so the
-  // settings fetch below knows not to clobber a duplicated engraving fee.
-  const isDuplicateRef = useRef<boolean>(
-    !!(location.state as { duplicateFrom?: SavedQuote } | null)?.duplicateFrom,
-  )
-
   // Load the hand-engraving slider bounds (min/max/step) configured in Master
   // Tables. The slider always starts at 0 (None) on a fresh quote — we no longer
   // seat it at the configured default; the user opts in by dragging it.
@@ -921,6 +914,18 @@ export function QuoteBuilderPage() {
                       </svg>
                     )}
                   </a>
+                )}
+                {!verify && (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-400"
+                    title="Enter a GIA/IGI report number to verify it on the lab's official report check"
+                  >
+                    Verify
+                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                      <circle cx="11" cy="11" r="7" />
+                      <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+                    </svg>
+                  </span>
                 )}
               </div>
               <input type="text" value={stone.labReport} placeholder="e.g. GIA 1234567890"
