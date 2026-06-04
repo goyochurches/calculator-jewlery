@@ -23,6 +23,7 @@ import { PaymentSuccessPage } from '@/pages/PaymentSuccess'
 import { PaymentCancelPage } from '@/pages/PaymentCancel'
 import { PaymentsPage } from '@/pages/Payments'
 import { FEATURES, isFeatureKey } from '@/lib/featureFlags'
+import { isWizardPreview } from '@/lib/wizardPreview'
 import { useFeatures } from '@/hooks/useFeatures'
 import { canSeePayments } from '@/lib/paymentsAccess'
 import Login from '@/pages/Login'
@@ -56,6 +57,13 @@ function RequirePermission({ permission }: { permission: NavKey }) {
   const { user } = useAuth()
   const { isEnabled } = useFeatures()
   if (!canAccess(user?.role, permission)) return <Navigate to={defaultRouteFor(user?.role)} replace />
+  // Quote Wizard (Beta): reachable when EITHER the shared runtime flag is on OR
+  // this browser opted into the personal preview (?wizard=1). Lets one user try
+  // it without enabling it for the whole team.
+  if (permission === 'quotes-wizard') {
+    if (!isEnabled('quotes-wizard') && !isWizardPreview()) return <Navigate to="/profile" replace />
+    return <Outlet />
+  }
   // Runtime feature flag — a disabled module can't be reached by URL either.
   // Redirect to /profile (never feature-gated) so we can't loop on a default
   // route that is itself disabled.

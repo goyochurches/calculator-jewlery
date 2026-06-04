@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useBrand } from '@/context/BrandContext'
 import { canAccess, type NavKey } from '@/constants/permissions'
 import { FEATURES, isFeatureKey } from '@/lib/featureFlags'
+import { isWizardPreview } from '@/lib/wizardPreview'
 import { canSeePayments } from '@/lib/paymentsAccess'
 import { useFeatures } from '@/hooks/useFeatures'
 import { useInboxUnread } from '@/hooks/useInboxUnread'
@@ -75,6 +76,13 @@ function SidebarContent({
   const navigate = useNavigate()
   const visibleNavItems = navItems.filter((item) => {
     if (item.hidden) return false
+    // Quote Wizard (Beta): shown when the shared flag is on OR this browser
+    // opted into the personal preview (?wizard=1) — so one user can try it
+    // without it appearing for everyone else.
+    if (item.key === 'quotes-wizard') {
+      if (!isEnabled('quotes-wizard') && !isWizardPreview()) return false
+      return canAccess(user?.role, item.key)
+    }
     // Runtime feature flag — keys outside the catalog (e.g. configuration)
     // are always allowed so the Configuration page can't be hidden.
     if (isFeatureKey(item.key) && !isEnabled(item.key)) return false
