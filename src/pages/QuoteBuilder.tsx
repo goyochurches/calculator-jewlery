@@ -132,8 +132,9 @@ export function QuoteBuilderPage() {
   const [fingerSize, setFingerSize] = useState(0)
   const [extraCosts, setExtraCosts] = useState(0)
   // Hand-engraving surcharge (dollars) chosen on the slider. 0 = no engraving.
-  // Replaces the old fixed-$150 yes/no toggle.
-  const [engravingFee, setEngravingFee] = useState<number>(ENGRAVING_SLIDER_DEFAULTS.default)
+  // Replaces the old fixed-$150 yes/no toggle. Always starts at 0 (None) on a
+  // fresh quote — the user opts in by dragging the slider.
+  const [engravingFee, setEngravingFee] = useState<number>(0)
   // Slider bounds, configurable from Master Tables (company settings).
   const [engravingBounds, setEngravingBounds] = useState<{ min: number; max: number; step: number; default: number }>(
     { ...ENGRAVING_SLIDER_DEFAULTS },
