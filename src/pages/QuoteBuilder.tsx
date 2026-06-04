@@ -62,6 +62,28 @@ const STONE_CLARITIES = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2',
 // Only these setter types make sense for customer-supplied stones.
 const CUSTOMER_STONE_SETTER_KEYS = ['customer_melee', 'channel', 'bezel', 'fancy', 'center'] as const
 
+// Turn a free-text lab report like "GIA 1234567890" into a deep-link to the
+// issuing lab's online verification page, so the user can confirm the stone's
+// certificate is real. Returns null when we can't confidently pull a report
+// number — the UI then just hides the "Verify" link instead of opening a
+// broken page.
+function labReportVerifyUrl(raw: string): { url: string; lab: string } | null {
+  const text = (raw ?? '').trim()
+  if (!text) return null
+  const upper = text.toUpperCase()
+  // Longest run of digits = the report number on every lab's slip.
+  const number = text.replace(/[\s-]/g, '').match(/\d{5,}/)?.[0]
+
+  if (upper.includes('IGI')) {
+    // IGI's lookup is a form (no documented query param) — open the verify page.
+    return { url: 'https://www.igi.org/verify-your-report/', lab: 'IGI' }
+  }
+  if (!number) return null
+  // Default to GIA — by far the most common, and its report-check accepts the
+  // report number straight off the query string.
+  return { url: `https://www.gia.edu/report-check?reportno=${number}`, lab: 'GIA' }
+}
+
 // Catalogue of jewelry piece types. Stored as the key, label is for display.
 const JEWELRY_TYPE_OPTIONS: Array<{ key: string; label: string }> = [
   { key: 'ring',      label: 'Ring' },
@@ -850,16 +872,40 @@ export function QuoteBuilderPage() {
             </div>
           )}
 
-          {stone.role !== 'MELEE' && (
+          {stone.role !== 'MELEE' && (() => {
+            const verify = labReportVerifyUrl(stone.labReport)
+            return (
             <div className="space-y-1 md:col-span-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Lab report <span className="font-normal normal-case text-slate-400">(optional)</span>
-              </label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Lab report <span className="font-normal normal-case text-slate-400">(optional)</span>
+                </label>
+                {verify && (
+                  <a
+                    href={verify.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                    title={`Open ${verify.lab}'s report check in a new tab to verify this certificate`}
+                  >
+                    Verify on {verify.lab}
+                    <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <path d="M7 17 17 7M7 7h10v10" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </a>
+                )}
+              </div>
               <input type="text" value={stone.labReport} placeholder="e.g. GIA 1234567890"
                 onChange={e => patchStone(stone.uid, { labReport: e.target.value })}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+              {verify && (
+                <p className="text-[10px] text-slate-400">
+                  Opens {verify.lab}'s official report check in a new tab so you can confirm the certificate.
+                </p>
+              )}
             </div>
-          )}
+            )
+          })()}
 
           <div className="space-y-1 md:col-span-2">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
