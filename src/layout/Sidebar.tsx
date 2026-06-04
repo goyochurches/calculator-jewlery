@@ -20,6 +20,7 @@ import {
   Menu,
   Settings,
   ShieldCheck,
+  Sparkles,
   Star,
   Users,
   X,
@@ -30,6 +31,7 @@ const navItems: { to: string; label: string; icon: typeof LayoutDashboard; key: 
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, key: 'dashboard' },
   { to: '/metals', label: 'Metals', icon: CircleDollarSign, key: 'metals' },
   { to: '/quotes', label: 'Quote Builder', icon: Calculator, key: 'quotes' },
+  { to: '/quotes-wizard', label: 'Quote Wizard', icon: Sparkles, key: 'quotes-wizard' },
   { to: '/quotes-list', label: 'Quotes', icon: FileText, key: 'quotes-list' },
   { to: '/messages', label: 'Messages', icon: MessageCircle, key: 'messages' },
   { to: '/clients', label: 'Clients', icon: Contact, key: 'clients' },
@@ -155,6 +157,11 @@ function SidebarContent({
                 {key === 'messages' && <InboxBadge collapsed={collapsed} />}
               </span>
               {!collapsed && <span className="font-medium">{label}</span>}
+              {key === 'quotes-wizard' && !collapsed && (
+                <span className="ml-auto inline-flex items-center rounded-full bg-amber-400/90 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-900">
+                  Beta
+                </span>
+              )}
               {key === 'messages' && !collapsed && <InboxBadgeInline />}
             </NavLink>
           ))}

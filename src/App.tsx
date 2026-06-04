@@ -5,6 +5,7 @@ import { BrandProvider } from '@/context/BrandContext'
 import { MainLayout } from '@/layout/MainLayout'
 import { GemstonesPage } from '@/pages/Gemstones'
 import { QuoteBuilderPage } from '@/pages/QuoteBuilder'
+import { QuoteBuilderWizardPage } from '@/pages/QuoteBuilderWizard'
 import { Dashboard } from '@/pages/Dashboard'
 import { Metals } from '@/pages/Metals'
 import { UsersPage } from '@/pages/Users'
@@ -109,6 +110,9 @@ export default function App() {
                 </Route>
                 <Route element={<RequirePermission permission="quotes" />}>
                   <Route path="/quotes" element={<QuoteBuilderPage />} />
+                </Route>
+                <Route element={<RequirePermission permission="quotes-wizard" />}>
+                  <Route path="/quotes-wizard" element={<QuoteBuilderWizardPage />} />
                 </Route>
                 <Route element={<RequirePermission permission="quotes-list" />}>
                   <Route path="/quotes-list" element={<QuotesList />} />

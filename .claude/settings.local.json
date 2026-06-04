@@ -121,7 +121,8 @@
       "Read(//tmp/**)",
       "Bash(npm init *)",
       "Bash(npm i *)",
-      "WebFetch(domain:gialaboratory.github.io)"
+      "WebFetch(domain:gialaboratory.github.io)",
+      "Bash(node *)"
     ]
   }
 }
