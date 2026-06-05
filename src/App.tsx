@@ -52,7 +52,7 @@ function PrivateRoutes() {
   return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />
 }
 
-fen ql quote wizard no puedunction RequirePermission({ permission }: { permission: NavKey }) {
+function RequirePermission({ permission }: { permission: NavKey }) {
   const { user } = useAuth()
   const { isEnabled } = useFeatures()
   if (!canAccess(user?.role, permission)) return <Navigate to={defaultRouteFor(user?.role)} replace />
