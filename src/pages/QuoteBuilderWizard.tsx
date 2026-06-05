@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { ClientPicker } from '@/components/ClientPicker'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { Toast } from '@/components/Toast'
@@ -55,13 +56,7 @@ export function QuoteBuilderWizardPage() {
   const [maxVisited, setMaxVisited] = useState(0)
 
   if (qb.config.loading) {
-    return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="flex items-center gap-2 text-slate-400">
-          <Sparkles className="h-5 w-5 animate-pulse" /> Loading the wizard…
-        </div>
-      </div>
-    )
+    return <WizardSkeleton />
   }
 
   const goTo = (i: number) => {
@@ -151,6 +146,76 @@ export function QuoteBuilderWizardPage() {
       </section>
 
       {qb.savedQuote && <WizardToast key={qb.savedQuote.id} quote={qb.savedQuote} onClose={() => qb.setSavedQuote(null)} />}
+    </div>
+  )
+}
+
+// ── Loading skeleton ────────────────────────────────────────────────────────
+function WizardSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Hero */}
+      <Card className="rounded-[30px] border-0 shadow-[0_30px_80px_rgba(15,23,42,0.24)]" style={{ backgroundColor: 'var(--theme-primary)' }}>
+        <CardContent className="p-6 sm:p-8 space-y-4">
+          <Skeleton className="h-3 w-36 bg-white/20" />
+          <Skeleton className="h-9 w-3/4 bg-white/30" />
+          <Skeleton className="h-3 w-2/3 bg-white/20" />
+        </CardContent>
+      </Card>
+
+      {/* Stepper */}
+      <div className="rounded-[24px] border border-slate-100 bg-white p-4 shadow-sm">
+        <div className="flex items-center">
+          {STEPS.map((s, i) => (
+            <div key={s.key} className="flex flex-1 items-center last:flex-none">
+              <div className="flex shrink-0 flex-col items-center gap-1.5">
+                <Skeleton className="h-10 w-10 rounded-2xl bg-slate-100" />
+                <Skeleton className="hidden h-2.5 w-16 bg-slate-100 sm:block" />
+              </div>
+              {i < STEPS.length - 1 && <Skeleton className="mx-2 h-0.5 flex-1 bg-slate-200" />}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <section className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
+        {/* Step content */}
+        <Card className="rounded-[30px] border border-white/80 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <CardContent className="p-6 sm:p-7 space-y-5">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-10 w-10 rounded-2xl bg-slate-100" />
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-3 w-56 bg-slate-100" />
+              </div>
+            </div>
+            <div className="grid gap-5 md:grid-cols-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="space-y-2">
+                  <Skeleton className="h-3 w-24 bg-slate-100" />
+                  <Skeleton className="h-10 w-full rounded-xl bg-slate-100" />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Live summary */}
+        <Card className="rounded-[30px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
+          <CardContent className="space-y-4 p-6">
+            <div className="rounded-2xl p-5 space-y-3" style={{ backgroundColor: 'var(--theme-primary)' }}>
+              <Skeleton className="h-2.5 w-24 bg-white/20" />
+              <Skeleton className="h-9 w-40 bg-white/30" />
+              <Skeleton className="h-10 w-full rounded-xl bg-black/20" />
+            </div>
+            <div className="space-y-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-11 w-full rounded-2xl bg-slate-100" />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
     </div>
   )
 }
