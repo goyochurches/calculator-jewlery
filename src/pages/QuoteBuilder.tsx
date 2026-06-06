@@ -2286,29 +2286,56 @@ export function QuoteBuilderPage() {
               </div>
 
               <div className="space-y-3 text-sm">
-                {([
-                  ['Material reference', pricing.materialCost],
-                  ['CAD design & Jeweler\'s time', pricing.ringLaborFee],
-                  // "Setting supplied diamonds" = stone cost + labor for the
-                  // in-house MAIN/SIDE/MELEE stones (we buy them and set them).
-                  [`Setting supplied diamonds (${pricing.totalAmount} stones · ${pricing.totalCarats} ct)`,
-                    pricing.diamondCost + pricing.settingFee],
-                  // Only render the customer line when there's at least one —
-                  // an empty "Setting customer diamonds (0 stones)" line is noise.
-                  ...(customerStones.length > 0
-                    ? [[
-                        `Setting customer diamonds (${pricing.customerStoneCount} stone${pricing.customerStoneCount === 1 ? '' : 's'})`,
-                        pricing.customerSettingFee,
-                      ] as [string, number]]
-                    : []),
-                  ['Hand engraving (milgrain)', pricing.engravingFee],
-                  ['Extra costs', extraCosts],
-                ] as Array<[string, number]>).map(([label, value]) => (
-                  <div key={label as string} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-                    <span className="text-slate-500">{label}</span>
-                    <span className="font-semibold text-slate-900">${(value as number).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                {/* Each line shows cost → retail so it's obvious the selected
+                    markup is applied to EVERY component (engraving included).
+                    Header maps the two money columns. */}
+                <div className="flex items-center justify-between gap-3 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  <span>Item</span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="w-16 text-right">Cost</span>
+                    <span className="w-9 text-center">×{parsedMarkup}</span>
+                    <span className="w-20 text-right text-slate-500">Customer</span>
                   </div>
-                ))}
+                </div>
+                {(() => {
+                  const mk = parsedMarkup
+                  const suppliedCost = pricing.diamondCost + pricing.settingFee
+                  // MAIN stones with their own markup are priced at that rate,
+                  // so this line's retail isn't a flat cost × mk; the rest are.
+                  const suppliedRetail = (suppliedCost - customMainRaw) * mk + customMainMarkedUp
+                  const rows: Array<[string, number, number]> = [
+                    ['Material reference', pricing.materialCost, pricing.materialCost * mk],
+                    ['CAD design & Jeweler\'s time', pricing.ringLaborFee, pricing.ringLaborFee * mk],
+                    // "Setting supplied diamonds" = stone cost + labor for the
+                    // in-house MAIN/SIDE/MELEE stones (we buy them and set them).
+                    [`Setting supplied diamonds (${pricing.totalAmount} stones · ${pricing.totalCarats} ct)`,
+                      suppliedCost, suppliedRetail],
+                    // Only render the customer line when there's at least one —
+                    // an empty "Setting customer diamonds (0 stones)" line is noise.
+                    ...(customerStones.length > 0
+                      ? [[
+                          `Setting customer diamonds (${pricing.customerStoneCount} stone${pricing.customerStoneCount === 1 ? '' : 's'})`,
+                          pricing.customerSettingFee, pricing.customerSettingFee * mk,
+                        ] as [string, number, number]]
+                      : []),
+                    ['Hand engraving (milgrain)', pricing.engravingFee, pricing.engravingFee * mk],
+                    ['Extra costs', extraCosts, extraCosts * mk],
+                  ]
+                  return rows.map(([label, cost, retail]) => (
+                    <div key={label} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+                      <span className="min-w-0 flex-1 text-slate-500">{label}</span>
+                      <div className="flex shrink-0 items-center gap-2 text-right">
+                        <span className="w-16 text-right text-xs tabular-nums text-slate-400">${cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                        <span className="w-9 rounded-full bg-slate-200 py-0.5 text-center text-[10px] font-semibold text-slate-600">×{mk}</span>
+                        <span className="w-20 text-right font-semibold tabular-nums text-slate-900">${retail.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  ))
+                })()}
+                <p className="px-1 text-[11px] text-slate-400">
+                  Every line is multiplied by the selected <strong className="text-slate-600">{parsedMarkup}×</strong> markup — engraving included.
+                  {parsedDiscount > 0 || applyTaxes ? ' Discount/tax are applied to the customer total below.' : ''}
+                </p>
               </div>
             </CardContent>
           </Card>
