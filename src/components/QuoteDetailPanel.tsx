@@ -11,6 +11,7 @@ import { useAuth } from '@/context/AuthContext'
 import { canSeePayments } from '@/lib/paymentsAccess'
 import { displayStatusFor } from '@/lib/quoteStatusDisplay'
 import { quotesService } from '@/services/quotesService'
+import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { NoticeDialog } from '@/components/NoticeDialog'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { AlertTriangle, Check, ChevronDown, ChevronUp, Copy, Eye, FileDown, MessageCircle, RefreshCw, Trash2, X, XCircle } from 'lucide-react'
@@ -515,6 +516,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <CopyShareLinkButton token={quote.publicToken} iconOnly={false} />
+              <OpenQuoteButton token={quote.publicToken} />
               {quote.status === 'approved' && isEnabled('quote-send-link') && (
                 <button
                   onClick={handleSendLink}
