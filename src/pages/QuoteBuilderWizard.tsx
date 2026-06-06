@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ClientPicker } from '@/components/ClientPicker'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
+import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { Toast } from '@/components/Toast'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
 import { useNavigate } from 'react-router-dom'
@@ -716,7 +717,10 @@ function StepReview({ qb }: { qb: QuoteBuilderState }) {
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Share link ready</p>
             <p className="mt-1 truncate font-mono text-sm text-slate-900">{publicQuoteUrl(qb.savedQuote.publicToken)}</p>
-            <div className="mt-2"><CopyShareLinkButton token={qb.savedQuote.publicToken} iconOnly={false} /></div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <CopyShareLinkButton token={qb.savedQuote.publicToken} iconOnly={false} />
+              <OpenQuoteButton token={qb.savedQuote.publicToken} />
+            </div>
           </div>
         )}
       </div>
@@ -810,6 +814,10 @@ function WizardToast({ quote, onClose }: { quote: { id: string; title: string; t
         if (hasLink && quote.publicToken) await copyToClipboard(publicQuoteUrl(quote.publicToken))
         else navigate('/quotes-list')
       }}
+      secondaryActionLabel={hasLink ? '↗ Open quote' : undefined}
+      onSecondaryAction={hasLink && quote.publicToken
+        ? () => window.open(publicQuoteUrl(quote.publicToken!), '_blank', 'noopener,noreferrer')
+        : undefined}
       onClose={onClose}
     />
   )

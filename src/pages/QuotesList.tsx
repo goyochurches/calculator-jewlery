@@ -8,6 +8,7 @@ import { computeCustomerPrice } from '@/lib/quotePricing'
 import { quotesService } from '@/services/quotesService'
 import type { QuoteStatus, SavedQuote } from '@/types'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
+import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { QuoteDetailPanel } from '@/components/QuoteDetailPanel'
 import { Bell, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CornerDownRight, Copy, ImageOff, Search, Trash2, X } from 'lucide-react'
@@ -926,6 +927,7 @@ function QuoteRow({
       <td className="px-3 py-4">
         <div className="flex items-center justify-end gap-1.5">
           <CopyShareLinkButton token={quote.publicToken} iconOnly />
+          <OpenQuoteButton token={quote.publicToken} iconOnly />
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onDuplicate() }}

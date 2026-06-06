@@ -8,6 +8,10 @@ interface ToastProps {
   description?: string
   actionLabel?: string
   onAction?: () => void
+  /** Optional second action shown next to the primary one. Does NOT auto-close
+   *  the toast, so a link can open in a new tab while the toast stays visible. */
+  secondaryActionLabel?: string
+  onSecondaryAction?: () => void
   onClose: () => void
   duration?: number
   variant?: ToastVariant
@@ -44,6 +48,8 @@ export function Toast({
   description,
   actionLabel,
   onAction,
+  secondaryActionLabel,
+  onSecondaryAction,
   onClose,
   duration = 5500,
   variant = 'success',
@@ -82,16 +88,28 @@ export function Toast({
             {description && (
               <p className="mt-0.5 text-xs text-slate-600">{description}</p>
             )}
-            {actionLabel && onAction && (
-              <button
-                onClick={() => {
-                  onAction()
-                  onClose()
-                }}
-                className={`mt-2 inline-flex items-center gap-1 text-xs font-semibold ${styles.actionColor}`}
-              >
-                {actionLabel}
-              </button>
+            {((actionLabel && onAction) || (secondaryActionLabel && onSecondaryAction)) && (
+              <div className="mt-2 flex flex-wrap items-center gap-3">
+                {actionLabel && onAction && (
+                  <button
+                    onClick={() => {
+                      onAction()
+                      onClose()
+                    }}
+                    className={`inline-flex items-center gap-1 text-xs font-semibold ${styles.actionColor}`}
+                  >
+                    {actionLabel}
+                  </button>
+                )}
+                {secondaryActionLabel && onSecondaryAction && (
+                  <button
+                    onClick={onSecondaryAction}
+                    className={`inline-flex items-center gap-1 text-xs font-semibold ${styles.actionColor}`}
+                  >
+                    {secondaryActionLabel}
+                  </button>
+                )}
+              </div>
             )}
           </div>
           <button

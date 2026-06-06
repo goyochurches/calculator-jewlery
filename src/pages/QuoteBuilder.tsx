@@ -13,6 +13,7 @@ import { quotesService } from '@/services/quotesService'
 import type { Client, GemstonePrice, JewelryMetalOption, SavedQuote } from '@/types'
 import { ClientPicker } from '@/components/ClientPicker'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
+import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { Toast } from '@/components/Toast'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
 import { Calculator, Camera, Check, ChevronDown, ChevronUp, Copy, Crown, Diamond, Gem, ImagePlus, Layers3, Pin, PinOff, Ruler, Sparkles, User, X } from 'lucide-react'
@@ -1368,8 +1369,9 @@ export function QuoteBuilderPage() {
                 Send this URL to <strong>{savedQuote.title}</strong>'s client — no login required. Valid for 3 months.
               </p>
             </div>
-            <div className="flex shrink-0 gap-2">
+            <div className="flex shrink-0 flex-wrap gap-2">
               <CopyShareLinkButton token={savedQuote.publicToken} iconOnly={false} />
+              <OpenQuoteButton token={savedQuote.publicToken} />
               <button
                 type="button"
                 onClick={() => setSavedQuote(null)}
@@ -2448,6 +2450,10 @@ function QuoteToast({
           navigate('/quotes-list')
         }
       }}
+      secondaryActionLabel={hasLink ? '↗ Open quote' : undefined}
+      onSecondaryAction={hasLink && quote.publicToken
+        ? () => window.open(publicQuoteUrl(quote.publicToken!), '_blank', 'noopener,noreferrer')
+        : undefined}
       onClose={onClose}
     />
   )

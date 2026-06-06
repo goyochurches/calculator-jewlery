@@ -1,4 +1,5 @@
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
+import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { QuoteDetailPanel } from '@/components/QuoteDetailPanel'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -239,7 +240,10 @@ export function ClientDetailPage() {
                             ${(q.total ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                           </td>
                           <td className="px-3 py-4">
-                            <CopyShareLinkButton token={q.publicToken} iconOnly={false} />
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <CopyShareLinkButton token={q.publicToken} iconOnly={false} />
+                              <OpenQuoteButton token={q.publicToken} />
+                            </div>
                           </td>
                         </tr>
                       )
