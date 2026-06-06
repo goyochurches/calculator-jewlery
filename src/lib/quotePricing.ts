@@ -4,14 +4,14 @@ import type { SavedQuote } from '@/types'
 // QuoteDetailPanel so the list, the detail drawer and the public link never
 // disagree on the number the customer actually pays.
 //
-// Formula: ((cost − engraving − customMainPool) × markup
-//           + customMainPool × customMarkup + engraving) × (1 − discount/100)
+// Formula: ((cost − customMainPool) × markup
+//           + customMainPool × customMarkup) × (1 − discount/100)
 //           + optional 7.75% sales tax.
+// Engraving is part of the cost and IS marked up like everything else.
 // A non-null customerPriceOverride short-circuits the whole pipeline.
 // Falls back to the legacy 2.5× / 0% defaults for quotes saved before markup
 // and per-stone overrides existed.
 
-const ENGRAVING_FEE = 150
 const SALES_TAX_RATE = 0.0775
 
 export interface CustomerPrice {
@@ -31,11 +31,6 @@ export interface CustomerPrice {
 export function computeCustomerPrice(quote: SavedQuote): CustomerPrice {
   const markup = quote.markupMultiplier ?? 2.5
   const discount = Math.max(0, Math.min(100, quote.discountPercent ?? 0))
-  // Prefer the per-quote slider amount; fall back to the legacy flat fee for
-  // quotes saved before the slider (engravingFee == null).
-  const engraveFee = quote.engravingFee != null
-    ? quote.engravingFee
-    : (quote.engraving ? ENGRAVING_FEE : 0)
 
   // Stones with a per-stone markup are priced separately from the generic pool.
   let customMainRaw = 0
@@ -46,8 +41,10 @@ export function computeCustomerPrice(quote: SavedQuote): CustomerPrice {
     customMainMarkedUp += s.contribution * s.markupMultiplier
   }
 
-  const genericPool = quote.total - engraveFee - customMainRaw
-  const beforeDiscount = genericPool * markup + customMainMarkedUp + engraveFee
+  // Engraving is part of the cost and IS marked up; only per-stone overrides
+  // (customMainRaw) are carved out to be priced at their own multiplier.
+  const genericPool = quote.total - customMainRaw
+  const beforeDiscount = genericPool * markup + customMainMarkedUp
   const discountAmount = beforeDiscount * (discount / 100)
   const afterDiscount = beforeDiscount - discountAmount
   const applyTaxes = !!quote.applyTaxes

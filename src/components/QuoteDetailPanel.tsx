@@ -247,14 +247,13 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
   }, [quote.id])
   const config = useQuoteConfig()
   const expiration = formatExpiration(quote.publicTokenExpiresAt)
-  // Customer-facing price = ((cost - engraving - customMainPool) × markup
-  //   + customMainPool×customMarkup + engraving) × (1 - discount/100).
+  // Customer-facing price = ((cost - customMainPool) × markup
+  //   + customMainPool×customMarkup) × (1 - discount/100).
+  // Engraving is part of the cost and IS marked up like everything else.
   // Falls back to the legacy 2.5× / 0% for quotes saved before V22 / V27.
   // A non-null customerPriceOverride short-circuits the entire pipeline.
-  const ENGRAVING_FEE = 150
   const markup = quote.markupMultiplier ?? 2.5
   const discount = Math.max(0, Math.min(100, quote.discountPercent ?? 0))
-  const engraveFee = quote.engraving ? ENGRAVING_FEE : 0
   let _customMainRaw = 0
   let _customMainMarkedUp = 0
   for (const s of (quote.stones ?? [])) {
@@ -262,8 +261,8 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
     _customMainRaw      += s.contribution
     _customMainMarkedUp += s.contribution * s.markupMultiplier
   }
-  const _genericPool = quote.total - engraveFee - _customMainRaw
-  const customerPriceBeforeDiscount = _genericPool * markup + _customMainMarkedUp + engraveFee
+  const _genericPool = quote.total - _customMainRaw
+  const customerPriceBeforeDiscount = _genericPool * markup + _customMainMarkedUp
   const discountAmount = customerPriceBeforeDiscount * (discount / 100)
   const customerPriceAfterDiscount = customerPriceBeforeDiscount - discountAmount
   // 7.75% sales tax applied on top when the seller toggled it on.

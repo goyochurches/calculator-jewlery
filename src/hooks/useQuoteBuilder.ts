@@ -558,8 +558,10 @@ export function useQuoteBuilder() {
     customMainRaw += contrib
     customMainMarkedUp += contrib * n
   })
-  const genericPool = pricing.total - pricing.engravingFee - customMainRaw
-  const customerPriceBeforeDiscount = genericPool * parsedMarkup + customMainMarkedUp + pricing.engravingFee
+  // Engraving is part of the cost and IS marked up like everything else; only
+  // MAIN stones with their own markup are carved out (priced at their rate).
+  const genericPool = pricing.total - customMainRaw
+  const customerPriceBeforeDiscount = genericPool * parsedMarkup + customMainMarkedUp
   const discountAmount = customerPriceBeforeDiscount * (parsedDiscount / 100)
   const customerPriceAfterDiscount = customerPriceBeforeDiscount - discountAmount
   const SALES_TAX_RATE = 0.0775

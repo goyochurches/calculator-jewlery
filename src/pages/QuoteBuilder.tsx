@@ -1127,11 +1127,11 @@ export function QuoteBuilderPage() {
     customMainRaw += contrib
     customMainMarkedUp += contrib * n
   })
-  // Price shown to the customer (markup applied to cost, leaving engraving
-  // as a flat pass-through). Main stones with their own markup are pulled
-  // out of the generic-markup pool and marked up at their own rate.
-  const genericPool = pricing.total - pricing.engravingFee - customMainRaw
-  const customerPriceBeforeDiscount = genericPool * parsedMarkup + customMainMarkedUp + pricing.engravingFee
+  // Price shown to the customer: the markup applies to the WHOLE cost,
+  // engraving included. Main stones with their own markup are pulled out of
+  // the generic-markup pool and marked up at their own rate instead.
+  const genericPool = pricing.total - customMainRaw
+  const customerPriceBeforeDiscount = genericPool * parsedMarkup + customMainMarkedUp
   const discountAmount = customerPriceBeforeDiscount * (parsedDiscount / 100)
   const customerPriceAfterDiscount = customerPriceBeforeDiscount - discountAmount
   // 7.75% sales tax — only when the seller toggled it on. Mirrors the
@@ -1682,7 +1682,7 @@ export function QuoteBuilderPage() {
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   <label className="text-sm font-semibold text-slate-900">
                     Retail markup
-                    <span className="ml-2 text-xs font-normal text-slate-500">applied on top of cost (engraving excluded)</span>
+                    <span className="ml-2 text-xs font-normal text-slate-500">applied on top of the full cost (engraving included)</span>
                   </label>
                   <span className="text-xs font-medium text-slate-500">
                     Cost <strong className="text-slate-700">${pricing.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
