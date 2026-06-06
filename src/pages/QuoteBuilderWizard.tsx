@@ -736,13 +736,19 @@ function ReviewItem({ label, value }: { label: string; value: string }) {
 // ── Live price summary (sticky) ─────────────────────────────────────────────
 function PriceSummary({ qb }: { qb: QuoteBuilderState }) {
   const p = qb.pricing
-  const lines: Array<[string, number]> = [
-    ['Material reference', p.materialCost],
-    ["CAD design & Jeweler's time", p.ringLaborFee],
-    [`Supplied diamonds (${p.totalAmount} · ${p.totalCarats} ct)`, p.diamondCost + p.settingFee],
-    ...(qb.customerStones.length > 0 ? [[`Customer diamonds (${p.customerStoneCount})`, p.customerSettingFee] as [string, number]] : []),
-    ['Hand engraving', p.engravingFee],
-    ['Extra costs', qb.extraCosts],
+  const mk = qb.parsedMarkup
+  const suppliedCost = p.diamondCost + p.settingFee
+  // MAIN stones with their own markup are priced at that rate, so this line's
+  // retail isn't a flat cost × mk; every other line is.
+  const suppliedRetail = (suppliedCost - qb.customMainRaw) * mk + qb.customMainMarkedUp
+  // [label, cost, retail] — retail shows the selected markup applied per line.
+  const lines: Array<[string, number, number]> = [
+    ['Material reference', p.materialCost, p.materialCost * mk],
+    ["CAD design & Jeweler's time", p.ringLaborFee, p.ringLaborFee * mk],
+    [`Supplied diamonds (${p.totalAmount} · ${p.totalCarats} ct)`, suppliedCost, suppliedRetail],
+    ...(qb.customerStones.length > 0 ? [[`Customer diamonds (${p.customerStoneCount})`, p.customerSettingFee, p.customerSettingFee * mk] as [string, number, number]] : []),
+    ['Hand engraving', p.engravingFee, p.engravingFee * mk],
+    ['Extra costs', qb.extraCosts, qb.extraCosts * mk],
   ]
   return (
     <Card className="rounded-[30px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] xl:sticky xl:top-24">
@@ -762,12 +768,30 @@ function PriceSummary({ qb }: { qb: QuoteBuilderState }) {
           )}
         </div>
         <div className="space-y-2 text-sm">
-          {lines.map(([label, value]) => (
-            <div key={label} className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-2.5">
-              <span className="text-slate-500">{label}</span>
-              <span className="font-semibold text-slate-900">{money(value)}</span>
+          {/* Each line shows cost → retail so the selected markup is visibly
+              applied to every component (engraving included). */}
+          <div className="flex items-center justify-between gap-3 px-4 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+            <span>Item</span>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="w-16 text-right">Cost</span>
+              <span className="w-9 text-center">×{mk}</span>
+              <span className="w-20 text-right text-slate-500">Customer</span>
+            </div>
+          </div>
+          {lines.map(([label, cost, retail]) => (
+            <div key={label} className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-2.5">
+              <span className="min-w-0 flex-1 text-slate-500">{label}</span>
+              <div className="flex shrink-0 items-center gap-2 text-right">
+                <span className="w-16 text-right text-xs tabular-nums text-slate-400">{money(cost)}</span>
+                <span className="w-9 rounded-full bg-slate-200 py-0.5 text-center text-[10px] font-semibold text-slate-600">×{mk}</span>
+                <span className="w-20 text-right font-semibold tabular-nums text-slate-900">{money(retail)}</span>
+              </div>
             </div>
           ))}
+          <p className="px-1 text-[11px] text-slate-400">
+            Every line is multiplied by the selected <strong className="text-slate-600">{mk}×</strong> markup — engraving included.
+            {qb.parsedDiscount > 0 || qb.applyTaxes ? ' Discount/tax are applied to the customer total above.' : ''}
+          </p>
         </div>
       </CardContent>
     </Card>

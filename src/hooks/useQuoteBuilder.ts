@@ -777,6 +777,8 @@ export function useQuoteBuilder() {
     photo, photoInputRef, cameraInputRef, handlePhotoChange, handleRemovePhoto,
     // derived prices
     pricing,
+    customMainRaw,
+    customMainMarkedUp,
     discountAmount,
     customerPriceBeforeDiscount,
     customerPriceAfterDiscount,
