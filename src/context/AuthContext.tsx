@@ -55,13 +55,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsLoading(false)
       return
     }
-    api.get<AuthUser>('/api/auth/me')
-      .then((u) => setUser(u))
-      .catch(() => {
-        localStorage.removeItem(TOKEN_KEY)
-        setToken(null)
-      })
-      .finally(() => setIsLoading(false))
+
+    let cancelled = false
+
+    // The backend (Render free tier) can be cold-starting on first load, so a
+    // single /auth/me call may time out even with a perfectly valid token.
+    // Retry a few times before giving up so we don't leave the user stuck on
+    // the loading screen or needlessly kick them to /login.
+    async function loadSession() {
+      const MAX_ATTEMPTS = 3
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        try {
+          const u = await api.get<AuthUser>('/api/auth/me')
+          if (!cancelled) setUser(u)
+          break
+        } catch (err) {
+          // A real 401 means the token is invalid — apiClient already cleared
+          // it and redirected to /login, so stop retrying.
+          if (err instanceof Error && err.message === 'Session expired') break
+          // Otherwise it's a network/timeout error (likely cold start): wait a
+          // moment and retry. We keep the token so a later load can recover the
+          // session once the backend is awake.
+          if (attempt < MAX_ATTEMPTS && !cancelled) {
+            await new Promise((r) => setTimeout(r, 2000))
+          }
+        }
+      }
+      if (!cancelled) setIsLoading(false)
+    }
+
+    loadSession()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   async function login(email: string, password: string) {
