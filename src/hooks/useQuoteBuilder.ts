@@ -600,7 +600,9 @@ export function useQuoteBuilder() {
     setSaveError(null)
     try {
       const firstStone = mainStones[0] ?? sideStones[0] ?? meleeStones[0] ?? null
-      const autoStatus = parsedDiscount > 15 ? 'PENDING' : 'APPROVED'
+      // Every new quote starts PENDING and must be approved manually with the
+      // Approve button — no auto-approval, regardless of discount size.
+      const autoStatus = 'PENDING'
       const sameClientAsSource =
         duplicatedFrom != null &&
         client != null &&

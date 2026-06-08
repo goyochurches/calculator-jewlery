@@ -672,8 +672,8 @@ function StepPricing({ qb }: { qb: QuoteBuilderState }) {
               <button key={p} type="button" onClick={() => qb.setDiscountText(String(p))} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${qb.parsedDiscount === p ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{p}%</button>
             ))}
           </div>
-          <div className={`mt-2 rounded-2xl border px-3 py-2 text-xs ${qb.parsedDiscount > 15 ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
-            {qb.parsedDiscount > 15 ? 'Discounts above 15% need approval — saved as Pending.' : 'Discounts up to 15% are auto-approved — saved as Approved.'}
+          <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            Every quote is saved as Pending and must be approved with the Approve button.
           </div>
         </div>
 

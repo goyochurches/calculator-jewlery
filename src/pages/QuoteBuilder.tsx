@@ -1186,10 +1186,10 @@ export function QuoteBuilderPage() {
       // Legacy fields are populated with aggregates so older list views keep
       // rendering until they're rewritten to consume `stones` directly.
       const firstStone = mainStones[0] ?? sideStones[0] ?? meleeStones[0] ?? null
-      // Approval rule: discounts ≤ 15% are auto-approved (covers "no discount"
-      // and the everyday range). Anything above 15% lands in PENDING so a
-      // manager has to sign it off before the client sees it.
-      const autoStatus = parsedDiscount > 15 ? 'PENDING' : 'APPROVED'
+      // Approval rule: every new quote lands in PENDING and must be approved
+      // manually with the Approve button before the client sees it — no
+      // auto-approval, regardless of discount size.
+      const autoStatus = 'PENDING'
       // Revision tracking: if we got here via "Duplicate" AND the user kept
       // the same client, attach the new quote to the ROOT of the chain so
       // the listing shows it nested under the original. Changing the client
