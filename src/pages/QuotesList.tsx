@@ -12,7 +12,7 @@ import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { QuoteDetailPanel } from '@/components/QuoteDetailPanel'
 import { Bell, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CornerDownRight, Copy, ImageOff, Search, Trash2, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 const STATUS_STYLES: Record<QuoteStatus, string> = {
@@ -99,27 +99,13 @@ export function QuotesListPage() {
   // drawer open.
   const [deleteTarget, setDeleteTarget] = useState<SavedQuote | null>(null)
   const [deleting, setDeleting] = useState(false)
-  // `quotes` holds only the members of the groups on the CURRENT server page —
-  // pagination, filtering and search are all done server-side now (paginated by
-  // revision group, see quotesService.getGroupsPage).
   const [quotes, setQuotes] = useState<SavedQuote[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  // A deep-linked quote (?quoteId=) may live on a page we haven't loaded; we
-  // fetch it on its own so the detail drawer can still open it.
-  const [externalQuote, setExternalQuote] = useState<SavedQuote | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  // Server-driven pagination + chip counts (across the whole data set, not just
-  // the loaded page).
-  const [totalPages, setTotalPages] = useState(1)
-  const [totalGroups, setTotalGroups] = useState(0)
-  const [statusCounts, setStatusCounts] = useState<Record<QuoteStatus, number>>(
-    { draft: 0, pending: 0, approved: 0, processing: 0, rejected: 0, fully_paid: 0 },
-  )
   // Which parent groups are expanded. Start collapsed so the listing stays
   // compact; the chevron + "+N revisions" badge makes the affordance obvious.
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
@@ -132,79 +118,29 @@ export function QuotesListPage() {
     })
   }
 
-  // Debounce the search box so we don't hit the server on every keystroke.
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300)
-    return () => clearTimeout(t)
-  }, [searchQuery])
+    quotesService.getAll()
+      .then(setQuotes)
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
 
-  // Fetch the current server page of groups. Reused after mutations (approve,
-  // delete, payment changes) so the list reflects server-side cascades.
-  const fetchPage = useCallback(async () => {
-    try {
-      const res = await quotesService.getGroupsPage({
-        page: Math.max(0, page - 1),
-        size: pageSize,
-        status: statusFilter,
-        search: debouncedSearch,
-      })
-      setQuotes(res.quotes)
-      setTotalPages(res.totalPages)
-      setTotalGroups(res.totalGroups)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      // Only the very first load shows the skeleton; later page/filter changes
-      // swap the rows in place without blanking the table.
-      setLoading(false)
-    }
-  }, [page, pageSize, statusFilter, debouncedSearch])
-
-  // Chip + summary-card counts come from a dedicated server query so they
-  // reflect the whole data set, not just the loaded page. fully_paid folds into
-  // approved for viewers who can't see payments (mirrors displayStatusFor).
-  const reloadCounts = useCallback(async () => {
-    try {
-      const raw = await quotesService.getStatusCounts()
-      const folded: Record<QuoteStatus, number> = {
-        draft: 0, pending: 0, approved: 0, processing: 0, rejected: 0, fully_paid: 0,
-      }
-      Object.entries(raw).forEach(([k, v]) => {
-        const disp = displayStatusFor(k as QuoteStatus, user)
-        folded[disp] = (folded[disp] ?? 0) + v
-      })
-      setStatusCounts(folded)
-    } catch (err) {
-      console.error(err)
-    }
-  }, [user])
-
-  useEffect(() => { fetchPage() }, [fetchPage])
-  useEffect(() => { reloadCounts() }, [reloadCounts])
-
-  // Clear the deep-link fallback once the drawer closes.
-  useEffect(() => { if (!selectedId) setExternalQuote(null) }, [selectedId])
-
-  // Deep-link support: if the URL carries ?quoteId=X (e.g. from the Payments
-  // page or a notification), auto-open the detail panel for that quote. With
-  // server pagination the quote may not be on the loaded page, so we fetch it
-  // on its own when it isn't already present.
+  // Deep-link support: if the URL carries ?quoteId=X (e.g. from the
+  // Payments page or a notification), auto-open the detail panel for
+  // that quote once the list has loaded. We also expand its parent group
+  // if it's a revision so the row is actually visible.
   useEffect(() => {
     const deepLinkId = searchParams.get('quoteId')
-    if (!deepLinkId) return
-    setSelectedId(deepLinkId)
+    if (!deepLinkId || quotes.length === 0) return
     const match = quotes.find(q => q.id === deepLinkId)
-    if (match) {
-      if (match.parentQuoteId != null) {
-        setExpandedGroups(prev => {
-          const next = new Set(prev)
-          next.add(String(match.parentQuoteId))
-          return next
-        })
-      }
-    } else {
-      // Not on the current page — pull it directly so the drawer can open.
-      quotesService.get(deepLinkId).then(setExternalQuote).catch(console.error)
+    if (!match) return
+    setSelectedId(deepLinkId)
+    if (match.parentQuoteId != null) {
+      setExpandedGroups(prev => {
+        const next = new Set(prev)
+        next.add(String(match.parentQuoteId))
+        return next
+      })
     }
     // Strip the param so refreshing the page doesn't re-open after the
     // user closes the panel.
@@ -216,14 +152,17 @@ export function QuotesListPage() {
   const handleStatusChange = async (id: string, status: 'APPROVED' | 'REJECTED' | 'PENDING') => {
     try {
       const updated = await quotesService.updateStatus(id, status)
-      // Keep the open drawer / deep-linked quote in sync immediately.
-      setQuotes((prev) => prev.map((q) => (q.id === id ? updated : q)))
-      setExternalQuote((prev) => (prev && prev.id === id ? updated : prev))
-      // Approving a quote auto-rejects every other revision in its group on the
-      // server (QuoteGroupService.rejectGroupMembersExcept). Any status change
-      // also shifts the chip counts. Refetch the page + counts so cascaded
-      // REJECTED statuses and the new counts show without a manual reload.
-      await Promise.all([fetchPage(), reloadCounts()])
+      // Approving a quote auto-rejects every other revision in its group on
+      // the server (see QuoteGroupService.rejectGroupMembersExcept). Refetch
+      // the full list so those cascaded REJECTED statuses show immediately
+      // instead of waiting for the next page load. For non-approval changes
+      // an in-place swap is enough.
+      if (status === 'APPROVED') {
+        const fresh = await quotesService.getAll()
+        setQuotes(fresh)
+      } else {
+        setQuotes((prev) => prev.map((q) => (q.id === id ? updated : q)))
+      }
     } catch (err) {
       console.error(err)
     }
@@ -240,12 +179,10 @@ export function QuotesListPage() {
 
   const handleDelete = async (id: string) => {
     // Throws on failure so the panel can surface the error in its own dialog
-    // and keep the drawer open. On success we drop the row, close the drawer
-    // and refetch so the page stays full and counts/totals stay accurate.
+    // and keep the drawer open. On success we drop the row and close the drawer.
     await quotesService.remove(id)
     setQuotes((prev) => prev.filter((q) => q.id !== id))
     setSelectedId(null)
-    await Promise.all([fetchPage(), reloadCounts()])
   }
 
   // Confirmed delete straight from a table row (Actions column).
@@ -257,7 +194,6 @@ export function QuotesListPage() {
       setQuotes((prev) => prev.filter((q) => q.id !== deleteTarget.id))
       if (selectedId === deleteTarget.id) setSelectedId(null)
       setDeleteTarget(null)
-      await Promise.all([fetchPage(), reloadCounts()])
     } catch (err) {
       console.error(err)
     } finally {
@@ -359,19 +295,19 @@ export function QuotesListPage() {
   // Reset to page 1 whenever the filter set changes
   useEffect(() => {
     setPage(1)
-  }, [statusFilter, debouncedSearch, pageSize])
+  }, [statusFilter, searchQuery, pageSize])
 
-  // Pagination is server-side and by GROUP: the server already returned exactly
-  // one page of groups, so we render them all — no client-side slicing.
-  const safePage = Math.min(page, Math.max(1, totalPages))
+  // Pagination operates on GROUPS, so page size is predictable regardless of
+  // how many revisions any one parent has.
+  const totalPages = Math.max(1, Math.ceil(filteredGroups.length / pageSize))
+  const safePage = Math.min(page, totalPages)
   const pageStart = (safePage - 1) * pageSize
-  const pageEnd = pageStart + filteredGroups.length
-  const pagedGroups = filteredGroups
+  const pageEnd = Math.min(pageStart + pageSize, filteredGroups.length)
+  const pagedGroups = filteredGroups.slice(pageStart, pageEnd)
 
-  // The detail drawer resolves the selected quote from the current page, falling
-  // back to the separately-fetched deep-link quote when it lives off-page.
-  const selected = quotes.find((q) => q.id === selectedId)
-    ?? (externalQuote && externalQuote.id === selectedId ? externalQuote : null)
+  // The detail drawer needs to find any selected quote — parent or child —
+  // across the full (unfiltered) set.
+  const selected = quotes.find((q) => q.id === selectedId) ?? null
 
   // Lock body scroll while the detail drawer is open so the underlying
   // table doesn't scroll behind the overlay.
@@ -390,9 +326,13 @@ export function QuotesListPage() {
     return () => document.removeEventListener('keydown', onKey)
   }, [selected])
 
-  // Sum of all per-status counts = total quotes across the whole data set
-  // (used for the "All" chip). fully_paid was already folded into approved.
-  const allCount = Object.values(statusCounts).reduce((a, b) => a + b, 0)
+  // Counts use the DISPLAY status (fully_paid → approved for non-admins)
+  // so the dashboard tiles + filter chips never reveal the existence of
+  // payment-only statuses to users who shouldn't see them.
+  const statusCounts = quotes.reduce<Record<QuoteStatus, number>>(
+    (acc, q) => { acc[displayStatusFor(q.status, user)]++; return acc },
+    { draft: 0, pending: 0, approved: 0, processing: 0, rejected: 0, fully_paid: 0 }
+  )
 
   if (loading) return <QuotesListSkeleton />
 
@@ -449,7 +389,7 @@ export function QuotesListPage() {
           <div className="-mx-1 flex flex-wrap items-center gap-1.5 overflow-x-auto px-1">
             {STATUS_FILTER_OPTIONS.map((opt) => {
               const isActive = statusFilter === opt.value
-              const count = opt.value === 'all' ? allCount : statusCounts[opt.value]
+              const count = opt.value === 'all' ? quotes.length : statusCounts[opt.value]
               return (
                 <button
                   key={opt.value}
@@ -485,9 +425,9 @@ export function QuotesListPage() {
           <CardHeader className="border-b border-slate-100">
             <CardTitle className="text-base font-semibold text-slate-900">All quotes</CardTitle>
             <p className="text-sm text-slate-500">
-              {statusFilter === 'all' && debouncedSearch === ''
+              {filteredGroups.length === groups.length
                 ? 'Click any row to see the full breakdown. Duplicates with the same client appear as revisions below their original.'
-                : `${totalGroups} group${totalGroups === 1 ? '' : 's'} match the current filters.`}
+                : `Showing ${filteredGroups.length} of ${groups.length} quotes.`}
             </p>
           </CardHeader>
           <CardContent className="p-0">
@@ -554,13 +494,13 @@ export function QuotesListPage() {
                 </tbody>
               </table>
             </div>
-            {totalGroups > 0 && (
+            {filteredGroups.length > 0 && (
               <PaginationBar
                 page={safePage}
                 totalPages={totalPages}
                 pageStart={pageStart}
                 pageEnd={pageEnd}
-                total={totalGroups}
+                total={filteredGroups.length}
                 pageSize={pageSize}
                 onPageChange={setPage}
                 onPageSizeChange={setPageSize}
@@ -586,11 +526,10 @@ export function QuotesListPage() {
                 onDelete={isAdmin ? handleDelete : undefined}
                 isAdmin={isAdmin}
                 onPaymentChanged={() => {
-                  // Refetch the page + counts so the status badge of the
+                  // Refetch the full list so the status badge of the
                   // affected quote reflects the cascade (e.g. FULLY_PAID
                   // → APPROVED after a refund).
-                  fetchPage()
-                  reloadCounts()
+                  quotesService.getAll().then(setQuotes).catch(console.error)
                 }}
               />
             </div>
