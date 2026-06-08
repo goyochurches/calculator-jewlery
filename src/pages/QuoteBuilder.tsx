@@ -1789,21 +1789,12 @@ export function QuoteBuilderPage() {
                 <p className="text-xs text-slate-400">
                   Pick a preset or type any value. Leave empty (or pick None) to charge the full markup price.
                 </p>
-                <div className={`flex items-start gap-2 rounded-2xl border px-3 py-2 text-xs ${
-                  parsedDiscount > 15
-                    ? 'border-amber-200 bg-amber-50 text-amber-800'
-                    : 'border-emerald-200 bg-emerald-50 text-emerald-800'
-                }`}>
-                  <span className={`mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${
-                    parsedDiscount > 15 ? 'bg-amber-500' : 'bg-emerald-500'
-                  }`}>
-                    {parsedDiscount > 15 ? '!' : '✓'}
+                <div className="flex items-start gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+                    !
                   </span>
                   <span>
-                    {parsedDiscount > 15
-                      ? <>Discounts above 15% need approval — this quote will be saved as <strong>Pending</strong>.</>
-                      : <>Discounts up to 15% are auto-approved — this quote will be saved as <strong>Approved</strong>.</>
-                    }
+                    Every quote is saved as <strong>Pending</strong> and must be approved with the <strong>Approve</strong> button.
                   </span>
                 </div>
               </div>
