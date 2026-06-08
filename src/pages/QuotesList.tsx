@@ -216,17 +216,14 @@ export function QuotesListPage() {
   const handleStatusChange = async (id: string, status: 'APPROVED' | 'REJECTED' | 'PENDING') => {
     try {
       const updated = await quotesService.updateStatus(id, status)
-      // Approving a quote auto-rejects every other revision in its group on
-      // the server (see QuoteGroupService.rejectGroupMembersExcept). Refetch
-      // the full list so those cascaded REJECTED statuses show immediately
-      // instead of waiting for the next page load. For non-approval changes
-      // an in-place swap is enough.
-      if (status === 'APPROVED') {
-        const fresh = await quotesService.getAll()
-        setQuotes(fresh)
-      } else {
-        setQuotes((prev) => prev.map((q) => (q.id === id ? updated : q)))
-      }
+      // Keep the open drawer / deep-linked quote in sync immediately.
+      setQuotes((prev) => prev.map((q) => (q.id === id ? updated : q)))
+      setExternalQuote((prev) => (prev && prev.id === id ? updated : prev))
+      // Approving a quote auto-rejects every other revision in its group on the
+      // server (QuoteGroupService.rejectGroupMembersExcept). Any status change
+      // also shifts the chip counts. Refetch the page + counts so cascaded
+      // REJECTED statuses and the new counts show without a manual reload.
+      await Promise.all([fetchPage(), reloadCounts()])
     } catch (err) {
       console.error(err)
     }
@@ -243,10 +240,12 @@ export function QuotesListPage() {
 
   const handleDelete = async (id: string) => {
     // Throws on failure so the panel can surface the error in its own dialog
-    // and keep the drawer open. On success we drop the row and close the drawer.
+    // and keep the drawer open. On success we drop the row, close the drawer
+    // and refetch so the page stays full and counts/totals stay accurate.
     await quotesService.remove(id)
     setQuotes((prev) => prev.filter((q) => q.id !== id))
     setSelectedId(null)
+    await Promise.all([fetchPage(), reloadCounts()])
   }
 
   // Confirmed delete straight from a table row (Actions column).
@@ -258,6 +257,7 @@ export function QuotesListPage() {
       setQuotes((prev) => prev.filter((q) => q.id !== deleteTarget.id))
       if (selectedId === deleteTarget.id) setSelectedId(null)
       setDeleteTarget(null)
+      await Promise.all([fetchPage(), reloadCounts()])
     } catch (err) {
       console.error(err)
     } finally {
