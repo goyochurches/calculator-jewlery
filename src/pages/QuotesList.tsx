@@ -12,7 +12,7 @@ import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { QuoteDetailPanel } from '@/components/QuoteDetailPanel'
 import { Bell, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CornerDownRight, Copy, ImageOff, Search, Trash2, X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 
 const STATUS_STYLES: Record<QuoteStatus, string> = {
@@ -99,13 +99,27 @@ export function QuotesListPage() {
   // drawer open.
   const [deleteTarget, setDeleteTarget] = useState<SavedQuote | null>(null)
   const [deleting, setDeleting] = useState(false)
+  // `quotes` holds only the members of the groups on the CURRENT server page —
+  // pagination, filtering and search are all done server-side now (paginated by
+  // revision group, see quotesService.getGroupsPage).
   const [quotes, setQuotes] = useState<SavedQuote[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // A deep-linked quote (?quoteId=) may live on a page we haven't loaded; we
+  // fetch it on its own so the detail drawer can still open it.
+  const [externalQuote, setExternalQuote] = useState<SavedQuote | null>(null)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [searchQuery, setSearchQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  // Server-driven pagination + chip counts (across the whole data set, not just
+  // the loaded page).
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalGroups, setTotalGroups] = useState(0)
+  const [statusCounts, setStatusCounts] = useState<Record<QuoteStatus, number>>(
+    { draft: 0, pending: 0, approved: 0, processing: 0, rejected: 0, fully_paid: 0 },
+  )
   // Which parent groups are expanded. Start collapsed so the listing stays
   // compact; the chevron + "+N revisions" badge makes the affordance obvious.
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
@@ -118,29 +132,79 @@ export function QuotesListPage() {
     })
   }
 
+  // Debounce the search box so we don't hit the server on every keystroke.
   useEffect(() => {
-    quotesService.getAll()
-      .then(setQuotes)
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [])
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300)
+    return () => clearTimeout(t)
+  }, [searchQuery])
 
-  // Deep-link support: if the URL carries ?quoteId=X (e.g. from the
-  // Payments page or a notification), auto-open the detail panel for
-  // that quote once the list has loaded. We also expand its parent group
-  // if it's a revision so the row is actually visible.
+  // Fetch the current server page of groups. Reused after mutations (approve,
+  // delete, payment changes) so the list reflects server-side cascades.
+  const fetchPage = useCallback(async () => {
+    try {
+      const res = await quotesService.getGroupsPage({
+        page: Math.max(0, page - 1),
+        size: pageSize,
+        status: statusFilter,
+        search: debouncedSearch,
+      })
+      setQuotes(res.quotes)
+      setTotalPages(res.totalPages)
+      setTotalGroups(res.totalGroups)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      // Only the very first load shows the skeleton; later page/filter changes
+      // swap the rows in place without blanking the table.
+      setLoading(false)
+    }
+  }, [page, pageSize, statusFilter, debouncedSearch])
+
+  // Chip + summary-card counts come from a dedicated server query so they
+  // reflect the whole data set, not just the loaded page. fully_paid folds into
+  // approved for viewers who can't see payments (mirrors displayStatusFor).
+  const reloadCounts = useCallback(async () => {
+    try {
+      const raw = await quotesService.getStatusCounts()
+      const folded: Record<QuoteStatus, number> = {
+        draft: 0, pending: 0, approved: 0, processing: 0, rejected: 0, fully_paid: 0,
+      }
+      Object.entries(raw).forEach(([k, v]) => {
+        const disp = displayStatusFor(k as QuoteStatus, user)
+        folded[disp] = (folded[disp] ?? 0) + v
+      })
+      setStatusCounts(folded)
+    } catch (err) {
+      console.error(err)
+    }
+  }, [user])
+
+  useEffect(() => { fetchPage() }, [fetchPage])
+  useEffect(() => { reloadCounts() }, [reloadCounts])
+
+  // Clear the deep-link fallback once the drawer closes.
+  useEffect(() => { if (!selectedId) setExternalQuote(null) }, [selectedId])
+
+  // Deep-link support: if the URL carries ?quoteId=X (e.g. from the Payments
+  // page or a notification), auto-open the detail panel for that quote. With
+  // server pagination the quote may not be on the loaded page, so we fetch it
+  // on its own when it isn't already present.
   useEffect(() => {
     const deepLinkId = searchParams.get('quoteId')
-    if (!deepLinkId || quotes.length === 0) return
-    const match = quotes.find(q => q.id === deepLinkId)
-    if (!match) return
+    if (!deepLinkId) return
     setSelectedId(deepLinkId)
-    if (match.parentQuoteId != null) {
-      setExpandedGroups(prev => {
-        const next = new Set(prev)
-        next.add(String(match.parentQuoteId))
-        return next
-      })
+    const match = quotes.find(q => q.id === deepLinkId)
+    if (match) {
+      if (match.parentQuoteId != null) {
+        setExpandedGroups(prev => {
+          const next = new Set(prev)
+          next.add(String(match.parentQuoteId))
+          return next
+        })
+      }
+    } else {
+      // Not on the current page — pull it directly so the drawer can open.
+      quotesService.get(deepLinkId).then(setExternalQuote).catch(console.error)
     }
     // Strip the param so refreshing the page doesn't re-open after the
     // user closes the panel.
