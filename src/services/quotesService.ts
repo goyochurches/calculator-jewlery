@@ -252,6 +252,48 @@ export const quotesService = {
     return (data.content ?? []).map(mapQuote)
   },
 
+  /**
+   * One page of the quotes list, paginated by revision GROUP on the server so a
+   * parent quote and its revisions never split across pages. `content` holds
+   * every member of the groups on this page; the caller groups them for display.
+   * `status`/`search` filter the whole data set server-side.
+   */
+  async getGroupsPage(opts: {
+    page: number
+    size: number
+    status?: string | null
+    search?: string | null
+  }): Promise<{ quotes: SavedQuote[]; totalGroups: number; totalPages: number }> {
+    const params = new URLSearchParams()
+    params.set('page', String(Math.max(0, opts.page)))
+    params.set('size', String(opts.size))
+    if (opts.status && opts.status !== 'all') params.set('status', opts.status.toUpperCase())
+    if (opts.search && opts.search.trim()) params.set('search', opts.search.trim())
+    const data = await api.get<{ content: ApiQuote[]; totalGroups: number; totalPages: number }>(
+      `/api/quotes/groups?${params.toString()}`,
+    )
+    return {
+      quotes: (data.content ?? []).map(mapQuote),
+      totalGroups: data.totalGroups ?? 0,
+      totalPages: data.totalPages ?? 1,
+    }
+  },
+
+  /** Quote-level counts per status (lowercased keys) for the list's filter chips. */
+  async getStatusCounts(): Promise<Record<string, number>> {
+    const data = await api.get<Record<string, number>>('/api/quotes/stats/status-counts')
+    const out: Record<string, number> = {}
+    Object.entries(data ?? {}).forEach(([k, v]) => { out[k.toLowerCase()] = v })
+    return out
+  },
+
+  /** Full single quote by id — used when a deep-linked quote isn't on the
+   *  currently-loaded page so the detail drawer can still open it. */
+  async get(id: string): Promise<SavedQuote> {
+    const data = await api.get<ApiQuote>(`/api/quotes/${id}`)
+    return mapQuote(data)
+  },
+
   async create(
     payload: Omit<ApiQuote, 'id' | 'createdBy' | 'createdAt'>,
     userId: number,
