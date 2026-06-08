@@ -1,9 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
-/** Abort a request if it hangs (e.g. backend cold-start on Render) so callers
- *  fail fast instead of leaving the UI stuck — see AuthContext loading state. */
-const DEFAULT_TIMEOUT_MS = 15000
-
 function getToken(): string | null {
   return localStorage.getItem('auth-token')
 }
@@ -16,19 +12,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS)
-  let res: Response
-  try {
-    res = await fetch(`${BASE_URL}${path}`, { ...options, headers, signal: controller.signal })
-  } catch (err) {
-    if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new Error('Request timed out')
-    }
-    throw err
-  } finally {
-    clearTimeout(timer)
-  }
+  // No request timeout on purpose: the backend (Render free tier) spins down
+  // after inactivity, so a cold-start request can legitimately take 30–60s to
+  // wake up. We let the request wait as long as it needs rather than aborting
+  // and surfacing a misleading "invalid credentials" error on the login screen.
+  const res = await fetch(`${BASE_URL}${path}`, { ...options, headers })
 
   if (res.status === 401) {
     localStorage.removeItem('auth-token')
