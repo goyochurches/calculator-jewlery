@@ -273,6 +273,10 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
   const customerPrice = quote.customerPriceOverride != null
     ? quote.customerPriceOverride
     : customerPriceAfterDiscount + taxAmount
+  // Actual hand-engraving surcharge: the per-quote slider value (0–600). Legacy
+  // quotes stored no fee, so fall back to the old flat $150 when engraving is on.
+  const engravingFeeUsd = quote.engraving ? (quote.engravingFee ?? 150) : 0
+  const engravingFeeLabel = `$${engravingFeeUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
   const handleRefresh = async () => {
     if (!onRefreshToken) return
@@ -627,7 +631,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
         <div className="rounded-2xl bg-slate-50 px-4 py-3">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Engraving</p>
           <p className="mt-1.5 text-sm font-semibold text-slate-900">
-            {quote.engraving ? 'Yes — $150' : 'No'}
+            {quote.engraving ? `Yes — ${engravingFeeLabel}` : 'No'}
           </p>
         </div>
 
@@ -859,6 +863,12 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                                 <dt className="font-semibold uppercase tracking-wide text-slate-400">Amount</dt>
                                 <dd className="text-slate-900">{amount} stone{amount === 1 ? '' : 's'}</dd>
                               </div>
+                              {s.markupMultiplier != null && (
+                                <div className="col-span-2">
+                                  <dt className="font-semibold uppercase tracking-wide text-slate-400">Stone markup</dt>
+                                  <dd className="text-slate-900">{s.markupMultiplier}× <span className="text-slate-400">· overrides the quote-level markup for this stone</span></dd>
+                                </div>
+                              )}
                               <div className="col-span-2">
                                 <dt className="font-semibold uppercase tracking-wide text-slate-400">Type of setting</dt>
                                 <dd className="text-slate-900">{setter?.label ?? s.setterType ?? '—'}{setter ? ` — $${setter.fee.toLocaleString('en-US', { minimumFractionDigits: 2 })}/stone` : ''}</dd>
@@ -1046,7 +1056,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                 label={`Setting customer diamonds (${customerStoneQty} stone${customerStoneQty === 1 ? '' : 's'})`}
                 value={`$${customerStoneFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
             )}
-            <LineItem label="Hand engraving (milgrain)" value={quote.engraving ? '$150.00' : '$0.00'} />
+            <LineItem label="Hand engraving (milgrain)" value={engravingFeeLabel} />
             {quote.extraCosts > 0 && (
               <LineItem label="Extra costs" value={`$${quote.extraCosts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
             )}
