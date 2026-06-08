@@ -359,19 +359,19 @@ export function QuotesListPage() {
   // Reset to page 1 whenever the filter set changes
   useEffect(() => {
     setPage(1)
-  }, [statusFilter, searchQuery, pageSize])
+  }, [statusFilter, debouncedSearch, pageSize])
 
-  // Pagination operates on GROUPS, so page size is predictable regardless of
-  // how many revisions any one parent has.
-  const totalPages = Math.max(1, Math.ceil(filteredGroups.length / pageSize))
-  const safePage = Math.min(page, totalPages)
+  // Pagination is server-side and by GROUP: the server already returned exactly
+  // one page of groups, so we render them all — no client-side slicing.
+  const safePage = Math.min(page, Math.max(1, totalPages))
   const pageStart = (safePage - 1) * pageSize
-  const pageEnd = Math.min(pageStart + pageSize, filteredGroups.length)
-  const pagedGroups = filteredGroups.slice(pageStart, pageEnd)
+  const pageEnd = pageStart + filteredGroups.length
+  const pagedGroups = filteredGroups
 
-  // The detail drawer needs to find any selected quote — parent or child —
-  // across the full (unfiltered) set.
-  const selected = quotes.find((q) => q.id === selectedId) ?? null
+  // The detail drawer resolves the selected quote from the current page, falling
+  // back to the separately-fetched deep-link quote when it lives off-page.
+  const selected = quotes.find((q) => q.id === selectedId)
+    ?? (externalQuote && externalQuote.id === selectedId ? externalQuote : null)
 
   // Lock body scroll while the detail drawer is open so the underlying
   // table doesn't scroll behind the overlay.
@@ -390,13 +390,9 @@ export function QuotesListPage() {
     return () => document.removeEventListener('keydown', onKey)
   }, [selected])
 
-  // Counts use the DISPLAY status (fully_paid → approved for non-admins)
-  // so the dashboard tiles + filter chips never reveal the existence of
-  // payment-only statuses to users who shouldn't see them.
-  const statusCounts = quotes.reduce<Record<QuoteStatus, number>>(
-    (acc, q) => { acc[displayStatusFor(q.status, user)]++; return acc },
-    { draft: 0, pending: 0, approved: 0, processing: 0, rejected: 0, fully_paid: 0 }
-  )
+  // Sum of all per-status counts = total quotes across the whole data set
+  // (used for the "All" chip). fully_paid was already folded into approved.
+  const allCount = Object.values(statusCounts).reduce((a, b) => a + b, 0)
 
   if (loading) return <QuotesListSkeleton />
 
@@ -453,7 +449,7 @@ export function QuotesListPage() {
           <div className="-mx-1 flex flex-wrap items-center gap-1.5 overflow-x-auto px-1">
             {STATUS_FILTER_OPTIONS.map((opt) => {
               const isActive = statusFilter === opt.value
-              const count = opt.value === 'all' ? quotes.length : statusCounts[opt.value]
+              const count = opt.value === 'all' ? allCount : statusCounts[opt.value]
               return (
                 <button
                   key={opt.value}
@@ -489,9 +485,9 @@ export function QuotesListPage() {
           <CardHeader className="border-b border-slate-100">
             <CardTitle className="text-base font-semibold text-slate-900">All quotes</CardTitle>
             <p className="text-sm text-slate-500">
-              {filteredGroups.length === groups.length
+              {statusFilter === 'all' && debouncedSearch === ''
                 ? 'Click any row to see the full breakdown. Duplicates with the same client appear as revisions below their original.'
-                : `Showing ${filteredGroups.length} of ${groups.length} quotes.`}
+                : `${totalGroups} group${totalGroups === 1 ? '' : 's'} match the current filters.`}
             </p>
           </CardHeader>
           <CardContent className="p-0">
@@ -558,13 +554,13 @@ export function QuotesListPage() {
                 </tbody>
               </table>
             </div>
-            {filteredGroups.length > 0 && (
+            {totalGroups > 0 && (
               <PaginationBar
                 page={safePage}
                 totalPages={totalPages}
                 pageStart={pageStart}
                 pageEnd={pageEnd}
-                total={filteredGroups.length}
+                total={totalGroups}
                 pageSize={pageSize}
                 onPageChange={setPage}
                 onPageSizeChange={setPageSize}
@@ -590,10 +586,11 @@ export function QuotesListPage() {
                 onDelete={isAdmin ? handleDelete : undefined}
                 isAdmin={isAdmin}
                 onPaymentChanged={() => {
-                  // Refetch the full list so the status badge of the
+                  // Refetch the page + counts so the status badge of the
                   // affected quote reflects the cascade (e.g. FULLY_PAID
                   // → APPROVED after a refund).
-                  quotesService.getAll().then(setQuotes).catch(console.error)
+                  fetchPage()
+                  reloadCounts()
                 }}
               />
             </div>
