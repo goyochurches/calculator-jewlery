@@ -16,7 +16,7 @@ import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { Toast } from '@/components/Toast'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
-import { Calculator, Camera, Check, ChevronDown, ChevronUp, Copy, Crown, Diamond, Gem, ImagePlus, Layers3, Pin, PinOff, Ruler, Sparkles, User, X } from 'lucide-react'
+import { Calculator, Camera, Check, ChevronDown, ChevronUp, Copy, Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Pin, PinOff, Ruler, Sparkles, User, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -893,10 +893,10 @@ export function QuoteBuilderPage() {
                     href={verify.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold no-underline shadow-sm transition hover:shadow ${
                       verify.valid
-                        ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                        : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:border-emerald-400 hover:bg-emerald-100'
+                        : 'border-rose-300 bg-rose-50 text-rose-700 hover:border-rose-400 hover:bg-rose-100'
                     }`}
                     title={
                       verify.valid
@@ -904,7 +904,6 @@ export function QuoteBuilderPage() {
                         : `This doesn't look like a valid ${verify.lab} report number yet — opens ${verify.lab}'s report check anyway`
                     }
                   >
-                    {verify.valid ? `Verify on ${verify.lab}` : `Check ${verify.lab} #`}
                     {verify.valid ? (
                       <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
                         <path d="m5 13 4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
@@ -914,6 +913,8 @@ export function QuoteBuilderPage() {
                         <path d="M12 9v4m0 4h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.42 0Z" strokeLinecap="round" strokeLinejoin="round" />
                       </svg>
                     )}
+                    {verify.valid ? `Verify on ${verify.lab}` : `Check ${verify.lab} #`}
+                    <ExternalLink className="h-3 w-3 opacity-80" />
                   </a>
                 )}
                 {!verify && (

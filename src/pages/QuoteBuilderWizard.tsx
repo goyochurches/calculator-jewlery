@@ -31,7 +31,7 @@ import {
 } from '@/hooks/useQuoteBuilder'
 import {
   ArrowLeft, ArrowRight, Camera, Check, ChevronDown, ChevronUp, CircleDollarSign,
-  Crown, Diamond, Gem, ImagePlus, Layers3, Sparkles, User, X,
+  Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Sparkles, User, X,
 } from 'lucide-react'
 
 const money = (n: number) =>

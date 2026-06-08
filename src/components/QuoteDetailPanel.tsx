@@ -14,7 +14,8 @@ import { quotesService } from '@/services/quotesService'
 import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { NoticeDialog } from '@/components/NoticeDialog'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { AlertTriangle, Check, ChevronDown, ChevronUp, Copy, Eye, FileDown, MessageCircle, RefreshCw, Trash2, X, XCircle } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, ChevronUp, Copy, ExternalLink, Eye, FileDown, MessageCircle, RefreshCw, Trash2, X, XCircle } from 'lucide-react'
+import { labReportVerifyUrl } from '@/hooks/useQuoteBuilder'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -876,7 +877,30 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                               {s.role !== 'MELEE' && (
                                 <div className="col-span-2">
                                   <dt className="font-semibold uppercase tracking-wide text-slate-400">Lab report</dt>
-                                  <dd className={s.labReport ? 'text-slate-900 font-mono' : 'text-slate-400'}>{s.labReport || '— not provided'}</dd>
+                                  {s.labReport ? (
+                                    (() => {
+                                      const verify = labReportVerifyUrl(s.labReport)
+                                      return (
+                                        <dd className="mt-1 flex flex-wrap items-center gap-2">
+                                          <span className="font-mono text-slate-900">{s.labReport}</span>
+                                          {verify && (
+                                            <a
+                                              href={verify.url}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              title={`Opens ${verify.lab}'s official report check in a new tab to verify this certificate`}
+                                              className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 no-underline shadow-sm transition hover:border-emerald-400 hover:bg-emerald-100"
+                                            >
+                                              Verify on {verify.lab}
+                                              <ExternalLink className="h-3 w-3" />
+                                            </a>
+                                          )}
+                                        </dd>
+                                      )
+                                    })()
+                                  ) : (
+                                    <dd className="text-slate-400">— not provided</dd>
+                                  )}
                                 </div>
                               )}
                               {s.comments && (
