@@ -665,7 +665,19 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
           <div className="space-y-2">
             <LineItem label="Metal" value={metalCfg.label} />
             <LineItem label="Weight" value={`${quote.weightGrams ?? 0} g`} />
+            {(quote.ringWidth ?? 0) > 0 && (
+              <LineItem label="Ring width" value={`${quote.ringWidth} mm`} />
+            )}
+            {(quote.fingerSize ?? 0) > 0 && (
+              <LineItem label="Finger size" value={`${quote.fingerSize}`} />
+            )}
             <LineItem label="CAD & Jeweler's time" value={ringLaborCfg ? `${ringLaborCfg.label} — $${ringLaborCfg.fee}` : (quote.ringLabor ?? '—')} />
+            {(quote.laborHours ?? 0) > 0 && (
+              <LineItem
+                label="Bench labor"
+                value={`${quote.laborHours} h × $${quote.hourlyRate}/h = $${((quote.laborHours ?? 0) * (quote.hourlyRate ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+              />
+            )}
           </div>
         </div>
 
@@ -1045,6 +1057,33 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
               />
             )}
           </div>
+        </div>
+
+        {/* Pricing & markup — always visible so the jeweler can see exactly how
+            the customer price was derived (markup, discount, tax, any manual
+            override), even on quotes without a public share link where this
+            used to be hidden. */}
+        <div>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Pricing &amp; markup</p>
+          <div className="space-y-2">
+            <LineItem label="Our cost" value={`$${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+            <LineItem label="Markup multiplier" value={`${markup}×`} />
+            <LineItem label="Discount" value={discount > 0 ? `−${discount}%` : 'None'} />
+            <LineItem label="Sales tax (7.75%)" value={applyTaxes ? 'Applied' : 'Not applied'} />
+            {quote.customerPriceOverride != null && (
+              <LineItem
+                label="Custom total override"
+                value={`$${quote.customerPriceOverride.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+              />
+            )}
+            <LineItem label="Customer price" value={`$${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+          </div>
+          {quote.customerPriceOverride != null && (
+            <p className="mt-2 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2 text-xs text-amber-800">
+              <strong>Custom total applied</strong> — markup, discount and tax are bypassed.
+              {quote.customerPriceOverrideReason ? <> Reason: {quote.customerPriceOverrideReason}</> : null}
+            </p>
+          )}
         </div>
 
         {/* Payment plan — splits the customer-facing total into Stripe
