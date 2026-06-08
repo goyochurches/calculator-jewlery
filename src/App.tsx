@@ -3,6 +3,7 @@ import { ThemeProvider } from '@/context/ThemeContext'
 import { AuthProvider, useAuth } from '@/context/AuthContext'
 import { BrandProvider } from '@/context/BrandContext'
 import { MainLayout } from '@/layout/MainLayout'
+import { LoadingScreen } from '@/components/LoadingScreen'
 import { GemstonesPage } from '@/pages/Gemstones'
 import { QuoteBuilderPage } from '@/pages/QuoteBuilder'
 import { QuoteBuilderWizardPage } from '@/pages/QuoteBuilderWizard'
@@ -31,24 +32,7 @@ import { canAccess, defaultRouteFor, type NavKey } from '@/constants/permissions
 
 function PrivateRoutes() {
   const { isAuthenticated, isLoading } = useAuth()
-  if (isLoading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--theme-tertiary)' }}>
-      <div className="flex items-center gap-2">
-        <span
-          className="h-3 w-3 animate-bounce rounded-full"
-          style={{ backgroundColor: 'var(--theme-primary)', animationDelay: '0ms' }}
-        />
-        <span
-          className="h-3 w-3 animate-bounce rounded-full"
-          style={{ backgroundColor: 'var(--theme-primary)', animationDelay: '150ms' }}
-        />
-        <span
-          className="h-3 w-3 animate-bounce rounded-full"
-          style={{ backgroundColor: 'var(--theme-primary)', animationDelay: '300ms' }}
-        />
-      </div>
-    </div>
-  )
+  if (isLoading) return <LoadingScreen message="Loading your workspace…" />
   return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />
 }
 

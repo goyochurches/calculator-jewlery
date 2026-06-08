@@ -11,6 +11,19 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  // Render free tier spins the backend down after inactivity, so the first
+  // login of the day can hang for 30–60s while it wakes. Surface a reassuring
+  // hint once the wait drags on so the spinner doesn't read as "frozen".
+  const [showColdStartHint, setShowColdStartHint] = useState(false)
+
+  useEffect(() => {
+    if (!loading) {
+      setShowColdStartHint(false)
+      return
+    }
+    const t = setTimeout(() => setShowColdStartHint(true), 6000)
+    return () => clearTimeout(t)
+  }, [loading])
 
   // Drop a stale "Invalid email or password" the second the user starts
   // typing again — otherwise the error sticks visually even though the
@@ -140,6 +153,13 @@ export default function Login() {
                 'Sign in'
               )}
             </button>
+
+            {loading && showColdStartHint && (
+              <p className="text-center text-xs text-slate-400 leading-relaxed">
+                The server was idle and is waking up — this can take up to a
+                minute on the first sign-in. Hang tight…
+              </p>
+            )}
           </form>
         </div>
 

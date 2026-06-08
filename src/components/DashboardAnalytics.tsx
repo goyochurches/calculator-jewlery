@@ -100,7 +100,7 @@ export function DashboardAnalytics() {
           <Card className="rounded-[24px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
             <CardContent className="space-y-4 p-5">
               <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Call activity</p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <MiniStat icon={<Phone className="h-4 w-4 text-sky-600" />} label="Total" value={a.callsTotal} />
                 <MiniStat icon={<Phone className="h-4 w-4 text-emerald-600" />} label="Answered" value={a.callsAnswered} sub={`${answerRate}%`} />
                 <MiniStat icon={<PhoneMissed className="h-4 w-4 text-rose-600" />} label="Missed" value={a.callsMissed} />

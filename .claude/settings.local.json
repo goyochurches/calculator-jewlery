@@ -125,7 +125,12 @@
       "Bash(node *)",
       "Bash(mvn -v)",
       "Bash(gh pr create --base main --head feat/two-factor-auth --title 'feat\\(auth\\): two-factor authentication \\(TOTP\\)' --body ' *)",
-      "Bash(python3 -c \"import bcrypt; print\\(bcrypt.hashpw\\(b'Simone2026!', bcrypt.gensalt\\(rounds=10\\)\\).decode\\(\\)\\)\")"
+      "Bash(python3 -c \"import bcrypt; print\\(bcrypt.hashpw\\(b'Simone2026!', bcrypt.gensalt\\(rounds=10\\)\\).decode\\(\\)\\)\")",
+      "Bash(grep -v \"^$\")",
+      "Bash(Get-ChildItem -Path \"D:\\\\wamp64\\\\www\\\\calculator-jewlery\\\\src\" -Recurse -Directory)",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem \"D:\\\\wamp64\\\\www\\\\calculator-jewlery\\\\src\\\\components\" -Filter \"*.tsx\")",
+      "Bash(Select-Object -ExpandProperty Name)"
     ]
   }
 }
