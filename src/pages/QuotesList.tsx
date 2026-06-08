@@ -837,7 +837,7 @@ function QuoteRow({
               type="button"
               onClick={(e) => { e.stopPropagation(); onToggle?.() }}
               disabled={!canToggle}
-              title={expanded ? 'Hide older versions' : `Show ${childCount} older version${childCount === 1 ? '' : 's'} of this quote`}
+              title={expanded ? 'Hide previous versions' : `Show ${childCount} previous version${childCount === 1 ? '' : 's'} of this quote`}
               className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide shadow-sm ring-1 transition-all duration-200 ${
                 isSelected
                   ? 'bg-white/20 text-white ring-white/40 hover:bg-white/30'
@@ -851,7 +851,7 @@ function QuoteRow({
               }`}>
                 <ChevronDown className="h-3 w-3" />
               </span>
-              {expanded ? 'Hide' : 'Show'} {childCount} older {childCount === 1 ? 'version' : 'versions'}
+              {expanded ? 'Hide' : 'Show'} {childCount} previous {childCount === 1 ? 'version' : 'versions'}
             </button>
           )}
           {isChild && (
