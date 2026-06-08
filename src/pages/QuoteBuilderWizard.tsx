@@ -545,8 +545,10 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Lab report (optional)</label>
               {verify ? (
                 <a href={verify.url} target="_blank" rel="noopener noreferrer"
-                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition ${verify.valid ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' : 'bg-rose-50 text-rose-700 hover:bg-rose-100'}`}>
+                  title={`Opens ${verify.lab}'s official report check in a new tab`}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold no-underline shadow-sm transition hover:shadow ${verify.valid ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:border-emerald-400 hover:bg-emerald-100' : 'border-rose-300 bg-rose-50 text-rose-700 hover:border-rose-400 hover:bg-rose-100'}`}>
                   {verify.valid ? `Verify on ${verify.lab}` : `Check ${verify.lab} #`}
+                  <ExternalLink className="h-3 w-3 opacity-80" />
                 </a>
               ) : (
                 <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-400">Verify</span>
