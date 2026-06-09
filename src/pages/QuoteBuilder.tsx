@@ -1787,10 +1787,31 @@ export function QuoteBuilderPage() {
                   <option value={0}>{rn?.model ? '— Select a size' : '— Pick a model first'}</option>
                   {(rn?.model?.sizes ?? []).map(s => (
                     <option key={s.fingerSize} value={s.fingerSize}>
-                      SZ {s.fingerSize} — {s.numStones ?? 0} stones · {s.ctw ?? 0}ct
+                      SZ {s.fingerSize} — {s.numStones ?? 0} stones · {((s.numStones ?? 0) * (rn?.ctPerStone ?? 0)).toFixed(2)}ct
                     </option>
                   ))}
                 </select>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="text-sm font-semibold text-slate-900">Diamond type</label>
+                  <button type="button"
+                    onClick={() => setRnCompareOpen(true)}
+                    disabled={!rn?.model || !rn?.sizeRow || !rn?.metalCat}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40">
+                    <Diamond className="h-3.5 w-3.5" />
+                    Lab vs Natural
+                  </button>
+                </div>
+                <div className="inline-flex w-full rounded-2xl bg-slate-100 p-1">
+                  {([['natural', 'Natural'], ['lab-grown', 'Lab']] as const).map(([val, label]) => (
+                    <button key={val} type="button" onClick={() => setRnStoneType(val)}
+                      className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${rnStoneType === val ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {rnMode && rn && !rn.metalCat && (
