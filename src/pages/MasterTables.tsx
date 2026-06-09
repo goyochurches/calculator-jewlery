@@ -1123,16 +1123,23 @@ function RnRingsSection() {
 
               <div className="mt-4">
                 <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                  Stone count per ring size <span className="font-normal normal-case text-slate-400">· CTW is derived as stones × ct/stone from the diamond table</span>
+                  Stone count &amp; CTW per ring size <span className="font-normal normal-case text-slate-400">· CTW (from the RN sheet) is priced at the diamond table's $/ct</span>
                 </p>
                 <div className="flex flex-wrap gap-3">
                   {dr.sizes.map(s => (
                     <div key={s.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-2">
                       <p className="mb-1 text-center text-xs font-semibold text-slate-600">SZ {s.fingerSize}</p>
-                      <div className="w-20">
-                        <label className="text-[10px] uppercase text-slate-400">Stones</label>
-                        <TInput type="number" step="1" value={s.numStones ?? ''}
-                          onChange={e => patchSize(m.id, s.id, { numStones: e.target.value === '' ? null : Number(e.target.value) })} />
+                      <div className="flex items-center gap-1">
+                        <div className="w-16">
+                          <label className="text-[10px] uppercase text-slate-400">Stones</label>
+                          <TInput type="number" step="1" value={s.numStones ?? ''}
+                            onChange={e => patchSize(m.id, s.id, { numStones: e.target.value === '' ? null : Number(e.target.value) })} />
+                        </div>
+                        <div className="w-16">
+                          <label className="text-[10px] uppercase text-slate-400">CTW</label>
+                          <TInput type="number" step="any" value={s.ctw ?? ''}
+                            onChange={e => patchSize(m.id, s.id, { ctw: e.target.value === '' ? null : Number(e.target.value) })} />
+                        </div>
                       </div>
                     </div>
                   ))}

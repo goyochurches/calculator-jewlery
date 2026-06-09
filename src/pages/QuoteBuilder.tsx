@@ -150,15 +150,16 @@ function computeRnBreakdown(args: {
   const settingPerStone = model?.settingLaborPerStone ?? 0
   const sizeKey = stoneType === 'lab-grown' ? (model?.diamondSizeKeyLab ?? '') : (model?.diamondSizeKey ?? '')
   const diamondRow = model ? diamondSizeFor(stoneType, sizeKey) : undefined
+  // CTW is the fixed sheet value for this model + size (same physical stones for
+  // natural or lab); only the per-carat price differs by diamond type/table.
+  const ctw = sizeRow?.ctw ?? 0
   const pricePerCarat = diamondRow?.basePrice ?? 0
-  const ctPerStone = diamondRow?.ctPerStone ?? 0
-  const ctw = Math.round(numStones * ctPerStone * 10000) / 10000
   const goldCost = avgGrams * goldPerGram
   const settingLabor = numStones * settingPerStone
   const diamondCost = ctw * pricePerCarat
   return {
     stoneType, metalCat, goldPerGram, casting, avgGrams, numStones, settingPerStone,
-    sizeKey, pricePerCarat, ctPerStone, ctw, goldCost, settingLabor, diamondCost,
+    sizeKey, pricePerCarat, ctw, goldCost, settingLabor, diamondCost,
     hasDiamondRow: !!diamondRow,
     total: goldCost + casting + settingLabor + diamondCost,
   }
@@ -1787,7 +1788,7 @@ export function QuoteBuilderPage() {
                   <option value={0}>{rn?.model ? '— Select a size' : '— Pick a model first'}</option>
                   {(rn?.model?.sizes ?? []).map(s => (
                     <option key={s.fingerSize} value={s.fingerSize}>
-                      SZ {s.fingerSize} — {s.numStones ?? 0} stones · {((s.numStones ?? 0) * (rn?.ctPerStone ?? 0)).toFixed(2)}ct
+                      SZ {s.fingerSize} — {s.numStones ?? 0} stones · {s.ctw ?? 0}ct
                     </option>
                   ))}
                 </select>
@@ -1824,11 +1825,21 @@ export function QuoteBuilderPage() {
                 <div className="md:col-span-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
                   <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">RN breakdown</p>
                   <dl className="space-y-1.5 text-sm">
-                    <RnRow label={`Stones (${rn.numStones}) · CTW`} value={`${rn.ctw} ct`} />
+                    <RnRow label="Number of stones" value={`${rn.numStones}`} />
+                    <RnRow label="CTW (from sheet)" value={`${rn.ctw} ct`} />
                     <RnRow label={`Gold (${rn.avgGrams}g × $${rn.goldPerGram}/g)`} value={`$${rn.goldCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                     <RnRow label="Casting labor" value={`$${rn.casting.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                     <RnRow label={`Setting (${rn.numStones} × $${rn.settingPerStone})`} value={`$${rn.settingLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
-                    <RnRow label={`Diamonds (${rn.ctw}ct × $${rn.pricePerCarat}/ct)`} value={`$${rn.diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                    {rn.hasDiamondRow ? (
+                      <RnRow
+                        label={`Diamonds · ${rn.stoneType === 'lab-grown' ? 'Lab' : 'Natural'} (${rn.ctw}ct × $${rn.pricePerCarat}/ct)`}
+                        value={`$${rn.diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                    ) : (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        No <strong>{rn.stoneType === 'lab-grown' ? 'Lab' : 'Natural'}</strong> diamond price found for key
+                        {' '}“<strong>{rn.sizeKey || '—'}</strong>”. Set it in Master Tables → Diamond Sizes (or the RN model's key).
+                      </div>
+                    )}
                     <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-semibold text-slate-900">
                       <span>RN ring cost</span>
                       <span>${rn.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
