@@ -245,7 +245,6 @@ export function QuoteBuilderPage() {
   const [rnModelKey, setRnModelKey] = useState('')
   const [rnFingerSize, setRnFingerSize] = useState<number>(0)
   const [rnStoneType, setRnStoneType] = useState<RnStoneType>('natural')
-  const [rnCompareOpen, setRnCompareOpen] = useState(false)
 
   // Multi-stone breakdown: 0 or 1 MAIN, plus 0..N SIDE and 0..N MELEE.
   // amount lives in UI state so the user can override it independently of
@@ -1471,7 +1470,6 @@ export function QuoteBuilderPage() {
       setRnModelKey('')
       setRnFingerSize(0)
       setRnStoneType('natural')
-      setRnCompareOpen(false)
       setCustomerStones([])
       setAttachments([])
       setInternalNotes('')
@@ -1774,16 +1772,7 @@ export function QuoteBuilderPage() {
               </div>
 
               <div className="space-y-2 md:col-span-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <label className="text-sm font-semibold text-slate-900">Diamond type</label>
-                  <button type="button"
-                    onClick={() => setRnCompareOpen(true)}
-                    disabled={!rn?.model || !rn?.sizeRow || !rn?.metalCat}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:opacity-40">
-                    <Diamond className="h-3.5 w-3.5" />
-                    Lab vs Natural
-                  </button>
-                </div>
+                <label className="text-sm font-semibold text-slate-900">Diamond type</label>
                 <div className="inline-flex w-full rounded-2xl bg-slate-100 p-1">
                   {([['natural', 'Natural'], ['lab-grown', 'Lab']] as const).map(([val, label]) => (
                     <button key={val} type="button" onClick={() => setRnStoneType(val)}
@@ -1845,70 +1834,6 @@ export function QuoteBuilderPage() {
               )}
             </CardContent>
           </Card>
-          )}
-
-          {/* ── Lab vs Natural comparison popup ──────────────────────────── */}
-          {rnCompareOpen && rn && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
-              onClick={() => setRnCompareOpen(false)}>
-              <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900">Lab vs Natural</h3>
-                    <p className="text-xs text-slate-500">
-                      {rn.model?.modelKey} · SZ {rn.sizeRow?.fingerSize} · {selectedMetalConfig.label} · {rn.numStones} stones
-                    </p>
-                  </div>
-                  <button type="button" onClick={() => setRnCompareOpen(false)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <div className="mt-4 grid grid-cols-2 gap-3">
-                  {([['natural', 'Natural', rn.natural], ['lab-grown', 'Lab', rn.lab]] as const).map(([val, label, d]) => {
-                    const isCurrent = rnStoneType === val
-                    const isCheaper = rn.natural.total !== rn.lab.total &&
-                      d.total === Math.min(rn.natural.total, rn.lab.total)
-                    return (
-                      <div key={val} className={`rounded-2xl border p-4 ${isCurrent ? 'border-slate-900 ring-1 ring-slate-900' : 'border-slate-200'}`}>
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-semibold text-slate-900">{label}</p>
-                          {isCheaper && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Cheaper</span>}
-                        </div>
-                        {d.hasDiamondRow ? (
-                          <dl className="mt-2 space-y-1 text-xs">
-                            <RnRow label="CTW" value={`${d.ctw} ct`} />
-                            <RnRow label="$/ct" value={`$${d.pricePerCarat.toLocaleString('en-US')}`} />
-                            <RnRow label="Diamonds" value={`$${d.diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
-                            <div className="mt-1 flex items-center justify-between border-t border-slate-200 pt-1 text-sm font-semibold text-slate-900">
-                              <span>Ring cost</span>
-                              <span>${d.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                            </div>
-                          </dl>
-                        ) : (
-                          <p className="mt-2 text-xs text-slate-400">No {label.toLowerCase()} stone configured for this size.</p>
-                        )}
-                        <button type="button"
-                          onClick={() => { setRnStoneType(val); setRnCompareOpen(false) }}
-                          disabled={!d.hasDiamondRow}
-                          className={`mt-3 w-full rounded-xl px-3 py-2 text-xs font-semibold transition disabled:opacity-40 ${isCurrent ? 'bg-slate-100 text-slate-500' : 'bg-slate-900 text-white hover:bg-slate-700'}`}>
-                          {isCurrent ? 'Selected' : `Use ${label}`}
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {rn.natural.hasDiamondRow && rn.lab.hasDiamondRow && rn.natural.total !== rn.lab.total && (
-                  <p className="mt-4 rounded-2xl bg-emerald-50 px-4 py-2.5 text-center text-xs font-medium text-emerald-800">
-                    {rn.lab.total < rn.natural.total ? 'Lab' : 'Natural'} saves{' '}
-                    <strong>${Math.abs(rn.natural.total - rn.lab.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
-                    {' '}in cost on this ring.
-                  </p>
-                )}
-              </div>
-            </div>
           )}
 
           {/* Sección 1: CAD Design & Jeweler's Time */}
