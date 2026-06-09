@@ -312,14 +312,6 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
   // Trim trailing zeros so "0.5000" → "0.5", but keep "0.04" / "0.0095" intact.
   const formatCt = (n: number) => n.toFixed(4).replace(/\.?0+$/, '')
 
-  // When the jeweler did NOT fold sales tax into the total, the headline price
-  // is pre-tax — so instead of the misleading "All-inclusive" we surface the
-  // CA sales tax (7.75%) the customer will still owe, plus an estimated
-  // total-with-tax. When tax IS applied the quote already carries subtotal/tax.
-  const CA_SALES_TAX_RATE = 0.0775
-  const estimatedTax = quote.total * CA_SALES_TAX_RATE
-  const estimatedTotalWithTax = quote.total + estimatedTax
-
   // Full per-stone breakdown: one row per stone the jeweler added in the
   // builder, showing every customer-facing detail (count × size · shape ·
   // color · carats · certification). Newer quotes carry the stones[] array;
