@@ -360,6 +360,7 @@ function StepClient({ qb }: { qb: QuoteBuilderState }) {
 
 // ── Step 2: Material ────────────────────────────────────────────────────────
 function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
+  if (qb.rnMode) return <RnWizardStep qb={qb} />
   return (
     <SectionCard title="CAD design, metal & jeweler's time" subtitle="The body of the piece." icon={Layers3}>
       <div className="grid gap-5 md:grid-cols-2">
@@ -402,8 +403,122 @@ function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
   )
 }
 
+// ── Step 2 (RN mode): pre-configured RN ring ────────────────────────────────
+function RnWizardStep({ qb }: { qb: QuoteBuilderState }) {
+  const rn = qb.rn
+  return (
+    <SectionCard title="RN ring" subtitle="Pick a model, metal and ring size — stone count, CTW, gold and labor come from the RN tables." icon={Gem}>
+      <div className="grid gap-5 md:grid-cols-2">
+        <div>
+          <label className={labelCls}>Metal</label>
+          <select value={qb.selectedMetal} onChange={e => qb.setSelectedMetal(e.target.value as JewelryMetalOption)} className={inputCls}>
+            {METAL_GROUPS.map(g => (
+              <optgroup key={g.group} label={g.group}>
+                {g.keys.map(key => <option key={key} value={key}>{JEWELRY_METAL_OPTIONS[key].label}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelCls}>RN model</label>
+          <select value={qb.rnModelKey} onChange={e => { qb.setRnModelKey(e.target.value); qb.setRnFingerSize(0) }} className={inputCls}>
+            <option value="">— Select a model</option>
+            {qb.config.rnRings.map(m => <option key={m.modelKey} value={m.modelKey}>{m.label || m.modelKey}</option>)}
+          </select>
+        </div>
+        <div className="md:col-span-2">
+          <label className={labelCls}>Ring size</label>
+          <select value={qb.rnFingerSize} onChange={e => qb.setRnFingerSize(Number(e.target.value))} disabled={!rn?.model} className={`${inputCls} disabled:opacity-50`}>
+            <option value={0}>{rn?.model ? '— Select a size' : '— Pick a model first'}</option>
+            {(rn?.model?.sizes ?? []).map(s => (
+              <option key={s.fingerSize} value={s.fingerSize}>SZ {s.fingerSize} — {s.numStones ?? 0} stones · {s.ctw ?? 0}ct</option>
+            ))}
+          </select>
+        </div>
+        <div className="md:col-span-2">
+          <label className={labelCls}>Diamond type</label>
+          <div className="inline-flex w-full rounded-2xl bg-slate-100 p-1">
+            {([['natural', 'Natural'], ['lab-grown', 'Lab']] as const).map(([val, label]) => (
+              <button key={val} type="button" onClick={() => qb.setRnStoneType(val)}
+                className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${qb.rnStoneType === val ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {rn && !rn.metalCat && (
+          <p className="md:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+            RN rings are only priced in 14K / 18K gold or platinum. Pick one of those metals above.
+          </p>
+        )}
+
+        {rn?.model && rn?.sizeRow && rn.metalCat && (
+          <div className="md:col-span-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+            <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">RN breakdown</p>
+            <dl className="space-y-1.5 text-sm">
+              <RnLine label="Number of stones" value={`${rn.numStones}`} />
+              <RnLine label="CTW (from sheet)" value={`${rn.ctw} ct`} />
+              <RnLine label={`Gold (${rn.avgGrams}g × $${rn.goldPerGram}/g)`} value={money(rn.goldCost)} />
+              <RnLine label="Casting labor" value={money(rn.casting)} />
+              <RnLine label={`Setting (${rn.numStones} × $${rn.settingPerStone})`} value={money(rn.settingLabor)} />
+            </dl>
+            <p className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Diamonds · pick type</p>
+            <div className="grid grid-cols-2 gap-2">
+              {([['natural', 'Natural', rn.natural], ['lab-grown', 'Lab', rn.lab]] as const).map(([val, label, d]) => {
+                const isSel = qb.rnStoneType === val
+                const isCheaper = d.hasDiamondRow && rn.natural.hasDiamondRow && rn.lab.hasDiamondRow &&
+                  rn.natural.total !== rn.lab.total && d.total === Math.min(rn.natural.total, rn.lab.total)
+                return (
+                  <button key={val} type="button" onClick={() => qb.setRnStoneType(val)}
+                    className={`rounded-xl border p-3 text-left transition ${isSel ? 'border-slate-900 bg-white ring-1 ring-slate-900' : 'border-slate-200 bg-white/60 hover:border-slate-300'}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold text-slate-900">{label}</span>
+                      {isSel
+                        ? <span className="rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">USING</span>
+                        : isCheaper && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">CHEAPER</span>}
+                    </div>
+                    {d.hasDiamondRow ? (
+                      <>
+                        <p className="mt-1 text-[11px] text-slate-500">{rn.ctw}ct × ${d.pricePerCarat.toLocaleString('en-US')}/ct</p>
+                        <p className="text-[11px] text-slate-500">Diamonds {money(d.diamondCost)}</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-900">{money(d.total)}</p>
+                      </>
+                    ) : (
+                      <p className="mt-1 text-[11px] text-amber-700">No price for key “{d.sizeKey || '—'}”</p>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    </SectionCard>
+  )
+}
+
+function RnLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-slate-600">
+      <dt>{label}</dt>
+      <dd className="font-medium tabular-nums text-slate-900">{value}</dd>
+    </div>
+  )
+}
+
 // ── Step 3: Stones ──────────────────────────────────────────────────────────
 function StepStones({ qb }: { qb: QuoteBuilderState }) {
+  if (qb.rnMode) {
+    return (
+      <SectionCard title="Stones" subtitle="Set automatically by the RN model." icon={Gem}>
+        <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 text-sm text-slate-500">
+          This RN ring's stone count and CTW come from the selected model — there's nothing to add here.
+          Adjust the model, size or diamond type in the previous step.
+        </div>
+      </SectionCard>
+    )
+  }
   const groups: Array<{ role: StoneRole; items: StoneRow[]; hint: string }> = [
     { role: 'MAIN',  items: qb.mainStones,  hint: 'Center stones — each can carry its own markup.' },
     { role: 'SIDE',  items: qb.sideStones,  hint: 'Accent stones.' },

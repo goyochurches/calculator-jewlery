@@ -5,6 +5,7 @@ import { gemstoneService } from '@/services/gemstoneService'
 import { companyService, ENGRAVING_SLIDER_DEFAULTS } from '@/services/companyService'
 import { quotesService } from '@/services/quotesService'
 import { DIAMOND_TYPE_OPTIONS, JEWELRY_METAL_OPTIONS } from '@/constants/config'
+import { computeRnBreakdown, type RnStoneType } from '@/lib/rnPricing'
 import type { Client, GemstonePrice, JewelryMetalOption, SavedQuote } from '@/types'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -49,6 +50,7 @@ export const CUSTOMER_STONE_SETTER_KEYS = ['customer_melee', 'channel', 'bezel',
 // Catalogue of jewelry piece types. Stored as the key, label is for display.
 export const JEWELRY_TYPE_OPTIONS: Array<{ key: string; label: string }> = [
   { key: 'ring',      label: 'Ring' },
+  { key: 'rn',        label: 'RN ring' },
   { key: 'pendant',   label: 'Pendant' },
   { key: 'necklace',  label: 'Necklace' },
   { key: 'bracelet',  label: 'Bracelet' },
@@ -160,6 +162,12 @@ export function useQuoteBuilder() {
   const [customerPriceOverrideReason, setCustomerPriceOverrideReason] = useState('')
   const [editingOverride, setEditingOverride] = useState(false)
   const [overrideError, setOverrideError] = useState<string | null>(null)
+
+  // ── RN ring mode (driven by the "RN ring" type of piece) ─────────────
+  const rnMode = jewelryType === 'rn'
+  const [rnModelKey, setRnModelKey] = useState('')
+  const [rnFingerSize, setRnFingerSize] = useState<number>(0)
+  const [rnStoneType, setRnStoneType] = useState<RnStoneType>('natural')
 
   const [stones, setStones] = useState<StoneRow[]>([])
   const parseNum = (s: string) => {
@@ -466,6 +474,17 @@ export function useQuoteBuilder() {
   const sideStones  = stones.filter(s => s.role === 'SIDE')
   const meleeStones = stones.filter(s => s.role === 'MELEE')
 
+  const rn = useMemo(() => {
+    if (!rnMode) return null
+    const model = config.rnRings.find(m => m.modelKey === rnModelKey) ?? null
+    const sizeRow = model?.sizes.find(s => s.fingerSize === rnFingerSize) ?? null
+    const base = { model, sizeRow, metal: selectedMetal, diamondSizeFor: config.diamondSizeFor }
+    const natural = computeRnBreakdown({ ...base, stoneType: 'natural' as const })
+    const lab = computeRnBreakdown({ ...base, stoneType: 'lab-grown' as const })
+    const selected = rnStoneType === 'lab-grown' ? lab : natural
+    return { model, sizeRow, natural, lab, ...selected }
+  }, [rnMode, config, rnModelKey, rnFingerSize, selectedMetal, rnStoneType])
+
   const pricing = useMemo(() => {
     const metalPricePerGram = selectedMetalConfig.pricePerGram
     const materialCost = metalPricePerGram * weightGrams
@@ -503,34 +522,55 @@ export function useQuoteBuilder() {
       customerStoneCount += qty
     })
 
+    // In RN mode the material / labor / setting / diamond figures come from the
+    // resolved RN model instead of the manual inputs; engraving and extra costs
+    // still apply on top, and the markup/discount/tax pipeline is untouched.
+    const eff = rnMode && rn
+      ? {
+          metalPricePerGram: rn.goldPerGram,
+          materialCost: rn.goldCost,
+          ringLaborFee: rn.casting,
+          settingFee: rn.settingLabor,
+          diamondCost: rn.diamondCost,
+          customerSettingFee: 0,
+          customerStoneCount: 0,
+          totalCarats: rn.ctw,
+          totalAmount: rn.numStones,
+          stoneBreakdown: [] as typeof stoneBreakdown,
+        }
+      : {
+          metalPricePerGram, materialCost, ringLaborFee, settingFee, diamondCost,
+          customerSettingFee, customerStoneCount, totalCarats, totalAmount, stoneBreakdown,
+        }
+
     const total =
-      materialCost +
-      ringLaborFee +
+      eff.materialCost +
+      eff.ringLaborFee +
       cadFee +
-      settingFee +
-      customerSettingFee +
-      diamondCost +
+      eff.settingFee +
+      eff.customerSettingFee +
+      eff.diamondCost +
       engravingFeeVal +
       extraCosts
 
     return {
-      metalPricePerGram,
-      materialCost,
-      ringLaborFee,
+      metalPricePerGram: eff.metalPricePerGram,
+      materialCost: eff.materialCost,
+      ringLaborFee: eff.ringLaborFee,
       cadFee,
-      settingFee,
-      customerSettingFee,
-      customerStoneCount,
-      diamondCost,
+      settingFee: eff.settingFee,
+      customerSettingFee: eff.customerSettingFee,
+      customerStoneCount: eff.customerStoneCount,
+      diamondCost: eff.diamondCost,
       engravingFee: engravingFeeVal,
-      totalCarats: Math.round((Number(totalCarats) || 0) * 10000) / 10000,
-      totalAmount,
-      stoneBreakdown,
+      totalCarats: Math.round((Number(eff.totalCarats) || 0) * 10000) / 10000,
+      totalAmount: eff.totalAmount,
+      stoneBreakdown: eff.stoneBreakdown,
       total,
     }
   }, [
     config, customerStones, engravingFee, extraCosts, ringLabor, ringWidth,
-    selectedMetalConfig, stones, weightGrams,
+    selectedMetalConfig, stones, weightGrams, rnMode, rn,
   ])
 
   const parsedMarkup = (() => {
@@ -587,6 +627,16 @@ export function useQuoteBuilder() {
       setSaveError('Enter the stone price for any “Custom” size stone before creating the quote.')
       return
     }
+    if (rnMode) {
+      if (!rn?.model || !rn?.sizeRow) {
+        setSaveError('Pick an RN model and a ring size before creating the quote.')
+        return
+      }
+      if (!rn.metalCat) {
+        setSaveError('RN rings are only available in 14K / 18K gold or platinum — pick one of those metals.')
+        return
+      }
+    }
     if (pricing.total <= 0) {
       setSaveError("This quote is still $0 — add metal weight, a CAD/Jeweler's-time level, a stone or an extra cost before creating it.")
       return
@@ -611,37 +661,70 @@ export function useQuoteBuilder() {
       const parentQuoteRef = sameClientAsSource
         ? { id: duplicatedFrom!.parentQuoteId ?? Number(duplicatedFrom!.id) }
         : null
+
+      // RN mode: store the pavé as a single MELEE stone (manualPrice = the exact
+      // CTW-based diamond cost) and fold the labor/gold breakdown into the note.
+      const rnDiamondType: 'natural' | 'lab-grown' = rn?.stoneType ?? 'natural'
+      const rnStones = rnMode && rn?.model && rn?.sizeRow
+        ? [{
+            role: 'MELEE' as const,
+            stoneType: rnDiamondType,
+            sizeKey: rn.sizeKey,
+            carats: rn.ctw,
+            setterType: '',
+            labReport: null,
+            sortOrder: 0,
+            shape: null, color: null, cut: null, clarity: null,
+            manualPrice: Math.round(rn.diamondCost * 100) / 100,
+            comments: `${rn.model.modelKey} · SZ ${rn.sizeRow.fingerSize} · ${rn.numStones} stones · ${rn.ctw}ct`,
+            markupMultiplier: null,
+            contribution: Math.round((rn.diamondCost + rn.settingLabor) * 100) / 100,
+          }]
+        : null
+      const rnNote = rnMode && rn?.model
+        ? [
+            `RN ${rn.model.modelKey} · SZ ${rn.sizeRow?.fingerSize ?? '—'} · ${selectedMetalConfig.label} · ${rn.stoneType === 'lab-grown' ? 'Lab' : 'Natural'}`,
+            `Gold: ${rn.avgGrams}g × $${rn.goldPerGram}/g = $${rn.goldCost.toFixed(2)}`,
+            `Casting labor: $${rn.casting.toFixed(2)}`,
+            `Setting: ${rn.numStones} × $${rn.settingPerStone} = $${rn.settingLabor.toFixed(2)}`,
+            `Stones: ${rn.ctw}ct × $${rn.pricePerCarat}/ct = $${rn.diamondCost.toFixed(2)}`,
+          ].join('\n')
+        : null
+      const mergedInternalNotes = rnMode
+        ? ([rnNote, internalNotes.trim() || null].filter(Boolean).join('\n\n') || null)
+        : (internalNotes.trim() === '' ? null : internalNotes.trim())
+
       const q = await quotesService.create({
         title: quoteTitle.trim(),
         clientName: client ? `${client.name}${client.surname ? ' ' + client.surname : ''}` : '',
         client: client ?? undefined,
         status: autoStatus,
         metal: selectedMetal,
-        ringLabor,
-        cadDesign: ringLabor,
+        ringLabor: rnMode ? '' : ringLabor,
+        cadDesign: rnMode ? '' : ringLabor,
         diamondAmount: pricing.totalAmount,
         diamondCarats: pricing.totalCarats,
-        diamondType: firstStone?.stoneType ?? 'natural',
-        diamondSize: firstStone?.sizeKey ?? '',
-        weightGrams,
-        ringWidth,
-        fingerSize,
+        diamondType: rnMode ? rnDiamondType : (firstStone?.stoneType ?? 'natural'),
+        diamondSize: rnMode && rn ? rn.sizeKey : (firstStone?.sizeKey ?? ''),
+        weightGrams: rnMode && rn ? (rn.avgGrams ?? 0) : weightGrams,
+        ringWidth: rnMode ? 0 : ringWidth,
+        fingerSize: rnMode ? rnFingerSize : fingerSize,
         laborHours: 0,
         hourlyRate: 0,
         extraCosts,
         total: pricing.total,
         markupMultiplier: parsedMarkup,
         discountPercent: parsedDiscount,
-        internalNotes: internalNotes.trim() === '' ? null : internalNotes.trim(),
+        internalNotes: mergedInternalNotes,
         customerNotes: customerNotes.trim() === '' ? null : customerNotes.trim(),
         parentQuote: parentQuoteRef,
         photo: photo ?? undefined,
         engraving: engravingFee > 0,
         engravingFee,
         applyTaxes,
-        setterType: firstStone?.setterType ?? '',
+        setterType: rnMode ? '' : (firstStone?.setterType ?? ''),
         jewelryType,
-        stones: stones.map((s, idx) => {
+        stones: rnMode ? (rnStones ?? []) : stones.map((s, idx) => {
           const breakdown = stoneBreakdownByUid[s.uid]
           const contribution = breakdown ? breakdown.cost + breakdown.labor : 0
           const markupNum = (() => {
@@ -711,6 +794,9 @@ export function useQuoteBuilder() {
       setEditingOverride(false)
       setOverrideError(null)
       setStones([])
+      setRnModelKey('')
+      setRnFingerSize(0)
+      setRnStoneType('natural')
       setCustomerStones([])
       setAttachments([])
       setInternalNotes('')
@@ -758,6 +844,12 @@ export function useQuoteBuilder() {
     customerPriceOverrideReason, setCustomerPriceOverrideReason,
     editingOverride, setEditingOverride,
     overrideError, setOverrideError,
+    // RN ring mode
+    rnMode,
+    rnModelKey, setRnModelKey,
+    rnFingerSize, setRnFingerSize,
+    rnStoneType, setRnStoneType,
+    rn,
     // stones
     stones, setStones, parseNum,
     mainStones, sideStones, meleeStones,
