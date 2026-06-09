@@ -8,6 +8,7 @@ import {
   type DiamondSizeConfig,
   type FingerSizeConfig,
   type PricingTier,
+  type RnRingModelConfig,
   type SetterConfig,
   type StoneType,
 } from '@/services/configService'
@@ -978,7 +979,171 @@ export function MasterTablesPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── RN Ring Models ── */}
+      <RnRingsSection />
     </div>
+  )
+}
+
+// ── RN Ring Models section ──────────────────────────────────────────────────
+// Self-contained editor for the pre-configured RN pavé rings (RN-143 … RN-151).
+// Each model exposes its per-metal labor + gold price, average weight, per-stone
+// setting labor and the linked diamond size, plus an inline table of stone
+// count + CTW per finger size. "Save" persists the model scalars and every
+// size row in one go.
+function RnRingsSection() {
+  const [models, setModels] = useState<RnRingModelConfig[]>([])
+  const [drafts, setDrafts] = useState<Record<number, RnRingModelConfig>>({})
+  const [savingId, setSavingId] = useState<number | null>(null)
+  const [savedId, setSavedId] = useState<number | null>(null)
+
+  useEffect(() => {
+    configService.getRnRings().then(setModels).catch(console.error)
+  }, [])
+
+  const draftFor = (m: RnRingModelConfig) => drafts[m.id] ?? m
+  const baseFor = (id: number) => drafts[id] ?? models.find(m => m.id === id)!
+  const patch = (id: number, p: Partial<RnRingModelConfig>) =>
+    setDrafts(d => ({ ...d, [id]: { ...baseFor(id), ...p } }))
+  const patchSize = (id: number, sizeId: number, p: { numStones?: number | null; ctw?: number | null }) =>
+    setDrafts(d => {
+      const base = baseFor(id)
+      return { ...d, [id]: { ...base, sizes: base.sizes.map(s => s.id === sizeId ? { ...s, ...p } : s) } }
+    })
+
+  const numOrNull = (v: string): number | null => (v === '' ? null : Number(v))
+
+  const save = async (m: RnRingModelConfig) => {
+    const dr = draftFor(m)
+    setSavingId(m.id)
+    try {
+      let result = await configService.updateRnRing(m.id, {
+        label: dr.label,
+        stoneMm: dr.stoneMm,
+        diamondStoneType: dr.diamondStoneType,
+        diamondSizeKey: dr.diamondSizeKey,
+        avgGrams: dr.avgGrams,
+        settingLaborPerStone: dr.settingLaborPerStone,
+        labor14k: dr.labor14k,
+        labor18k: dr.labor18k,
+        laborPlat: dr.laborPlat,
+        goldPrice14k: dr.goldPrice14k,
+        goldPrice18k: dr.goldPrice18k,
+        goldPricePlat: dr.goldPricePlat,
+      })
+      for (const s of dr.sizes) {
+        result = await configService.updateRnRingSize(s.id, {
+          numStones: s.numStones ?? 0,
+          ctw: s.ctw ?? 0,
+        })
+      }
+      setModels(prev => prev.map(x => x.id === m.id ? result : x))
+      setDrafts(d => { const { [m.id]: _drop, ...rest } = d; return rest })
+      setSavedId(m.id)
+      setTimeout(() => setSavedId(null), 2000)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSavingId(null)
+    }
+  }
+
+  const numField = (label: string, value: number | null, onChange: (v: number | null) => void, prefix?: string) => (
+    <div className="space-y-1">
+      <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{label}</label>
+      <div className="relative">
+        {prefix && <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">{prefix}</span>}
+        <TInput type="number" step="any" value={value ?? ''} className={prefix ? 'pl-5' : undefined}
+          onChange={e => onChange(numOrNull(e.target.value))} />
+      </div>
+    </div>
+  )
+
+  return (
+    <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+      <CardHeader className="border-b border-slate-100">
+        <CardTitle className="text-base font-semibold text-slate-900">RN Ring Models</CardTitle>
+        <p className="text-sm text-slate-500">
+          Pre-configured pavé rings used by the Quote Builder's “RN ring” mode. Labor and gold price are per metal;
+          stone count + CTW are per ring size. Stone cost is priced from the linked diamond size.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-5 p-6">
+        {models.length === 0 && (
+          <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-3 text-sm text-slate-400">
+            No RN models loaded.
+          </p>
+        )}
+        {models.map(m => {
+          const dr = draftFor(m)
+          return (
+            <div key={m.id} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white">{m.modelKey}</span>
+                  <input value={dr.label ?? ''} onChange={e => patch(m.id, { label: e.target.value })}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-400" />
+                </div>
+                <div className="flex items-center gap-3">
+                  {savedId === m.id && <span className="text-xs font-medium text-emerald-600">Saved</span>}
+                  <Button size="sm" className="text-white" style={{ backgroundColor: 'var(--theme-primary)' }}
+                    onClick={() => save(m)} disabled={savingId === m.id}>
+                    {savingId === m.id ? 'Saving…' : 'Save'}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+                {numField('Stone mm', dr.stoneMm, v => patch(m.id, { stoneMm: v }))}
+                {numField('Avg grams', dr.avgGrams, v => patch(m.id, { avgGrams: v }))}
+                {numField('Setting / stone', dr.settingLaborPerStone, v => patch(m.id, { settingLaborPerStone: v }), '$')}
+                {numField('Labor 14K', dr.labor14k, v => patch(m.id, { labor14k: v }), '$')}
+                {numField('Labor 18K', dr.labor18k, v => patch(m.id, { labor18k: v }), '$')}
+                {numField('Labor PLAT', dr.laborPlat, v => patch(m.id, { laborPlat: v }), '$')}
+                {numField('Gold 14K /g', dr.goldPrice14k, v => patch(m.id, { goldPrice14k: v }), '$')}
+                {numField('Gold 18K /g', dr.goldPrice18k, v => patch(m.id, { goldPrice18k: v }), '$')}
+                {numField('Gold PLAT /g', dr.goldPricePlat, v => patch(m.id, { goldPricePlat: v }), '$')}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Diamond type</label>
+                  <TSelect value={dr.diamondStoneType} onChange={e => patch(m.id, { diamondStoneType: e.target.value })}>
+                    <option value="NATURAL">NATURAL</option>
+                    <option value="LAB">LAB</option>
+                  </TSelect>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Diamond size key</label>
+                  <TInput value={dr.diamondSizeKey} onChange={e => patch(m.id, { diamondSizeKey: e.target.value })} />
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Stone count &amp; CTW per ring size</p>
+                <div className="flex flex-wrap gap-3">
+                  {dr.sizes.map(s => (
+                    <div key={s.id} className="rounded-xl border border-slate-100 bg-slate-50/60 p-2">
+                      <p className="mb-1 text-center text-xs font-semibold text-slate-600">SZ {s.fingerSize}</p>
+                      <div className="flex items-center gap-1">
+                        <div className="w-16">
+                          <label className="text-[10px] uppercase text-slate-400">Stones</label>
+                          <TInput type="number" step="1" value={s.numStones ?? ''}
+                            onChange={e => patchSize(m.id, s.id, { numStones: e.target.value === '' ? null : Number(e.target.value) })} />
+                        </div>
+                        <div className="w-16">
+                          <label className="text-[10px] uppercase text-slate-400">CTW</label>
+                          <TInput type="number" step="any" value={s.ctw ?? ''}
+                            onChange={e => patchSize(m.id, s.id, { ctw: e.target.value === '' ? null : Number(e.target.value) })} />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </CardContent>
+    </Card>
   )
 }
 

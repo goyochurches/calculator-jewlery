@@ -3,6 +3,7 @@ import {
   type DiamondSizeConfig,
   type FingerSizeConfig,
   type PricingTier,
+  type RnRingModelConfig,
   type SetterConfig,
   type StoneType,
 } from '@/services/configService'
@@ -23,6 +24,7 @@ export interface QuoteConfig {
   cadTiers: PricingTier[]
   ringLaborTiers: PricingTier[]
   setters: SetterConfig[]
+  rnRings: RnRingModelConfig[]
   /** Look up the diamond-size row for a (stoneType, sizeKey) pair. The
    *  backend stores one row per stone_type AND size, so callers must pass
    *  the stone's type to get the right basePrice / ctPerStone — using
@@ -37,7 +39,7 @@ export interface QuoteConfig {
 }
 
 const EMPTY: QuoteConfig = {
-  diamondSizes: [], fingerSizes: [], cadTiers: [], ringLaborTiers: [], setters: [],
+  diamondSizes: [], fingerSizes: [], cadTiers: [], ringLaborTiers: [], setters: [], rnRings: [],
   diamondSizeFor: () => undefined,
   fingerSizeMap: {}, cadMap: {}, ringLaborMap: {}, setterMap: {},
   loading: true,
@@ -53,8 +55,11 @@ export function useQuoteConfig(): QuoteConfig {
       configService.getCadTiers(),
       configService.getRingLaborTiers(),
       configService.getSetters(),
+      // RN models live behind a newer endpoint; if the backend hasn't shipped
+      // it yet, degrade to an empty list instead of breaking the whole builder.
+      configService.getRnRings().catch(() => [] as Awaited<ReturnType<typeof configService.getRnRings>>),
     ])
-      .then(([diamondSizes, fingerSizes, cadTiers, ringLaborTiers, setters]) => {
+      .then(([diamondSizes, fingerSizes, cadTiers, ringLaborTiers, setters, rnRings]) => {
         const byTypeAndKey: Record<string, DiamondSizeConfig> = Object.fromEntries(
           diamondSizes.map(d => [`${d.stoneType}|${d.sizeKey}`, d])
         )
@@ -64,6 +69,7 @@ export function useQuoteConfig(): QuoteConfig {
           cadTiers,
           ringLaborTiers,
           setters,
+          rnRings,
           diamondSizeFor: (stoneType, sizeKey) =>
             byTypeAndKey[`${normalizeStoneType(stoneType)}|${sizeKey}`],
           fingerSizeMap: Object.fromEntries(fingerSizes.map(f => [f.size, f])),

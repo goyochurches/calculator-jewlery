@@ -35,6 +35,36 @@ export interface SetterConfig {
   sortOrder: number
 }
 
+/** Stone count + CTW for one finger size (SZ 4..8) of an RN ring model. */
+export interface RnRingSizeConfig {
+  id: number
+  fingerSize: number
+  numStones: number | null
+  ctw: number | null
+}
+
+/** A pre-configured "RN" pavé ring blank (RN-143 … RN-151). */
+export interface RnRingModelConfig {
+  id: number
+  modelKey: string
+  label: string
+  stoneMm: number | null
+  /** NATURAL | LAB — which diamond_size_config family to price from. */
+  diamondStoneType: string
+  /** size_key of the diamond row used for the per-carat stone price. */
+  diamondSizeKey: string
+  avgGrams: number | null
+  settingLaborPerStone: number | null
+  labor14k: number | null
+  labor18k: number | null
+  laborPlat: number | null
+  goldPrice14k: number | null
+  goldPrice18k: number | null
+  goldPricePlat: number | null
+  sortOrder: number
+  sizes: RnRingSizeConfig[]
+}
+
 export const configService = {
   getDiamondSizes: (): Promise<DiamondSizeConfig[]> =>
     api.get('/api/config/diamond-sizes'),
@@ -86,4 +116,19 @@ export const configService = {
 
   deleteSetter: (id: number): Promise<void> =>
     api.delete(`/api/config/setters/${id}`),
+
+  getRnRings: (): Promise<RnRingModelConfig[]> =>
+    api.get('/api/config/rn-rings'),
+
+  updateRnRing: (id: number, update: Partial<Omit<RnRingModelConfig, 'id' | 'sizes'>>): Promise<RnRingModelConfig> =>
+    api.put(`/api/config/rn-rings/${id}`, update),
+
+  createRnRing: (input: Omit<RnRingModelConfig, 'id'>): Promise<RnRingModelConfig> =>
+    api.post('/api/config/rn-rings', input),
+
+  deleteRnRing: (id: number): Promise<void> =>
+    api.delete(`/api/config/rn-rings/${id}`),
+
+  updateRnRingSize: (id: number, update: { numStones?: number; ctw?: number }): Promise<RnRingModelConfig> =>
+    api.put(`/api/config/rn-rings/sizes/${id}`, update),
 }

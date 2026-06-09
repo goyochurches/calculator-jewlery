@@ -113,6 +113,27 @@ const JEWELRY_TYPE_OPTIONS: Array<{ key: string; label: string }> = [
 ]
 
 
+// RN ring sheets carry one labor + gold price per metal *family* (14k / 18k /
+// platinum), independent of the white/yellow/rose color. Collapse the full
+// JewelryMetalOption down to that family so the RN tables can be indexed.
+type RnMetalCategory = '14k' | '18k' | 'plat'
+function rnMetalCategory(metal: JewelryMetalOption): RnMetalCategory | null {
+  if (metal === 'platinum') return 'plat'
+  if (metal.startsWith('gold-14k')) return '14k'
+  if (metal.startsWith('gold-18k')) return '18k'
+  return null // silver / unsupported — RN rings are gold/platinum only
+}
+
+/** One label/value row in the RN breakdown panel. */
+function RnRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-slate-600">
+      <dt>{label}</dt>
+      <dd className="font-medium tabular-nums text-slate-900">{value}</dd>
+    </div>
+  )
+}
+
 export function QuoteBuilderPage() {
   const { user } = useAuth()
   const config = useQuoteConfig()
@@ -170,6 +191,15 @@ export function QuoteBuilderPage() {
   const [customerPriceOverrideReason, setCustomerPriceOverrideReason] = useState('')
   const [editingOverride, setEditingOverride] = useState(false)
   const [overrideError, setOverrideError] = useState<string | null>(null)
+
+  // ── RN ring mode ─────────────────────────────────────────────────────
+  // When ON, the whole ring is priced from a single pre-configured RN model
+  // (RN-143 … RN-151) + finger size + metal, and the manual Material / Stone
+  // Setting inputs are hidden. The selected metal still drives which RN labor
+  // and gold-price column applies.
+  const [rnMode, setRnMode] = useState(false)
+  const [rnModelKey, setRnModelKey] = useState('')
+  const [rnFingerSize, setRnFingerSize] = useState<number>(0)
 
   // Multi-stone breakdown: 0 or 1 MAIN, plus 0..N SIDE and 0..N MELEE.
   // amount lives in UI state so the user can override it independently of
@@ -1023,6 +1053,38 @@ export function QuoteBuilderPage() {
     )
   }
 
+  // ── RN ring derived metrics ──────────────────────────────────────────
+  // Resolves the selected RN model + finger size + metal into the full cost
+  // breakdown, reusing the existing diamond_size_config row for the per-carat
+  // stone price (so "the CTW is priced from the stone tables we already have").
+  // Null whenever RN mode is off.
+  const rn = useMemo(() => {
+    if (!rnMode) return null
+    const model = config.rnRings.find(m => m.modelKey === rnModelKey) ?? null
+    const sizeRow = model?.sizes.find(s => s.fingerSize === rnFingerSize) ?? null
+    const metalCat = rnMetalCategory(selectedMetal)
+    const goldPerGram = model && metalCat
+      ? (metalCat === '14k' ? model.goldPrice14k : metalCat === '18k' ? model.goldPrice18k : model.goldPricePlat) ?? 0
+      : 0
+    const casting = model && metalCat
+      ? (metalCat === '14k' ? model.labor14k : metalCat === '18k' ? model.labor18k : model.laborPlat) ?? 0
+      : 0
+    const avgGrams = model?.avgGrams ?? 0
+    const numStones = sizeRow?.numStones ?? 0
+    const ctw = sizeRow?.ctw ?? 0
+    const settingPerStone = model?.settingLaborPerStone ?? 0
+    const diamondRow = model ? config.diamondSizeFor(model.diamondStoneType, model.diamondSizeKey) : undefined
+    const pricePerCarat = diamondRow?.basePrice ?? 0
+    const goldCost = avgGrams * goldPerGram
+    const settingLabor = numStones * settingPerStone
+    const diamondCost = ctw * pricePerCarat
+    return {
+      model, sizeRow, metalCat, goldPerGram, casting, avgGrams, numStones, ctw,
+      settingPerStone, pricePerCarat, goldCost, settingLabor, diamondCost,
+      total: goldCost + casting + settingLabor + diamondCost,
+    }
+  }, [rnMode, config, rnModelKey, rnFingerSize, selectedMetal])
+
   const pricing = useMemo(() => {
     const metalPricePerGram = selectedMetalConfig.pricePerGram
     const materialCost = metalPricePerGram * weightGrams
@@ -1066,34 +1128,56 @@ export function QuoteBuilderPage() {
       customerStoneCount += qty
     })
 
+    // In RN mode the material / labor / setting / diamond figures come from the
+    // resolved RN model instead of the manual inputs; engraving and extra costs
+    // still apply on top, and the rest of the pipeline (markup/discount/tax) is
+    // untouched.
+    const eff = rnMode && rn
+      ? {
+          metalPricePerGram: rn.goldPerGram,
+          materialCost: rn.goldCost,
+          ringLaborFee: rn.casting,
+          settingFee: rn.settingLabor,
+          diamondCost: rn.diamondCost,
+          customerSettingFee: 0,
+          customerStoneCount: 0,
+          totalCarats: rn.ctw,
+          totalAmount: rn.numStones,
+          stoneBreakdown: [] as typeof stoneBreakdown,
+        }
+      : {
+          metalPricePerGram, materialCost, ringLaborFee, settingFee, diamondCost,
+          customerSettingFee, customerStoneCount, totalCarats, totalAmount, stoneBreakdown,
+        }
+
     const total =
-      materialCost +
-      ringLaborFee +
+      eff.materialCost +
+      eff.ringLaborFee +
       cadFee +
-      settingFee +
-      customerSettingFee +
-      diamondCost +
+      eff.settingFee +
+      eff.customerSettingFee +
+      eff.diamondCost +
       engravingFeeVal +
       extraCosts
 
     return {
-      metalPricePerGram,
-      materialCost,
-      ringLaborFee,
+      metalPricePerGram: eff.metalPricePerGram,
+      materialCost: eff.materialCost,
+      ringLaborFee: eff.ringLaborFee,
       cadFee,
-      settingFee,
-      customerSettingFee,
-      customerStoneCount,
-      diamondCost,
+      settingFee: eff.settingFee,
+      customerSettingFee: eff.customerSettingFee,
+      customerStoneCount: eff.customerStoneCount,
+      diamondCost: eff.diamondCost,
       engravingFee: engravingFeeVal,
-      totalCarats: Math.round((Number(totalCarats) || 0) * 10000) / 10000,
-      totalAmount,
-      stoneBreakdown,
+      totalCarats: Math.round((Number(eff.totalCarats) || 0) * 10000) / 10000,
+      totalAmount: eff.totalAmount,
+      stoneBreakdown: eff.stoneBreakdown,
       total,
     }
   }, [
     config, customerStones, engravingFee, extraCosts, ringLabor, ringWidth,
-    selectedMetalConfig, stones, weightGrams,
+    selectedMetalConfig, stones, weightGrams, rnMode, rn,
   ])
 
   // Parse the markup once from the input. Empty / NaN falls back to the
@@ -1167,6 +1251,16 @@ export function QuoteBuilderPage() {
       setSaveError('Enter the stone price for any “Custom” size stone before creating the quote.')
       return
     }
+    if (rnMode) {
+      if (!rn?.model || !rn?.sizeRow) {
+        setSaveError('Pick an RN model and a ring size before creating the quote.')
+        return
+      }
+      if (!rn.metalCat) {
+        setSaveError('RN rings are only available in 14K / 18K gold or platinum — pick one of those metals.')
+        return
+      }
+    }
     // Can't create an empty quote: require a non-zero total (some metal
     // weight, labor, a stone, engraving or extra cost). Blocks saving a
     // brand-new quote while everything is still at 0.
@@ -1203,37 +1297,74 @@ export function QuoteBuilderPage() {
       const parentQuoteRef = sameClientAsSource
         ? { id: duplicatedFrom!.parentQuoteId ?? Number(duplicatedFrom!.id) }
         : null
+
+      // ── RN mode: derive the persisted shape from the selected model ──────
+      // The whole pavé is stored as a single MELEE stone whose manualPrice is
+      // the exact CTW-based diamond cost, so the detail view's stone line and
+      // the stored `total` agree. The labor/gold breakdown goes into the
+      // internal note for the jeweler.
+      const rnDiamondType: 'natural' | 'lab-grown' =
+        rn?.model?.diamondStoneType?.toUpperCase() === 'LAB' ? 'lab-grown' : 'natural'
+      const rnStones = rnMode && rn?.model && rn?.sizeRow
+        ? [{
+            role: 'MELEE' as const,
+            stoneType: rnDiamondType,
+            sizeKey: rn.model.diamondSizeKey,
+            carats: rn.ctw,
+            setterType: '',
+            labReport: null,
+            sortOrder: 0,
+            shape: null, color: null, cut: null, clarity: null,
+            manualPrice: Math.round(rn.diamondCost * 100) / 100,
+            comments: `${rn.model.modelKey} · SZ ${rn.sizeRow.fingerSize} · ${rn.numStones} stones · ${rn.ctw}ct`,
+            markupMultiplier: null,
+            contribution: Math.round((rn.diamondCost + rn.settingLabor) * 100) / 100,
+          }]
+        : null
+      const rnNote = rnMode && rn?.model
+        ? [
+            `RN ${rn.model.modelKey} · SZ ${rn.sizeRow?.fingerSize ?? '—'} · ${selectedMetalConfig.label}`,
+            `Gold: ${rn.avgGrams}g × $${rn.goldPerGram}/g = $${rn.goldCost.toFixed(2)}`,
+            `Casting labor: $${rn.casting.toFixed(2)}`,
+            `Setting: ${rn.numStones} × $${rn.settingPerStone} = $${rn.settingLabor.toFixed(2)}`,
+            `Stones: ${rn.ctw}ct × $${rn.pricePerCarat}/ct = $${rn.diamondCost.toFixed(2)}`,
+          ].join('\n')
+        : null
+      const mergedInternalNotes = rnMode
+        ? ([rnNote, internalNotes.trim() || null].filter(Boolean).join('\n\n') || null)
+        : (internalNotes.trim() === '' ? null : internalNotes.trim())
+
       const q = await quotesService.create({
         title: quoteTitle.trim(),
         clientName: client ? `${client.name}${client.surname ? ' ' + client.surname : ''}` : '',
         client: client ?? undefined,
         status: autoStatus,
         metal: selectedMetal,
-        ringLabor,
-        cadDesign: ringLabor,
+        ringLabor: rnMode ? '' : ringLabor,
+        cadDesign: rnMode ? '' : ringLabor,
         diamondAmount: pricing.totalAmount,
         diamondCarats: pricing.totalCarats,
-        diamondType: firstStone?.stoneType ?? 'natural',
-        diamondSize: firstStone?.sizeKey ?? '',
-        weightGrams,
-        ringWidth,
-        fingerSize,
+        diamondType: rnMode ? rnDiamondType : (firstStone?.stoneType ?? 'natural'),
+        diamondSize: rnMode && rn?.model ? rn.model.diamondSizeKey : (firstStone?.sizeKey ?? ''),
+        weightGrams: rnMode && rn ? (rn.avgGrams ?? 0) : weightGrams,
+        ringWidth: rnMode ? 0 : ringWidth,
+        fingerSize: rnMode ? rnFingerSize : fingerSize,
         laborHours: 0,
         hourlyRate: 0,
         extraCosts,
         total: pricing.total,
         markupMultiplier: parsedMarkup,
         discountPercent: parsedDiscount,
-        internalNotes: internalNotes.trim() === '' ? null : internalNotes.trim(),
+        internalNotes: mergedInternalNotes,
         customerNotes: customerNotes.trim() === '' ? null : customerNotes.trim(),
         parentQuote: parentQuoteRef,
         photo: photo ?? undefined,
         engraving: engravingFee > 0,
         engravingFee,
         applyTaxes,
-        setterType: firstStone?.setterType ?? '',
+        setterType: rnMode ? '' : (firstStone?.setterType ?? ''),
         jewelryType,
-        stones: stones.map((s, idx) => {
+        stones: rnMode ? (rnStones ?? []) : stones.map((s, idx) => {
           const breakdown = stoneBreakdownByUid[s.uid]
           const contribution = breakdown ? breakdown.cost + breakdown.labor : 0
           const markupNum = (() => {
@@ -1306,6 +1437,9 @@ export function QuoteBuilderPage() {
       setEditingOverride(false)
       setOverrideError(null)
       setStones([])
+      setRnMode(false)
+      setRnModelKey('')
+      setRnFingerSize(0)
       setCustomerStones([])
       setAttachments([])
       setInternalNotes('')
@@ -1556,20 +1690,123 @@ export function QuoteBuilderPage() {
             </CardContent>
           </Card>
 
+          {/* ── Pricing mode: Manual vs RN ring ──────────────────────────── */}
+          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+            <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Pricing mode</p>
+                <p className="text-xs text-slate-500">
+                  <strong>Manual</strong> builds from metal, labor and individual stones.{' '}
+                  <strong>RN ring</strong> prices a whole pre-set pavé from one model + size.
+                </p>
+              </div>
+              <div className="inline-flex shrink-0 rounded-full bg-slate-100 p-1">
+                <button type="button" onClick={() => setRnMode(false)}
+                  className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${!rnMode ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
+                  Manual
+                </button>
+                <button type="button" onClick={() => setRnMode(true)}
+                  className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${rnMode ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
+                  RN ring
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ── RN ring section (only in RN mode) ────────────────────────── */}
+          {rnMode && (
+          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+            <CardHeader className="border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Gem className="h-4 w-4 text-slate-500" />
+                <CardTitle className="text-base font-semibold text-slate-900">RN ring</CardTitle>
+              </div>
+              <p className="text-sm text-slate-500">
+                Pick a model, metal and ring size — stone count, CTW, gold and labor are filled from the RN tables.
+              </p>
+            </CardHeader>
+            <CardContent className="grid gap-5 pt-6 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-900">Metal</label>
+                <select value={selectedMetal} onChange={e => setSelectedMetal(e.target.value as JewelryMetalOption)}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
+                  {METAL_GROUPS.map(g => (
+                    <optgroup key={g.group} label={g.group}>
+                      {g.keys.map(key => (
+                        <option key={key} value={key}>{JEWELRY_METAL_OPTIONS[key].label}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-900">RN model</label>
+                <select value={rnModelKey} onChange={e => { setRnModelKey(e.target.value); setRnFingerSize(0) }}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
+                  <option value="">— Select a model</option>
+                  {config.rnRings.map(m => (
+                    <option key={m.modelKey} value={m.modelKey}>{m.label || m.modelKey}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-semibold text-slate-900">Ring size</label>
+                <select value={rnFingerSize} onChange={e => setRnFingerSize(Number(e.target.value))} disabled={!rn?.model}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white disabled:opacity-50">
+                  <option value={0}>{rn?.model ? '— Select a size' : '— Pick a model first'}</option>
+                  {(rn?.model?.sizes ?? []).map(s => (
+                    <option key={s.fingerSize} value={s.fingerSize}>
+                      SZ {s.fingerSize} — {s.numStones ?? 0} stones · {s.ctw ?? 0}ct
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {rnMode && rn && !rn.metalCat && (
+                <p className="md:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                  RN rings are only priced in 14K / 18K gold or platinum. Pick one of those metals above.
+                </p>
+              )}
+
+              {rn?.model && rn?.sizeRow && rn.metalCat && (
+                <div className="md:col-span-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">RN breakdown</p>
+                  <dl className="space-y-1.5 text-sm">
+                    <RnRow label={`Stones (${rn.numStones}) · CTW`} value={`${rn.ctw} ct`} />
+                    <RnRow label={`Gold (${rn.avgGrams}g × $${rn.goldPerGram}/g)`} value={`$${rn.goldCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                    <RnRow label="Casting labor" value={`$${rn.casting.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                    <RnRow label={`Setting (${rn.numStones} × $${rn.settingPerStone})`} value={`$${rn.settingLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                    <RnRow label={`Diamonds (${rn.ctw}ct × $${rn.pricePerCarat}/ct)`} value={`$${rn.diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                    <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-semibold text-slate-900">
+                      <span>RN ring cost</span>
+                      <span>${rn.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </dl>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          )}
+
           {/* Sección 1: CAD Design & Jeweler's Time */}
           <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
             <CardHeader className="border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Layers3 className="h-4 w-4 text-slate-500" />
                 <CardTitle className="text-base font-semibold text-slate-900">
-                  CAD Design &amp; Jeweler's Time
+                  {rnMode ? 'Pricing & options' : "CAD Design & Jeweler's Time"}
                 </CardTitle>
               </div>
               <p className="text-sm text-slate-500">
-                Metal, weight, ring dimensions, CAD complexity and jeweler's time.
+                {rnMode
+                  ? 'Engraving, tax, extra costs, markup and discount.'
+                  : 'Metal, weight, ring dimensions, CAD complexity and jeweler\'s time.'}
               </p>
             </CardHeader>
             <CardContent className="grid gap-5 pt-6 md:grid-cols-2">
+              {!rnMode && (<>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-900">Metal</label>
                 <select value={selectedMetal} onChange={e => setSelectedMetal(e.target.value as JewelryMetalOption)}
@@ -1626,6 +1863,7 @@ export function QuoteBuilderPage() {
                   ))}
                 </select>
               </div>
+              </>)}
 
               <div className="space-y-2 md:col-span-2">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -1802,7 +2040,8 @@ export function QuoteBuilderPage() {
             </CardContent>
           </Card>
 
-          {/* Sección 2: STONE SETTING */}
+          {/* Sección 2: STONE SETTING (hidden in RN mode — stones come from the model) */}
+          {!rnMode && (
           <Card className="relative overflow-hidden rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.10),transparent_45%),radial-gradient(circle_at_top_right,rgba(244,63,94,0.08),transparent_50%)]" aria-hidden />
             <CardHeader className="relative border-b border-slate-100">
@@ -2023,6 +2262,7 @@ export function QuoteBuilderPage() {
               </div>
             </CardContent>
           </Card>
+          )}
 
           {/* Sección: INTERNAL ATTACHMENTS — not shown to client */}
           <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
