@@ -861,19 +861,27 @@ function PriceSummary({ qb }: { qb: QuoteBuilderState }) {
   // MAIN stones with their own markup are priced at that rate, so the supplied
   // diamonds line's retail isn't a flat cost × mk; every other line is.
   const diamondRetail = (p.diamondCost - qb.customMainRaw) * mk + qb.customMainMarkedUp
-  // In RN mode the diamond type is a single choice for the whole ring, so we
-  // surface it on the supplied-diamonds line (Lab vs Natural).
-  const diamondType = qb.rnMode ? (qb.rnStoneType === 'lab-grown' ? ' — Lab-grown' : ' — Natural') : ''
   // [label, cost, retail] — retail shows the selected markup applied per line.
-  const lines: Array<[string, number, number]> = [
-    [`MATERIAL: ${qb.selectedMetalConfig.label}`, p.materialCost, p.materialCost * mk],
-    ['Labor', p.ringLaborFee, p.ringLaborFee * mk],
-    ['Setting labor', p.settingFee, p.settingFee * mk],
-    [`Supplied diamonds by us${diamondType} (${p.totalAmount} · ${p.totalCarats} ct)`, p.diamondCost, diamondRetail],
-    ...(qb.customerStones.length > 0 ? [[`Customer diamonds (${p.customerStoneCount})`, p.customerSettingFee, p.customerSettingFee * mk] as [string, number, number]] : []),
-    ['Hand engraving', p.engravingFee, p.engravingFee * mk],
-    ['Extra costs', qb.extraCosts, qb.extraCosts * mk],
-  ]
+  // RN rings use a dedicated wording (per Fabiola): MATERIAL/Labor, with setting
+  // labor and the supplied diamonds split out and the diamond type spelled out.
+  // The manual flow keeps its original labels untouched.
+  const lines: Array<[string, number, number]> = qb.rnMode
+    ? [
+        [`MATERIAL: ${qb.selectedMetalConfig.label}`, p.materialCost, p.materialCost * mk],
+        ['Labor', p.ringLaborFee, p.ringLaborFee * mk],
+        ['Setting labor', p.settingFee, p.settingFee * mk],
+        [`Supplied diamonds by us — ${qb.rnStoneType === 'lab-grown' ? 'Lab-grown' : 'Natural'} (${p.totalAmount} · ${p.totalCarats} ct)`, p.diamondCost, diamondRetail],
+        ['Hand engraving', p.engravingFee, p.engravingFee * mk],
+        ['Extra costs', qb.extraCosts, qb.extraCosts * mk],
+      ]
+    : [
+        ['Material reference', p.materialCost, p.materialCost * mk],
+        ["CAD design & Jeweler's time", p.ringLaborFee, p.ringLaborFee * mk],
+        [`Supplied diamonds (${p.totalAmount} · ${p.totalCarats} ct)`, p.diamondCost + p.settingFee, diamondRetail + p.settingFee * mk],
+        ...(qb.customerStones.length > 0 ? [[`Customer diamonds (${p.customerStoneCount})`, p.customerSettingFee, p.customerSettingFee * mk] as [string, number, number]] : []),
+        ['Hand engraving', p.engravingFee, p.engravingFee * mk],
+        ['Extra costs', qb.extraCosts, qb.extraCosts * mk],
+      ]
   return (
     <Card className="rounded-[30px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] xl:sticky xl:top-24">
       <CardContent className="space-y-4 p-6">
