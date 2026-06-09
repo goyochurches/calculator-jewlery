@@ -1824,27 +1824,44 @@ export function QuoteBuilderPage() {
               {rn?.model && rn?.sizeRow && rn.metalCat && (
                 <div className="md:col-span-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
                   <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">RN breakdown</p>
+                  {/* Shared across both diamond types (same physical ring). */}
                   <dl className="space-y-1.5 text-sm">
                     <RnRow label="Number of stones" value={`${rn.numStones}`} />
                     <RnRow label="CTW (from sheet)" value={`${rn.ctw} ct`} />
                     <RnRow label={`Gold (${rn.avgGrams}g × $${rn.goldPerGram}/g)`} value={`$${rn.goldCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                     <RnRow label="Casting labor" value={`$${rn.casting.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                     <RnRow label={`Setting (${rn.numStones} × $${rn.settingPerStone})`} value={`$${rn.settingLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
-                    {rn.hasDiamondRow ? (
-                      <RnRow
-                        label={`Diamonds · ${rn.stoneType === 'lab-grown' ? 'Lab' : 'Natural'} (${rn.ctw}ct × $${rn.pricePerCarat}/ct)`}
-                        value={`$${rn.diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
-                    ) : (
-                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                        No <strong>{rn.stoneType === 'lab-grown' ? 'Lab' : 'Natural'}</strong> diamond price found for key
-                        {' '}“<strong>{rn.sizeKey || '—'}</strong>”. Set it in Master Tables → Diamond Sizes (or the RN model's key).
-                      </div>
-                    )}
-                    <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 text-sm font-semibold text-slate-900">
-                      <span>RN ring cost</span>
-                      <span>${rn.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                    </div>
                   </dl>
+
+                  {/* Natural vs Lab side by side — tap one to use it in the quote. */}
+                  <p className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Diamonds · pick type</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {([['natural', 'Natural', rn.natural], ['lab-grown', 'Lab', rn.lab]] as const).map(([val, label, d]) => {
+                      const isSel = rnStoneType === val
+                      const isCheaper = d.hasDiamondRow && rn.natural.hasDiamondRow && rn.lab.hasDiamondRow &&
+                        rn.natural.total !== rn.lab.total && d.total === Math.min(rn.natural.total, rn.lab.total)
+                      return (
+                        <button key={val} type="button" onClick={() => setRnStoneType(val)}
+                          className={`rounded-xl border p-3 text-left transition ${isSel ? 'border-slate-900 bg-white ring-1 ring-slate-900' : 'border-slate-200 bg-white/60 hover:border-slate-300'}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold text-slate-900">{label}</span>
+                            {isSel
+                              ? <span className="rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">USING</span>
+                              : isCheaper && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">CHEAPER</span>}
+                          </div>
+                          {d.hasDiamondRow ? (
+                            <>
+                              <p className="mt-1 text-[11px] text-slate-500">{rn.ctw}ct × ${d.pricePerCarat.toLocaleString('en-US')}/ct</p>
+                              <p className="text-[11px] text-slate-500">Diamonds ${d.diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                              <p className="mt-1 text-sm font-semibold text-slate-900">${d.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                            </>
+                          ) : (
+                            <p className="mt-1 text-[11px] text-amber-700">No price for key “{d.sizeKey || '—'}”</p>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
             </CardContent>
