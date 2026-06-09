@@ -1,6 +1,5 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useHistory } from '@/hooks/useHistorial'
 import { gemstoneService } from '@/services/gemstoneService'
 import { companyService, ENGRAVING_SLIDER_DEFAULTS, type CompanySettings } from '@/services/companyService'
 import {
@@ -12,7 +11,7 @@ import {
   type SetterConfig,
   type StoneType,
 } from '@/services/configService'
-import type { GemstonePrice, HistorialEntry } from '../types'
+import type { GemstonePrice } from '../types'
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -27,12 +26,6 @@ const CATEGORY_STYLES: Record<GemstonePrice['category'], string> = {
   precious: 'bg-rose-50 text-rose-700',
   'semi-precious': 'bg-teal-50 text-teal-700',
   organic: 'bg-lime-50 text-lime-700',
-}
-
-const SIGNAL_STYLES: Record<HistorialEntry['signal'], string> = {
-  buy: 'bg-emerald-50 text-emerald-700',
-  sell: 'bg-rose-50 text-rose-700',
-  hold: 'bg-amber-50 text-amber-700',
 }
 
 const TH = ({ children }: { children: React.ReactNode }) => (
@@ -79,8 +72,6 @@ const BLANK_RL: Omit<PricingTier, 'id'> = {
 const pf = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
 export function MasterTablesPage() {
-  const { historyEntries: history } = useHistory()
-
   // ── Gemstones ────────────────────────────────────────────────────────────────
   const [gemstones, setGemstones] = useState<GemstonePrice[]>([])
   const [gemEditId, setGemEditId] = useState<string | null>(null)
@@ -331,7 +322,7 @@ export function MasterTablesPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Master Tables</h1>
-        <p className="mt-1 text-sm text-slate-500">Reference data for metals, gemstones, clients and price history.</p>
+        <p className="mt-1 text-sm text-slate-500">Reference data for metals, gemstones, diamonds and RN ring models.</p>
       </div>
 
       {/* ── Gemstones ── */}
@@ -457,45 +448,6 @@ export function MasterTablesPage() {
                     </td>
                   </tr>
                 )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ── History (read-only) ── */}
-      <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-        <CardHeader className="border-b border-slate-100">
-          <CardTitle className="text-base font-semibold text-slate-900">Price History</CardTitle>
-          <p className="text-sm text-slate-500">Historical signal entries across tracked instruments.</p>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[600px] text-sm">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/70">
-                  <TH>Date</TH><TH>Metal</TH><TH>Price</TH><TH>Change</TH><TH>Signal</TH>
-                </tr>
-              </thead>
-              <tbody>
-                {history.map((entry) => {
-                  const pos = entry.changePercent >= 0
-                  return (
-                    <tr key={entry.id} className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/80">
-                      <td className="px-6 py-4 text-slate-500">{entry.date}</td>
-                      <td className="px-6 py-4 font-semibold capitalize text-slate-900">{entry.metal}</td>
-                      <td className="px-6 py-4 font-semibold text-slate-900">{pf(entry.price)}</td>
-                      <td className={`px-6 py-4 font-medium ${pos ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {pos ? '+' : ''}{entry.changePercent.toFixed(2)}%
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${SIGNAL_STYLES[entry.signal]}`}>
-                          {entry.signal}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
               </tbody>
             </table>
           </div>
