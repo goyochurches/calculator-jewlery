@@ -460,7 +460,7 @@ function RnWizardStep({ qb }: { qb: QuoteBuilderState }) {
               <RnLine label="Number of stones" value={`${rn.numStones}`} />
               <RnLine label="CTW (from sheet)" value={`${rn.ctw} ct`} />
               <RnLine label={`Gold (${rn.avgGrams}g × $${rn.goldPerGram}/g)`} value={money(rn.goldCost)} />
-              <RnLine label="Casting labor" value={money(rn.casting)} />
+              <RnLine label="Labor" value={money(rn.casting)} />
               <RnLine label={`Setting (${rn.numStones} × $${rn.settingPerStone})`} value={money(rn.settingLabor)} />
             </dl>
             <p className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Diamonds · pick type</p>
@@ -858,15 +858,18 @@ function ReviewItem({ label, value }: { label: string; value: string }) {
 function PriceSummary({ qb }: { qb: QuoteBuilderState }) {
   const p = qb.pricing
   const mk = qb.parsedMarkup
-  const suppliedCost = p.diamondCost + p.settingFee
-  // MAIN stones with their own markup are priced at that rate, so this line's
-  // retail isn't a flat cost × mk; every other line is.
-  const suppliedRetail = (suppliedCost - qb.customMainRaw) * mk + qb.customMainMarkedUp
+  // MAIN stones with their own markup are priced at that rate, so the supplied
+  // diamonds line's retail isn't a flat cost × mk; every other line is.
+  const diamondRetail = (p.diamondCost - qb.customMainRaw) * mk + qb.customMainMarkedUp
+  // In RN mode the diamond type is a single choice for the whole ring, so we
+  // surface it on the supplied-diamonds line (Lab vs Natural).
+  const diamondType = qb.rnMode ? (qb.rnStoneType === 'lab-grown' ? ' — Lab-grown' : ' — Natural') : ''
   // [label, cost, retail] — retail shows the selected markup applied per line.
   const lines: Array<[string, number, number]> = [
-    ['Material reference', p.materialCost, p.materialCost * mk],
-    ["CAD design & Jeweler's time", p.ringLaborFee, p.ringLaborFee * mk],
-    [`Supplied diamonds (${p.totalAmount} · ${p.totalCarats} ct)`, suppliedCost, suppliedRetail],
+    [`MATERIAL: ${qb.selectedMetalConfig.label}`, p.materialCost, p.materialCost * mk],
+    ['Labor', p.ringLaborFee, p.ringLaborFee * mk],
+    ['Setting labor', p.settingFee, p.settingFee * mk],
+    [`Supplied diamonds by us${diamondType} (${p.totalAmount} · ${p.totalCarats} ct)`, p.diamondCost, diamondRetail],
     ...(qb.customerStones.length > 0 ? [[`Customer diamonds (${p.customerStoneCount})`, p.customerSettingFee, p.customerSettingFee * mk] as [string, number, number]] : []),
     ['Hand engraving', p.engravingFee, p.engravingFee * mk],
     ['Extra costs', qb.extraCosts, qb.extraCosts * mk],
