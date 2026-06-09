@@ -410,10 +410,8 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
     `PRICE: ${fmtMoney(quote.total)} USD`,
     quote.applyTaxes ? `  Subtotal: ${fmtMoney(quote.subtotal)}` : null,
     quote.applyTaxes ? `  Sales tax (7.75%): ${fmtMoney(quote.taxAmount)}` : null,
-    !quote.applyTaxes ? `  + CA sales tax (7.75%): ${fmtMoney(estimatedTax)}` : null,
-    !quote.applyTaxes ? `  Estimated total with tax: ${fmtMoney(estimatedTotalWithTax)}` : null,
     quote.discountPercent > 0 ? `  You save ${fmtMoney(quote.discountAmount)} (${quote.discountPercent}% off)` : null,
-    quote.applyTaxes ? 'Includes 7.75% sales tax' : 'Plus CA sales tax (7.75%)',
+    quote.applyTaxes ? 'Includes 7.75% sales tax' : 'All-inclusive',
     '',
     'SPECIFICATIONS',
     ...specs.map(s => `• ${s.label}: ${s.value}`),
@@ -480,16 +478,9 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
                 <div className="flex justify-between"><span>Sales tax (7.75%)</span><span>${quote.taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
               </div>
             )}
-            {!quote.applyTaxes && (
-              <div className="mt-4 space-y-1 border-t border-white/15 pt-3 text-[12px] text-white/75">
-                <div className="flex justify-between"><span>Price</span><span>${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
-                <div className="flex justify-between"><span>CA sales tax (7.75%)</span><span>+${estimatedTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
-                <div className="flex justify-between font-semibold text-white/90"><span>Estimated total with tax</span><span>${estimatedTotalWithTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
-              </div>
-            )}
             <div className="mx-auto mt-3 h-px w-16 bg-gradient-to-r from-transparent via-amber-300/80 to-transparent" />
             <p className="mt-3 text-[11px] uppercase tracking-[0.28em] text-white/55">
-              {quote.applyTaxes ? 'Includes 7.75% sales tax' : 'Plus CA sales tax (7.75%)'} · USD
+              {quote.applyTaxes ? 'Includes 7.75% sales tax' : 'All-inclusive'} · USD
             </p>
           </div>
 
