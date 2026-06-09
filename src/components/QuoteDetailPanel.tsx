@@ -302,7 +302,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
 
   const metalCfg = JEWELRY_METAL_OPTIONS[quote.metal] ?? { label: quote.metal }
   const JEWELRY_TYPE_LABELS: Record<string, string> = {
-    ring: 'Ring', pendant: 'Pendant', necklace: 'Necklace', bracelet: 'Bracelet',
+    ring: 'Ring', rn: 'RN ring', pendant: 'Pendant', necklace: 'Necklace', bracelet: 'Bracelet',
     earrings: 'Earrings', cufflinks: 'Cufflinks', brooch: 'Brooch', anklet: 'Anklet',
     other: 'Other',
   }

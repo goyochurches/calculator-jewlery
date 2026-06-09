@@ -103,6 +103,7 @@ function labReportVerifyUrl(raw: string): { url: string; lab: string; valid: boo
 // Catalogue of jewelry piece types. Stored as the key, label is for display.
 const JEWELRY_TYPE_OPTIONS: Array<{ key: string; label: string }> = [
   { key: 'ring',      label: 'Ring' },
+  { key: 'rn',        label: 'RN ring' },
   { key: 'pendant',   label: 'Pendant' },
   { key: 'necklace',  label: 'Necklace' },
   { key: 'bracelet',  label: 'Bracelet' },
@@ -238,7 +239,9 @@ export function QuoteBuilderPage() {
   // (RN-143 … RN-151) + finger size + metal, and the manual Material / Stone
   // Setting inputs are hidden. The selected metal still drives which RN labor
   // and gold-price column applies.
-  const [rnMode, setRnMode] = useState(false)
+  // RN mode is now driven by the "Type of piece" picker — choosing "RN ring"
+  // turns the builder into the pre-configured RN flow.
+  const rnMode = jewelryType === 'rn'
   const [rnModelKey, setRnModelKey] = useState('')
   const [rnFingerSize, setRnFingerSize] = useState<number>(0)
   const [rnStoneType, setRnStoneType] = useState<RnStoneType>('natural')
@@ -1465,7 +1468,6 @@ export function QuoteBuilderPage() {
       setEditingOverride(false)
       setOverrideError(null)
       setStones([])
-      setRnMode(false)
       setRnModelKey('')
       setRnFingerSize(0)
       setRnStoneType('natural')
@@ -1720,30 +1722,7 @@ export function QuoteBuilderPage() {
             </CardContent>
           </Card>
 
-          {/* ── Pricing mode: Manual vs RN ring ──────────────────────────── */}
-          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
-            <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">Pricing mode</p>
-                <p className="text-xs text-slate-500">
-                  <strong>Manual</strong> builds from metal, labor and individual stones.{' '}
-                  <strong>RN ring</strong> prices a whole pre-set pavé from one model + size.
-                </p>
-              </div>
-              <div className="inline-flex shrink-0 rounded-full bg-slate-100 p-1">
-                <button type="button" onClick={() => setRnMode(false)}
-                  className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${!rnMode ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
-                  Manual
-                </button>
-                <button type="button" onClick={() => setRnMode(true)}
-                  className={`rounded-full px-4 py-1.5 text-xs font-semibold transition ${rnMode ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}>
-                  RN ring
-                </button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* ── RN ring section (only in RN mode) ────────────────────────── */}
+          {/* ── RN ring section (shown when "RN ring" is the type of piece) ── */}
           {rnMode && (
           <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
             <CardHeader className="border-b border-slate-100">
