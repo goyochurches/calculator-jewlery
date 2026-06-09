@@ -1840,6 +1840,70 @@ export function QuoteBuilderPage() {
           </Card>
           )}
 
+          {/* ── Lab vs Natural comparison popup ──────────────────────────── */}
+          {rnCompareOpen && rn && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
+              onClick={() => setRnCompareOpen(false)}>
+              <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-slate-900">Lab vs Natural</h3>
+                    <p className="text-xs text-slate-500">
+                      {rn.model?.modelKey} · SZ {rn.sizeRow?.fingerSize} · {selectedMetalConfig.label} · {rn.numStones} stones
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => setRnCompareOpen(false)}
+                    className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  {([['natural', 'Natural', rn.natural], ['lab-grown', 'Lab', rn.lab]] as const).map(([val, label, d]) => {
+                    const isCurrent = rnStoneType === val
+                    const isCheaper = rn.natural.total !== rn.lab.total &&
+                      d.total === Math.min(rn.natural.total, rn.lab.total)
+                    return (
+                      <div key={val} className={`rounded-2xl border p-4 ${isCurrent ? 'border-slate-900 ring-1 ring-slate-900' : 'border-slate-200'}`}>
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold text-slate-900">{label}</p>
+                          {isCheaper && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Cheaper</span>}
+                        </div>
+                        {d.hasDiamondRow ? (
+                          <dl className="mt-2 space-y-1 text-xs">
+                            <RnRow label="CTW" value={`${d.ctw} ct`} />
+                            <RnRow label="$/ct" value={`$${d.pricePerCarat.toLocaleString('en-US')}`} />
+                            <RnRow label="Diamonds" value={`$${d.diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                            <div className="mt-1 flex items-center justify-between border-t border-slate-200 pt-1 text-sm font-semibold text-slate-900">
+                              <span>Ring cost</span>
+                              <span>${d.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                          </dl>
+                        ) : (
+                          <p className="mt-2 text-xs text-slate-400">No {label.toLowerCase()} stone configured for this size.</p>
+                        )}
+                        <button type="button"
+                          onClick={() => { setRnStoneType(val); setRnCompareOpen(false) }}
+                          disabled={!d.hasDiamondRow}
+                          className={`mt-3 w-full rounded-xl px-3 py-2 text-xs font-semibold transition disabled:opacity-40 ${isCurrent ? 'bg-slate-100 text-slate-500' : 'bg-slate-900 text-white hover:bg-slate-700'}`}>
+                          {isCurrent ? 'Selected' : `Use ${label}`}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {rn.natural.hasDiamondRow && rn.lab.hasDiamondRow && rn.natural.total !== rn.lab.total && (
+                  <p className="mt-4 rounded-2xl bg-emerald-50 px-4 py-2.5 text-center text-xs font-medium text-emerald-800">
+                    {rn.lab.total < rn.natural.total ? 'Lab' : 'Natural'} saves{' '}
+                    <strong>${Math.abs(rn.natural.total - rn.lab.total).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                    {' '}in cost on this ring.
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Sección 1: CAD Design & Jeweler's Time */}
           <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
             <CardHeader className="border-b border-slate-100">
