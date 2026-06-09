@@ -312,6 +312,14 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
   // Trim trailing zeros so "0.5000" → "0.5", but keep "0.04" / "0.0095" intact.
   const formatCt = (n: number) => n.toFixed(4).replace(/\.?0+$/, '')
 
+  // When the jeweler did NOT fold sales tax into the total, the headline price
+  // is pre-tax — so instead of the misleading "All-inclusive" we surface the
+  // CA sales tax (7.75%) the customer will still owe, plus an estimated
+  // total-with-tax. When tax IS applied the quote already carries subtotal/tax.
+  const CA_SALES_TAX_RATE = 0.0775
+  const estimatedTax = quote.total * CA_SALES_TAX_RATE
+  const estimatedTotalWithTax = quote.total + estimatedTax
+
   // Full per-stone breakdown: one row per stone the jeweler added in the
   // builder, showing every customer-facing detail (count × size · shape ·
   // color · carats · certification). Newer quotes carry the stones[] array;
@@ -402,8 +410,10 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
     `PRICE: ${fmtMoney(quote.total)} USD`,
     quote.applyTaxes ? `  Subtotal: ${fmtMoney(quote.subtotal)}` : null,
     quote.applyTaxes ? `  Sales tax (7.75%): ${fmtMoney(quote.taxAmount)}` : null,
+    !quote.applyTaxes ? `  + CA sales tax (7.75%): ${fmtMoney(estimatedTax)}` : null,
+    !quote.applyTaxes ? `  Estimated total with tax: ${fmtMoney(estimatedTotalWithTax)}` : null,
     quote.discountPercent > 0 ? `  You save ${fmtMoney(quote.discountAmount)} (${quote.discountPercent}% off)` : null,
-    quote.applyTaxes ? 'Includes 7.75% sales tax' : 'All-inclusive',
+    quote.applyTaxes ? 'Includes 7.75% sales tax' : 'Plus CA sales tax (7.75%)',
     '',
     'SPECIFICATIONS',
     ...specs.map(s => `• ${s.label}: ${s.value}`),
@@ -470,9 +480,16 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
                 <div className="flex justify-between"><span>Sales tax (7.75%)</span><span>${quote.taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
               </div>
             )}
+            {!quote.applyTaxes && (
+              <div className="mt-4 space-y-1 border-t border-white/15 pt-3 text-[12px] text-white/75">
+                <div className="flex justify-between"><span>Price</span><span>${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+                <div className="flex justify-between"><span>CA sales tax (7.75%)</span><span>+${estimatedTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+                <div className="flex justify-between font-semibold text-white/90"><span>Estimated total with tax</span><span>${estimatedTotalWithTax.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+              </div>
+            )}
             <div className="mx-auto mt-3 h-px w-16 bg-gradient-to-r from-transparent via-amber-300/80 to-transparent" />
             <p className="mt-3 text-[11px] uppercase tracking-[0.28em] text-white/55">
-              {quote.applyTaxes ? 'Includes 7.75% sales tax' : 'All-inclusive'} · USD
+              {quote.applyTaxes ? 'Includes 7.75% sales tax' : 'Plus CA sales tax (7.75%)'} · USD
             </p>
           </div>
 
