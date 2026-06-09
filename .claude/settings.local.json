@@ -140,7 +140,9 @@
       "Bash(Select-Object Name)",
       "Bash(Get-ChildItem -Path \"D:\\\\wamp64\\\\www\\\\calculator-jewlery\\\\src\" -Directory)",
       "Bash(awk '{print $NF}')",
-      "Bash(echo \"BACKEND_EXIT=$?\")"
+      "Bash(echo \"BACKEND_EXIT=$?\")",
+      "Bash(grep *)",
+      "Bash(echo \"BUILD EXIT=$?\")"
     ]
   }
 }

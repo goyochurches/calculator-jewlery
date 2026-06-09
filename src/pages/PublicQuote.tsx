@@ -358,10 +358,18 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
         )
       : [{ icon: Ruler, label: 'Stone size', value: diamondSizeLabel ? `${diamondSizeLabel} mm` : '—' }]
 
+  // RN ready-made rings only carry the fields the RN flow fills in (metal,
+  // diamond type, stones, carats, finger size). The bench-labor / CAD-design /
+  // ring-width rows are never set in that flow, so we omit them entirely rather
+  // than print empty or "0 mm" noise.
+  const isRn = quote.jewelryType === 'rn'
+
   const specs: { icon: React.ElementType; label: string; value: string }[] = [
     { icon: Gem,      label: 'Metal',          value: metal },
-    { icon: Wrench,   label: "Jeweler's time", value: labor },
-    { icon: Sparkles, label: 'CAD design',     value: cad },
+    ...(isRn ? [] : [
+      { icon: Wrench,   label: "Jeweler's time", value: labor },
+      { icon: Sparkles, label: 'CAD design',     value: cad },
+    ]),
     { icon: Diamond,  label: 'Diamond type',   value: diamondTypeLabel },
     ...stoneSpecs,
     // Stone sourcing. The "supplied by S&S" line only appears on mixed pieces
@@ -374,7 +382,7 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
     ...(totalStones > 0 ? [{ icon: Diamond, label: 'Total stones', value: `${totalStones} ${plural(totalStones)}` }] : []),
     ...(totalCt > 0 ? [{ icon: Diamond, label: 'Carat weight', value: `${formatCt(totalCt)} ct tw` }] : []),
     { icon: Ruler,    label: 'Finger size',    value: `Size ${quote.fingerSize ?? '—'}` },
-    { icon: Ruler,    label: 'Ring width',     value: `${quote.ringWidth ?? 0} mm` },
+    ...(isRn ? [] : [{ icon: Ruler, label: 'Ring width', value: `${quote.ringWidth ?? 0} mm` }]),
   ]
 
   // Whether the "Copy details to share" button is shown — driven by the

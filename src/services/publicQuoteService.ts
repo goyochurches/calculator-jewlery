@@ -43,6 +43,10 @@ export interface PublicQuote {
   taxRate: number
   taxAmount: number
   metal: string
+  /** Jewelry piece type (ring, rn, pendant, ...). When 'rn' the share link
+   *  uses the ready-made RN layout and hides the bench-labor / CAD / ring-width
+   *  rows the RN flow never fills in. Optional: older backends omit it. */
+  jewelryType?: string | null
   ringLabor: string
   cadDesign: string
   diamondType: string
