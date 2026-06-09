@@ -333,6 +333,30 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
     MELEE: stones.filter(s => s.role === 'MELEE'),
   }
 
+  // RN ready-made rings persist their pavé as a single MELEE stone purely for
+  // pricing — it must NOT surface in the generic Main/Side/Melee breakdown.
+  // Instead we render a dedicated "RN ring" section built from the structured
+  // RN note (header line "RN model · SZ · metal · type", then the Gold / Labor /
+  // Setting / Stones rows). The note is split off from any free-text the
+  // jeweler appended, which stays in the Internal notes block below.
+  const rnStone = isRn ? (stones.find(s => s.role === 'MELEE') ?? stones[0] ?? null) : null
+  const rnBlock = (() => {
+    if (!isRn) return null
+    const notes = quote.internalNotes?.trim()
+    if (notes) {
+      const paras = notes.split('\n\n')
+      if (paras[0]?.startsWith('RN ')) {
+        return { lines: paras[0].split('\n'), rest: paras.slice(1).join('\n\n').trim() || null }
+      }
+    }
+    return { lines: [] as string[], rest: notes || null }
+  })()
+  // Internal notes shown in the dedicated block below: for RN that's only the
+  // free-text the jeweler appended (the RN breakdown moves to its own section).
+  const internalNotesDisplay = isRn
+    ? rnBlock?.rest ?? null
+    : (quote.internalNotes && quote.internalNotes.trim() !== '' ? quote.internalNotes : null)
+
   // Aggregate cost + setting labor from the persisted stones[]. Falls back to
   // the legacy diamondCarats/diamondType/diamondSize fields if a quote was
   // saved before the multi-stone refactor.
@@ -694,6 +718,54 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
           </div>
         </div>
 
+        {isRn && rnBlock && (
+          <div>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">RN ring</p>
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 shadow-sm space-y-3">
+              {rnBlock.lines.length > 0 ? (
+                <>
+                  {rnBlock.lines[0] && (
+                    <p className="text-sm font-semibold text-slate-900">{rnBlock.lines[0]}</p>
+                  )}
+                  <dl className="space-y-2">
+                    {rnBlock.lines.slice(1).map((line, i) => {
+                      const sep = line.indexOf(': ')
+                      const label = sep >= 0 ? line.slice(0, sep) : line
+                      const value = sep >= 0 ? line.slice(sep + 2) : ''
+                      return (
+                        <div key={i} className="flex items-center justify-between gap-3 rounded-xl bg-white/70 px-3 py-2 text-sm">
+                          <span className="text-slate-500">{label}</span>
+                          <span className="font-semibold text-slate-900 text-right">{value}</span>
+                        </div>
+                      )
+                    })}
+                  </dl>
+                </>
+              ) : (
+                // Fallback if the structured RN note is missing — build the
+                // diamonds summary straight from the saved quote fields.
+                <dl className="space-y-2">
+                  <div className="flex items-center justify-between gap-3 rounded-xl bg-white/70 px-3 py-2 text-sm">
+                    <span className="text-slate-500">Diamonds</span>
+                    <span className="font-semibold text-slate-900 text-right">
+                      {DIAMOND_TYPE_OPTIONS[quote.diamondType as keyof typeof DIAMOND_TYPE_OPTIONS]?.label ?? quote.diamondType}
+                      {(quote.diamondAmount ?? 0) > 0 ? ` · ${quote.diamondAmount} stone${quote.diamondAmount === 1 ? '' : 's'}` : ''}
+                      {(quote.diamondCarats ?? 0) > 0 ? ` · ${quote.diamondCarats} ct` : ''}
+                    </span>
+                  </div>
+                  {rnStone?.manualPrice != null && (
+                    <div className="flex items-center justify-between gap-3 rounded-xl bg-white/70 px-3 py-2 text-sm">
+                      <span className="text-slate-500">Diamond cost</span>
+                      <span className="font-semibold text-slate-900">${rnStone.manualPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  )}
+                </dl>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!isRn && (
         <div>
           <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Stone setting</p>
           {isLegacy && (
@@ -1008,6 +1080,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             </div>
           )}
         </div>
+        )}
 
         {quote.customerNotes && quote.customerNotes.trim() !== '' && (
           <div>
@@ -1025,7 +1098,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
           </div>
         )}
 
-        {quote.internalNotes && quote.internalNotes.trim() !== '' && (
+        {internalNotesDisplay && (
           <div>
             <div className="mb-2 flex items-center justify-between">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
@@ -1036,7 +1109,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
               </span>
             </div>
             <div className="rounded-2xl border border-amber-100 bg-amber-50/50 px-4 py-3">
-              <p className="whitespace-pre-wrap text-sm text-slate-700">{quote.internalNotes}</p>
+              <p className="whitespace-pre-wrap text-sm text-slate-700">{internalNotesDisplay}</p>
             </div>
           </div>
         )}
