@@ -130,7 +130,16 @@
       "Bash(Get-ChildItem -Path \"D:\\\\wamp64\\\\www\\\\calculator-jewlery\\\\src\" -Recurse -Directory)",
       "Bash(Select-Object FullName)",
       "Bash(Get-ChildItem \"D:\\\\wamp64\\\\www\\\\calculator-jewlery\\\\src\\\\components\" -Filter \"*.tsx\")",
-      "Bash(Select-Object -ExpandProperty Name)"
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(mvn -o compile)",
+      "Bash(mvn -o -q test -Dtest=SavedQuoteRepositoryTest)",
+      "Bash(timeout 400 mvn -q test -Dtest=SavedQuoteRepositoryTest)",
+      "Bash(grep -rln \"client_min_messages\" src/main/resources src/test/resources)",
+      "Bash(find src/main/resources src/test/resources -iname \"import.sql\" -o -iname \"data.sql\" -o -iname \"schema.sql\")",
+      "Bash(Get-ChildItem -Force)",
+      "Bash(Select-Object Name)",
+      "Bash(Get-ChildItem -Path \"D:\\\\wamp64\\\\www\\\\calculator-jewlery\\\\src\" -Directory)",
+      "Bash(awk '{print $NF}')"
     ]
   }
 }

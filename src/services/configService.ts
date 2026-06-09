@@ -51,8 +51,10 @@ export interface RnRingModelConfig {
   stoneMm: number | null
   /** NATURAL | LAB — which diamond_size_config family to price from. */
   diamondStoneType: string
-  /** size_key of the diamond row used for the per-carat stone price. */
+  /** size_key of the NATURAL diamond row (per-diameter) used for stone pricing. */
   diamondSizeKey: string
+  /** size_key of the LAB diamond row used when the quote picks lab-grown. */
+  diamondSizeKeyLab: string | null
   avgGrams: number | null
   settingLaborPerStone: number | null
   labor14k: number | null

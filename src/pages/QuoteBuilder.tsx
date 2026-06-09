@@ -7,6 +7,7 @@ import {
 } from '@/constants/config'
 import { useAuth } from '@/context/AuthContext'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
+import type { DiamondSizeConfig, RnRingModelConfig, RnRingSizeConfig } from '@/services/configService'
 import { gemstoneService } from '@/services/gemstoneService'
 import { companyService, ENGRAVING_SLIDER_DEFAULTS } from '@/services/companyService'
 import { quotesService } from '@/services/quotesService'
@@ -124,6 +125,45 @@ function rnMetalCategory(metal: JewelryMetalOption): RnMetalCategory | null {
   return null // silver / unsupported — RN rings are gold/platinum only
 }
 
+export type RnStoneType = 'natural' | 'lab-grown'
+
+/**
+ * Pure RN cost breakdown for a given model + size + metal + diamond type.
+ * The carat weight (CTW) and per-carat price are pulled from the existing
+ * diamond_size_config row for that type, so Natural vs Lab differ only by the
+ * row they resolve to. Reused by the live pricing and the Lab-vs-Natural popup.
+ */
+function computeRnBreakdown(args: {
+  model: RnRingModelConfig | null
+  sizeRow: RnRingSizeConfig | null
+  metal: JewelryMetalOption
+  stoneType: RnStoneType
+  diamondSizeFor: (stoneType: string | undefined | null, sizeKey: string) => DiamondSizeConfig | undefined
+}) {
+  const { model, sizeRow, metal, stoneType, diamondSizeFor } = args
+  const metalCat = rnMetalCategory(metal)
+  const pick = <T,>(a: T, b: T, c: T): T => (metalCat === '14k' ? a : metalCat === '18k' ? b : c)
+  const goldPerGram = model && metalCat ? (pick(model.goldPrice14k, model.goldPrice18k, model.goldPricePlat) ?? 0) : 0
+  const casting = model && metalCat ? (pick(model.labor14k, model.labor18k, model.laborPlat) ?? 0) : 0
+  const avgGrams = model?.avgGrams ?? 0
+  const numStones = sizeRow?.numStones ?? 0
+  const settingPerStone = model?.settingLaborPerStone ?? 0
+  const sizeKey = stoneType === 'lab-grown' ? (model?.diamondSizeKeyLab ?? '') : (model?.diamondSizeKey ?? '')
+  const diamondRow = model ? diamondSizeFor(stoneType, sizeKey) : undefined
+  const pricePerCarat = diamondRow?.basePrice ?? 0
+  const ctPerStone = diamondRow?.ctPerStone ?? 0
+  const ctw = Math.round(numStones * ctPerStone * 10000) / 10000
+  const goldCost = avgGrams * goldPerGram
+  const settingLabor = numStones * settingPerStone
+  const diamondCost = ctw * pricePerCarat
+  return {
+    stoneType, metalCat, goldPerGram, casting, avgGrams, numStones, settingPerStone,
+    sizeKey, pricePerCarat, ctPerStone, ctw, goldCost, settingLabor, diamondCost,
+    hasDiamondRow: !!diamondRow,
+    total: goldCost + casting + settingLabor + diamondCost,
+  }
+}
+
 /** One label/value row in the RN breakdown panel. */
 function RnRow({ label, value }: { label: string; value: string }) {
   return (
@@ -200,6 +240,8 @@ export function QuoteBuilderPage() {
   const [rnMode, setRnMode] = useState(false)
   const [rnModelKey, setRnModelKey] = useState('')
   const [rnFingerSize, setRnFingerSize] = useState<number>(0)
+  const [rnStoneType, setRnStoneType] = useState<RnStoneType>('natural')
+  const [rnCompareOpen, setRnCompareOpen] = useState(false)
 
   // Multi-stone breakdown: 0 or 1 MAIN, plus 0..N SIDE and 0..N MELEE.
   // amount lives in UI state so the user can override it independently of
@@ -1062,28 +1104,14 @@ export function QuoteBuilderPage() {
     if (!rnMode) return null
     const model = config.rnRings.find(m => m.modelKey === rnModelKey) ?? null
     const sizeRow = model?.sizes.find(s => s.fingerSize === rnFingerSize) ?? null
-    const metalCat = rnMetalCategory(selectedMetal)
-    const goldPerGram = model && metalCat
-      ? (metalCat === '14k' ? model.goldPrice14k : metalCat === '18k' ? model.goldPrice18k : model.goldPricePlat) ?? 0
-      : 0
-    const casting = model && metalCat
-      ? (metalCat === '14k' ? model.labor14k : metalCat === '18k' ? model.labor18k : model.laborPlat) ?? 0
-      : 0
-    const avgGrams = model?.avgGrams ?? 0
-    const numStones = sizeRow?.numStones ?? 0
-    const ctw = sizeRow?.ctw ?? 0
-    const settingPerStone = model?.settingLaborPerStone ?? 0
-    const diamondRow = model ? config.diamondSizeFor(model.diamondStoneType, model.diamondSizeKey) : undefined
-    const pricePerCarat = diamondRow?.basePrice ?? 0
-    const goldCost = avgGrams * goldPerGram
-    const settingLabor = numStones * settingPerStone
-    const diamondCost = ctw * pricePerCarat
-    return {
-      model, sizeRow, metalCat, goldPerGram, casting, avgGrams, numStones, ctw,
-      settingPerStone, pricePerCarat, goldCost, settingLabor, diamondCost,
-      total: goldCost + casting + settingLabor + diamondCost,
-    }
-  }, [rnMode, config, rnModelKey, rnFingerSize, selectedMetal])
+    const base = { model, sizeRow, metal: selectedMetal, diamondSizeFor: config.diamondSizeFor }
+    const natural = computeRnBreakdown({ ...base, stoneType: 'natural' })
+    const lab = computeRnBreakdown({ ...base, stoneType: 'lab-grown' })
+    const selected = rnStoneType === 'lab-grown' ? lab : natural
+    // `selected` is spread last so rn.total / rn.ctw / rn.diamondCost reflect the
+    // chosen diamond type; natural + lab are kept for the Lab-vs-Natural popup.
+    return { model, sizeRow, natural, lab, ...selected }
+  }, [rnMode, config, rnModelKey, rnFingerSize, selectedMetal, rnStoneType])
 
   const pricing = useMemo(() => {
     const metalPricePerGram = selectedMetalConfig.pricePerGram
@@ -1303,13 +1331,12 @@ export function QuoteBuilderPage() {
       // the exact CTW-based diamond cost, so the detail view's stone line and
       // the stored `total` agree. The labor/gold breakdown goes into the
       // internal note for the jeweler.
-      const rnDiamondType: 'natural' | 'lab-grown' =
-        rn?.model?.diamondStoneType?.toUpperCase() === 'LAB' ? 'lab-grown' : 'natural'
+      const rnDiamondType: 'natural' | 'lab-grown' = rn?.stoneType ?? 'natural'
       const rnStones = rnMode && rn?.model && rn?.sizeRow
         ? [{
             role: 'MELEE' as const,
             stoneType: rnDiamondType,
-            sizeKey: rn.model.diamondSizeKey,
+            sizeKey: rn.sizeKey,
             carats: rn.ctw,
             setterType: '',
             labReport: null,
@@ -1323,7 +1350,7 @@ export function QuoteBuilderPage() {
         : null
       const rnNote = rnMode && rn?.model
         ? [
-            `RN ${rn.model.modelKey} · SZ ${rn.sizeRow?.fingerSize ?? '—'} · ${selectedMetalConfig.label}`,
+            `RN ${rn.model.modelKey} · SZ ${rn.sizeRow?.fingerSize ?? '—'} · ${selectedMetalConfig.label} · ${rn.stoneType === 'lab-grown' ? 'Lab' : 'Natural'}`,
             `Gold: ${rn.avgGrams}g × $${rn.goldPerGram}/g = $${rn.goldCost.toFixed(2)}`,
             `Casting labor: $${rn.casting.toFixed(2)}`,
             `Setting: ${rn.numStones} × $${rn.settingPerStone} = $${rn.settingLabor.toFixed(2)}`,
@@ -1345,7 +1372,7 @@ export function QuoteBuilderPage() {
         diamondAmount: pricing.totalAmount,
         diamondCarats: pricing.totalCarats,
         diamondType: rnMode ? rnDiamondType : (firstStone?.stoneType ?? 'natural'),
-        diamondSize: rnMode && rn?.model ? rn.model.diamondSizeKey : (firstStone?.sizeKey ?? ''),
+        diamondSize: rnMode && rn ? rn.sizeKey : (firstStone?.sizeKey ?? ''),
         weightGrams: rnMode && rn ? (rn.avgGrams ?? 0) : weightGrams,
         ringWidth: rnMode ? 0 : ringWidth,
         fingerSize: rnMode ? rnFingerSize : fingerSize,
@@ -1440,6 +1467,8 @@ export function QuoteBuilderPage() {
       setRnMode(false)
       setRnModelKey('')
       setRnFingerSize(0)
+      setRnStoneType('natural')
+      setRnCompareOpen(false)
       setCustomerStones([])
       setAttachments([])
       setInternalNotes('')
