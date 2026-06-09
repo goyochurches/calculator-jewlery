@@ -307,6 +307,10 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
     other: 'Other',
   }
   const jewelryTypeLabel = quote.jewelryType ? (JEWELRY_TYPE_LABELS[quote.jewelryType] ?? quote.jewelryType) : null
+  // RN ready-made rings only fill in metal / weight / finger size / diamonds in
+  // the builder — the bench-labor (CAD & Jeweler's time), ring-width and
+  // hourly-labor rows are never set, so we hide them instead of showing "—".
+  const isRn = quote.jewelryType === 'rn'
   const ringLaborCfg = config.ringLaborMap[quote.ringLabor]
   // Quotes saved before the multi-stone refactor only have the legacy diamond_*
   // fields. Synthesize a single MAIN entry so the detail still renders the
@@ -448,7 +452,9 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             </span>
           </div>
           <p className="mt-2 text-sm text-white/70">
-            {metalCfg.label} · {ringLaborCfg?.label ?? quote.ringLabor}
+            {isRn
+              ? `${metalCfg.label}${jewelryTypeLabel ? ` · ${jewelryTypeLabel}` : ''}`
+              : `${metalCfg.label} · ${ringLaborCfg?.label ?? quote.ringLabor}`}
           </p>
           {quote.publicToken && (
             <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[11px] font-medium text-white/85">
@@ -676,7 +682,9 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
             {(quote.fingerSize ?? 0) > 0 && (
               <LineItem label="Finger size" value={`${quote.fingerSize}`} />
             )}
-            <LineItem label="CAD & Jeweler's time" value={ringLaborCfg ? `${ringLaborCfg.label} — $${ringLaborCfg.fee}` : (quote.ringLabor ?? '—')} />
+            {!isRn && (
+              <LineItem label="CAD & Jeweler's time" value={ringLaborCfg ? `${ringLaborCfg.label} — $${ringLaborCfg.fee}` : (quote.ringLabor ?? '—')} />
+            )}
             {(quote.laborHours ?? 0) > 0 && (
               <LineItem
                 label="Bench labor"
