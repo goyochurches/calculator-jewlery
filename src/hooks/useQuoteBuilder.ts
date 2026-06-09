@@ -685,7 +685,7 @@ export function useQuoteBuilder() {
         ? [
             `RN ${rn.model.modelKey} · SZ ${rn.sizeRow?.fingerSize ?? '—'} · ${selectedMetalConfig.label} · ${rn.stoneType === 'lab-grown' ? 'Lab' : 'Natural'}`,
             `Gold: ${rn.avgGrams}g × $${rn.goldPerGram}/g = $${rn.goldCost.toFixed(2)}`,
-            `Casting labor: $${rn.casting.toFixed(2)}`,
+            `Labor: $${rn.casting.toFixed(2)}`,
             `Setting: ${rn.numStones} × $${rn.settingPerStone} = $${rn.settingLabor.toFixed(2)}`,
             `Stones: ${rn.ctw}ct × $${rn.pricePerCarat}/ct = $${rn.diamondCost.toFixed(2)}`,
           ].join('\n')
