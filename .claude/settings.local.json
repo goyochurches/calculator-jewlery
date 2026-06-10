@@ -142,7 +142,10 @@
       "Bash(awk '{print $NF}')",
       "Bash(echo \"BACKEND_EXIT=$?\")",
       "Bash(grep *)",
-      "Bash(echo \"BUILD EXIT=$?\")"
+      "Bash(echo \"BUILD EXIT=$?\")",
+      "Bash(Get-ChildItem -Path \"D:\\\\wamp64\\\\www\\\\calculator-jewlery\" -Recurse)",
+      "Bash(Select-Object -First 50)",
+      "Bash(echo \"=== EXIT: $? ===\")"
     ]
   }
 }

@@ -8,6 +8,8 @@ import {
 import { useAuth } from '@/context/AuthContext'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { computeRnBreakdown, type RnStoneType } from '@/lib/rnPricing'
+import { compareStoneTypes } from '@/lib/stoneTypeCompare'
+import { StoneTypeCompareDialog } from '@/components/StoneTypeCompareDialog'
 import { gemstoneService } from '@/services/gemstoneService'
 import { companyService, ENGRAVING_SLIDER_DEFAULTS } from '@/services/companyService'
 import { quotesService } from '@/services/quotesService'
@@ -17,7 +19,7 @@ import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { Toast } from '@/components/Toast'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
-import { Calculator, Camera, Check, ChevronDown, ChevronUp, Copy, Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Pin, PinOff, Ruler, Sparkles, User, X } from 'lucide-react'
+import { Calculator, Camera, Check, ChevronDown, ChevronUp, Copy, Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Pin, PinOff, Ruler, Scale, Sparkles, User, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -194,6 +196,9 @@ export function QuoteBuilderPage() {
   const [rnModelKey, setRnModelKey] = useState('')
   const [rnFingerSize, setRnFingerSize] = useState<number>(0)
   const [rnStoneType, setRnStoneType] = useState<RnStoneType>('natural')
+
+  // Which stone row has its Natural-vs-Lab popup open (by uid), or null.
+  const [compareUid, setCompareUid] = useState<string | null>(null)
 
   // Multi-stone breakdown: 0 or 1 MAIN, plus 0..N SIDE and 0..N MELEE.
   // amount lives in UI state so the user can override it independently of
@@ -730,6 +735,17 @@ export function QuoteBuilderPage() {
     }
 
     // ── Expanded (form) view ────────────────────────────────────────────
+    // Same physical stone priced as natural vs lab for the compare popup.
+    const compareData = compareStoneTypes({
+      sizeKey: stone.sizeKey,
+      carats: caratsNum,
+      amount: amountNum,
+      setterFee: stoneSetterFee,
+      manualPrice: hasManualPrice ? parseNum(stone.manualPrice) : null,
+      diamondSizeFor: config.diamondSizeFor,
+    })
+    const cheaperLabel = compareData.cheaper === 'natural' ? 'Natural' : 'Lab'
+
     return (
       <div key={stone.uid} className={`relative rounded-2xl border ${theme.ring} ${theme.tint} p-4 space-y-3 overflow-hidden shadow-sm transition hover:shadow-md`}>
         <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${theme.bar}`} aria-hidden />
@@ -779,6 +795,20 @@ export function QuoteBuilderPage() {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Natural vs Lab — popup comparing the same stone priced both ways. */}
+          <div className="md:col-span-2">
+            <button type="button" onClick={() => setCompareUid(stone.uid)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">
+              <Scale className="h-3.5 w-3.5 text-slate-400" />
+              Natural vs Lab
+              {compareData.cheaper && (
+                <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">
+                  {compareData.cheaper === stone.stoneType ? 'best price' : `${cheaperLabel} cheaper`}
+                </span>
+              )}
+            </button>
           </div>
 
           <div className="space-y-1">
@@ -997,6 +1027,16 @@ export function QuoteBuilderPage() {
             <Check className="h-3.5 w-3.5" /> Done
           </button>
         </div>
+
+        <StoneTypeCompareDialog
+          open={compareUid === stone.uid}
+          comparison={compareData}
+          current={stone.stoneType}
+          carats={caratsNum}
+          title={`${theme.label} stone #${index + 1}`}
+          onPick={t => patchStone(stone.uid, { stoneType: t })}
+          onClose={() => setCompareUid(null)}
+        />
       </div>
     )
   }
