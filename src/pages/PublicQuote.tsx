@@ -477,7 +477,8 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
             {quote.applyTaxes && (
               <div className="mt-4 space-y-1 border-t border-white/15 pt-3 text-[12px] text-white/75">
                 <div className="flex justify-between"><span>Subtotal</span><span>${quote.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
-                <div className="flex justify-between"><span>Sales tax (7.75%)</span><span>${quote.taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+                <div className="flex justify-between"><span>Sales tax (7.75%)</span><span>+${quote.taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+                <div className="flex justify-between font-semibold text-white/90"><span>Total</span><span>${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
               </div>
             )}
             {!quote.applyTaxes && (
