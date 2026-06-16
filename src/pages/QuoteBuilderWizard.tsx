@@ -33,6 +33,7 @@ import {
   ArrowLeft, ArrowRight, Camera, Check, ChevronDown, ChevronUp, CircleDollarSign,
   Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Sparkles, User, X,
 } from 'lucide-react'
+import { CreateLabSizeDialog } from '@/components/CreateLabSizeDialog'
 
 const money = (n: number) =>
   '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -406,6 +407,7 @@ function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
 // ── Step 2 (RN mode): pre-configured RN ring ────────────────────────────────
 function RnWizardStep({ qb }: { qb: QuoteBuilderState }) {
   const rn = qb.rn
+  const [showCreateLabRn, setShowCreateLabRn] = useState(false)
   return (
     <SectionCard title="RN ring" subtitle="Pick a model, metal and ring size — stone count, CTW, gold and labor come from the RN tables." icon={Gem}>
       <div className="grid gap-5 md:grid-cols-2">
@@ -464,33 +466,58 @@ function RnWizardStep({ qb }: { qb: QuoteBuilderState }) {
               <RnLine label={`Setting (${rn.numStones} × $${rn.settingPerStone})`} value={money(rn.settingLabor)} />
             </dl>
             <p className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Diamonds · pick type</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className=”grid grid-cols-2 gap-2”>
               {([['natural', 'Natural', rn.natural], ['lab-grown', 'Lab', rn.lab]] as const).map(([val, label, d]) => {
                 const isSel = qb.rnStoneType === val
                 const isCheaper = d.hasDiamondRow && rn.natural.hasDiamondRow && rn.lab.hasDiamondRow &&
                   rn.natural.total !== rn.lab.total && d.total === Math.min(rn.natural.total, rn.lab.total)
-                return (
-                  <button key={val} type="button" onClick={() => qb.setRnStoneType(val)}
-                    className={`rounded-xl border p-3 text-left transition ${isSel ? 'border-slate-900 bg-white ring-1 ring-slate-900' : 'border-slate-200 bg-white/60 hover:border-slate-300'}`}>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-semibold text-slate-900">{label}</span>
-                      {isSel
-                        ? <span className="rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">USING</span>
-                        : isCheaper && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">CHEAPER</span>}
+                const cardCls = `rounded-xl border p-3 text-left transition ${isSel ? 'border-slate-900 bg-white ring-1 ring-slate-900' : 'border-slate-200 bg-white/60 hover:border-slate-300'}`
+                const header = (
+                  <div className=”flex items-center justify-between gap-2”>
+                    <span className=”text-xs font-semibold text-slate-900”>{label}</span>
+                    {isSel
+                      ? <span className=”rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white”>USING</span>
+                      : isCheaper && <span className=”rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700”>CHEAPER</span>}
+                  </div>
+                )
+                if (val === 'lab-grown' && !d.hasDiamondRow) {
+                  return (
+                    <div key={val} className={cardCls}>
+                      {header}
+                      <p className=”mt-1 text-[11px] text-amber-700”>No price for key “{d.sizeKey || '—'}”</p>
+                      {d.sizeKey && (
+                        <button type=”button”
+                          onClick={() => setShowCreateLabRn(true)}
+                          className=”mt-1.5 rounded-lg bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-100”>
+                          + Add Lab price
+                        </button>
+                      )}
                     </div>
+                  )
+                }
+                return (
+                  <button key={val} type=”button” onClick={() => qb.setRnStoneType(val)} className={cardCls}>
+                    {header}
                     {d.hasDiamondRow ? (
                       <>
-                        <p className="mt-1 text-[11px] text-slate-500">{rn.ctw}ct × ${d.pricePerCarat.toLocaleString('en-US')}/ct</p>
-                        <p className="text-[11px] text-slate-500">Diamonds {money(d.diamondCost)}</p>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">{money(d.total)}</p>
+                        <p className=”mt-1 text-[11px] text-slate-500”>{rn.ctw}ct × ${d.pricePerCarat.toLocaleString('en-US')}/ct</p>
+                        <p className=”text-[11px] text-slate-500”>Diamonds {money(d.diamondCost)}</p>
+                        <p className=”mt-1 text-sm font-semibold text-slate-900”>{money(d.total)}</p>
                       </>
                     ) : (
-                      <p className="mt-1 text-[11px] text-amber-700">No price for key “{d.sizeKey || '—'}”</p>
+                      <p className=”mt-1 text-[11px] text-amber-700”>No price for key “{d.sizeKey || '—'}”</p>
                     )}
                   </button>
                 )
               })}
             </div>
+            <CreateLabSizeDialog
+              open={showCreateLabRn}
+              sizeKey={rn.lab.sizeKey}
+              initialLabel={rn.natural.hasDiamondRow ? rn.natural.sizeLabel : ''}
+              onCreated={() => qb.config.refresh()}
+              onClose={() => setShowCreateLabRn(false)}
+            />
           </div>
         )}
       </div>
