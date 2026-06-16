@@ -721,45 +721,93 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
         {isRn && rnBlock && (
           <div>
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-slate-400">RN ring</p>
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/40 p-4 shadow-sm space-y-3">
-              {rnBlock.lines.length > 0 ? (
-                <>
-                  {rnBlock.lines[0] && (
-                    <p className="text-sm font-semibold text-slate-900">{rnBlock.lines[0]}</p>
-                  )}
-                  <dl className="space-y-2">
-                    {rnBlock.lines.slice(1).map((line, i) => {
-                      const sep = line.indexOf(': ')
-                      const label = sep >= 0 ? line.slice(0, sep) : line
-                      const value = sep >= 0 ? line.slice(sep + 2) : ''
-                      return (
-                        <div key={i} className="flex items-center justify-between gap-3 rounded-xl bg-white/70 px-3 py-2 text-sm">
-                          <span className="text-slate-500">{label}</span>
-                          <span className="font-semibold text-slate-900 text-right">{value}</span>
+            <div className="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+              {rnBlock.lines.length > 0 ? (() => {
+                // Parse "RN A123 · SZ 6 · 14k White Gold · Natural"
+                const header = rnBlock.lines[0] ?? ''
+                const parts = header.replace(/^RN\s+/, '').split(' · ')
+                const modelKey = parts[0] ?? ''
+                const sz = parts[1] ?? ''
+                const metal = parts[2] ?? ''
+                const stoneLabel = parts[3] ?? ''
+                const isLab = stoneLabel.toLowerCase().includes('lab')
+                return (
+                  <>
+                    <div className="bg-gradient-to-br from-slate-800 to-slate-900 px-4 py-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-widest text-white/40">Ready-made band</p>
+                          <p className="mt-0.5 text-xl font-bold tracking-tight text-white">{modelKey || 'RN Ring'}</p>
                         </div>
-                      )
-                    })}
-                  </dl>
-                </>
-              ) : (
-                // Fallback if the structured RN note is missing — build the
-                // diamonds summary straight from the saved quote fields.
-                <dl className="space-y-2">
-                  <div className="flex items-center justify-between gap-3 rounded-xl bg-white/70 px-3 py-2 text-sm">
-                    <span className="text-slate-500">Diamonds</span>
-                    <span className="font-semibold text-slate-900 text-right">
+                        <span className={`mt-0.5 shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                          isLab
+                            ? 'bg-violet-500/25 text-violet-300 ring-1 ring-violet-400/40'
+                            : 'bg-amber-500/25 text-amber-300 ring-1 ring-amber-400/40'
+                        }`}>
+                          {stoneLabel || 'Natural'}
+                        </span>
+                      </div>
+                      {(sz || metal) && (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {sz && <span className="rounded-lg bg-white/10 px-2.5 py-1 text-xs font-medium text-white/75">{sz}</span>}
+                          {metal && <span className="rounded-lg bg-white/10 px-2.5 py-1 text-xs font-medium text-white/75">{metal}</span>}
+                          {(quote.diamondAmount ?? 0) > 0 && (
+                            <span className="rounded-lg bg-white/10 px-2.5 py-1 text-xs font-medium text-white/75">
+                              {quote.diamondAmount} stones
+                            </span>
+                          )}
+                          {(quote.diamondCarats ?? 0) > 0 && (
+                            <span className="rounded-lg bg-white/10 px-2.5 py-1 text-xs font-medium text-white/75">
+                              {(quote.diamondCarats ?? 0).toFixed(2)} ct
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="divide-y divide-slate-100 bg-white">
+                      {rnBlock.lines.slice(1).map((line, i) => {
+                        const sep = line.indexOf(': ')
+                        const label = sep >= 0 ? line.slice(0, sep) : line
+                        const value = sep >= 0 ? line.slice(sep + 2) : ''
+                        const isStones = label === 'Stones'
+                        return (
+                          <div key={i} className={`flex items-center justify-between gap-3 px-4 py-3 ${isStones ? 'bg-amber-50/50' : ''}`}>
+                            <span className="text-sm text-slate-500">{label}</span>
+                            <span className={`font-semibold tabular-nums text-sm ${isStones ? 'text-amber-900' : 'text-slate-900'}`}>{value}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {rnStone?.contribution != null && (
+                      <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3">
+                        <span className="text-sm font-semibold text-slate-600">Diamonds + Setting</span>
+                        <span className="text-sm font-bold text-slate-900 tabular-nums">
+                          ${rnStone.contribution.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )
+              })() : (
+                // Fallback if the structured RN note is missing
+                <div className="divide-y divide-slate-100 bg-white">
+                  <div className="flex items-center justify-between gap-3 px-4 py-3">
+                    <span className="text-sm text-slate-500">Diamonds</span>
+                    <span className="text-sm font-semibold text-slate-900">
                       {DIAMOND_TYPE_OPTIONS[quote.diamondType as keyof typeof DIAMOND_TYPE_OPTIONS]?.label ?? quote.diamondType}
                       {(quote.diamondAmount ?? 0) > 0 ? ` · ${quote.diamondAmount} stone${quote.diamondAmount === 1 ? '' : 's'}` : ''}
-                      {(quote.diamondCarats ?? 0) > 0 ? ` · ${quote.diamondCarats} ct` : ''}
+                      {(quote.diamondCarats ?? 0) > 0 ? ` · ${(quote.diamondCarats ?? 0).toFixed(2)} ct` : ''}
                     </span>
                   </div>
                   {rnStone?.manualPrice != null && (
-                    <div className="flex items-center justify-between gap-3 rounded-xl bg-white/70 px-3 py-2 text-sm">
-                      <span className="text-slate-500">Diamond cost</span>
-                      <span className="font-semibold text-slate-900">${rnStone.manualPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    <div className="flex items-center justify-between gap-3 px-4 py-3">
+                      <span className="text-sm text-slate-500">Diamond cost</span>
+                      <span className="text-sm font-semibold text-slate-900">${rnStone.manualPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
-                </dl>
+                </div>
               )}
             </div>
           </div>
