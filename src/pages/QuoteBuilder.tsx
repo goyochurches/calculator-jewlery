@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button'
+﻿import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -995,7 +995,7 @@ export function QuoteBuilderPage() {
               {verify && (
                 <p className={`text-[10px] ${verify.valid ? 'text-slate-400' : 'text-rose-500'}`}>
                   {verify.valid
-                    ? `Looks like a valid ${verify.lab} number — click “Verify on ${verify.lab}” to confirm it on the official report check.`
+                    ? `Looks like a valid ${verify.lab} number — click "Verify on ${verify.lab}" to confirm it on the official report check.`
                     : `This doesn't look like a complete ${verify.lab} report number yet.`}
                 </p>
               )}
@@ -1275,7 +1275,7 @@ export function QuoteBuilderPage() {
     // custom-size stones; preset sizes price themselves.
     const customMissingPrice = stones.some(s => s.sizeKey === '' && s.manualPrice.trim() === '')
     if (customMissingPrice) {
-      setSaveError('Enter the stone price for any “Custom” size stone before creating the quote.')
+      setSaveError('Enter the stone price for any "Custom" size stone before creating the quote.')
       return
     }
     if (rnMode) {
@@ -1799,32 +1799,32 @@ export function QuoteBuilderPage() {
 
                   {/* Natural vs Lab side by side — tap one to use it in the quote. */}
                   <p className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Diamonds · pick type</p>
-                  <div className=”grid grid-cols-2 gap-2”>
+                  <div className="grid grid-cols-2 gap-2">
                     {([['natural', 'Natural', rn.natural], ['lab-grown', 'Lab', rn.lab]] as const).map(([val, label, d]) => {
                       const isSel = rnStoneType === val
                       const isCheaper = d.hasDiamondRow && rn.natural.hasDiamondRow && rn.lab.hasDiamondRow &&
                         rn.natural.total !== rn.lab.total && d.total === Math.min(rn.natural.total, rn.lab.total)
                       const cardCls = `rounded-xl border p-3 text-left transition ${isSel ? 'border-slate-900 bg-white ring-1 ring-slate-900' : 'border-slate-200 bg-white/60 hover:border-slate-300'}`
                       const header = (
-                        <div className=”flex items-center justify-between gap-2”>
-                          <span className=”text-xs font-semibold text-slate-900”>{label}</span>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-slate-900">{label}</span>
                           {isSel
-                            ? <span className=”rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white”>USING</span>
-                            : isCheaper && <span className=”rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700”>CHEAPER</span>}
+                            ? <span className="rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">USING</span>
+                            : isCheaper && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">CHEAPER</span>}
                         </div>
                       )
                       if (val === 'lab-grown' && !d.hasDiamondRow) {
                         return (
                           <div key={val} className={cardCls}>
                             {header}
-                            <p className=”mt-1 text-[11px] text-amber-700”>
-                              No Lab diamond price for size <span className=”font-mono font-semibold”>”{d.sizeKey || '—'}”</span>.
+                            <p className="mt-1 text-[11px] text-amber-700">
+                              No Lab diamond price for size <span className="font-mono font-semibold">"{d.sizeKey || '—'}"</span>.
                             </p>
-                            <p className=”text-[10px] text-amber-600”>This size key exists for Natural but has no Lab entry yet.</p>
+                            <p className="text-[10px] text-amber-600">This size key exists for Natural but has no Lab entry yet.</p>
                             {d.sizeKey && (
-                              <button type=”button”
+                              <button type="button"
                                 onClick={() => setShowCreateLabRn(true)}
-                                className=”mt-1.5 rounded-lg bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-100”>
+                                className="mt-1.5 rounded-lg bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-100">
                                 + Add Lab price
                               </button>
                             )}
@@ -1832,16 +1832,16 @@ export function QuoteBuilderPage() {
                         )
                       }
                       return (
-                        <button key={val} type=”button” onClick={() => setRnStoneType(val)} className={cardCls}>
+                        <button key={val} type="button" onClick={() => setRnStoneType(val)} className={cardCls}>
                           {header}
                           {d.hasDiamondRow ? (
                             <>
-                              <p className=”mt-1 text-[11px] text-slate-500”>{rn.ctw}ct × ${d.pricePerCarat.toLocaleString('en-US')}/ct</p>
-                              <p className=”text-[11px] text-slate-500”>Diamonds ${d.diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
-                              <p className=”mt-1 text-sm font-semibold text-slate-900”>${d.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                              <p className="mt-1 text-[11px] text-slate-500">{rn.ctw}ct × ${d.pricePerCarat.toLocaleString('en-US')}/ct</p>
+                              <p className="text-[11px] text-slate-500">Diamonds ${d.diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                              <p className="mt-1 text-sm font-semibold text-slate-900">${d.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                             </>
                           ) : (
-                            <p className=”mt-1 text-[11px] text-amber-700”>No price for key “{d.sizeKey || '—'}”</p>
+                            <p className="mt-1 text-[11px] text-amber-700">No price for key "{d.sizeKey || '—'}"</p>
                           )}
                         </button>
                       )

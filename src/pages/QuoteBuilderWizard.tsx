@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -466,32 +466,32 @@ function RnWizardStep({ qb }: { qb: QuoteBuilderState }) {
               <RnLine label={`Setting (${rn.numStones} × $${rn.settingPerStone})`} value={money(rn.settingLabor)} />
             </dl>
             <p className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Diamonds · pick type</p>
-            <div className=”grid grid-cols-2 gap-2”>
+            <div className="grid grid-cols-2 gap-2">
               {([['natural', 'Natural', rn.natural], ['lab-grown', 'Lab', rn.lab]] as const).map(([val, label, d]) => {
                 const isSel = qb.rnStoneType === val
                 const isCheaper = d.hasDiamondRow && rn.natural.hasDiamondRow && rn.lab.hasDiamondRow &&
                   rn.natural.total !== rn.lab.total && d.total === Math.min(rn.natural.total, rn.lab.total)
                 const cardCls = `rounded-xl border p-3 text-left transition ${isSel ? 'border-slate-900 bg-white ring-1 ring-slate-900' : 'border-slate-200 bg-white/60 hover:border-slate-300'}`
                 const header = (
-                  <div className=”flex items-center justify-between gap-2”>
-                    <span className=”text-xs font-semibold text-slate-900”>{label}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-900">{label}</span>
                     {isSel
-                      ? <span className=”rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white”>USING</span>
-                      : isCheaper && <span className=”rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700”>CHEAPER</span>}
+                      ? <span className="rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">USING</span>
+                      : isCheaper && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">CHEAPER</span>}
                   </div>
                 )
                 if (val === 'lab-grown' && !d.hasDiamondRow) {
                   return (
                     <div key={val} className={cardCls}>
                       {header}
-                      <p className=”mt-1 text-[11px] text-amber-700”>
-                        No Lab diamond price for size <span className=”font-mono font-semibold”>”{d.sizeKey || '—'}”</span>.
+                      <p className="mt-1 text-[11px] text-amber-700">
+                        No Lab diamond price for size <span className="font-mono font-semibold">"{d.sizeKey || '—'}"</span>.
                       </p>
-                      <p className=”text-[10px] text-amber-600”>This size key exists for Natural but has no Lab entry yet.</p>
+                      <p className="text-[10px] text-amber-600">This size key exists for Natural but has no Lab entry yet.</p>
                       {d.sizeKey && (
-                        <button type=”button”
+                        <button type="button"
                           onClick={() => setShowCreateLabRn(true)}
-                          className=”mt-1.5 rounded-lg bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-100”>
+                          className="mt-1.5 rounded-lg bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-100">
                           + Add Lab price
                         </button>
                       )}
@@ -499,16 +499,16 @@ function RnWizardStep({ qb }: { qb: QuoteBuilderState }) {
                   )
                 }
                 return (
-                  <button key={val} type=”button” onClick={() => qb.setRnStoneType(val)} className={cardCls}>
+                  <button key={val} type="button" onClick={() => qb.setRnStoneType(val)} className={cardCls}>
                     {header}
                     {d.hasDiamondRow ? (
                       <>
-                        <p className=”mt-1 text-[11px] text-slate-500”>{rn.ctw}ct × ${d.pricePerCarat.toLocaleString('en-US')}/ct</p>
-                        <p className=”text-[11px] text-slate-500”>Diamonds {money(d.diamondCost)}</p>
-                        <p className=”mt-1 text-sm font-semibold text-slate-900”>{money(d.total)}</p>
+                        <p className="mt-1 text-[11px] text-slate-500">{rn.ctw}ct × ${d.pricePerCarat.toLocaleString('en-US')}/ct</p>
+                        <p className="text-[11px] text-slate-500">Diamonds {money(d.diamondCost)}</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-900">{money(d.total)}</p>
                       </>
                     ) : (
-                      <p className=”mt-1 text-[11px] text-amber-700”>No price for key “{d.sizeKey || '—'}”</p>
+                      <p className="mt-1 text-[11px] text-amber-700">No price for key "{d.sizeKey || '—'}"</p>
                     )}
                   </button>
                 )
