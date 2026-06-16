@@ -216,6 +216,11 @@ export function StoneTypeCompareDialog({
               </div>
             </dl>
             <p className="mt-2 text-base font-semibold tabular-nums text-slate-900">{money(opt.total)}</p>
+            {opt.stoneType === 'lab-grown' && (
+              <p className="mt-2 border-t border-amber-200 pt-1.5 text-[10px] font-medium text-amber-700">
+                Make sure you double check the mark up for the Lab Version since it could be below what we usually charge.
+              </p>
+            )}
           </>
         ) : comparison.comparable === false && opt.stoneCost > 0 ? (
           <>
