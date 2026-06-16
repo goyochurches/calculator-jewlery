@@ -64,7 +64,7 @@ export function computeRnBreakdown(args: {
   const sheetCtw = sizeRow?.ctw ?? 0
   const sheetStones = sizeRow?.numStones ?? 0
   const ctw = customNumStones != null && sheetStones > 0
-    ? sheetCtw * (customNumStones / sheetStones)
+    ? Math.round(sheetCtw * (customNumStones / sheetStones) * 100) / 100
     : sheetCtw
   const pricePerCarat = diamondRow?.basePrice ?? 0
   const goldCost = avgGrams * goldPerGram
