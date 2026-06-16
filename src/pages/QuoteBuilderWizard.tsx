@@ -484,7 +484,10 @@ function RnWizardStep({ qb }: { qb: QuoteBuilderState }) {
                   return (
                     <div key={val} className={cardCls}>
                       {header}
-                      <p className=”mt-1 text-[11px] text-amber-700”>No price for key “{d.sizeKey || '—'}”</p>
+                      <p className=”mt-1 text-[11px] text-amber-700”>
+                        No Lab diamond price for size <span className=”font-mono font-semibold”>”{d.sizeKey || '—'}”</span>.
+                      </p>
+                      <p className=”text-[10px] text-amber-600”>This size key exists for Natural but has no Lab entry yet.</p>
                       {d.sizeKey && (
                         <button type=”button”
                           onClick={() => setShowCreateLabRn(true)}
