@@ -514,7 +514,7 @@ function RnWizardStep({ qb }: { qb: QuoteBuilderState }) {
             <CreateLabSizeDialog
               open={showCreateLabRn}
               sizeKey={rn.lab.sizeKey}
-              initialLabel={rn.natural.hasDiamondRow ? rn.natural.sizeLabel : ''}
+              initialLabel={qb.config.diamondSizeFor('natural', rn.natural.sizeKey)?.label ?? ''}
               onCreated={() => qb.config.refresh()}
               onClose={() => setShowCreateLabRn(false)}
             />

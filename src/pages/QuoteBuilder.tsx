@@ -1847,7 +1847,7 @@ export function QuoteBuilderPage() {
                   <CreateLabSizeDialog
                     open={showCreateLabRn}
                     sizeKey={rn.lab.sizeKey}
-                    initialLabel={rn.natural.hasDiamondRow ? rn.natural.sizeLabel : ''}
+                    initialLabel={config.diamondSizeFor('natural', rn.natural.sizeKey)?.label ?? ''}
                     onCreated={() => config.refresh()}
                     onClose={() => setShowCreateLabRn(false)}
                   />
