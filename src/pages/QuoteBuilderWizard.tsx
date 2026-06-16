@@ -409,6 +409,7 @@ function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
 function RnWizardStep({ qb }: { qb: QuoteBuilderState }) {
   const rn = qb.rn
   const [showCreateLabRn, setShowCreateLabRn] = useState(false)
+  const [linkingLabRn, setLinkingLabRn] = useState(false)
   return (
     <SectionCard title="RN ring" subtitle="Pick a model, metal and ring size — stone count, CTW, gold and labor come from the RN tables." icon={Gem}>
       <div className="grid gap-5 md:grid-cols-2">
