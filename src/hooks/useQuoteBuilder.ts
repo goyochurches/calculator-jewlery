@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { useQuoteConfig } from '@/hooks/useQuoteConfig'
+import { useQuoteConfig, normalizeSizeKey } from '@/hooks/useQuoteConfig'
 import { gemstoneService } from '@/services/gemstoneService'
 import { companyService, ENGRAVING_SLIDER_DEFAULTS } from '@/services/companyService'
 import { quotesService } from '@/services/quotesService'
@@ -431,7 +431,10 @@ export function useQuoteBuilder() {
       const next = { ...s, ...patch }
       if (patch.stoneType && !patch.sizeKey) {
         const list = patch.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
-        if (!list.some(d => d.sizeKey === next.sizeKey)) {
+        const match = list.find(d => normalizeSizeKey(d.sizeKey) === normalizeSizeKey(next.sizeKey))
+        if (match) {
+          next.sizeKey = match.sizeKey
+        } else {
           next.sizeKey = list[0]?.sizeKey ?? ''
         }
       }

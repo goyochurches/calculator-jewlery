@@ -18,6 +18,13 @@ function normalizeStoneType(t: string | undefined | null): StoneType {
   return 'NATURAL'
 }
 
+// Normalize numeric sizeKeys so "1.5" and "1.50" resolve to the same entry.
+export function normalizeSizeKey(k: string): string {
+  const trimmed = k.trim()
+  const n = Number(trimmed)
+  return Number.isFinite(n) && trimmed !== '' ? String(n) : trimmed
+}
+
 export interface QuoteConfig {
   diamondSizes: DiamondSizeConfig[]
   fingerSizes: FingerSizeConfig[]
@@ -61,7 +68,7 @@ export function useQuoteConfig(): QuoteConfig {
     ])
       .then(([diamondSizes, fingerSizes, cadTiers, ringLaborTiers, setters, rnRings]) => {
         const byTypeAndKey: Record<string, DiamondSizeConfig> = Object.fromEntries(
-          diamondSizes.map(d => [`${d.stoneType}|${d.sizeKey}`, d])
+          diamondSizes.map(d => [`${d.stoneType}|${normalizeSizeKey(d.sizeKey)}`, d])
         )
         setConfig({
           diamondSizes,
@@ -71,7 +78,7 @@ export function useQuoteConfig(): QuoteConfig {
           setters,
           rnRings,
           diamondSizeFor: (stoneType, sizeKey) =>
-            byTypeAndKey[`${normalizeStoneType(stoneType)}|${sizeKey}`],
+            byTypeAndKey[`${normalizeStoneType(stoneType)}|${normalizeSizeKey(sizeKey)}`],
           fingerSizeMap: Object.fromEntries(fingerSizes.map(f => [f.size, f])),
           cadMap: Object.fromEntries(cadTiers.map(t => [t.tierKey, t])),
           ringLaborMap: Object.fromEntries(ringLaborTiers.map(t => [t.tierKey, t])),

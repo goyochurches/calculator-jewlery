@@ -6,7 +6,7 @@ import {
   JEWELRY_METAL_OPTIONS,
 } from '@/constants/config'
 import { useAuth } from '@/context/AuthContext'
-import { useQuoteConfig } from '@/hooks/useQuoteConfig'
+import { useQuoteConfig, normalizeSizeKey } from '@/hooks/useQuoteConfig'
 import { computeRnBreakdown, type RnStoneType } from '@/lib/rnPricing'
 import { compareStoneTypes } from '@/lib/stoneTypeCompare'
 import { StoneTypeCompareDialog } from '@/components/StoneTypeCompareDialog'
@@ -544,7 +544,10 @@ export function QuoteBuilderPage() {
       // If the size or type changed, jump to a valid size for that stoneType.
       if (patch.stoneType && !patch.sizeKey) {
         const list = patch.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
-        if (!list.some(d => d.sizeKey === next.sizeKey)) {
+        const match = list.find(d => normalizeSizeKey(d.sizeKey) === normalizeSizeKey(next.sizeKey))
+        if (match) {
+          next.sizeKey = match.sizeKey
+        } else {
           next.sizeKey = list[0]?.sizeKey ?? ''
         }
       }

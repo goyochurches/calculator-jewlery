@@ -145,7 +145,9 @@
       "Bash(echo \"BUILD EXIT=$?\")",
       "Bash(Get-ChildItem -Path \"D:\\\\wamp64\\\\www\\\\calculator-jewlery\" -Recurse)",
       "Bash(Select-Object -First 50)",
-      "Bash(echo \"=== EXIT: $? ===\")"
+      "Bash(echo \"=== EXIT: $? ===\")",
+      "PowerShell(Get-ChildItem \"D:\\\\wamp64\\\\www\\\\calculator-jewlery\" | Where-Object { $_.Name -match \"README|NOTES|TODO|\\\\.md$\" })",
+      "Bash(Get-ChildItem -Path \"D:\\\\wamp64\\\\www\\\\calculator-jewlery\" -Directory)"
     ]
   }
 }
