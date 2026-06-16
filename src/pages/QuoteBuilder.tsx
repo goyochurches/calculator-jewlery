@@ -1863,6 +1863,11 @@ export function QuoteBuilderPage() {
                               <p className="mt-1 text-[11px] text-slate-500">{rn.ctw}ct × ${d.pricePerCarat.toLocaleString('en-US')}/ct</p>
                               <p className="text-[11px] text-slate-500">Diamonds ${d.diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                               <p className="mt-1 text-sm font-semibold text-slate-900">${d.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                              {val === 'lab-grown' && (
+                                <p className="mt-1.5 border-t border-amber-200 pt-1.5 text-[10px] font-medium text-amber-700">
+                                  Make sure you double check the mark up for the Lab Version since it could be below what we usually charge.
+                                </p>
+                              )}
                             </>
                           ) : (
                             <p className="mt-1 text-[11px] text-amber-700">No price for key "{d.sizeKey || '—'}"</p>
