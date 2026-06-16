@@ -80,11 +80,14 @@ export function CreateLabSizeDialog({
         </button>
 
         <div className="px-6 pt-6 pb-2">
-          <h2 className="text-base font-semibold tracking-tight text-slate-950">Add Lab price</h2>
-          <p className="mt-0.5 text-xs text-slate-500">
-            Creating a <span className="font-medium text-sky-700">LAB</span> diamond size for key{' '}
-            <span className="font-mono font-semibold text-slate-700">"{sizeKey}"</span>
+          <h2 className="text-base font-semibold tracking-tight text-slate-950">Add Lab diamond price</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Creating a <span className="font-medium text-sky-700">LAB</span> entry for size key:
           </p>
+          <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Key</span>
+            <span className="font-mono text-sm font-bold text-slate-800">{sizeKey}</span>
+          </div>
         </div>
 
         <div className="px-6 pb-6 pt-4 space-y-3">
