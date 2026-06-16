@@ -6,7 +6,7 @@ interface CreateLabSizeDialogProps {
   open: boolean
   sizeKey: string
   initialLabel?: string
-  onCreated: () => void
+  onCreated: (sizeKey: string) => void
   onClose: () => void
 }
 
@@ -59,7 +59,7 @@ export function CreateLabSizeDialog({
         ctPerStone: ctPerStone !== '' ? Number(ctPerStone) : null,
         basePrice: Number(basePrice),
       })
-      onCreated()
+      onCreated(sizeKey)
       onClose()
     } catch (e) {
       console.error(e)

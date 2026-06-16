@@ -34,6 +34,7 @@ import {
   Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Sparkles, User, X,
 } from 'lucide-react'
 import { CreateLabSizeDialog } from '@/components/CreateLabSizeDialog'
+import { configService } from '@/services/configService'
 
 const money = (n: number) =>
   '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -516,9 +517,17 @@ function RnWizardStep({ qb }: { qb: QuoteBuilderState }) {
             </div>
             <CreateLabSizeDialog
               open={showCreateLabRn}
-              sizeKey={rn.lab.sizeKey}
+              sizeKey={rn.natural.sizeKey}
               initialLabel={qb.config.diamondSizeFor('natural', rn.natural.sizeKey)?.label ?? ''}
-              onCreated={() => qb.config.refresh()}
+              onCreated={(createdKey) => {
+                if (rn.model) {
+                  configService.updateRnRing(rn.model.id, { diamondSizeKeyLab: createdKey })
+                    .then(() => qb.config.refresh())
+                    .catch(console.error)
+                } else {
+                  qb.config.refresh()
+                }
+              }}
               onClose={() => setShowCreateLabRn(false)}
             />
           </div>

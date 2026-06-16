@@ -11,6 +11,7 @@ import { computeRnBreakdown, type RnStoneType } from '@/lib/rnPricing'
 import { compareStoneTypes } from '@/lib/stoneTypeCompare'
 import { StoneTypeCompareDialog } from '@/components/StoneTypeCompareDialog'
 import { CreateLabSizeDialog } from '@/components/CreateLabSizeDialog'
+import { configService } from '@/services/configService'
 import { gemstoneService } from '@/services/gemstoneService'
 import { companyService, ENGRAVING_SLIDER_DEFAULTS } from '@/services/companyService'
 import { quotesService } from '@/services/quotesService'
@@ -1849,9 +1850,17 @@ export function QuoteBuilderPage() {
                   </div>
                   <CreateLabSizeDialog
                     open={showCreateLabRn}
-                    sizeKey={rn.lab.sizeKey}
+                    sizeKey={rn.natural.sizeKey}
                     initialLabel={config.diamondSizeFor('natural', rn.natural.sizeKey)?.label ?? ''}
-                    onCreated={() => config.refresh()}
+                    onCreated={(createdKey) => {
+                      if (rn.model) {
+                        configService.updateRnRing(rn.model.id, { diamondSizeKeyLab: createdKey })
+                          .then(() => config.refresh())
+                          .catch(console.error)
+                      } else {
+                        config.refresh()
+                      }
+                    }}
                     onClose={() => setShowCreateLabRn(false)}
                   />
                 </div>
