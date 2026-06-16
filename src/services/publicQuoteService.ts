@@ -11,6 +11,8 @@ export interface PublicQuoteStone {
   stoneType: string
   /** mm size, e.g. "1.3" or "1.6-1.7". */
   sizeKey: string
+  /** Human-readable label from Master Tables, e.g. "Ø 1.50 mm". Null for legacy quotes. */
+  sizeLabel?: string | null
   /** Number of physical stones of this size (carats ÷ ctPerStone). 0 = unknown. */
   amount?: number | null
   carats?: number | null
