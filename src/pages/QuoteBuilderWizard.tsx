@@ -483,20 +483,41 @@ function RnWizardStep({ qb }: { qb: QuoteBuilderState }) {
                   </div>
                 )
                 if (val === 'lab-grown' && !d.hasDiamondRow) {
+                  const labExistsForNaturalKey = !!qb.config.diamondSizeFor('lab-grown', rn.natural.sizeKey)
                   return (
                     <div key={val} className={cardCls}>
                       {header}
-                      <p className="mt-1 text-[11px] text-amber-700">
-                        No Lab diamond price for size <span className="font-mono font-semibold">"{d.sizeKey || '—'}"</span>.
-                      </p>
-                      <p className="text-[10px] text-amber-600">This size key exists for Natural but has no Lab entry yet.</p>
-                      {d.sizeKey && (
-                        <button type="button"
-                          onClick={() => setShowCreateLabRn(true)}
-                          className="mt-1.5 rounded-lg px-2 py-0.5 text-[11px] font-semibold transition"
-                          style={{ backgroundColor: 'rgba(60,46,96,0.08)', color: '#3C2E60' }}>
-                          + Add Lab price
-                        </button>
+                      {labExistsForNaturalKey ? (
+                        <>
+                          <p className="mt-1 text-[11px] text-amber-700">
+                            Lab entry for <span className="font-mono font-semibold">"{rn.natural.sizeKey}"</span> exists but this model points to the wrong key{d.sizeKey ? <> (<span className="font-mono">"{d.sizeKey}"</span>)</> : ''}.
+                          </p>
+                          <button type="button" disabled={linkingLabRn}
+                            onClick={async () => {
+                              if (!rn.model) return
+                              setLinkingLabRn(true)
+                              try {
+                                await configService.updateRnRing(rn.model.id, { diamondSizeKeyLab: rn.natural.sizeKey })
+                                qb.config.refresh()
+                              } finally { setLinkingLabRn(false) }
+                            }}
+                            className="mt-1.5 rounded-lg px-2 py-0.5 text-[11px] font-semibold transition disabled:opacity-50"
+                            style={{ backgroundColor: 'rgba(60,46,96,0.08)', color: '#3C2E60' }}>
+                            {linkingLabRn ? 'Linking...' : `Link to Lab "${rn.natural.sizeKey}"`}
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <p className="mt-1 text-[11px] text-amber-700">
+                            No Lab price for size <span className="font-mono font-semibold">"{rn.natural.sizeKey}"</span>.
+                          </p>
+                          <button type="button"
+                            onClick={() => setShowCreateLabRn(true)}
+                            className="mt-1.5 rounded-lg px-2 py-0.5 text-[11px] font-semibold transition"
+                            style={{ backgroundColor: 'rgba(60,46,96,0.08)', color: '#3C2E60' }}>
+                            + Add Lab price
+                          </button>
+                        </>
                       )}
                     </div>
                   )
