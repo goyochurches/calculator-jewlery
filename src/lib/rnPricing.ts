@@ -59,12 +59,13 @@ export function computeRnBreakdown(args: {
   const settingPerStone = model?.settingLaborPerStone ?? 0
   const sizeKey = stoneType === 'lab-grown' ? (model?.diamondSizeKeyLab ?? '') : (model?.diamondSizeKey ?? '')
   const diamondRow = model ? diamondSizeFor(stoneType, sizeKey) : undefined
-  // When customNumStones is set, derive CTW from stones × ctPerStone.
-  // Otherwise use the fixed sheet CTW for this model + size.
-  const ctPerStone = diamondRow?.ctPerStone ?? 0
-  const ctw = customNumStones != null && ctPerStone > 0
-    ? customNumStones * ctPerStone
-    : (sizeRow?.ctw ?? 0)
+  // When customNumStones is set, scale the sheet CTW proportionally so that
+  // "Other with N = eternity N" gives exactly the same price as Eternity.
+  const sheetCtw = sizeRow?.ctw ?? 0
+  const sheetStones = sizeRow?.numStones ?? 0
+  const ctw = customNumStones != null && sheetStones > 0
+    ? sheetCtw * (customNumStones / sheetStones)
+    : sheetCtw
   const pricePerCarat = diamondRow?.basePrice ?? 0
   const goldCost = avgGrams * goldPerGram
   const settingLabor = numStones * settingPerStone
