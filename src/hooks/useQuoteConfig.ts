@@ -7,7 +7,7 @@ import {
   type SetterConfig,
   type StoneType,
 } from '@/services/configService'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 // Quote stones use lowercase 'natural' / 'lab-grown' (with a legacy
 // 'grunberger' on old quotes); the config rows are keyed by the backend
@@ -43,6 +43,8 @@ export interface QuoteConfig {
   ringLaborMap: Record<string, PricingTier>
   setterMap: Record<string, SetterConfig>
   loading: boolean
+  /** Re-fetch all config data from the backend. */
+  refresh: () => void
 }
 
 const EMPTY: QuoteConfig = {
@@ -50,10 +52,14 @@ const EMPTY: QuoteConfig = {
   diamondSizeFor: () => undefined,
   fingerSizeMap: {}, cadMap: {}, ringLaborMap: {}, setterMap: {},
   loading: true,
+  refresh: () => {},
 }
 
 export function useQuoteConfig(): QuoteConfig {
+  const [tick, setTick] = useState(0)
   const [config, setConfig] = useState<QuoteConfig>(EMPTY)
+
+  const refresh = useCallback(() => setTick(t => t + 1), [])
 
   useEffect(() => {
     Promise.all([
@@ -84,10 +90,11 @@ export function useQuoteConfig(): QuoteConfig {
           ringLaborMap: Object.fromEntries(ringLaborTiers.map(t => [t.tierKey, t])),
           setterMap: Object.fromEntries(setters.map(s => [s.typeKey, s])),
           loading: false,
+          refresh,
         })
       })
       .catch(console.error)
-  }, [])
+  }, [tick, refresh])
 
   return config
 }

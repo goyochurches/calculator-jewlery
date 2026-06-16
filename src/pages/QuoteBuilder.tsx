@@ -1037,6 +1037,8 @@ export function QuoteBuilderPage() {
           current={stone.stoneType}
           carats={caratsNum}
           title={`${theme.label} stone #${index + 1}`}
+          sizeKey={stone.sizeKey}
+          onCreatedLabSize={() => config.refresh()}
           onPick={t => patchStone(stone.uid, { stoneType: t })}
           onClose={() => setCompareUid(null)}
         />

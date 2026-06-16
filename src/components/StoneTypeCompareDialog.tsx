@@ -1,6 +1,7 @@
 import { X } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import type { CompareStoneType, StoneTypeComparison, StoneTypeOption } from '@/lib/stoneTypeCompare'
+import { configService } from '@/services/configService'
 
 interface StoneTypeCompareDialogProps {
   open: boolean
@@ -9,16 +10,24 @@ interface StoneTypeCompareDialogProps {
   carats: number
   /** Stone label for the header, e.g. "Main stone #1". */
   title?: string
+  /** The sizeKey of the current stone — used to pre-fill the Lab creation form. */
+  sizeKey?: string
+  /** Called after a new Lab diamond size is saved, so the parent can refresh config. */
+  onCreatedLabSize?: () => void
   onPick: (stoneType: CompareStoneType) => void
   onClose: () => void
 }
 
 const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
+const inputCls =
+  'w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-400'
+
 /**
  * Natural vs Lab popup for a single stone. Shows the same physical stone priced
- * both ways and lets the jeweler pick the option that suits the customer. The
- * "cheaper" badge only shows when both sides are priced from the tables.
+ * both ways and lets the jeweler pick the option that suits the customer. When
+ * the Lab side has no price row yet, an inline form lets the user create it
+ * without leaving the quote builder.
  */
 export function StoneTypeCompareDialog({
   open,
@@ -26,9 +35,24 @@ export function StoneTypeCompareDialog({
   current,
   carats,
   title,
+  sizeKey,
+  onCreatedLabSize,
   onPick,
   onClose,
 }: StoneTypeCompareDialogProps) {
+  const [showCreate, setShowCreate] = useState(false)
+  const [createDraft, setCreateDraft] = useState({ label: '', ctPerStone: '', basePrice: '' })
+  const [creating, setCreating] = useState(false)
+
+  // Reset create form when dialog closes or when Lab gets a row (after refresh).
+  useEffect(() => {
+    if (!open) setShowCreate(false)
+  }, [open])
+
+  useEffect(() => {
+    if (comparison?.lab.hasRow) setShowCreate(false)
+  }, [comparison?.lab.hasRow])
+
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
@@ -45,37 +69,134 @@ export function StoneTypeCompareDialog({
 
   if (!open || !comparison) return null
 
-  // Why the two sides aren't an even comparison, for the footnote:
-  //  · exactly one side has a table row  → uneven (the other can't be priced)
-  //  · neither/both have rows but still not comparable → a custom/manual price
-  //    fixes the cost, so the type is only a label here.
+  const handleCreate = async () => {
+    if (!sizeKey || !createDraft.basePrice) return
+    setCreating(true)
+    try {
+      await configService.createDiamondSize({
+        stoneType: 'LAB',
+        sizeKey,
+        label: createDraft.label,
+        ctPerStone: createDraft.ctPerStone !== '' ? Number(createDraft.ctPerStone) : null,
+        basePrice: Number(createDraft.basePrice),
+      })
+      setShowCreate(false)
+      onCreatedLabSize?.()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setCreating(false)
+    }
+  }
+
   const oneSideMissing = comparison.natural.hasRow !== comparison.lab.hasRow
 
   const renderCard = (opt: StoneTypeOption) => {
     const isSel = current === opt.stoneType
     const isCheaper = comparison.cheaper === opt.stoneType
-    // Pickable when there's a table row to price from, or when a manual/custom
-    // price already fixes the cost (then the type is just a label).
     const pickable = opt.hasRow || !comparison.comparable
+    const isLabMissing = opt.stoneType === 'lab-grown' && !opt.hasRow
+
+    const baseClass = `flex-1 rounded-2xl border p-4 text-left transition ${
+      isSel
+        ? 'border-slate-900 bg-white ring-1 ring-slate-900'
+        : 'border-slate-200 bg-white/70'
+    }`
+
+    const headerEl = (
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-slate-900">{opt.label}</span>
+        {isSel
+          ? <span className="rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">USING</span>
+          : isCheaper && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">CHEAPER</span>}
+      </div>
+    )
+
+    // LAB card with missing price — rendered as div so buttons can nest inside
+    if (isLabMissing) {
+      return (
+        <div key={opt.stoneType} className={`${baseClass} ${!pickable ? 'opacity-50' : ''}`}>
+          {headerEl}
+          {showCreate ? (
+            <div className="mt-3 space-y-2">
+              <p className="text-[11px] font-semibold text-sky-700">New Lab price</p>
+              <div>
+                <label className="block text-[10px] uppercase tracking-wide text-slate-400">Label</label>
+                <input
+                  className={inputCls}
+                  value={createDraft.label}
+                  onChange={e => setCreateDraft(d => ({ ...d, label: e.target.value }))}
+                />
+              </div>
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <label className="block text-[10px] uppercase tracking-wide text-slate-400">CT/stone</label>
+                  <input
+                    type="number" step="0.0001" placeholder="0.014"
+                    className={inputCls}
+                    value={createDraft.ctPerStone}
+                    onChange={e => setCreateDraft(d => ({ ...d, ctPerStone: e.target.value }))}
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="block text-[10px] uppercase tracking-wide text-slate-400">$/stone *</label>
+                  <input
+                    type="number" step="0.01" placeholder="0.00" required
+                    className={inputCls}
+                    value={createDraft.basePrice}
+                    onChange={e => setCreateDraft(d => ({ ...d, basePrice: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-0.5">
+                <button
+                  type="button"
+                  disabled={creating || !createDraft.basePrice}
+                  onClick={handleCreate}
+                  className="flex-1 rounded-lg bg-sky-600 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-sky-700 disabled:opacity-50"
+                >
+                  {creating ? 'Saving…' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCreate(false)}
+                  className="rounded-lg px-2 py-1.5 text-[11px] text-slate-500 transition hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p className="mt-2 text-[11px] text-amber-700">No price for this size in {opt.label}.</p>
+              {sizeKey && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreateDraft({ label: comparison.natural.sizeLabel, ctPerStone: '', basePrice: '' })
+                    setShowCreate(true)
+                  }}
+                  className="mt-2 rounded-lg bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-100"
+                >
+                  + Add Lab price
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )
+    }
+
+    // Normal card — full clickable button
     return (
       <button
         key={opt.stoneType}
         type="button"
         disabled={!pickable}
         onClick={() => { onPick(opt.stoneType); onClose() }}
-        className={`flex-1 rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${
-          isSel
-            ? 'border-slate-900 bg-white ring-1 ring-slate-900'
-            : 'border-slate-200 bg-white/70 hover:border-slate-300 hover:shadow-sm'
-        }`}
+        className={`${baseClass} disabled:cursor-not-allowed disabled:opacity-50 hover:border-slate-300 hover:shadow-sm`}
       >
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-sm font-semibold text-slate-900">{opt.label}</span>
-          {isSel
-            ? <span className="rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">USING</span>
-            : isCheaper && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">CHEAPER</span>}
-        </div>
-
+        {headerEl}
         {opt.hasRow ? (
           <>
             <p className="mt-2 text-[11px] text-slate-500">{opt.sizeLabel}</p>
@@ -142,7 +263,7 @@ export function StoneTypeCompareDialog({
           {!comparison.comparable && (
             <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
               {oneSideMissing
-                ? 'One of the two types has no price for this size, so this isn’t an even comparison.'
+                ? 'One of the two types has no price for this size, so this isn\'t an even comparison.'
                 : 'This stone uses a custom price, so Natural and Lab cost the same here — picking only changes the label.'}
             </p>
           )}
