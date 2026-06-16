@@ -21,7 +21,7 @@ interface StoneTypeCompareDialogProps {
 const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 
 const inputCls =
-  'w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-400'
+  'w-full rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-400'
 
 /**
  * Natural vs Lab popup for a single stone. Shows the same physical stone priced
