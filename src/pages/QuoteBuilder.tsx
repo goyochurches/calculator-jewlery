@@ -1353,7 +1353,7 @@ export function QuoteBuilderPage() {
             sortOrder: 0,
             shape: null, color: null, cut: null, clarity: null,
             manualPrice: Math.round(rn.diamondCost * 100) / 100,
-            comments: `${rn.model.modelKey} · SZ ${rn.sizeRow.fingerSize} · ${rn.numStones} stones · ${rn.ctw}ct`,
+            comments: `${rn.model.modelKey} · SZ ${rn.sizeRow.fingerSize} · ${rn.numStones} stones · ${rn.ctw.toFixed(2)}ct`,
             markupMultiplier: null,
             contribution: Math.round((rn.diamondCost + rn.settingLabor) * 100) / 100,
           }]
@@ -1364,7 +1364,7 @@ export function QuoteBuilderPage() {
             `Gold: ${rn.avgGrams}g × $${rn.goldPerGram}/g = $${rn.goldCost.toFixed(2)}`,
             `Labor: $${rn.casting.toFixed(2)}`,
             `Setting: ${rn.numStones} × $${rn.settingPerStone} = $${rn.settingLabor.toFixed(2)}`,
-            `Stones: ${rn.ctw}ct × $${rn.pricePerCarat}/ct = $${rn.diamondCost.toFixed(2)}`,
+            `Stones: ${rn.ctw.toFixed(2)}ct × $${rn.pricePerCarat}/ct = $${rn.diamondCost.toFixed(2)}`,
           ].join('\n')
         : null
       const mergedInternalNotes = rnMode
@@ -1772,7 +1772,7 @@ export function QuoteBuilderPage() {
                   <option value={0}>{rn?.model ? '— Select a size' : '— Pick a model first'}</option>
                   {(rn?.model?.sizes ?? []).map(s => (
                     <option key={s.fingerSize} value={s.fingerSize}>
-                      SZ {s.fingerSize} — {s.numStones ?? 0} stones · {s.ctw ?? 0}ct
+                      SZ {s.fingerSize} — {s.numStones ?? 0} stones · {(s.ctw ?? 0).toFixed(2)}ct
                     </option>
                   ))}
                 </select>
@@ -1829,7 +1829,7 @@ export function QuoteBuilderPage() {
                   {/* Shared across both diamond types (same physical ring). */}
                   <dl className="space-y-1.5 text-sm">
                     <RnRow label="Number of stones" value={`${rn.numStones}`} />
-                    <RnRow label="CTW (from sheet)" value={`${rn.ctw} ct`} />
+                    <RnRow label="CTW (from sheet)" value={`${rn.ctw.toFixed(2)} ct`} />
                     <RnRow label={`Gold (${rn.avgGrams}g × $${rn.goldPerGram}/g)`} value={`$${rn.goldCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                     <RnRow label="Labor" value={`$${rn.casting.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                     <RnRow label={`Setting (${rn.numStones} × $${rn.settingPerStone})`} value={`$${rn.settingLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
@@ -1857,7 +1857,7 @@ export function QuoteBuilderPage() {
                                   ? <span className="rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">USING</span>
                                   : isCheaper && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">CHEAPER</span>}
                               </div>
-                              <p className="mt-1 text-[11px] text-slate-500">{stones} stones · {d.ctw.toFixed(4).replace(/\.?0+$/, '')}ct</p>
+                              <p className="mt-1 text-[11px] text-slate-500">{stones} stones · {d.ctw.toFixed(2)}ct</p>
                               <p className="mt-1 text-sm font-semibold text-slate-900">${d.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                             </button>
                           )
@@ -1927,7 +1927,7 @@ export function QuoteBuilderPage() {
                           {header}
                           {d.hasDiamondRow ? (
                             <>
-                              <p className="mt-1 text-[11px] text-slate-500">{rn.ctw}ct × ${d.pricePerCarat.toLocaleString('en-US')}/ct</p>
+                              <p className="mt-1 text-[11px] text-slate-500">{rn.ctw.toFixed(2)}ct × ${d.pricePerCarat.toLocaleString('en-US')}/ct</p>
                               <p className="text-[11px] text-slate-500">Diamonds ${d.diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                               <p className="mt-1 text-sm font-semibold text-slate-900">${d.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                               {val === 'lab-grown' && (
