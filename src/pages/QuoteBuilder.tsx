@@ -198,6 +198,8 @@ export function QuoteBuilderPage() {
   const [rnModelKey, setRnModelKey] = useState('')
   const [rnFingerSize, setRnFingerSize] = useState<number>(0)
   const [rnStoneType, setRnStoneType] = useState<RnStoneType>('natural')
+  const [rnBandMode, setRnBandMode] = useState<'eternity' | 'other'>('eternity')
+  const [rnCustomStones, setRnCustomStones] = useState<string>('')
   const [showCreateLabRn, setShowCreateLabRn] = useState(false)
   const [linkingLabRn, setLinkingLabRn] = useState(false)
 
@@ -1106,13 +1108,20 @@ export function QuoteBuilderPage() {
     const model = config.rnRings.find(m => m.modelKey === rnModelKey) ?? null
     const sizeRow = model?.sizes.find(s => s.fingerSize === rnFingerSize) ?? null
     const base = { model, sizeRow, metal: selectedMetal, diamondSizeFor: config.diamondSizeFor }
-    const natural = computeRnBreakdown({ ...base, stoneType: 'natural' })
-    const lab = computeRnBreakdown({ ...base, stoneType: 'lab-grown' })
+    // Eternity = default numStones from sheet. Other = custom stone count.
+    const customStones = rnBandMode === 'other' ? (parseInt(rnCustomStones) || 0) : 0
+    const otherBase = customStones > 0 ? { ...base, customNumStones: customStones } : null
+    // Per diamond type, compute eternity and other breakdowns.
+    const naturalEternity = computeRnBreakdown({ ...base, stoneType: 'natural' })
+    const labEternity = computeRnBreakdown({ ...base, stoneType: 'lab-grown' })
+    const naturalOther = otherBase ? computeRnBreakdown({ ...otherBase, stoneType: 'natural' }) : null
+    const labOther = otherBase ? computeRnBreakdown({ ...otherBase, stoneType: 'lab-grown' }) : null
+    // Active values reflect the chosen band mode + diamond type.
+    const natural = (rnBandMode === 'other' && naturalOther) ? naturalOther : naturalEternity
+    const lab     = (rnBandMode === 'other' && labOther)     ? labOther     : labEternity
     const selected = rnStoneType === 'lab-grown' ? lab : natural
-    // `selected` is spread last so rn.total / rn.ctw / rn.diamondCost reflect the
-    // chosen diamond type; natural + lab are kept for the Lab-vs-Natural popup.
-    return { model, sizeRow, natural, lab, ...selected }
-  }, [rnMode, config, rnModelKey, rnFingerSize, selectedMetal, rnStoneType])
+    return { model, sizeRow, natural, lab, naturalEternity, labEternity, naturalOther, labOther, ...selected }
+  }, [rnMode, config, rnModelKey, rnFingerSize, selectedMetal, rnStoneType, rnBandMode, rnCustomStones])
 
   const pricing = useMemo(() => {
     const metalPricePerGram = selectedMetalConfig.pricePerGram
@@ -1769,6 +1778,33 @@ export function QuoteBuilderPage() {
                 </select>
               </div>
 
+              {/* Band mode: Eternity (default) vs Other (custom stone count) */}
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-sm font-semibold text-slate-900">Band type</label>
+                <div className="inline-flex w-full rounded-2xl bg-slate-100 p-1">
+                  {([['eternity', 'Eternity'], ['other', 'Other']] as const).map(([val, label]) => (
+                    <button key={val} type="button"
+                      onClick={() => { setRnBandMode(val); if (val === 'eternity') setRnCustomStones('') }}
+                      className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${rnBandMode === val ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {rnBandMode === 'other' && (
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-sm font-semibold text-slate-900">Number of stones</label>
+                  <input
+                    type="number" min={1} step={1}
+                    value={rnCustomStones}
+                    onChange={e => setRnCustomStones(e.target.value)}
+                    placeholder={`Default eternity: ${rn?.sizeRow?.numStones ?? '—'} stones`}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+                  />
+                </div>
+              )}
+
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-semibold text-slate-900">Diamond type</label>
                 <div className="inline-flex w-full rounded-2xl bg-slate-100 p-1">
@@ -1798,6 +1834,37 @@ export function QuoteBuilderPage() {
                     <RnRow label="Labor" value={`$${rn.casting.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                     <RnRow label={`Setting (${rn.numStones} × $${rn.settingPerStone})`} value={`$${rn.settingLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                   </dl>
+
+                  {/* Eternity vs Other — only shown when Other mode has a stone count */}
+                  {rn.naturalOther && (
+                    <>
+                      <p className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Band type · compare</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {([
+                          ['eternity', 'Eternity', rnStoneType === 'lab-grown' ? rn.labEternity : rn.naturalEternity, rn.naturalEternity.numStones] as const,
+                          ['other',    'Other',    rnStoneType === 'lab-grown' ? rn.labOther!   : rn.naturalOther,    rn.naturalOther.numStones]    as const,
+                        ]).map(([val, label, d, stones]) => {
+                          const isSel = rnBandMode === val
+                          const etTotal = (rnStoneType === 'lab-grown' ? rn.labEternity : rn.naturalEternity).total
+                          const otTotal = (rnStoneType === 'lab-grown' ? rn.labOther!   : rn.naturalOther).total
+                          const isCheaper = d.total === Math.min(etTotal, otTotal) && etTotal !== otTotal
+                          return (
+                            <button key={val} type="button" onClick={() => setRnBandMode(val)}
+                              className={`rounded-xl border p-3 text-left transition ${isSel ? 'border-slate-900 bg-white ring-1 ring-slate-900' : 'border-slate-200 bg-white/60 hover:border-slate-300'}`}>
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-semibold text-slate-900">{label}</span>
+                                {isSel
+                                  ? <span className="rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">USING</span>
+                                  : isCheaper && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">CHEAPER</span>}
+                              </div>
+                              <p className="mt-1 text-[11px] text-slate-500">{stones} stones · {d.ctw.toFixed(4).replace(/\.?0+$/, '')}ct</p>
+                              <p className="mt-1 text-sm font-semibold text-slate-900">${d.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )}
 
                   {/* Natural vs Lab side by side — tap one to use it in the quote. */}
                   <p className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Diamonds · pick type</p>

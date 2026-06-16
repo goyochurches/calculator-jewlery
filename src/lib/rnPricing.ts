@@ -46,20 +46,25 @@ export function computeRnBreakdown(args: {
   metal: JewelryMetalOption
   stoneType: RnStoneType
   diamondSizeFor: (stoneType: string | undefined | null, sizeKey: string) => DiamondSizeConfig | undefined
+  /** When set, overrides sizeRow.numStones and recalculates CTW as customNumStones × ctPerStone. */
+  customNumStones?: number
 }): RnBreakdown {
-  const { model, sizeRow, metal, stoneType, diamondSizeFor } = args
+  const { model, sizeRow, metal, stoneType, diamondSizeFor, customNumStones } = args
   const metalCat = rnMetalCategory(metal)
   const pick = <T,>(a: T, b: T, c: T): T => (metalCat === '14k' ? a : metalCat === '18k' ? b : c)
   const goldPerGram = model && metalCat ? (pick(model.goldPrice14k, model.goldPrice18k, model.goldPricePlat) ?? 0) : 0
   const casting = model && metalCat ? (pick(model.labor14k, model.labor18k, model.laborPlat) ?? 0) : 0
   const avgGrams = model?.avgGrams ?? 0
-  const numStones = sizeRow?.numStones ?? 0
+  const numStones = customNumStones ?? sizeRow?.numStones ?? 0
   const settingPerStone = model?.settingLaborPerStone ?? 0
   const sizeKey = stoneType === 'lab-grown' ? (model?.diamondSizeKeyLab ?? '') : (model?.diamondSizeKey ?? '')
   const diamondRow = model ? diamondSizeFor(stoneType, sizeKey) : undefined
-  // CTW is the fixed sheet value for this model + size (same physical stones for
-  // natural or lab); only the per-carat price differs by diamond type/table.
-  const ctw = sizeRow?.ctw ?? 0
+  // When customNumStones is set, derive CTW from stones × ctPerStone.
+  // Otherwise use the fixed sheet CTW for this model + size.
+  const ctPerStone = diamondRow?.ctPerStone ?? 0
+  const ctw = customNumStones != null && ctPerStone > 0
+    ? customNumStones * ctPerStone
+    : (sizeRow?.ctw ?? 0)
   const pricePerCarat = diamondRow?.basePrice ?? 0
   const goldCost = avgGrams * goldPerGram
   const settingLabor = numStones * settingPerStone
