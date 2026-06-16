@@ -337,10 +337,11 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
   // stone, skipping any field the jeweler left blank.
   const describeStone = (s: PublicQuoteStone): string => {
     const parts: string[] = []
-    // A blank or "other" size key means a non-standard / custom stone (common
-    // on the MAIN stone, where size is descriptive and the price is typed in) —
-    // show a friendly label instead of a stray "mm".
-    const size = (!s.sizeKey || s.sizeKey === 'other') ? 'Custom size' : `${sizeLabelFor(s.sizeKey)} mm`
+    // Prefer the label from Master Tables (e.g. "Ø 1.50 mm") over the legacy
+    // frontend constant lookup, which only has the old range-style keys.
+    const size = s.sizeLabel
+      ? s.sizeLabel
+      : (!s.sizeKey || s.sizeKey === 'other') ? 'Custom size' : `${sizeLabelFor(s.sizeKey)} mm`
     parts.push(s.amount && s.amount > 0 ? `${s.amount} × ${size}` : size)
     if (s.shape) parts.push(s.shape)
     if (s.color) parts.push(`color ${s.color}`)
