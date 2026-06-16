@@ -119,7 +119,7 @@ export function StoneTypeCompareDialog({
           {headerEl}
           {showCreate ? (
             <div className="mt-3 space-y-2">
-              <p className="text-[11px] font-semibold text-sky-700">New Lab price</p>
+              <p className="text-[11px] font-semibold" style={{ color: '#3C2E60' }}>New Lab price</p>
               <div>
                 <label className="block text-[10px] uppercase tracking-wide text-slate-400">Label</label>
                 <input
@@ -153,7 +153,8 @@ export function StoneTypeCompareDialog({
                   type="button"
                   disabled={creating || !createDraft.basePrice}
                   onClick={handleCreate}
-                  className="flex-1 rounded-lg bg-sky-600 px-2 py-1.5 text-[11px] font-semibold text-white transition hover:bg-sky-700 disabled:opacity-50"
+                  className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-semibold text-white transition disabled:opacity-50"
+                  style={{ backgroundColor: '#3C2E60' }}
                 >
                   {creating ? 'Saving…' : 'Save'}
                 </button>
@@ -176,7 +177,8 @@ export function StoneTypeCompareDialog({
                     setCreateDraft({ label: comparison.natural.sizeLabel, ctPerStone: '', basePrice: '' })
                     setShowCreate(true)
                   }}
-                  className="mt-2 rounded-lg bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-100"
+                  className="mt-2 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition"
+                  style={{ backgroundColor: 'rgba(60,46,96,0.08)', color: '#3C2E60' }}
                 >
                   + Add Lab price
                 </button>

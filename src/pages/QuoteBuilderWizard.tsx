@@ -492,7 +492,8 @@ function RnWizardStep({ qb }: { qb: QuoteBuilderState }) {
                       {d.sizeKey && (
                         <button type="button"
                           onClick={() => setShowCreateLabRn(true)}
-                          className="mt-1.5 rounded-lg bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-100">
+                          className="mt-1.5 rounded-lg px-2 py-0.5 text-[11px] font-semibold transition"
+                          style={{ backgroundColor: 'rgba(60,46,96,0.08)', color: '#3C2E60' }}>
                           + Add Lab price
                         </button>
                       )}
