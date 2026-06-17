@@ -239,11 +239,40 @@ interface SpringPage<T> {
   size?: number
 }
 
+export interface QuotePage {
+  items: SavedQuote[]
+  totalPages: number
+  totalElements: number
+  currentPage: number
+}
+
 export const quotesService = {
+  async getPage(params: {
+    page?: number
+    size?: number
+    status?: string
+    q?: string
+  }): Promise<QuotePage> {
+    const { page = 0, size = 20, status, q } = params
+    let url = `/api/quotes?page=${page}&size=${size}&sort=createdAt,desc&sort=id,desc`
+    if (status && status !== 'all') url += `&status=${status.toUpperCase()}`
+    if (q && q.trim()) url += `&q=${encodeURIComponent(q.trim())}`
+    const data = await api.get<SpringPage<ApiQuote>>(url)
+    return {
+      items: (data.content ?? []).map(mapQuote),
+      totalPages: data.totalPages ?? 1,
+      totalElements: data.totalElements ?? 0,
+      currentPage: data.number ?? 0,
+    }
+  },
+
+  async getCounts(): Promise<Record<string, number>> {
+    return api.get<Record<string, number>>('/api/quotes/counts')
+  },
+
   async getAll(): Promise<SavedQuote[]> {
-    const data = await api.get<ApiQuote[] | SpringPage<ApiQuote>>('/api/quotes')
-    const items = Array.isArray(data) ? data : data.content ?? []
-    return items.map(mapQuote)
+    const data = await api.get<SpringPage<ApiQuote>>('/api/quotes?size=10000&sort=createdAt,desc')
+    return (data.content ?? []).map(mapQuote)
   },
 
   async getByClient(clientId: number): Promise<SavedQuote[]> {
