@@ -233,10 +233,12 @@ function mapCustomerStone(s: ApiCustomerStone): QuoteCustomerStone {
 
 interface SpringPage<T> {
   content: T[]
+  // VIA_DTO mode nests metadata under "page"
+  page?: { totalElements: number; totalPages: number; number: number; size: number }
+  // legacy flat fields (kept as fallback)
   totalElements?: number
   totalPages?: number
   number?: number
-  size?: number
 }
 
 export interface QuotePage {
@@ -258,11 +260,12 @@ export const quotesService = {
     if (status && status !== 'all') url += `&status=${status.toUpperCase()}`
     if (q && q.trim()) url += `&q=${encodeURIComponent(q.trim())}`
     const data = await api.get<SpringPage<ApiQuote>>(url)
+    const meta = data.page
     return {
       items: (data.content ?? []).map(mapQuote),
-      totalPages: data.totalPages ?? 1,
-      totalElements: data.totalElements ?? 0,
-      currentPage: data.number ?? 0,
+      totalPages:    meta?.totalPages    ?? data.totalPages    ?? 1,
+      totalElements: meta?.totalElements ?? data.totalElements ?? 0,
+      currentPage:   meta?.number        ?? data.number        ?? 0,
     }
   },
 
