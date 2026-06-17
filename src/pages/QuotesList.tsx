@@ -495,6 +495,7 @@ export function QuotesListPage() {
                 pageEnd={pageEnd}
                 total={totalElements}
                 pageSize={pageSize}
+                loading={loading}
                 onPageChange={(p) => setPage(p - 1)}
                 onPageSizeChange={setPageSize}
               />
@@ -566,6 +567,7 @@ function PaginationBar({
   pageEnd,
   total,
   pageSize,
+  loading,
   onPageChange,
   onPageSizeChange,
 }: {
@@ -575,12 +577,13 @@ function PaginationBar({
   pageEnd: number
   total: number
   pageSize: number
+  loading?: boolean
   onPageChange: (p: number) => void
   onPageSizeChange: (size: number) => void
 }) {
   const pages = getPageNumbers(page, totalPages)
-  const canPrev = page > 1
-  const canNext = page < totalPages
+  const canPrev = page > 1 && !loading
+  const canNext = page < totalPages && !loading
 
   return (
     <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
