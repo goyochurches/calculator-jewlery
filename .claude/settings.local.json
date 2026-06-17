@@ -147,7 +147,11 @@
       "Bash(Select-Object -First 50)",
       "Bash(echo \"=== EXIT: $? ===\")",
       "PowerShell(Get-ChildItem \"D:\\\\wamp64\\\\www\\\\calculator-jewlery\" | Where-Object { $_.Name -match \"README|NOTES|TODO|\\\\.md$\" })",
-      "Bash(Get-ChildItem -Path \"D:\\\\wamp64\\\\www\\\\calculator-jewlery\" -Directory)"
+      "Bash(Get-ChildItem -Path \"D:\\\\wamp64\\\\www\\\\calculator-jewlery\" -Directory)",
+      "Bash(npx @nestjs/cli --version)",
+      "Bash(npx @nestjs/cli new calculator-service --package-manager npm --skip-git --language TS)",
+      "Bash(gh repo *)",
+      "Bash(cmd /c \"cd /d D:\\\\wamp64\\\\www\\\\price-calculator && mvn compile -q 2>&1\")"
     ]
   }
 }

@@ -29,6 +29,7 @@ import { canSeePayments } from '@/lib/paymentsAccess'
 import Login from '@/pages/Login'
 import SetupPassword from '@/pages/SetupPassword'
 import { canAccess, defaultRouteFor, type NavKey } from '@/constants/permissions'
+import { CompetitorsPage } from '@/pages/Competitors'
 
 function PrivateRoutes() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -127,6 +128,9 @@ export default function App() {
                 </Route>
                 <Route element={<RequirePermission permission="master-tables" />}>
                   <Route path="/master-tables" element={<MasterTables />} />
+                </Route>
+                <Route element={<RequirePermission permission="competitors" />}>
+                  <Route path="/competitors" element={<CompetitorsPage />} />
                 </Route>
               </Route>
             </Route>
