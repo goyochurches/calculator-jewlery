@@ -398,9 +398,11 @@ export function QuotesListPage() {
           <CardHeader className="border-b border-slate-100">
             <CardTitle className="text-base font-semibold text-slate-900">All quotes</CardTitle>
             <p className="text-sm text-slate-500">
-              {filteredGroups.length === groups.length
-                ? 'Click any row to see the full breakdown. Duplicates with the same client appear as revisions below their original.'
-                : `Showing ${filteredGroups.length} of ${groups.length} quotes.`}
+              {loading
+                ? 'Loading…'
+                : totalElements === 0
+                  ? 'No quotes match the current filters.'
+                  : `${totalElements.toLocaleString()} total · click any row to see the full breakdown`}
             </p>
           </CardHeader>
           <CardContent className="p-0">
@@ -416,28 +418,35 @@ export function QuotesListPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredGroups.length === 0 && (
+                  {!loading && groups.length === 0 && (
                     <tr>
                       <td colSpan={9} className="px-6 py-12 text-center text-sm text-slate-400">
                         No quotes match the current filters.
                       </td>
                     </tr>
                   )}
-                  {pagedGroups.flatMap((group) => {
+                  {loading && quotes.length === 0 && (
+                    <tr>
+                      <td colSpan={9} className="px-6 py-8 text-center text-sm text-slate-400">
+                        Loading…
+                      </td>
+                    </tr>
+                  )}
+                  {groups.flatMap((group) => {
                     const rows: React.ReactNode[] = []
-                    const expanded = effectivelyExpanded(group.parent.id, group.parentMatches)
+                    const expanded = effectivelyExpanded(group.parent.id)
                     const childCount = group.children.length
                     rows.push(
                       <QuoteRow
                         key={group.parent.id}
                         quote={group.parent}
-                        kind={group.parentMatches ? 'parent' : 'parent-ghost'}
+                        kind="parent"
                         isSelected={group.parent.id === selectedId}
                         onSelect={() => setSelectedId(group.parent.id === selectedId ? null : group.parent.id)}
                         onDuplicate={() => navigate('/quotes', { state: { duplicateFrom: group.parent } })}
                         childCount={childCount}
                         expanded={expanded}
-                        canToggle={group.parentMatches && childCount > 0}
+                        canToggle={childCount > 0}
                         onToggle={() => toggleGroup(group.parent.id)}
                         viewerUser={user}
                         onDelete={canDelete ? () => setDeleteTarget(group.parent) : undefined}
@@ -467,15 +476,15 @@ export function QuotesListPage() {
                 </tbody>
               </table>
             </div>
-            {filteredGroups.length > 0 && (
+            {totalElements > 0 && (
               <PaginationBar
-                page={safePage}
+                page={page + 1}
                 totalPages={totalPages}
                 pageStart={pageStart}
                 pageEnd={pageEnd}
-                total={filteredGroups.length}
+                total={totalElements}
                 pageSize={pageSize}
-                onPageChange={setPage}
+                onPageChange={(p) => setPage(p - 1)}
                 onPageSizeChange={setPageSize}
               />
             )}
@@ -499,10 +508,8 @@ export function QuotesListPage() {
                 onDelete={isAdmin ? handleDelete : undefined}
                 isAdmin={isAdmin}
                 onPaymentChanged={() => {
-                  // Refetch the full list so the status badge of the
-                  // affected quote reflects the cascade (e.g. FULLY_PAID
-                  // → APPROVED after a refund).
-                  quotesService.getAll().then(setQuotes).catch(console.error)
+                  refetchPage()
+                  loadCounts()
                 }}
               />
             </div>
