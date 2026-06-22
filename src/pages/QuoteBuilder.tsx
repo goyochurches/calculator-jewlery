@@ -828,7 +828,7 @@ export function QuoteBuilderPage() {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Amount</label>
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quantity</label>
             <input type="text" inputMode="numeric" value={stone.amount} placeholder="0"
               onChange={e => onStoneAmountChange(stone.uid, e.target.value)}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />

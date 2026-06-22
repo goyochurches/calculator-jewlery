@@ -674,7 +674,7 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
         <Field label="Carats">
           <input type="text" inputMode="decimal" value={stone.carats} placeholder="0.0000" onChange={e => qb.onStoneCaratsChange(stone.uid, e.target.value)} className={miniCls} />
         </Field>
-        <Field label="Amount">
+        <Field label="Quantity">
           <input type="text" inputMode="numeric" value={stone.amount} placeholder="0" onChange={e => qb.onStoneAmountChange(stone.uid, e.target.value)} className={miniCls} />
         </Field>
         <Field label="Type of setting" wide>
