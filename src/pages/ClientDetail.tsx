@@ -15,6 +15,7 @@ import type { Client, QuoteStatus, SavedQuote } from '@/types'
 import { ArrowLeft, Check, Clock, CreditCard, FileText, Mail, Phone, RotateCcw, User, XCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 
 const STATUS_STYLES: Record<QuoteStatus, string> = {
   draft:      'bg-slate-100 text-slate-600',
@@ -83,8 +84,11 @@ export function ClientDetailPage() {
       } else {
         setQuotes(prev => prev.map(q => q.id === clientQuoteId ? updated : q))
       }
+      const label = status === 'APPROVED' ? 'approved' : status === 'REJECTED' ? 'rejected' : 'reset to pending'
+      toast.success(`Quote ${label}`)
     } catch (e) {
       console.error(e)
+      toast.error('Failed to update status')
     }
   }
 

@@ -39,6 +39,7 @@ export function UsersPage() {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<Usuario | null>(null)
   const [editingUser, setEditingUser] = useState<Usuario | null>(null)
 
@@ -47,9 +48,14 @@ export function UsersPage() {
   }, [])
 
   const toggleStatus = async (id: string, current: Usuario['status']) => {
+    setTogglingId(id)
     const next = current === 'active' ? 'inactive' : 'active'
-    await userService.updateStatus(id, next)
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, status: next } : u))
+    try {
+      await userService.updateStatus(id, next)
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, status: next } : u))
+    } finally {
+      setTogglingId(null)
+    }
   }
 
   const confirmDelete = async () => {
@@ -204,8 +210,8 @@ export function UsersPage() {
                 <Pencil className="mr-1.5 h-4 w-4" />
                 Edit profile
               </Button>
-              <Button variant="outline" size="lg" onClick={() => toggleStatus(u.id, u.status)}>
-                {u.status === 'active' ? 'Disable' : 'Enable'}
+              <Button variant="outline" size="lg" onClick={() => toggleStatus(u.id, u.status)} disabled={togglingId === u.id}>
+                {togglingId === u.id ? 'Saving…' : (u.status === 'active' ? 'Disable' : 'Enable')}
               </Button>
               <Button
                 variant="outline"

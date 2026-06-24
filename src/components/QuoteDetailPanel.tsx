@@ -14,7 +14,7 @@ import { quotesService } from '@/services/quotesService'
 import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { NoticeDialog } from '@/components/NoticeDialog'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { AlertTriangle, Check, ChevronDown, ChevronUp, Copy, ExternalLink, Eye, FileDown, MessageCircle, RefreshCw, Trash2, X, XCircle } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, ChevronUp, Copy, ExternalLink, Eye, FileDown, Loader2, MessageCircle, RefreshCw, Trash2, X, XCircle } from 'lucide-react'
 import { labReportVerifyUrl } from '@/hooks/useQuoteBuilder'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -181,10 +181,20 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
   const canSeePayments_ = canSeePayments(user)
   const [refreshing, setRefreshing] = useState(false)
   const [pdfLoading, setPdfLoading] = useState(false)
+  const [pendingStatus, setPendingStatus] = useState<'APPROVED' | 'REJECTED' | 'PENDING' | null>(null)
   // Delete confirmation flow — gated behind a two-button ConfirmDialog so a
   // misclick can't wipe a quote (the action is irreversible).
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  const handleStatusAction = async (status: 'APPROVED' | 'REJECTED' | 'PENDING') => {
+    setPendingStatus(status)
+    try {
+      await onStatusChange!(quote.id, status)
+    } finally {
+      setPendingStatus(null)
+    }
+  }
   const handleDuplicate = () => {
     onClose()
     navigate('/quotes', { state: { duplicateFrom: quote } })
@@ -670,26 +680,32 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
           <div className="flex gap-2">
             {quote.status !== 'approved' && (
               <button
-                onClick={() => onStatusChange!(quote.id, 'APPROVED')}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
+                onClick={() => handleStatusAction('APPROVED')}
+                disabled={!!pendingStatus}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <Check className="h-4 w-4" /> Approve
+                {pendingStatus === 'APPROVED' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                {pendingStatus === 'APPROVED' ? 'Approving…' : 'Approve'}
               </button>
             )}
             {quote.status !== 'rejected' && (
               <button
-                onClick={() => onStatusChange!(quote.id, 'REJECTED')}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600"
+                onClick={() => handleStatusAction('REJECTED')}
+                disabled={!!pendingStatus}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-rose-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                <XCircle className="h-4 w-4" /> Reject
+                {pendingStatus === 'REJECTED' ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
+                {pendingStatus === 'REJECTED' ? 'Rejecting…' : 'Reject'}
               </button>
             )}
             {quote.status !== 'pending' && (
               <button
-                onClick={() => onStatusChange!(quote.id, 'PENDING')}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-amber-400 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-500"
+                onClick={() => handleStatusAction('PENDING')}
+                disabled={!!pendingStatus}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl bg-amber-400 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-500 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Reset
+                {pendingStatus === 'PENDING' && <Loader2 className="h-4 w-4 animate-spin" />}
+                {pendingStatus === 'PENDING' ? 'Resetting…' : 'Reset'}
               </button>
             )}
           </div>
