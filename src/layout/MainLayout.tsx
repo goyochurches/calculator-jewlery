@@ -1,9 +1,9 @@
 import { NotificationPanel } from '@/components/NotificationPanel'
+import { Toast } from '@/components/Toast'
 import { useNotifications } from '@/hooks/useNotifications'
 import { Bell, Menu, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
 import { Sidebar } from './Sidebar'
 
 const pageCopy: Record<string, { title: string; subtitle: string }> = {
@@ -65,17 +65,6 @@ export function MainLayout() {
   })
   const navigate = useNavigate()
   const { notifications, unreadCount, markRead, markAllRead, lastPush, dismissLastPush } = useNotifications()
-
-  useEffect(() => {
-    if (!lastPush) return
-    const fn = lastPush.type === 'DANGER' ? toast.error : toast.success
-    fn('New notification', {
-      description: lastPush.message,
-      action: lastPush.link ? { label: 'Open', onClick: () => navigate(lastPush.link!) } : undefined,
-      onDismiss: dismissLastPush,
-      onAutoClose: dismissLastPush,
-    })
-  }, [lastPush?.id])
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed))
@@ -168,6 +157,19 @@ export function MainLayout() {
         </div>
       </div>
 
+      {/* Real-time WebSocket push → transient bottom-right toast. Keyed by
+          notification id so a rapid second push replaces the previous one. */}
+      {lastPush && (
+        <Toast
+          key={lastPush.id}
+          title="New notification"
+          description={lastPush.message}
+          variant={lastPush.type === 'DANGER' ? 'error' : 'success'}
+          actionLabel={lastPush.link ? 'Open' : undefined}
+          onAction={lastPush.link ? () => navigate(lastPush.link!) : undefined}
+          onClose={dismissLastPush}
+        />
+      )}
     </div>
   )
 }

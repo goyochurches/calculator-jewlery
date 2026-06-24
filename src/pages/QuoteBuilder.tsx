@@ -19,8 +19,8 @@ import type { Client, GemstonePrice, JewelryMetalOption, SavedQuote } from '@/ty
 import { ClientPicker } from '@/components/ClientPicker'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { OpenQuoteButton } from '@/components/OpenQuoteButton'
+import { Toast } from '@/components/Toast'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
-import { toast } from 'sonner'
 import { Calculator, Camera, Check, ChevronDown, ChevronUp, Copy, Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Pin, PinOff, Ruler, Scale, Sparkles, User, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -1453,13 +1453,6 @@ export function QuoteBuilderPage() {
         }),
       }, user.id)
       setSavedQuote({ id: q.id, title: q.title, total: pricing.total, publicToken: q.publicToken ?? null })
-      const hasLink = !!q.publicToken
-      toast.success('Quote created!', {
-        description: `${q.title} · $${pricing.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}${hasLink ? ' · share link ready' : ''}`,
-        action: hasLink
-          ? { label: 'Copy share link', onClick: () => copyToClipboard(publicQuoteUrl(q.publicToken!)) }
-          : { label: 'View quotes →', onClick: () => navigate('/quotes-list') },
-      })
       // Reset every field back to its initial default so the builder is
       // ready for the next quote without leaking values from the one we
       // just saved.
@@ -2837,7 +2830,38 @@ export function QuoteBuilderPage() {
         </div>
       </section>
 
+      {savedQuote && <QuoteToast key={savedQuote.id} quote={savedQuote} onClose={() => setSavedQuote(null)} />}
     </div>
+  )
+}
+
+function QuoteToast({
+  quote,
+  onClose,
+}: {
+  quote: { id: string; title: string; total: number; publicToken: string | null }
+  onClose: () => void
+}) {
+  const navigate = useNavigate()
+  const hasLink = !!quote.publicToken
+  return (
+    <Toast
+      title="Quote created!"
+      description={`${quote.title} · $${quote.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}${hasLink ? ' · share link ready' : ''}`}
+      actionLabel={hasLink ? 'Copy share link' : 'View quotes →'}
+      onAction={async () => {
+        if (hasLink && quote.publicToken) {
+          await copyToClipboard(publicQuoteUrl(quote.publicToken))
+        } else {
+          navigate('/quotes-list')
+        }
+      }}
+      secondaryActionLabel={hasLink ? '↗ Open quote' : undefined}
+      onSecondaryAction={hasLink && quote.publicToken
+        ? () => window.open(publicQuoteUrl(quote.publicToken!), '_blank', 'noopener,noreferrer')
+        : undefined}
+      onClose={onClose}
+    />
   )
 }
 

@@ -14,7 +14,6 @@ import { QuoteDetailPanel } from '@/components/QuoteDetailPanel'
 import { Bell, ChevronDown, ChevronLeft, ChevronRight, Copy, ImageOff, Search, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { toast } from 'sonner'
 
 const STATUS_STYLES: Record<QuoteStatus, string> = {
   draft: 'bg-slate-100 text-slate-600',
@@ -194,11 +193,8 @@ export function QuotesListPage() {
       await quotesService.updateStatus(id, status)
       refetchPage()
       loadCounts()
-      const label = status === 'APPROVED' ? 'approved' : status === 'REJECTED' ? 'rejected' : 'reset to pending'
-      toast.success(`Quote ${label}`)
     } catch (err) {
       console.error(err)
-      toast.error('Failed to update status')
     }
   }
 
@@ -229,10 +225,8 @@ export function QuotesListPage() {
       if (selectedId === deleteTarget.id) setSelectedId(null)
       setDeleteTarget(null)
       loadCounts()
-      toast.success('Quote deleted')
     } catch (err) {
       console.error(err)
-      toast.error('Failed to delete quote')
     } finally {
       setDeleting(false)
     }

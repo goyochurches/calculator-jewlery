@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+﻿import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -6,8 +6,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { ClientPicker } from '@/components/ClientPicker'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { OpenQuoteButton } from '@/components/OpenQuoteButton'
+import { Toast } from '@/components/Toast'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
-import { toast } from 'sonner'
 import { useNavigate } from 'react-router-dom'
 import { DIAMOND_TYPE_OPTIONS, JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import type { JewelryMetalOption } from '@/types'
@@ -55,21 +55,8 @@ const roleMeta: Record<StoneRole, { label: string; icon: typeof Crown; accent: s
 
 export function QuoteBuilderWizardPage() {
   const qb = useQuoteBuilder()
-  const navigate = useNavigate()
   const [step, setStep] = useState(0)
   const [maxVisited, setMaxVisited] = useState(0)
-
-  useEffect(() => {
-    if (!qb.savedQuote) return
-    const q = qb.savedQuote
-    const hasLink = !!q.publicToken
-    toast.success('Quote created!', {
-      description: `${q.title} · ${money(q.total)}${hasLink ? ' · share link ready' : ''}`,
-      action: hasLink
-        ? { label: 'Copy share link', onClick: () => copyToClipboard(publicQuoteUrl(q.publicToken!)) }
-        : { label: 'View quotes →', onClick: () => navigate('/quotes-list') },
-    })
-  }, [qb.savedQuote?.id])
 
   if (qb.config.loading) {
     return <WizardSkeleton />
@@ -161,6 +148,7 @@ export function QuoteBuilderWizardPage() {
         </div>
       </section>
 
+      {qb.savedQuote && <WizardToast key={qb.savedQuote.id} quote={qb.savedQuote} onClose={() => qb.setSavedQuote(null)} />}
     </div>
   )
 }
@@ -1009,3 +997,23 @@ function PriceSummary({ qb }: { qb: QuoteBuilderState }) {
   )
 }
 
+function WizardToast({ quote, onClose }: { quote: { id: string; title: string; total: number; publicToken: string | null }; onClose: () => void }) {
+  const navigate = useNavigate()
+  const hasLink = !!quote.publicToken
+  return (
+    <Toast
+      title="Quote created!"
+      description={`${quote.title} · ${money(quote.total)}${hasLink ? ' · share link ready' : ''}`}
+      actionLabel={hasLink ? 'Copy share link' : 'View quotes →'}
+      onAction={async () => {
+        if (hasLink && quote.publicToken) await copyToClipboard(publicQuoteUrl(quote.publicToken))
+        else navigate('/quotes-list')
+      }}
+      secondaryActionLabel={hasLink ? '↗ Open quote' : undefined}
+      onSecondaryAction={hasLink && quote.publicToken
+        ? () => window.open(publicQuoteUrl(quote.publicToken!), '_blank', 'noopener,noreferrer')
+        : undefined}
+      onClose={onClose}
+    />
+  )
+}
