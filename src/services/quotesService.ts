@@ -231,6 +231,77 @@ function mapCustomerStone(s: ApiCustomerStone): QuoteCustomerStone {
   }
 }
 
+interface ApiQuoteSummary {
+  id: number
+  title: string
+  clientName: string
+  createdBy: { id: number; name: string; email: string; avatar: string; bio?: string | null; photo?: string | null }
+  createdAt: string
+  status: 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'FULLY_PAID'
+  metal: string
+  photo?: string | null
+  total: number
+  markupMultiplier?: number | null
+  discountPercent?: number | null
+  customerPriceOverride?: number | null
+  applyTaxes?: boolean | null
+  publicToken?: string | null
+  parentQuoteId?: number | null
+  stones?: Array<{ markupMultiplier?: number | null; contribution?: number | null }>
+}
+
+function mapSummary(q: ApiQuoteSummary): SavedQuote {
+  return {
+    id: String(q.id),
+    title: q.title,
+    clientName: q.clientName ?? '',
+    createdBy: q.createdBy?.name ?? 'Unknown',
+    createdByEmail: q.createdBy?.email ?? null,
+    createdByAvatar: q.createdBy?.avatar ?? null,
+    createdByBio: q.createdBy?.bio ?? null,
+    createdByPhoto: q.createdBy?.photo ?? null,
+    createdAt: q.createdAt,
+    status: q.status.toLowerCase() as SavedQuote['status'],
+    metal: q.metal as SavedQuote['metal'],
+    photo: q.photo ?? null,
+    total: q.total,
+    markupMultiplier: q.markupMultiplier ?? null,
+    discountPercent: q.discountPercent ?? null,
+    customerPriceOverride: q.customerPriceOverride ?? null,
+    customerPriceOverrideReason: null,
+    applyTaxes: q.applyTaxes ?? false,
+    publicToken: q.publicToken ?? null,
+    parentQuoteId: q.parentQuoteId ?? null,
+    stones: (q.stones ?? []).map(s => ({
+      id: null, role: 'MAIN' as const, stoneType: 'natural' as const,
+      sizeKey: '', carats: 0, setterType: '',
+      labReport: null, sortOrder: null, shape: null, color: null,
+      cut: null, clarity: null, manualPrice: null, comments: null,
+      markupMultiplier: s.markupMultiplier ?? null,
+      contribution: s.contribution ?? null,
+    })),
+    // fields only needed in the detail panel — null/empty until detail is fetched
+    ringLabor: 'none' as const,
+    cadDesign: 'none' as const,
+    diamondAmount: 0, diamondCarats: 0,
+    diamondType: 'natural' as const, diamondSize: '',
+    weightGrams: 0, ringWidth: 0, fingerSize: 0,
+    laborHours: 0, hourlyRate: 0, extraCosts: 0,
+    engraving: false, engravingFee: null, setterType: null, jewelryType: null,
+    internalNotes: null, customerNotes: null,
+    client: null, clientId: null,
+    customerStones: [], attachments: [],
+    publicTokenExpiresAt: null, lastOpenedAt: null, openCount: null,
+    pendingWhatsappStatus: null, pendingWhatsappTo: null,
+    pendingWhatsappError: null, pendingWhatsappSentAt: null,
+    approvalActionAt: null, approvalAction: null, approvalRejectionReason: null,
+    approvalWhatsappStatus: null, approvalWhatsappError: null, approvalWhatsappSentAt: null,
+    openedWhatsappStatus: null, openedWhatsappError: null, openedWhatsappSentAt: null,
+    paymentHasPlan: null, paymentTotalDue: null, paymentTotalPaid: null,
+    paymentTotalCount: null, paymentPaidCount: null, paymentFullyPaid: null,
+  }
+}
+
 interface SpringPage<T> {
   content: T[]
   // VIA_DTO mode nests metadata under "page"
@@ -259,10 +330,10 @@ export const quotesService = {
     let url = `/api/quotes?page=${page}&size=${size}&sort=createdAt,desc&sort=id,desc`
     if (status && status !== 'all') url += `&status=${status.toUpperCase()}`
     if (q && q.trim()) url += `&q=${encodeURIComponent(q.trim())}`
-    const data = await api.get<SpringPage<ApiQuote>>(url)
+    const data = await api.get<SpringPage<ApiQuoteSummary>>(url)
     const meta = data.page
     return {
-      items: (data.content ?? []).map(mapQuote),
+      items: (data.content ?? []).map(mapSummary),
       totalPages:    meta?.totalPages    ?? data.totalPages    ?? 1,
       totalElements: meta?.totalElements ?? data.totalElements ?? 0,
       currentPage:   meta?.number        ?? data.number        ?? 0,

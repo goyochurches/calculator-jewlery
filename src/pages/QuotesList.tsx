@@ -10,7 +10,6 @@ import type { QuoteStatus, SavedQuote } from '@/types'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { QuoteDetailPanel } from '@/components/QuoteDetailPanel'
 import { Bell, ChevronDown, ChevronLeft, ChevronRight, Copy, ImageOff, Search, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -105,9 +104,6 @@ export function QuotesListPage() {
   const [totalElements, setTotalElements] = useState(0)
   const [loading, setLoading] = useState(true)
 
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [selectedDetail, setSelectedDetail] = useState<SavedQuote | null>(null)
-  const [detailLoading, setDetailLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -160,24 +156,15 @@ export function QuotesListPage() {
   }, [])
   useEffect(() => { loadCounts() }, [loadCounts])
 
-  // Deep-link: ?quoteId=X opens the detail panel for that quote
+  // Deep-link: ?quoteId=X navigates to the detail page for that quote
   useEffect(() => {
     const deepLinkId = searchParams.get('quoteId')
-    if (!deepLinkId || quotes.length === 0) return
-    const match = quotes.find(q => q.id === deepLinkId)
-    if (!match) return
-    setSelectedId(deepLinkId)
-    if (match.parentQuoteId != null) {
-      setExpandedGroups(prev => {
-        const next = new Set(prev)
-        next.add(String(match.parentQuoteId))
-        return next
-      })
-    }
+    if (!deepLinkId) return
     const next = new URLSearchParams(searchParams)
     next.delete('quoteId')
     setSearchParams(next, { replace: true })
-  }, [searchParams, quotes, setSearchParams])
+    navigate(`/quotes-list/${deepLinkId}`)
+  }, [searchParams, setSearchParams, navigate])
 
   const refetchPage = useCallback(() => {
     quotesService.getPage({
@@ -190,35 +177,6 @@ export function QuotesListPage() {
     }).catch(console.error)
   }, [page, pageSize, statusFilter, debouncedSearch])
 
-  const handleStatusChange = async (id: string, status: 'APPROVED' | 'REJECTED' | 'PENDING') => {
-    try {
-      const updated = await quotesService.updateStatus(id, status)
-      setQuotes(prev => prev.map(q => q.id === id ? { ...q, status: updated.status } : q))
-      setSelectedDetail(prev => prev?.id === id ? updated : prev)
-      loadCounts()
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
-  const handleRefreshToken = async (id: string) => {
-    try {
-      const updated = await quotesService.refreshPublicToken(id)
-      setQuotes((prev) => prev.map((q) => (q.id === id ? updated : q)))
-      setSelectedDetail(prev => prev?.id === id ? updated : prev)
-    } catch (err) {
-      console.error(err)
-    }
-  }
-
-  const handleDelete = async (id: string) => {
-    await quotesService.remove(id)
-    setQuotes((prev) => prev.filter((q) => q.id !== id))
-    setTotalElements(n => n - 1)
-    setSelectedId(null)
-    loadCounts()
-  }
-
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return
     setDeleting(true)
@@ -226,7 +184,6 @@ export function QuotesListPage() {
       await quotesService.remove(deleteTarget.id)
       setQuotes((prev) => prev.filter((q) => q.id !== deleteTarget.id))
       setTotalElements(n => n - 1)
-      if (selectedId === deleteTarget.id) setSelectedId(null)
       setDeleteTarget(null)
       loadCounts()
     } catch (err) {
@@ -278,31 +235,6 @@ export function QuotesListPage() {
   }, [quotes])
 
   const effectivelyExpanded = (groupId: string) => expandedGroups.has(groupId)
-
-  // Fetch full detail when a row is selected
-  useEffect(() => {
-    if (!selectedId) { setSelectedDetail(null); return }
-    let cancelled = false
-    setDetailLoading(true)
-    quotesService.getById(selectedId)
-      .then(detail => { if (!cancelled) { setSelectedDetail(detail); setDetailLoading(false) } })
-      .catch(() => { if (!cancelled) setDetailLoading(false) })
-    return () => { cancelled = true }
-  }, [selectedId])
-
-  useEffect(() => {
-    if (!selectedId) return
-    const original = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = original }
-  }, [selectedId])
-
-  useEffect(() => {
-    if (!selectedId) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedId(null) }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [selectedId])
 
   // Summary-card counts come from the global /counts endpoint
   const statusCounts: Record<QuoteStatus, number> = {
@@ -465,8 +397,8 @@ export function QuotesListPage() {
                         key={group.parent.id}
                         quote={group.parent}
                         kind="parent"
-                        isSelected={group.parent.id === selectedId}
-                        onSelect={() => setSelectedId(group.parent.id === selectedId ? null : group.parent.id)}
+                        isSelected={false}
+                        onSelect={() => navigate(`/quotes-list/${group.parent.id}`)}
                         onDuplicate={() => navigate('/quotes', { state: { duplicateFrom: group.parent } })}
                         childCount={childCount}
                         expanded={expanded}
@@ -484,8 +416,8 @@ export function QuotesListPage() {
                             quote={child}
                             kind="child"
                             isLastChild={idx === group.children.length - 1}
-                            isSelected={child.id === selectedId}
-                            onSelect={() => setSelectedId(child.id === selectedId ? null : child.id)}
+                            isSelected={false}
+                            onSelect={() => navigate(`/quotes-list/${child.id}`)}
                             onDuplicate={() => navigate('/quotes', { state: { duplicateFrom: child } })}
                             viewerUser={user}
                             revisionIndex={idx + 1}
@@ -515,35 +447,6 @@ export function QuotesListPage() {
             )}
           </CardContent>
         </Card>
-
-        {/* Detail drawer — right-docked overlay on every screen size. Wider on
-            xl+ to feel like a side panel, full width on phones. */}
-        {selectedId && (
-          <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
-            <div
-              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
-              onClick={() => setSelectedId(null)}
-            />
-            <div className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col overflow-y-auto bg-white shadow-2xl xl:max-w-lg">
-              {detailLoading || !selectedDetail ? (
-                <QuoteDetailSkeleton onClose={() => setSelectedId(null)} />
-              ) : (
-                <QuoteDetailPanel
-                  quote={selectedDetail}
-                  onClose={() => setSelectedId(null)}
-                  onStatusChange={handleStatusChange}
-                  onRefreshToken={isAdmin ? handleRefreshToken : undefined}
-                  onDelete={isAdmin ? handleDelete : undefined}
-                  isAdmin={isAdmin}
-                  onPaymentChanged={() => {
-                    refetchPage()
-                    loadCounts()
-                  }}
-                />
-              )}
-            </div>
-          </div>
-        )}
 
         <ConfirmDialog
           open={deleteTarget !== null}
@@ -722,30 +625,6 @@ function QuotesListSkeleton() {
   )
 }
 
-function QuoteDetailSkeleton({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="flex flex-col">
-      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-        <div className="space-y-1.5">
-          <Skeleton className="h-5 w-48" />
-          <Skeleton className="h-3.5 w-32 bg-slate-100" />
-        </div>
-        <button
-          onClick={onClose}
-          className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100"
-        >
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-      <div className="space-y-3 p-5">
-        <Skeleton className="h-28 w-full rounded-2xl bg-slate-100" />
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Skeleton key={i} className="h-14 w-full rounded-2xl bg-slate-100" />
-        ))}
-      </div>
-    </div>
-  )
-}
 
 /** Single row in the quotes table. Renders three visual variants:
  *   · parent       — full opacity, may show an expand chevron + "N revisions"

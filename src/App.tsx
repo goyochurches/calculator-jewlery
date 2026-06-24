@@ -14,6 +14,7 @@ import { Configuration } from '@/pages/Configuration'
 import { ReviewsPage } from '@/pages/Reviews'
 import MasterTables from '@/pages/MasterTables'
 import QuotesList from '@/pages/QuotesList'
+import QuoteDetailPage from '@/pages/QuoteDetailPage'
 import { ProfilePage } from '@/pages/Profile'
 import { ClientsPage } from '@/pages/Clients'
 import { ClientDetailPage } from '@/pages/ClientDetail'
@@ -100,6 +101,7 @@ export default function App() {
                 </Route>
                 <Route element={<RequirePermission permission="quotes-list" />}>
                   <Route path="/quotes-list" element={<QuotesList />} />
+                  <Route path="/quotes-list/:id" element={<QuoteDetailPage />} />
                 </Route>
                 <Route element={<RequirePermission permission="messages" />}>
                   <Route path="/messages" element={<InboxPage />} />

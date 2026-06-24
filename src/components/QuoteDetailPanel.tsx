@@ -19,7 +19,7 @@ import { labReportVerifyUrl } from '@/hooks/useQuoteBuilder'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-const STATUS_STYLES: Record<QuoteStatus, string> = {
+export const STATUS_STYLES: Record<QuoteStatus, string> = {
   draft: 'bg-slate-100 text-slate-600',
   pending: 'bg-amber-50 text-amber-700',
   approved: 'bg-emerald-50 text-emerald-700',
@@ -28,7 +28,7 @@ const STATUS_STYLES: Record<QuoteStatus, string> = {
   fully_paid: 'bg-emerald-100 text-emerald-800',
 }
 
-const STATUS_LABELS: Record<QuoteStatus, string> = {
+export const STATUS_LABELS: Record<QuoteStatus, string> = {
   draft: 'Draft',
   pending: 'Pending',
   approved: 'Approved',
@@ -37,13 +37,13 @@ const STATUS_LABELS: Record<QuoteStatus, string> = {
   fully_paid: 'Fully paid',
 }
 
-function initials(name: string) {
+export function initials(name: string) {
   const parts = name.trim().split(/\s+/)
   if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase()
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-function Avatar({ name }: { name: string }) {
+export function Avatar({ name }: { name: string }) {
   return (
     <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">
       {initials(name)}
@@ -51,7 +51,7 @@ function Avatar({ name }: { name: string }) {
   )
 }
 
-function LineItem({ label, value }: { label: string; value: string }) {
+export function LineItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm">
       <span className="text-slate-500">{label}</span>
@@ -60,7 +60,7 @@ function LineItem({ label, value }: { label: string; value: string }) {
   )
 }
 
-function PhotoDetail({ src }: { src?: string | null }) {
+export function PhotoDetail({ src }: { src?: string | null }) {
   const [zoomed, setZoomed] = useState(false)
   if (!src) return null
   return (
@@ -126,8 +126,7 @@ interface QuoteDetailPanelProps {
   onPaymentChanged?: () => void
 }
 
-/** Renders an absolute date + a "X ago" hint for any ISO timestamp. */
-function formatLastOpened(iso: string | null | undefined): string | null {
+export function formatLastOpened(iso: string | null | undefined): string | null {
   if (!iso) return null
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return null
@@ -145,7 +144,7 @@ function formatLastOpened(iso: string | null | undefined): string | null {
   return `${date.toLocaleString()} (${relative})`
 }
 
-function formatExpiration(iso: string | null | undefined): { label: string; expired: boolean } {
+export function formatExpiration(iso: string | null | undefined): { label: string; expired: boolean } {
   if (!iso) return { label: 'No expiration', expired: false }
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return { label: 'No expiration', expired: false }
@@ -166,9 +165,9 @@ function formatExpiration(iso: string | null | undefined): { label: string; expi
  * even when their stored keys (small/medium/etc.) no longer match the
  * current spec.
  */
-type StoneRole = 'MAIN' | 'SIDE' | 'MELEE'
+export type StoneRole = 'MAIN' | 'SIDE' | 'MELEE'
 
-const ROLE_THEME: Record<StoneRole, { label: string; dot: string; ring: string; tint: string; chip: string }> = {
+export const ROLE_THEME: Record<StoneRole, { label: string; dot: string; ring: string; tint: string; chip: string }> = {
   MAIN:  { label: 'Main',  dot: 'bg-amber-500',   ring: 'border-amber-200',   tint: 'bg-amber-50/40',   chip: 'bg-amber-100 text-amber-800' },
   SIDE:  { label: 'Side',  dot: 'bg-sky-500',     ring: 'border-sky-200',     tint: 'bg-sky-50/40',     chip: 'bg-sky-100 text-sky-800' },
   MELEE: { label: 'Melee', dot: 'bg-emerald-500', ring: 'border-emerald-200', tint: 'bg-emerald-50/40', chip: 'bg-emerald-100 text-emerald-800' },
@@ -1278,7 +1277,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
  *   3. Share link → Creator                 (quote was approved, creator gets the public link)
  *   4. Customer opened → Creator            (customer opened the share link; cooldown 30 min)
  */
-function WhatsAppNotificationsBlock({ quote }: { quote: SavedQuote }) {
+export function WhatsAppNotificationsBlock({ quote }: { quote: SavedQuote }) {
   type Event = {
     key: string
     at: string | null
