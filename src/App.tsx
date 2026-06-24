@@ -29,6 +29,7 @@ import { canSeePayments } from '@/lib/paymentsAccess'
 import Login from '@/pages/Login'
 import SetupPassword from '@/pages/SetupPassword'
 import { canAccess, defaultRouteFor, type NavKey } from '@/constants/permissions'
+import { Toaster } from 'sonner'
 
 function PrivateRoutes() {
   const { isAuthenticated, isLoading } = useAuth()
@@ -133,6 +134,7 @@ export default function App() {
             </Route>
           </Routes>
         </BrowserRouter>
+          <Toaster position="bottom-right" richColors duration={5500} />
         </BrandProvider>
       </AuthProvider>
     </ThemeProvider>

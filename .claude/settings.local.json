@@ -151,7 +151,9 @@
       "Bash(npx @nestjs/cli --version)",
       "Bash(npx @nestjs/cli new calculator-service --package-manager npm --skip-git --language TS)",
       "Bash(gh repo *)",
-      "Bash(cmd /c \"cd /d D:\\\\wamp64\\\\www\\\\price-calculator && mvn compile -q 2>&1\")"
+      "Bash(cmd /c \"cd /d D:\\\\wamp64\\\\www\\\\price-calculator && mvn compile -q 2>&1\")",
+      "WebFetch(domain:sileo.aaryan.design)",
+      "PowerShell(cd D:\\\\wamp64\\\\www\\\\calculator-jewlery; npx tsc --noEmit 2>&1 | Select-String \"error TS\" | Where-Object { $_ -notmatch \"TS6305\" } | Select-Object -First 20)"
     ]
   }
 }

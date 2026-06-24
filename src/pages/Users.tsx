@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { Toast } from '@/components/Toast'
+import { toast } from 'sonner'
 import { ROLE_LABELS } from '@/constants/config'
 import { userService } from '@/services/userService'
 import { useAuth } from '@/context/AuthContext'
@@ -38,11 +38,8 @@ export function UsersPage() {
   const [form, setForm] = useState({ ...BLANK })
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
-  const [createdUser, setCreatedUser] = useState<{ id: string; name: string; role: string } | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const [deletedUser, setDeletedUser] = useState<{ id: string; name: string; email: string } | null>(null)
   const [confirmTarget, setConfirmTarget] = useState<Usuario | null>(null)
-  const [errorToast, setErrorToast] = useState<{ id: string; title: string; description: string } | null>(null)
   const [editingUser, setEditingUser] = useState<Usuario | null>(null)
 
   useEffect(() => {
@@ -62,7 +59,7 @@ export function UsersPage() {
     try {
       await userService.delete(u.id)
       setUsers(prev => prev.filter(x => x.id !== u.id))
-      setDeletedUser({ id: u.id, name: u.name, email: u.email })
+      toast.success('User deleted', { description: `${u.name} · ${u.email}` })
       setConfirmTarget(null)
     } catch (err: unknown) {
       const rawMsg = err instanceof Error ? err.message : String(err ?? '')
@@ -71,11 +68,7 @@ export function UsersPage() {
         rawMsg === 'Failed to fetch'
           ? "Can't reach the server. Please contact the administrator."
           : rawMsg || 'Please contact the administrator.'
-      setErrorToast({
-        id: `${u.id}-${Date.now()}`,
-        title: 'Failed to delete user',
-        description: friendlyMsg,
-      })
+      toast.error('Failed to delete user', { description: friendlyMsg })
       setConfirmTarget(null)
     } finally {
       setDeletingId(null)
@@ -92,7 +85,7 @@ export function UsersPage() {
       const avatar = computeAvatar(form.name) || '?'
       const newUser = await userService.create({ ...form, avatar })
       setUsers(prev => [...prev, newUser])
-      setCreatedUser({ id: newUser.id, name: newUser.name, role: ROLE_LABELS[newUser.role] ?? newUser.role })
+      toast.success('User created · invitation sent', { description: `${newUser.name} · ${ROLE_LABELS[newUser.role] ?? newUser.role}` })
       closeCreate()
     } catch (err: unknown) {
       setCreateError(err instanceof Error ? err.message : 'Failed to create user')
@@ -229,34 +222,6 @@ export function UsersPage() {
           </div>
         ))}
       </CardContent>
-
-      {createdUser && (
-        <Toast
-          key={`created-${createdUser.id}`}
-          title="User created · invitation sent"
-          description={`${createdUser.name} · ${createdUser.role}`}
-          onClose={() => setCreatedUser(null)}
-        />
-      )}
-
-      {deletedUser && (
-        <Toast
-          key={`deleted-${deletedUser.id}`}
-          title="User deleted"
-          description={`${deletedUser.name} · ${deletedUser.email}`}
-          onClose={() => setDeletedUser(null)}
-        />
-      )}
-
-      {errorToast && (
-        <Toast
-          key={`error-${errorToast.id}`}
-          variant="error"
-          title={errorToast.title}
-          description={errorToast.description}
-          onClose={() => setErrorToast(null)}
-        />
-      )}
 
       {editingUser && (
         <EditProfileDialog
