@@ -106,6 +106,8 @@ export function QuotesListPage() {
   const [loading, setLoading] = useState(true)
 
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedDetail, setSelectedDetail] = useState<SavedQuote | null>(null)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -190,8 +192,9 @@ export function QuotesListPage() {
 
   const handleStatusChange = async (id: string, status: 'APPROVED' | 'REJECTED' | 'PENDING') => {
     try {
-      await quotesService.updateStatus(id, status)
-      refetchPage()
+      const updated = await quotesService.updateStatus(id, status)
+      setQuotes(prev => prev.map(q => q.id === id ? { ...q, status: updated.status } : q))
+      setSelectedDetail(prev => prev?.id === id ? updated : prev)
       loadCounts()
     } catch (err) {
       console.error(err)
@@ -202,6 +205,7 @@ export function QuotesListPage() {
     try {
       const updated = await quotesService.refreshPublicToken(id)
       setQuotes((prev) => prev.map((q) => (q.id === id ? updated : q)))
+      setSelectedDetail(prev => prev?.id === id ? updated : prev)
     } catch (err) {
       console.error(err)
     }
@@ -275,21 +279,30 @@ export function QuotesListPage() {
 
   const effectivelyExpanded = (groupId: string) => expandedGroups.has(groupId)
 
-  const selected = quotes.find((q) => q.id === selectedId) ?? null
+  // Fetch full detail when a row is selected
+  useEffect(() => {
+    if (!selectedId) { setSelectedDetail(null); return }
+    let cancelled = false
+    setDetailLoading(true)
+    quotesService.getById(selectedId)
+      .then(detail => { if (!cancelled) { setSelectedDetail(detail); setDetailLoading(false) } })
+      .catch(() => { if (!cancelled) setDetailLoading(false) })
+    return () => { cancelled = true }
+  }, [selectedId])
 
   useEffect(() => {
-    if (!selected) return
+    if (!selectedId) return
     const original = document.body.style.overflow
     document.body.style.overflow = 'hidden'
     return () => { document.body.style.overflow = original }
-  }, [selected])
+  }, [selectedId])
 
   useEffect(() => {
-    if (!selected) return
+    if (!selectedId) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedId(null) }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [selected])
+  }, [selectedId])
 
   // Summary-card counts come from the global /counts endpoint
   const statusCounts: Record<QuoteStatus, number> = {
@@ -505,25 +518,29 @@ export function QuotesListPage() {
 
         {/* Detail drawer — right-docked overlay on every screen size. Wider on
             xl+ to feel like a side panel, full width on phones. */}
-        {selected && (
+        {selectedId && (
           <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
             <div
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
               onClick={() => setSelectedId(null)}
             />
             <div className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col overflow-y-auto bg-white shadow-2xl xl:max-w-lg">
-              <QuoteDetailPanel
-                quote={selected}
-                onClose={() => setSelectedId(null)}
-                onStatusChange={handleStatusChange}
-                onRefreshToken={isAdmin ? handleRefreshToken : undefined}
-                onDelete={isAdmin ? handleDelete : undefined}
-                isAdmin={isAdmin}
-                onPaymentChanged={() => {
-                  refetchPage()
-                  loadCounts()
-                }}
-              />
+              {detailLoading || !selectedDetail ? (
+                <QuoteDetailSkeleton onClose={() => setSelectedId(null)} />
+              ) : (
+                <QuoteDetailPanel
+                  quote={selectedDetail}
+                  onClose={() => setSelectedId(null)}
+                  onStatusChange={handleStatusChange}
+                  onRefreshToken={isAdmin ? handleRefreshToken : undefined}
+                  onDelete={isAdmin ? handleDelete : undefined}
+                  isAdmin={isAdmin}
+                  onPaymentChanged={() => {
+                    refetchPage()
+                    loadCounts()
+                  }}
+                />
+              )}
             </div>
           </div>
         )}
@@ -701,6 +718,31 @@ function QuotesListSkeleton() {
           </div>
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+function QuoteDetailSkeleton({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="flex flex-col">
+      <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+        <div className="space-y-1.5">
+          <Skeleton className="h-5 w-48" />
+          <Skeleton className="h-3.5 w-32 bg-slate-100" />
+        </div>
+        <button
+          onClick={onClose}
+          className="flex h-8 w-8 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+      <div className="space-y-3 p-5">
+        <Skeleton className="h-28 w-full rounded-2xl bg-slate-100" />
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-14 w-full rounded-2xl bg-slate-100" />
+        ))}
+      </div>
     </div>
   )
 }
