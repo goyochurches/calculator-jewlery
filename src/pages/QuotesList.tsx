@@ -55,23 +55,6 @@ function Avatar({ name, photo }: { name: string; photo?: string | null }) {
   )
 }
 
-// ── Thumbnail shown in the table row ────────────────────────────────────────
-function PhotoThumb({ src }: { src?: string | null }) {
-  if (!src) {
-    return (
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-300">
-        <ImageOff className="h-4 w-4" />
-      </div>
-    )
-  }
-  return (
-    <img
-      src={src}
-      alt="Reference"
-      className="h-10 w-10 shrink-0 rounded-xl object-cover ring-1 ring-slate-200"
-    />
-  )
-}
 
 type StatusFilter = QuoteStatus | 'all'
 
@@ -165,17 +148,6 @@ export function QuotesListPage() {
     setSearchParams(next, { replace: true })
     navigate(`/quotes-list/${deepLinkId}`)
   }, [searchParams, setSearchParams, navigate])
-
-  const refetchPage = useCallback(() => {
-    quotesService.getPage({
-      page,
-      size: pageSize,
-      status: statusFilter !== 'all' ? statusFilter : undefined,
-      q: debouncedSearch || undefined,
-    }).then(({ items, totalPages: tp, totalElements: te }) => {
-      setQuotes(items); setTotalPages(tp); setTotalElements(te)
-    }).catch(console.error)
-  }, [page, pageSize, statusFilter, debouncedSearch])
 
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return

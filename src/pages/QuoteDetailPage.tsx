@@ -27,7 +27,6 @@ import { labReportVerifyUrl } from '@/hooks/useQuoteBuilder'
 import { quotesService } from '@/services/quotesService'
 import type { QuoteStone, SavedQuote } from '@/types'
 import {
-  AlertTriangle,
   ArrowLeft,
   Check,
   ChevronDown,
@@ -160,7 +159,7 @@ export default function QuoteDetailPage() {
     if (!quote) return
     setDeleting(true)
     try {
-      await quotesService.delete(quote.id)
+      await quotesService.remove(quote.id)
       navigate('/quotes-list', { replace: true })
     } catch (err) {
       setConfirmDelete(false)
@@ -174,7 +173,7 @@ export default function QuoteDetailPage() {
     if (!quote) return
     setRefreshing(true)
     try {
-      const updated = await quotesService.refreshToken(quote.id)
+      const updated = await quotesService.refreshPublicToken(quote.id)
       setQuote(updated)
     } catch (err) {
       setNotice({ title: 'Could not refresh the link', description: err instanceof Error ? err.message : undefined, variant: 'error' })
