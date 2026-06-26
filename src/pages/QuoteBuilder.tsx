@@ -151,17 +151,18 @@ export function QuoteBuilderPage() {
   //   false → scrolls away with the rest of the page (the previous behaviour
   //           before we made it sticky). User toggles with the pin button.
   const [pinSummary, setPinSummary] = useState(true)
-  const [selectedMetal, setSelectedMetal] = useState<JewelryMetalOption>('gold-18k-white')
+  // ── Multi-metal rows (1–3) ───────────────────────────────────────────
+  interface MetalRow { uid: string; metal: JewelryMetalOption; grams: string }
+  const defaultMetalRows = (): MetalRow[] => [{ uid: crypto.randomUUID(), metal: 'gold-18k-white', grams: '' }]
+  const [metalRows, setMetalRows] = useState<MetalRow[]>(defaultMetalRows)
+  const selectedMetal = metalRows[0]?.metal ?? 'gold-18k-white'
   // Empty by default so a fresh quote carries no CAD/Jeweler's-time fee — the
   // builder starts fully zeroed until the user picks a difficulty level.
   const [ringLabor, setRingLabor] = useState('')
-  // Numeric factors start at 0 so a fresh quote begins empty — and the
-  // post-save reset below returns them to these same 0 values, so the
-  // builder starts and ends in an identical zeroed state.
-  const [weightGrams, setWeightGrams] = useState(0)
   const [ringWidth, setRingWidth] = useState(0)
   const [fingerSize, setFingerSize] = useState(0)
   const [extraCosts, setExtraCosts] = useState(0)
+  const parseNum = (s: string) => { const n = Number(s); return Number.isFinite(n) ? n : 0 }
   // Hand-engraving surcharge (dollars) chosen on the slider. 0 = no engraving.
   // Replaces the old fixed-$150 yes/no toggle. Always starts at 0 (None) on a
   // fresh quote — the user opts in by dragging the slider.
@@ -242,10 +243,6 @@ export function QuoteBuilderPage() {
     collapsed: boolean
   }
   const [stones, setStones] = useState<StoneRow[]>([])
-  const parseNum = (s: string) => {
-    const n = Number(s)
-    return Number.isFinite(n) ? n : 0
-  }
 
   // ── Customer stones: client brings their own stone, we only charge setting
   // labor (quantity × setter fee). Stone type is picked from the gemstones

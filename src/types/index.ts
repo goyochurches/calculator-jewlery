@@ -116,6 +116,13 @@ export interface QuoteAttachment {
   createdAt?: string | null
 }
 
+export interface QuoteMetal {
+  id?: number | null
+  metalKey: JewelryMetalOption
+  weightGrams: number
+  position: number
+}
+
 export interface SavedQuote {
   id: string
   title: string
@@ -130,6 +137,7 @@ export interface SavedQuote {
   createdAt: string
   status: QuoteStatus
   metal: JewelryMetalOption
+  metalRows?: QuoteMetal[] | null
   ringLabor: string
   cadDesign: string
   diamondAmount: number
