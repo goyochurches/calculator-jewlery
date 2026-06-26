@@ -6,7 +6,7 @@ import { companyService, ENGRAVING_SLIDER_DEFAULTS } from '@/services/companySer
 import { quotesService } from '@/services/quotesService'
 import { DIAMOND_TYPE_OPTIONS, JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import { computeRnBreakdown, type RnStoneType } from '@/lib/rnPricing'
-import type { Client, GemstonePrice, JewelryMetalOption, SavedQuote } from '@/types'
+import type { Client, GemstonePrice, JewelryMetalOption, QuoteMetal, SavedQuote } from '@/types'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 // ── Shared constants ────────────────────────────────────────────────────────
@@ -86,6 +86,7 @@ export function labReportVerifyUrl(raw: string): { url: string; lab: string; val
 }
 
 // ── Types ───────────────────────────────────────────────────────────────────
+export interface MetalRow { uid: string; metal: JewelryMetalOption; grams: string }
 export type StoneRole = 'MAIN' | 'SIDE' | 'MELEE'
 
 export interface StoneRow {
@@ -145,9 +146,10 @@ export function useQuoteBuilder() {
   const [fieldErrors, setFieldErrors] = useState<{ title?: string; client?: string }>({})
   const [jewelryType, setJewelryType] = useState<string>('ring')
   const [pinSummary, setPinSummary] = useState(true)
-  const [selectedMetal, setSelectedMetal] = useState<JewelryMetalOption>('gold-18k-white')
+  const defaultMetalRows = (): MetalRow[] => [{ uid: crypto.randomUUID(), metal: 'gold-18k-white', grams: '' }]
+  const [metalRows, setMetalRows] = useState<MetalRow[]>(defaultMetalRows)
+  const selectedMetal = metalRows[0]?.metal ?? 'gold-18k-white'
   const [ringLabor, setRingLabor] = useState('')
-  const [weightGrams, setWeightGrams] = useState(0)
   const [ringWidth, setRingWidth] = useState(0)
   const [fingerSize, setFingerSize] = useState(0)
   const [extraCosts, setExtraCosts] = useState(0)
@@ -250,9 +252,12 @@ export function useQuoteBuilder() {
     setQuoteTitle(dup.title)
     setClient(dup.client ?? null)
     setJewelryType(dup.jewelryType ?? 'ring')
-    setSelectedMetal(dup.metal as JewelryMetalOption)
+    setMetalRows(
+      dup.metalRows && dup.metalRows.length > 0
+        ? dup.metalRows.map((r: QuoteMetal) => ({ uid: crypto.randomUUID(), metal: r.metalKey as JewelryMetalOption, grams: String(r.weightGrams ?? '') }))
+        : [{ uid: crypto.randomUUID(), metal: (dup.metal ?? 'gold-18k-white') as JewelryMetalOption, grams: String(dup.weightGrams ?? '') }]
+    )
     setRingLabor(dup.ringLabor)
-    setWeightGrams(dup.weightGrams ?? 0)
     setRingWidth(dup.ringWidth ?? 0)
     setFingerSize(dup.fingerSize ?? 7)
     setExtraCosts(dup.extraCosts ?? 0)
@@ -382,7 +387,7 @@ export function useQuoteBuilder() {
     if (cameraInputRef.current) cameraInputRef.current.value = ''
   }
 
-  const selectedMetalConfig = JEWELRY_METAL_OPTIONS[selectedMetal]
+  const selectedMetalConfig = JEWELRY_METAL_OPTIONS[selectedMetal] ?? JEWELRY_METAL_OPTIONS['gold-18k-white']
 
   const sizesByStoneType = useMemo(() => ({
     NATURAL: config.diamondSizes.filter(d => d.stoneType === 'NATURAL'),
@@ -488,9 +493,13 @@ export function useQuoteBuilder() {
     return { model, sizeRow, natural, lab, ...selected }
   }, [rnMode, config, rnModelKey, rnFingerSize, selectedMetal, rnStoneType])
 
+  const parseGrams = (s: string) => { const n = Number(s); return Number.isFinite(n) ? n : 0 }
   const pricing = useMemo(() => {
-    const metalPricePerGram = selectedMetalConfig.pricePerGram
-    const materialCost = metalPricePerGram * weightGrams
+    const materialCost = metalRows.reduce((sum, row) => {
+      const cfg = JEWELRY_METAL_OPTIONS[row.metal]
+      return sum + (cfg ? cfg.pricePerGram * parseGrams(row.grams) : 0)
+    }, 0)
+    const metalPricePerGram = JEWELRY_METAL_OPTIONS[selectedMetal]?.pricePerGram ?? 0
     const ringLaborFee = config.ringLaborMap[ringLabor]?.fee ?? 0
     const cadFee = 0
     const engravingFeeVal = Math.max(0, engravingFee)
@@ -573,7 +582,7 @@ export function useQuoteBuilder() {
     }
   }, [
     config, customerStones, engravingFee, extraCosts, ringLabor, ringWidth,
-    selectedMetalConfig, stones, weightGrams, rnMode, rn,
+    metalRows, selectedMetal, stones, rnMode, rn,
   ])
 
   const parsedMarkup = (() => {
@@ -703,13 +712,16 @@ export function useQuoteBuilder() {
         client: client ?? undefined,
         status: autoStatus,
         metal: selectedMetal,
+        metalRows: rnMode
+          ? [{ metalKey: selectedMetal, weightGrams: rn?.avgGrams ?? 0, position: 0 }]
+          : metalRows.map((r, i) => ({ metalKey: r.metal, weightGrams: parseGrams(r.grams), position: i })),
         ringLabor: rnMode ? '' : ringLabor,
         cadDesign: rnMode ? '' : ringLabor,
         diamondAmount: pricing.totalAmount,
         diamondCarats: pricing.totalCarats,
         diamondType: rnMode ? rnDiamondType : (firstStone?.stoneType ?? 'natural'),
         diamondSize: rnMode && rn ? rn.sizeKey : (firstStone?.sizeKey ?? ''),
-        weightGrams: rnMode && rn ? (rn.avgGrams ?? 0) : weightGrams,
+        weightGrams: rnMode && rn ? (rn.avgGrams ?? 0) : metalRows.reduce((s, r) => s + parseGrams(r.grams), 0),
         ringWidth: rnMode ? 0 : ringWidth,
         fingerSize: rnMode ? rnFingerSize : fingerSize,
         laborHours: 0,
@@ -782,9 +794,8 @@ export function useQuoteBuilder() {
       setQuoteTitle('')
       setClient(null)
       setJewelryType('ring')
-      setSelectedMetal('gold-18k-white')
+      setMetalRows(defaultMetalRows())
       setRingLabor('')
-      setWeightGrams(0)
       setRingWidth(0)
       setFingerSize(0)
       setExtraCosts(0)
@@ -832,9 +843,9 @@ export function useQuoteBuilder() {
     jewelryType, setJewelryType, jewelryTypeLabel,
     pinSummary, setPinSummary,
     // material
-    selectedMetal, setSelectedMetal, selectedMetalConfig,
+    metalRows, setMetalRows,
+    selectedMetal, selectedMetalConfig,
     ringLabor, setRingLabor, ringLaborLabel,
-    weightGrams, setWeightGrams,
     ringWidth, setRingWidth,
     fingerSize, setFingerSize,
     extraCosts, setExtraCosts,

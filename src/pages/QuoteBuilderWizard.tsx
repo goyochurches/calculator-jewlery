@@ -26,6 +26,7 @@ import {
   DISCOUNT_PRESETS,
   DEFAULT_MARKUP,
   type QuoteBuilderState,
+  type MetalRow,
   type StoneRow,
   type StoneRole,
 } from '@/hooks/useQuoteBuilder'
@@ -361,27 +362,97 @@ function StepClient({ qb }: { qb: QuoteBuilderState }) {
 }
 
 // ── Step 2: Material ────────────────────────────────────────────────────────
+function MetalSelect({ row, onChange }: { row: MetalRow; onChange: (metal: JewelryMetalOption) => void }) {
+  return (
+    <select value={row.metal} onChange={e => onChange(e.target.value as JewelryMetalOption)} className={inputCls}>
+      {METAL_GROUPS.map(g => (
+        <optgroup key={g.group} label={g.group}>
+          {g.keys.map(key => (
+            <option key={key} value={key}>{JEWELRY_METAL_OPTIONS[key].label} — ${JEWELRY_METAL_OPTIONS[key].pricePerGram}/g</option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
+  )
+}
+
 function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
   if (qb.rnMode) return <RnWizardStep qb={qb} />
+  const isSingle = qb.metalRows.length === 1
   return (
     <SectionCard title="CAD design, metal & jeweler's time" subtitle="The body of the piece." icon={Layers3}>
       <div className="grid gap-5 md:grid-cols-2">
-        <div>
-          <label className={labelCls}>Metal</label>
-          <select value={qb.selectedMetal} onChange={e => qb.setSelectedMetal(e.target.value as JewelryMetalOption)} className={inputCls}>
-            {METAL_GROUPS.map(g => (
-              <optgroup key={g.group} label={g.group}>
-                {g.keys.map(key => (
-                  <option key={key} value={key}>{JEWELRY_METAL_OPTIONS[key].label} — ${JEWELRY_METAL_OPTIONS[key].pricePerGram}/g</option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className={labelCls}>Weight (grams)</label>
-          <input type="number" min={0} step={0.1} value={qb.weightGrams || ''} placeholder="0" onChange={e => qb.setWeightGrams(Number(e.target.value) || 0)} className={inputCls} />
-        </div>
+        {isSingle ? (<>
+          {/* Single-metal: classic two-field layout */}
+          <div>
+            <label className={labelCls}>Metal</label>
+            <MetalSelect row={qb.metalRows[0]} onChange={metal => qb.setMetalRows([{ ...qb.metalRows[0], metal }])} />
+          </div>
+          <div>
+            <label className={labelCls}>Weight (grams)</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number" min={0} step={0.1}
+                value={qb.metalRows[0].grams}
+                placeholder="0"
+                onChange={e => qb.setMetalRows([{ ...qb.metalRows[0], grams: e.target.value }])}
+                className={inputCls}
+              />
+              <button
+                type="button"
+                onClick={() => qb.setMetalRows(prev => [...prev, { uid: crypto.randomUUID(), metal: 'gold-18k-white', grams: '' }])}
+                className="shrink-0 inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-200 whitespace-nowrap"
+              >
+                + Add metal
+              </button>
+            </div>
+          </div>
+        </>) : (
+          /* Multi-metal: rows with selector + grams side by side */
+          <div className="md:col-span-2 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className={labelCls}>Metals</label>
+              {qb.metalRows.length < 3 && (
+                <button
+                  type="button"
+                  onClick={() => qb.setMetalRows(prev => [...prev, { uid: crypto.randomUUID(), metal: 'gold-18k-white', grams: '' }])}
+                  className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-200"
+                >
+                  + Add metal
+                </button>
+              )}
+            </div>
+            <div className="space-y-2">
+              {qb.metalRows.map(row => (
+                <div key={row.uid} className="flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <MetalSelect row={row} onChange={metal => qb.setMetalRows(prev => prev.map(r => r.uid === row.uid ? { ...r, metal } : r))} />
+                  </div>
+                  <input
+                    type="number" min={0} step={0.1}
+                    value={row.grams}
+                    placeholder="g"
+                    onChange={e => qb.setMetalRows(prev => prev.map(r => r.uid === row.uid ? { ...r, grams: e.target.value } : r))}
+                    className="w-24 shrink-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => qb.setMetalRows(prev => prev.filter(r => r.uid !== row.uid))}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-slate-400">
+              Total material cost: <strong className="text-slate-700">
+                ${qb.metalRows.reduce((s, r) => s + (JEWELRY_METAL_OPTIONS[r.metal]?.pricePerGram ?? 0) * (Number(r.grams) || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+              </strong>
+            </p>
+          </div>
+        )}
+
         <div className="md:col-span-2">
           <label className={labelCls}>CAD design &amp; Jeweler's time</label>
           <select value={qb.ringLabor} onChange={e => qb.setRingLabor(e.target.value)} className={inputCls}>
@@ -415,7 +486,7 @@ function RnWizardStep({ qb }: { qb: QuoteBuilderState }) {
       <div className="grid gap-5 md:grid-cols-2">
         <div>
           <label className={labelCls}>Metal</label>
-          <select value={qb.selectedMetal} onChange={e => qb.setSelectedMetal(e.target.value as JewelryMetalOption)} className={inputCls}>
+          <select value={qb.selectedMetal} onChange={e => qb.setMetalRows(prev => prev.map((r, i) => i === 0 ? { ...r, metal: e.target.value as JewelryMetalOption } : r))} className={inputCls}>
             {METAL_GROUPS.map(g => (
               <optgroup key={g.group} label={g.group}>
                 {g.keys.map(key => <option key={key} value={key}>{JEWELRY_METAL_OPTIONS[key].label}</option>)}
