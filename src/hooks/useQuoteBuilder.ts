@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useQuoteConfig, normalizeSizeKey } from '@/hooks/useQuoteConfig'
 import { gemstoneService } from '@/services/gemstoneService'
@@ -144,6 +144,8 @@ export function useQuoteBuilder() {
   const [savedQuote, setSavedQuote] = useState<{ id: string; title: string; total: number; publicToken: string | null } | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<{ title?: string; client?: string }>({})
+  const [metalGramsError, setMetalGramsError] = useState(false)
+  const gramsErrorRef = useRef<HTMLDivElement>(null)
   const [jewelryType, setJewelryType] = useState<string>('ring')
   const [pinSummary, setPinSummary] = useState(true)
   const defaultMetalRows = (): MetalRow[] => [{ uid: crypto.randomUUID(), metal: 'gold-18k-white', grams: '' }]
@@ -640,7 +642,9 @@ export function useQuoteBuilder() {
       return
     }
     if (!rnMode && metalRows.some(r => parseGrams(r.grams) <= 0)) {
+      setMetalGramsError(true)
       setSaveError('Enter the gram weight for every metal row before creating the quote.')
+      setTimeout(() => gramsErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
       return
     }
     if (rnMode) {
@@ -821,6 +825,7 @@ export function useQuoteBuilder() {
       setCustomerNotes('')
       setPhoto(null)
       setFieldErrors({})
+      setMetalGramsError(false)
       setSaveError(null)
       setDuplicatedFrom(null)
       if (photoInputRef.current) photoInputRef.current.value = ''
@@ -844,6 +849,7 @@ export function useQuoteBuilder() {
     client, setClient,
     saving, savedQuote, setSavedQuote, saveError, setSaveError,
     fieldErrors, setFieldErrors,
+    metalGramsError, setMetalGramsError, gramsErrorRef,
     jewelryType, setJewelryType, jewelryTypeLabel,
     pinSummary, setPinSummary,
     // material

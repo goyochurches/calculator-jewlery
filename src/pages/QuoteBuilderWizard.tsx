@@ -388,15 +388,15 @@ function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
             <label className={labelCls}>Metal</label>
             <MetalSelect row={qb.metalRows[0]} onChange={metal => qb.setMetalRows([{ ...qb.metalRows[0], metal }])} />
           </div>
-          <div>
+          <div ref={qb.gramsErrorRef}>
             <label className={labelCls}>Weight (grams)</label>
             <div className="flex items-center gap-2">
               <input
                 type="number" min={0} step={0.1}
                 value={qb.metalRows[0].grams}
                 placeholder="0"
-                onChange={e => qb.setMetalRows([{ ...qb.metalRows[0], grams: e.target.value }])}
-                className={`${inputCls} ${qb.metalRows[0].grams === '' || Number(qb.metalRows[0].grams) <= 0 ? 'border-rose-300' : ''}`}
+                onChange={e => { qb.setMetalRows([{ ...qb.metalRows[0], grams: e.target.value }]); if (qb.metalGramsError) qb.setMetalGramsError(false) }}
+                className={`${inputCls} ${qb.metalGramsError && (qb.metalRows[0].grams === '' || Number(qb.metalRows[0].grams) <= 0) ? 'border-rose-400' : ''}`}
               />
               <button
                 type="button"
@@ -407,10 +407,13 @@ function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
                 + Add metal
               </button>
             </div>
+            {qb.metalGramsError && (qb.metalRows[0].grams === '' || Number(qb.metalRows[0].grams) <= 0) && (
+              <p className="mt-1 text-xs font-medium text-rose-600">Gram weight is required</p>
+            )}
           </div>
         </>) : (
           /* Multi-metal: rows with selector + grams side by side */
-          <div className="md:col-span-2 space-y-3">
+          <div className="md:col-span-2 space-y-3" ref={qb.gramsErrorRef}>
             <div className="flex items-center justify-between">
               <label className={labelCls}>Metals</label>
               {qb.metalRows.length < 3 && (
@@ -434,8 +437,8 @@ function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
                     type="number" min={0} step={0.1}
                     value={row.grams}
                     placeholder="g"
-                    onChange={e => qb.setMetalRows(prev => prev.map(r => r.uid === row.uid ? { ...r, grams: e.target.value } : r))}
-                    className={`w-24 shrink-0 rounded-2xl border bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:bg-white ${row.grams === '' || Number(row.grams) <= 0 ? 'border-rose-300' : 'border-slate-200 focus:border-slate-400'}`}
+                    onChange={e => { qb.setMetalRows(prev => prev.map(r => r.uid === row.uid ? { ...r, grams: e.target.value } : r)); if (qb.metalGramsError) qb.setMetalGramsError(false) }}
+                    className={`w-24 shrink-0 rounded-2xl border bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:bg-white ${qb.metalGramsError && (row.grams === '' || Number(row.grams) <= 0) ? 'border-rose-400' : 'border-slate-200 focus:border-slate-400'}`}
                   />
                   <button
                     type="button"
@@ -447,6 +450,9 @@ function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
                 </div>
               ))}
             </div>
+            {qb.metalGramsError && qb.metalRows.some(r => r.grams === '' || Number(r.grams) <= 0) && (
+              <p className="text-xs font-medium text-rose-600">All metal rows require a gram weight</p>
+            )}
             <p className="text-xs text-slate-400">
               Total material cost: <strong className="text-slate-700">
                 ${qb.metalRows.reduce((s, r) => s + (JEWELRY_METAL_OPTIONS[r.metal]?.pricePerGram ?? 0) * (Number(r.grams) || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}

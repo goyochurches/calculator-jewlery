@@ -1296,6 +1296,7 @@ export function QuoteBuilderPage() {
     }
     if (!rnMode && metalRows.some(r => parseNum(r.grams) <= 0)) {
       setMetalGramsError(true)
+      setSaveError('Enter the gram weight for every metal row before creating the quote.')
       setTimeout(() => gramsErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
       return
     }
@@ -2021,7 +2022,7 @@ export function QuoteBuilderPage() {
                     type="number" min={0} step={0.1}
                     value={metalRows[0].grams}
                     placeholder="0"
-                    onChange={e => { setMetalRows([{ ...metalRows[0], grams: e.target.value }]); if (metalGramsError) setMetalGramsError(false) }}
+                    onChange={e => { setMetalRows([{ ...metalRows[0], grams: e.target.value }]); if (metalGramsError) { setMetalGramsError(false); setSaveError(null) } }}
                     className={`w-full rounded-2xl border bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:bg-white ${metalGramsError && (metalRows[0].grams === '' || parseNum(metalRows[0].grams) <= 0) ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200 focus:border-slate-400'}`}
                   />
                   <button
@@ -2033,10 +2034,13 @@ export function QuoteBuilderPage() {
                     + Add metal
                   </button>
                 </div>
+                {metalGramsError && (metalRows[0].grams === '' || parseNum(metalRows[0].grams) <= 0) && (
+                  <p className="text-xs font-medium text-rose-600">Gram weight is required</p>
+                )}
               </div>
               </>) : (
               /* Multi-metal: rows with selector + grams side by side */
-              <div className="space-y-3 md:col-span-2">
+              <div className="space-y-3 md:col-span-2" ref={gramsErrorRef}>
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-semibold text-slate-900">Metals</label>
                   {metalRows.length < 3 && (
@@ -2072,8 +2076,8 @@ export function QuoteBuilderPage() {
                         type="number" min={0} step={0.1}
                         value={row.grams}
                         placeholder="g"
-                        onChange={e => setMetalRows(prev => prev.map(r => r.uid === row.uid ? { ...r, grams: e.target.value } : r))}
-                        className={`w-24 shrink-0 rounded-2xl border bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:bg-white ${row.grams === '' || parseNum(row.grams) <= 0 ? 'border-rose-300 focus:border-rose-400' : 'border-slate-200 focus:border-slate-400'}`}
+                        onChange={e => { setMetalRows(prev => prev.map(r => r.uid === row.uid ? { ...r, grams: e.target.value } : r)); if (metalGramsError) { setMetalGramsError(false); setSaveError(null) } }}
+                        className={`w-24 shrink-0 rounded-2xl border bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:bg-white ${metalGramsError && (row.grams === '' || parseNum(row.grams) <= 0) ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200 focus:border-slate-400'}`}
                       />
                       <button
                         type="button"
@@ -2086,6 +2090,9 @@ export function QuoteBuilderPage() {
                     </div>
                   ))}
                 </div>
+                {metalGramsError && metalRows.some(r => r.grams === '' || parseNum(r.grams) <= 0) && (
+                  <p className="text-xs font-medium text-rose-600">All metal rows require a gram weight</p>
+                )}
                 <p className="text-xs text-slate-400">
                   Total material cost: <strong className="text-slate-700">${metalRows.reduce((s, r) => s + (JEWELRY_METAL_OPTIONS[r.metal]?.pricePerGram ?? 0) * parseNum(r.grams), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
                 </p>
