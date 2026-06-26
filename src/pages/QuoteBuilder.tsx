@@ -1218,7 +1218,7 @@ export function QuoteBuilderPage() {
     }
   }, [
     config, customerStones, engravingFee, extraCosts, ringLabor, ringWidth,
-    selectedMetalConfig, stones, weightGrams, rnMode, rn,
+    metalRows, selectedMetal, stones, rnMode, rn,
   ])
 
   // Parse the markup once from the input. Empty / NaN falls back to the
@@ -1380,13 +1380,16 @@ export function QuoteBuilderPage() {
         client: client ?? undefined,
         status: autoStatus,
         metal: selectedMetal,
+        metalRows: rnMode
+          ? [{ metalKey: selectedMetal, weightGrams: rn?.avgGrams ?? 0, position: 0 }]
+          : metalRows.map((r, i) => ({ metalKey: r.metal, weightGrams: parseNum(r.grams), position: i })),
         ringLabor: rnMode ? '' : ringLabor,
         cadDesign: rnMode ? '' : ringLabor,
         diamondAmount: pricing.totalAmount,
         diamondCarats: pricing.totalCarats,
         diamondType: rnMode ? rnDiamondType : (firstStone?.stoneType ?? 'natural'),
         diamondSize: rnMode && rn ? rn.sizeKey : (firstStone?.sizeKey ?? ''),
-        weightGrams: rnMode && rn ? (rn.avgGrams ?? 0) : weightGrams,
+        weightGrams: rnMode && rn ? (rn.avgGrams ?? 0) : metalRows.reduce((s, r) => s + parseNum(r.grams), 0),
         ringWidth: rnMode ? 0 : ringWidth,
         fingerSize: rnMode ? rnFingerSize : fingerSize,
         laborHours: 0,
