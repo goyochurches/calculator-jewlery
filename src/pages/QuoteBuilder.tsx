@@ -357,9 +357,12 @@ export function QuoteBuilderPage() {
     setQuoteTitle(dup.title)
     setClient(dup.client ?? null)
     setJewelryType(dup.jewelryType ?? 'ring')
-    setSelectedMetal(dup.metal as JewelryMetalOption)
+    setMetalRows(
+      dup.metalRows && dup.metalRows.length > 0
+        ? dup.metalRows.map(r => ({ uid: crypto.randomUUID(), metal: r.metalKey as JewelryMetalOption, grams: String(r.weightGrams ?? '') }))
+        : [{ uid: crypto.randomUUID(), metal: (dup.metal ?? 'gold-18k-white') as JewelryMetalOption, grams: String(dup.weightGrams ?? '') }]
+    )
     setRingLabor(dup.ringLabor)
-    setWeightGrams(dup.weightGrams ?? 0)
     setRingWidth(dup.ringWidth ?? 0)
     setFingerSize(dup.fingerSize ?? 7)
     setExtraCosts(dup.extraCosts ?? 0)
@@ -1121,8 +1124,11 @@ export function QuoteBuilderPage() {
   }, [rnMode, config, rnModelKey, rnFingerSize, selectedMetal, rnStoneType, rnBandMode, rnCustomStones])
 
   const pricing = useMemo(() => {
-    const metalPricePerGram = selectedMetalConfig.pricePerGram
-    const materialCost = metalPricePerGram * weightGrams
+    const materialCost = metalRows.reduce((sum, row) => {
+      const cfg = JEWELRY_METAL_OPTIONS[row.metal]
+      return sum + (cfg ? cfg.pricePerGram * parseNum(row.grams) : 0)
+    }, 0)
+    const metalPricePerGram = JEWELRY_METAL_OPTIONS[selectedMetal]?.pricePerGram ?? 0
     const ringLaborFee = config.ringLaborMap[ringLabor]?.fee ?? 0
     const cadFee = 0
     const engravingFeeVal = Math.max(0, engravingFee)
@@ -1456,9 +1462,8 @@ export function QuoteBuilderPage() {
       setQuoteTitle('')
       setClient(null)
       setJewelryType('ring')
-      setSelectedMetal('gold-18k-white')
+      setMetalRows(defaultMetalRows())
       setRingLabor('')
-      setWeightGrams(0)
       setRingWidth(0)
       setFingerSize(0)
       setExtraCosts(0)
