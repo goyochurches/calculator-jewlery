@@ -639,6 +639,10 @@ export function useQuoteBuilder() {
       setSaveError('Enter the stone price for any “Custom” size stone before creating the quote.')
       return
     }
+    if (!rnMode && metalRows.some(r => parseGrams(r.grams) <= 0)) {
+      setSaveError('Enter the gram weight for every metal row before creating the quote.')
+      return
+    }
     if (rnMode) {
       if (!rn?.model || !rn?.sizeRow) {
         setSaveError('Pick an RN model and a ring size before creating the quote.')

@@ -145,6 +145,8 @@ export function QuoteBuilderPage() {
   const [savedQuote, setSavedQuote] = useState<{ id: string; title: string; total: number; publicToken: string | null } | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<{ title?: string; client?: string }>({})
+  const [metalGramsError, setMetalGramsError] = useState(false)
+  const gramsErrorRef = useRef<HTMLDivElement>(null)
   const [jewelryType, setJewelryType] = useState<string>('ring')
   // Pin behaviour for the right-column "Estimated total" card.
   //   true  → sticky, follows the user as they scroll (default).
@@ -1292,6 +1294,11 @@ export function QuoteBuilderPage() {
       setSaveError('Enter the stone price for any "Custom" size stone before creating the quote.')
       return
     }
+    if (!rnMode && metalRows.some(r => parseNum(r.grams) <= 0)) {
+      setMetalGramsError(true)
+      setTimeout(() => gramsErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50)
+      return
+    }
     if (rnMode) {
       if (!rn?.model || !rn?.sizeRow) {
         setSaveError('Pick an RN model and a ring size before creating the quote.')
@@ -2007,20 +2014,21 @@ export function QuoteBuilderPage() {
                 </select>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-2" ref={gramsErrorRef}>
                 <label className="text-sm font-semibold text-slate-900">Weight (grams)</label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number" min={0} step={0.1}
                     value={metalRows[0].grams}
                     placeholder="0"
-                    onChange={e => setMetalRows([{ ...metalRows[0], grams: e.target.value }])}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+                    onChange={e => { setMetalRows([{ ...metalRows[0], grams: e.target.value }]); if (metalGramsError) setMetalGramsError(false) }}
+                    className={`w-full rounded-2xl border bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:bg-white ${metalGramsError && (metalRows[0].grams === '' || parseNum(metalRows[0].grams) <= 0) ? 'border-rose-400 focus:border-rose-500' : 'border-slate-200 focus:border-slate-400'}`}
                   />
                   <button
                     type="button"
                     onClick={() => setMetalRows(prev => [...prev, { uid: crypto.randomUUID(), metal: 'gold-18k-white', grams: '' }])}
-                    className="shrink-0 inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-200 whitespace-nowrap"
+                    className="shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90 whitespace-nowrap"
+                    style={{ backgroundColor: 'var(--theme-primary)' }}
                   >
                     + Add metal
                   </button>
@@ -2035,7 +2043,8 @@ export function QuoteBuilderPage() {
                     <button
                       type="button"
                       onClick={() => setMetalRows(prev => [...prev, { uid: crypto.randomUUID(), metal: 'gold-18k-white', grams: '' }])}
-                      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-200"
+                      className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold text-white transition hover:opacity-90"
+                      style={{ backgroundColor: 'var(--theme-primary)' }}
                     >
                       + Add metal
                     </button>
@@ -2064,7 +2073,7 @@ export function QuoteBuilderPage() {
                         value={row.grams}
                         placeholder="g"
                         onChange={e => setMetalRows(prev => prev.map(r => r.uid === row.uid ? { ...r, grams: e.target.value } : r))}
-                        className="w-24 shrink-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+                        className={`w-24 shrink-0 rounded-2xl border bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:bg-white ${row.grams === '' || parseNum(row.grams) <= 0 ? 'border-rose-300 focus:border-rose-400' : 'border-slate-200 focus:border-slate-400'}`}
                       />
                       <button
                         type="button"

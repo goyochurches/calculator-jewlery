@@ -396,12 +396,13 @@ function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
                 value={qb.metalRows[0].grams}
                 placeholder="0"
                 onChange={e => qb.setMetalRows([{ ...qb.metalRows[0], grams: e.target.value }])}
-                className={inputCls}
+                className={`${inputCls} ${qb.metalRows[0].grams === '' || Number(qb.metalRows[0].grams) <= 0 ? 'border-rose-300' : ''}`}
               />
               <button
                 type="button"
                 onClick={() => qb.setMetalRows(prev => [...prev, { uid: crypto.randomUUID(), metal: 'gold-18k-white', grams: '' }])}
-                className="shrink-0 inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-200 whitespace-nowrap"
+                className="shrink-0 inline-flex items-center gap-1 rounded-full px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90 whitespace-nowrap"
+                style={{ backgroundColor: 'var(--theme-primary)' }}
               >
                 + Add metal
               </button>
@@ -416,7 +417,8 @@ function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
                 <button
                   type="button"
                   onClick={() => qb.setMetalRows(prev => [...prev, { uid: crypto.randomUUID(), metal: 'gold-18k-white', grams: '' }])}
-                  className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-200"
+                  className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold text-white transition hover:opacity-90"
+                  style={{ backgroundColor: 'var(--theme-primary)' }}
                 >
                   + Add metal
                 </button>
@@ -433,7 +435,7 @@ function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
                     value={row.grams}
                     placeholder="g"
                     onChange={e => qb.setMetalRows(prev => prev.map(r => r.uid === row.uid ? { ...r, grams: e.target.value } : r))}
-                    className="w-24 shrink-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+                    className={`w-24 shrink-0 rounded-2xl border bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:bg-white ${row.grams === '' || Number(row.grams) <= 0 ? 'border-rose-300' : 'border-slate-200 focus:border-slate-400'}`}
                   />
                   <button
                     type="button"

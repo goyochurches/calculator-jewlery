@@ -159,7 +159,11 @@
       "PowerShell(cd D:\\\\wamp64\\\\www\\\\calculator-jewlery; npx tsc -p tsconfig.app.json --noEmit 2>&1 | Select-String \"error TS\" | Where-Object { $_ -notmatch \"mockData|Configuration\\\\.tsx|MasterTables|QuoteBuilder\\\\.tsx\\\\\\(42|QuoteBuilder\\\\.tsx\\\\\\(185|QuotesList\\\\.tsx\\\\\\(6[0-1]\" } | Select-Object -First 10)",
       "PowerShell(cd D:\\\\wamp64\\\\www\\\\calculator-jewlery; npx tsc -p tsconfig.app.json --noEmit 2>&1 | Select-String \"error TS\" | Where-Object { $_ -notmatch \"mockData|Configuration\\\\.tsx|MasterTables|QuoteBuilder\\\\.tsx\\\\\\(42|QuoteBuilder\\\\.tsx\\\\\\(185\" } | Select-Object -First 20)",
       "PowerShell(cd D:\\\\wamp64\\\\www\\\\calculator-jewlery; npx tsc -p tsconfig.app.json --noEmit 2>&1 | Select-String \"error TS\" | Where-Object { $_ -notmatch \"mockData|Configuration\\\\.tsx|MasterTables|QuoteBuilder\\\\.tsx\\\\\\(42|QuoteBuilder\\\\.tsx\\\\\\(185\" } | Select-Object -First 15)",
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(python -c \"import base64; data=open\\('public/s&s_logo.png','rb'\\).read\\(\\); print\\(len\\(data\\), 'bytes'\\); print\\(base64.b64encode\\(data\\).decode\\(\\)[:80]+'...'\\)\")",
+      "Bash(powershell -Command \"[Convert]::ToBase64String\\([IO.File]::ReadAllBytes\\('D:/wamp64/www/calculator-jewlery/public/s&s_logo.png'\\)\\) | Out-File -FilePath 'C:/Users/goyoc/AppData/Local/Temp/logo_b64.txt' -Encoding ascii -NoNewline; \\(Get-Item 'C:/Users/goyoc/AppData/Local/Temp/logo_b64.txt'\\).Length\")",
+      "Bash(python -c \"import base64; data=open\\('D:/wamp64/www/calculator-jewlery/public/s&s_logo.png','rb'\\).read\\(\\); print\\(base64.b64encode\\(data\\).decode\\(\\)\\)\")",
+      "Read(//c/Users/goyoc/AppData/Local/Temp/**)"
     ]
   }
 }
