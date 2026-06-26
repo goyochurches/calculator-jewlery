@@ -1747,7 +1747,7 @@ export function QuoteBuilderPage() {
             <CardContent className="grid gap-5 pt-6 md:grid-cols-2">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-slate-900">Metal</label>
-                <select value={selectedMetal} onChange={e => setSelectedMetal(e.target.value as JewelryMetalOption)}
+                <select value={selectedMetal} onChange={e => setMetalRows(prev => prev.map((r, i) => i === 0 ? { ...r, metal: e.target.value as JewelryMetalOption } : r))}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
                   {METAL_GROUPS.map(g => (
                     <optgroup key={g.group} label={g.group}>
@@ -1986,27 +1986,63 @@ export function QuoteBuilderPage() {
             </CardHeader>
             <CardContent className="grid gap-5 pt-6 md:grid-cols-2">
               {!rnMode && (<>
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-900">Metal</label>
-                <select value={selectedMetal} onChange={e => setSelectedMetal(e.target.value as JewelryMetalOption)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white">
-                  {METAL_GROUPS.map(g => (
-                    <optgroup key={g.group} label={g.group}>
-                      {g.keys.map(key => (
-                        <option key={key} value={key}>
-                          {JEWELRY_METAL_OPTIONS[key].label} — ${JEWELRY_METAL_OPTIONS[key].pricePerGram}/g
-                        </option>
-                      ))}
-                    </optgroup>
+              <div className="space-y-3 md:col-span-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-semibold text-slate-900">Metal</label>
+                  {metalRows.length < 3 && (
+                    <button
+                      type="button"
+                      onClick={() => setMetalRows(prev => [...prev, { uid: crypto.randomUUID(), metal: 'gold-18k-white', grams: '' }])}
+                      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-200"
+                    >
+                      + Add metal
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {metalRows.map((row, idx) => (
+                    <div key={row.uid} className="flex items-center gap-2">
+                      <select
+                        value={row.metal}
+                        onChange={e => setMetalRows(prev => prev.map(r => r.uid === row.uid ? { ...r, metal: e.target.value as JewelryMetalOption } : r))}
+                        className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+                      >
+                        {METAL_GROUPS.map(g => (
+                          <optgroup key={g.group} label={g.group}>
+                            {g.keys.map(key => (
+                              <option key={key} value={key}>
+                                {JEWELRY_METAL_OPTIONS[key].label} — ${JEWELRY_METAL_OPTIONS[key].pricePerGram}/g
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                      <input
+                        type="number" min={0} step={0.1}
+                        value={row.grams}
+                        placeholder="g"
+                        onChange={e => setMetalRows(prev => prev.map(r => r.uid === row.uid ? { ...r, grams: e.target.value } : r))}
+                        className="w-24 shrink-0 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white"
+                      />
+                      {idx === 0 && metalRows.length === 1 ? null : (
+                        <button
+                          type="button"
+                          onClick={() => setMetalRows(prev => prev.filter(r => r.uid !== row.uid))}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-rose-50 hover:text-rose-500"
+                          aria-label="Remove metal"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                      {idx === 0 && metalRows.length === 1 && <div className="w-9 shrink-0" />}
+                    </div>
                   ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-slate-900">Weight (grams)</label>
-                <input type="number" min={0} step={0.1} value={weightGrams || ''} placeholder="0"
-                  onChange={e => setWeightGrams(Number(e.target.value) || 0)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white" />
+                </div>
+                {metalRows.length > 1 && (
+                  <p className="text-xs text-slate-400">
+                    Total material cost: <strong className="text-slate-700">${metalRows.reduce((s, r) => s + (JEWELRY_METAL_OPTIONS[r.metal]?.pricePerGram ?? 0) * parseNum(r.grams), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2 md:col-span-2">
