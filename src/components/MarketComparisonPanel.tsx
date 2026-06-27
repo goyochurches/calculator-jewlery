@@ -62,8 +62,13 @@ export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId
         <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-100">
           <TrendingUp className="h-4 w-4 text-violet-600" />
         </div>
-        <div>
-          <p className="text-sm font-semibold text-slate-800">Market comparison</p>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold text-slate-800">Market comparison</p>
+            <span className="inline-flex items-center rounded-full bg-amber-400/90 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-900">
+              Beta
+            </span>
+          </div>
           <p className="text-[11px] text-slate-400">
             {clientName
               ? `${clientName}'s history + similar pieces in the market`
