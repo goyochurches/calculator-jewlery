@@ -22,7 +22,6 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
-  TrendingUp,
   Users,
   X,
 } from 'lucide-react'
@@ -34,7 +33,6 @@ const navItems: { to: string; label: string; icon: typeof LayoutDashboard; key: 
   { to: '/quotes', label: 'Quote Builder', icon: Calculator, key: 'quotes' },
   { to: '/quotes-wizard', label: 'Quote Wizard', icon: Sparkles, key: 'quotes-wizard' },
   { to: '/quotes-list', label: 'Quotes', icon: FileText, key: 'quotes-list' },
-  { to: '/market-prices', label: 'Market Prices', icon: TrendingUp, key: 'market-prices' },
   { to: '/messages', label: 'Messages', icon: MessageCircle, key: 'messages' },
   { to: '/clients', label: 'Clients', icon: Contact, key: 'clients' },
   { to: '/gemstones', label: 'Gemstones', icon: Diamond, key: 'gemstones' },
