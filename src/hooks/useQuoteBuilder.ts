@@ -149,10 +149,10 @@ export function useQuoteBuilder() {
   const [saving, setSaving] = useState(false)
   const [savedQuote, setSavedQuote] = useState<{ id: string; title: string; total: number; publicToken: string | null } | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
-  const [fieldErrors, setFieldErrors] = useState<{ title?: string; client?: string }>({})
+  const [fieldErrors, setFieldErrors] = useState<{ title?: string; client?: string; jewelryType?: string }>({})
   const [metalGramsError, setMetalGramsError] = useState(false)
   const gramsErrorRef = useRef<HTMLDivElement>(null)
-  const [jewelryType, setJewelryType] = useState<string>('ring')
+  const [jewelryType, setJewelryType] = useState<string>('')
   const [pinSummary, setPinSummary] = useState(true)
   const defaultMetalRows = (): MetalRow[] => [{ uid: crypto.randomUUID(), metal: 'gold-18k-white', grams: '' }]
   const [metalRows, setMetalRows] = useState<MetalRow[]>(defaultMetalRows)
@@ -259,7 +259,7 @@ export function useQuoteBuilder() {
     setDuplicatedFrom(dup)
     setQuoteTitle(dup.title)
     setClient(dup.client ?? null)
-    setJewelryType(dup.jewelryType ?? 'ring')
+    setJewelryType(dup.jewelryType ?? '')
     setMetalRows(
       dup.metalRows && dup.metalRows.length > 0
         ? dup.metalRows.map((r: QuoteMetal) => ({ uid: crypto.randomUUID(), metal: r.metalKey as JewelryMetalOption, grams: String(r.weightGrams ?? '') }))
@@ -637,9 +637,10 @@ export function useQuoteBuilder() {
 
   const handleQuoteReady = async () => {
     if (!user) return
-    const errors: { title?: string; client?: string } = {}
+    const errors: { title?: string; client?: string; jewelryType?: string } = {}
     if (!quoteTitle.trim()) errors.title = 'Please enter a quote title.'
     if (!client) errors.client = 'Please select or create a client.'
+    if (!jewelryType) errors.jewelryType = 'Please select a type of piece.'
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
     const customMissingPrice = stones.some(s => s.sizeKey === '' && s.manualPrice.trim() === '')
@@ -807,7 +808,7 @@ export function useQuoteBuilder() {
       setSavedQuote({ id: q.id, title: q.title, total: pricing.total, publicToken: q.publicToken ?? null })
       setQuoteTitle('')
       setClient(null)
-      setJewelryType('ring')
+      setJewelryType('')
       setMetalRows(defaultMetalRows())
       setRingLabor('')
       setRingWidth(0)

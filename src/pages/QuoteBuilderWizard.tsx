@@ -312,9 +312,15 @@ function StepClient({ qb }: { qb: QuoteBuilderState }) {
 
         <div className="md:col-span-2">
           <label className={labelCls}>Type of piece</label>
-          <select value={qb.jewelryType} onChange={e => qb.setJewelryType(e.target.value)} className={inputCls}>
+          <select
+            value={qb.jewelryType}
+            onChange={e => { qb.setJewelryType(e.target.value); if (qb.fieldErrors.jewelryType) qb.setFieldErrors(p => ({ ...p, jewelryType: undefined })) }}
+            className={`${inputCls} ${qb.fieldErrors.jewelryType ? 'border-rose-400 ring-rose-200' : ''}`}
+          >
+            <option value="" disabled>Select type of piece…</option>
             {JEWELRY_TYPE_OPTIONS.map(j => <option key={j.key} value={j.key}>{j.label}</option>)}
           </select>
+          {qb.fieldErrors.jewelryType && <p className="mt-1 text-xs font-medium text-rose-600">{qb.fieldErrors.jewelryType}</p>}
         </div>
 
         <div className="md:col-span-2">
