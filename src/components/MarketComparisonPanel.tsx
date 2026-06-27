@@ -78,7 +78,7 @@ export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId
 
       {/* Competitor products */}
       {loading ? (
-        <CompetitorsSkeleton />
+        <CompetitorsSkeleton layout={layout} />
       ) : hasCompetitors ? (
         <section>
           <SectionLabel icon={Store} label="Competitor products" />
@@ -108,6 +108,60 @@ export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId
         </section>
       )}
     </div>
+  )
+}
+
+// ── Competitor card (detail page) ────────────────────────────────────────────
+
+function CompetitorCard({ product: p, myPrice }: { product: CompetitorProduct; myPrice: number }) {
+  const diff     = p.priceUsd - myPrice
+  const pct      = myPrice > 0 ? (diff / myPrice) * 100 : 0
+  const cheaper  = diff < 0
+  const storeColor = STORE_COLORS[p.storeName] ?? 'bg-slate-50 text-slate-600 border-slate-200'
+
+  return (
+    <a
+      href={p.productUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition hover:border-violet-200 hover:shadow-md"
+    >
+      <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+        {p.imageUrl ? (
+          <img
+            src={p.imageUrl}
+            alt={p.productName}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <Store className="h-8 w-8 text-slate-300" />
+          </div>
+        )}
+        <span className={`absolute right-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold shadow ${
+          cheaper ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'
+        }`}>
+          {cheaper ? '−' : '+'}{Math.abs(Math.round(pct))}% vs yours
+        </span>
+      </div>
+      <div className="flex flex-1 flex-col p-3">
+        <div className="flex items-center justify-between gap-1 mb-1.5">
+          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${storeColor}`}>
+            {p.storeName}
+          </span>
+          <ExternalLink className="h-3 w-3 text-slate-300 group-hover:text-violet-500 transition shrink-0" />
+        </div>
+        <p className="line-clamp-2 text-xs font-semibold leading-snug text-slate-800 flex-1">{p.productName}</p>
+        {(p.karat || p.metalType) && (
+          <p className="mt-1 text-[10px] text-slate-400">{[p.karat, p.metalType].filter(Boolean).join(' · ')}</p>
+        )}
+        <div className="mt-2 flex items-center justify-between">
+          <p className="text-base font-bold text-slate-900">{money(p.priceUsd)}</p>
+          <span className="text-[10px] text-violet-500 font-medium group-hover:underline">View →</span>
+        </div>
+      </div>
+    </a>
   )
 }
 
@@ -311,7 +365,21 @@ function AiAnalysisSkeleton() {
   )
 }
 
-function CompetitorsSkeleton() {
+function CompetitorsSkeleton({ layout = 'table' }: { layout?: 'table' | 'cards' }) {
+  if (layout === 'cards') return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {[0, 1, 2, 3].map(i => (
+        <div key={i} className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
+          <Skeleton className="aspect-[4/3] w-full rounded-none" />
+          <div className="space-y-2 p-3">
+            <Skeleton className="h-3 w-2/3" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-4 w-1/3 mt-2" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
   return (
     <div className="mt-2 overflow-hidden rounded-2xl border border-slate-100">
       <div className="border-b border-slate-100 bg-slate-50 px-3 py-2">
