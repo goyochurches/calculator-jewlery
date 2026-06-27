@@ -20,6 +20,7 @@ import { ClientPicker } from '@/components/ClientPicker'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { Toast } from '@/components/Toast'
+import { MarketComparisonPanel } from '@/components/MarketComparisonPanel'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
 import { Calculator, Camera, Check, ChevronDown, ChevronUp, Copy, Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Pin, PinOff, Ruler, Scale, Sparkles, User, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -2924,6 +2925,17 @@ export function QuoteBuilderPage() {
           </Card>
         </div>
       </section>
+
+      {/* ── Market comparison ──────────────────────────────────────────── */}
+      {customerPrice > 0 && (
+        <section className="mt-6 rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
+          <MarketComparisonPanel
+            jewelryType={jewelryType}
+            metalKey={selectedMetal}
+            myPrice={customerPrice}
+          />
+        </section>
+      )}
 
       {savedQuote && <QuoteToast key={savedQuote.id} quote={savedQuote} onClose={() => setSavedQuote(null)} />}
     </div>

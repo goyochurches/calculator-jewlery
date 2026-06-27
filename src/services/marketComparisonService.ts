@@ -23,6 +23,44 @@ export interface CompetitorProduct {
   category: string | null
   metalType: string | null
   karat: string | null
+  description?: string | null
+}
+
+export interface CompetitorProductPage {
+  content: CompetitorProduct[]
+  totalElements: number
+  totalPages: number
+  number: number
+  size: number
+}
+
+export interface FilterOptions {
+  stores: string[]
+  categories: string[]
+}
+
+export async function fetchCompetitorProducts(params: {
+  store?: string
+  category?: string
+  metalType?: string
+  karat?: string
+  search?: string
+  page?: number
+  size?: number
+}): Promise<CompetitorProductPage> {
+  const p = new URLSearchParams()
+  if (params.store)     p.set('store', params.store)
+  if (params.category)  p.set('category', params.category)
+  if (params.metalType) p.set('metalType', params.metalType)
+  if (params.karat)     p.set('karat', params.karat)
+  if (params.search)    p.set('search', params.search)
+  if (params.page != null) p.set('page', String(params.page))
+  if (params.size != null) p.set('size', String(params.size))
+  return api.get<CompetitorProductPage>(`/api/competitor-products?${p}`)
+}
+
+export async function fetchFilterOptions(): Promise<FilterOptions> {
+  return api.get<FilterOptions>('/api/competitor-products/filter-options')
 }
 
 export interface MarketComparisonResult {

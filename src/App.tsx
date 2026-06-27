@@ -24,6 +24,7 @@ import { ApprovalPage } from '@/pages/Approval'
 import { PaymentSuccessPage } from '@/pages/PaymentSuccess'
 import { PaymentCancelPage } from '@/pages/PaymentCancel'
 import { PaymentsPage } from '@/pages/Payments'
+import { MarketPricesPage } from '@/pages/MarketPrices'
 import { FEATURES, isFeatureKey } from '@/lib/featureFlags'
 import { useFeatures } from '@/hooks/useFeatures'
 import { canSeePayments } from '@/lib/paymentsAccess'
@@ -123,6 +124,9 @@ export default function App() {
                 )}
                 <Route element={<RequirePermission permission="reviews" />}>
                   <Route path="/reviews" element={<ReviewsPage />} />
+                </Route>
+                <Route element={<RequirePermission permission="market-prices" />}>
+                  <Route path="/market-prices" element={<MarketPricesPage />} />
                 </Route>
                 <Route element={<RequirePermission permission="configuration" />}>
                   <Route path="/configuration" element={<Configuration />} />
