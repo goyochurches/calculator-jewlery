@@ -160,8 +160,10 @@ function CompetitorCard({ product: p, myPrice }: { product: CompetitorProduct; m
           <ExternalLink className="h-3 w-3 text-slate-300 group-hover:text-violet-500 transition shrink-0" />
         </div>
         <p className="line-clamp-2 text-xs font-semibold leading-snug text-slate-800 flex-1">{p.productName}</p>
-        {(p.karat || p.metalType) && (
-          <p className="mt-1 text-[10px] text-slate-400">{[p.karat, p.metalType].filter(Boolean).join(' · ')}</p>
+        {(p.karat || p.metalType || p.metalColor) && (
+          <p className="mt-1 text-[10px] text-slate-400">
+            {[p.karat, p.metalColor, p.metalType].filter(Boolean).join(' ')}
+          </p>
         )}
         <div className="mt-2 flex items-center justify-between">
           <p className="text-base font-bold text-slate-900">{money(p.priceUsd)}</p>
@@ -223,8 +225,10 @@ function CompetitorRow({ product: p, myPrice }: { product: CompetitorProduct; my
           )}
           <div className="min-w-0">
             <p className="truncate font-semibold text-slate-800 leading-tight">{p.productName}</p>
-            {(p.karat || p.metalType) && (
-              <p className="text-[10px] text-slate-400">{[p.karat, p.metalType].filter(Boolean).join(' · ')}</p>
+            {(p.karat || p.metalType || p.metalColor) && (
+              <p className="text-[10px] text-slate-400">
+                {[p.karat, p.metalColor, p.metalType].filter(Boolean).join(' ')}
+              </p>
             )}
           </div>
         </div>

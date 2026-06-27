@@ -23,6 +23,7 @@ export interface CompetitorProduct {
   category: string | null
   metalType: string | null
   karat: string | null
+  metalColor: string | null
   description?: string | null
 }
 
@@ -88,14 +89,15 @@ export interface QuoteContext {
   hasMelee?: boolean
 }
 
-/** Extracts "gold" and "18k" from a metal key like "gold-18k-white". */
-export function parseMetalKey(key: string): { metalType: string; karat: string | undefined } {
-  if (!key || key === 'platinum') return { metalType: 'platinum', karat: 'platinum' }
-  if (key === 'silver') return { metalType: 'silver', karat: undefined }
+/** Extracts "gold", "18k", and "white" from a metal key like "gold-18k-white". */
+export function parseMetalKey(key: string): { metalType: string; karat: string | undefined; metalColor: string | undefined } {
+  if (!key || key === 'platinum') return { metalType: 'platinum', karat: 'platinum', metalColor: undefined }
+  if (key === 'silver') return { metalType: 'silver', karat: undefined, metalColor: undefined }
   const parts = key.split('-')
   const metalType = parts[0] ?? 'gold'
   const karat = parts.find(p => /^\d+k$/i.test(p))
-  return { metalType, karat }
+  const metalColor = parts.find(p => ['white', 'yellow', 'rose'].includes(p))
+  return { metalType, karat, metalColor }
 }
 
 export async function fetchMarketComparison(
@@ -106,15 +108,16 @@ export async function fetchMarketComparison(
   stoneType?: string | null,
   ctx?: QuoteContext | null,
 ): Promise<MarketComparisonResult> {
-  const { metalType, karat } = parseMetalKey(metalKey)
+  const { metalType, karat, metalColor } = parseMetalKey(metalKey)
   const params = new URLSearchParams({
     jewelryType,
     metalType,
     myPrice: String(Math.round(myPrice)),
   })
-  if (karat)     params.set('karat', karat)
-  if (clientId)  params.set('clientId', String(clientId))
-  if (stoneType) params.set('stoneType', stoneType)
+  if (karat)      params.set('karat',      karat)
+  if (metalColor) params.set('metalColor', metalColor)
+  if (clientId)   params.set('clientId',   String(clientId))
+  if (stoneType)  params.set('stoneType',  stoneType)
 
   // Rich context for AI analysis — backend uses these to produce piece-specific insights.
   if (ctx) {
