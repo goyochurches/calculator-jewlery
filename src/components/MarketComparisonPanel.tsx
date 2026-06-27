@@ -81,11 +81,7 @@ export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId
       ) : hasCompetitors ? (
         <section>
           <SectionLabel icon={Store} label="Competitor products" />
-          <div className="mt-2 grid gap-3 sm:grid-cols-2">
-            {data!.competitorProducts.map(p => (
-              <CompetitorCard key={p.id} product={p} myPrice={myPrice} />
-            ))}
-          </div>
+          <CompetitorTable products={data!.competitorProducts} myPrice={myPrice} />
         </section>
       ) : !loading && !error ? (
         <EmptyState label="No competitor products found for this piece type yet." />
@@ -109,75 +105,90 @@ export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId
   )
 }
 
-// ── Competitor card (large image + store + link) ──────────────────────────────
+// ── Competitor table ──────────────────────────────────────────────────────────
 
-function CompetitorCard({ product: p, myPrice }: { product: CompetitorProduct; myPrice: number }) {
+function CompetitorTable({ products, myPrice }: { products: CompetitorProduct[]; myPrice: number }) {
+  return (
+    <div className="mt-2 overflow-hidden rounded-2xl border border-slate-100">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-slate-100 bg-slate-50">
+            <th className="px-3 py-2 text-left font-semibold text-slate-400 uppercase tracking-wider">Store</th>
+            <th className="px-3 py-2 text-left font-semibold text-slate-400 uppercase tracking-wider">Product</th>
+            <th className="px-3 py-2 text-right font-semibold text-slate-400 uppercase tracking-wider">Price</th>
+            <th className="px-3 py-2 text-right font-semibold text-slate-400 uppercase tracking-wider">vs yours</th>
+            <th className="px-3 py-2"></th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-50">
+          {products.map(p => <CompetitorRow key={p.id} product={p} myPrice={myPrice} />)}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function CompetitorRow({ product: p, myPrice }: { product: CompetitorProduct; myPrice: number }) {
   const diff      = p.priceUsd - myPrice
   const pct       = myPrice > 0 ? (diff / myPrice) * 100 : 0
   const cheaper   = diff < 0
-  const diffLabel = `${cheaper ? '−' : '+'}${Math.abs(Math.round(pct))}%`
   const storeColor = STORE_COLORS[p.storeName] ?? 'bg-slate-50 text-slate-600 border-slate-200'
 
   return (
-    <a
-      href={p.productUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition hover:border-violet-200 hover:shadow-md"
-    >
-      {/* Image — full width, square */}
-      <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
-        {p.imageUrl ? (
-          <img
-            src={p.imageUrl}
-            alt={p.productName}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Store className="h-8 w-8 text-slate-300" />
-          </div>
-        )}
-        {/* % badge floating over image */}
-        <span className={`absolute right-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold shadow ${
-          cheaper ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'
-        }`}>
-          {cheaper ? '−' : '+'}{Math.abs(Math.round(pct))}% vs yours
+    <tr className="group bg-white hover:bg-slate-50 transition-colors">
+      {/* Store */}
+      <td className="px-3 py-2.5 whitespace-nowrap">
+        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${storeColor}`}>
+          {p.storeName}
         </span>
-      </div>
+      </td>
 
-      {/* Info */}
-      <div className="flex flex-1 flex-col p-3">
-        {/* Store badge */}
-        <div className="flex items-center justify-between gap-1 mb-1.5">
-          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${storeColor}`}>
-            {p.storeName}
-          </span>
-          <ExternalLink className="h-3 w-3 text-slate-300 group-hover:text-violet-500 transition shrink-0" />
+      {/* Product name + meta */}
+      <td className="px-3 py-2.5 max-w-[180px]">
+        <div className="flex items-center gap-2">
+          {p.imageUrl && (
+            <img
+              src={p.imageUrl}
+              alt=""
+              className="h-8 w-8 rounded-lg object-cover shrink-0 bg-slate-100"
+              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+            />
+          )}
+          <div className="min-w-0">
+            <p className="truncate font-semibold text-slate-800 leading-tight">{p.productName}</p>
+            {(p.karat || p.metalType) && (
+              <p className="text-[10px] text-slate-400">{[p.karat, p.metalType].filter(Boolean).join(' · ')}</p>
+            )}
+          </div>
         </div>
+      </td>
 
-        {/* Title */}
-        <p className="line-clamp-2 text-xs font-semibold leading-snug text-slate-800 flex-1">
-          {p.productName}
-        </p>
+      {/* Price */}
+      <td className="px-3 py-2.5 text-right font-bold text-slate-900 whitespace-nowrap">
+        {money(p.priceUsd)}
+      </td>
 
-        {/* Meta row */}
-        {(p.karat || p.metalType) && (
-          <p className="mt-1 text-[10px] text-slate-400">
-            {[p.karat, p.metalType].filter(Boolean).join(' · ')}
-          </p>
-        )}
+      {/* % diff */}
+      <td className="px-3 py-2.5 text-right whitespace-nowrap">
+        <span className={`rounded-full px-2 py-0.5 font-bold text-[11px] ${
+          cheaper ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'
+        }`}>
+          {cheaper ? '−' : '+'}{Math.abs(Math.round(pct))}%
+        </span>
+      </td>
 
-        {/* Price */}
-        <div className="mt-2 flex items-center justify-between">
-          <p className="text-base font-bold text-slate-900">{money(p.priceUsd)}</p>
-          <span className="text-[10px] text-violet-500 font-medium group-hover:underline">
-            View →
-          </span>
-        </div>
-      </div>
-    </a>
+      {/* Link */}
+      <td className="px-3 py-2.5 text-right">
+        <a
+          href={p.productUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-violet-500 hover:text-violet-700 font-medium transition"
+        >
+          <ExternalLink className="h-3 w-3" />
+        </a>
+      </td>
+    </tr>
   )
 }
 
@@ -296,15 +307,16 @@ function AiAnalysisSkeleton() {
 
 function CompetitorsSkeleton() {
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="mt-2 overflow-hidden rounded-2xl border border-slate-100">
+      <div className="border-b border-slate-100 bg-slate-50 px-3 py-2">
+        <Skeleton className="h-3 w-1/3" />
+      </div>
       {[0, 1, 2, 3].map(i => (
-        <div key={i} className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
-          <Skeleton className="aspect-[4/3] w-full rounded-none" />
-          <div className="space-y-2 p-3">
-            <Skeleton className="h-3 w-2/3" />
-            <Skeleton className="h-3 w-full" />
-            <Skeleton className="h-4 w-1/3 mt-2" />
-          </div>
+        <div key={i} className="flex items-center gap-3 border-b border-slate-50 bg-white px-3 py-2.5 last:border-0">
+          <Skeleton className="h-8 w-8 rounded-lg shrink-0" />
+          <Skeleton className="h-3 flex-1" />
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="h-5 w-12 rounded-full" />
         </div>
       ))}
     </div>
