@@ -40,6 +40,7 @@ import {
   Trash2,
   XCircle,
 } from 'lucide-react'
+import { MarketComparisonPanel } from '@/components/MarketComparisonPanel'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
@@ -1018,6 +1019,15 @@ export default function QuoteDetailPage() {
                 {quote.customerPriceOverrideReason ? <> Reason: {quote.customerPriceOverrideReason}</> : null}
               </p>
             )}
+          </Card>
+
+          {/* Market comparison */}
+          <Card>
+            <MarketComparisonPanel
+              jewelryType={quote.jewelryType ?? 'ring'}
+              metalKey={quote.metalRows?.[0]?.metalKey ?? quote.metal ?? 'gold-18k-white'}
+              myPrice={customerPrice}
+            />
           </Card>
         </div>
       </div>
