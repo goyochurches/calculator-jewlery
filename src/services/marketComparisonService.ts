@@ -71,6 +71,21 @@ export interface MarketComparisonResult {
   priceLabel: string   // e.g. "Excellent — well below market"
 }
 
+/** Rich quote details forwarded to the AI so the analysis is piece-specific. */
+export interface QuoteContext {
+  mainStoneCarats?: number | null
+  mainStoneShape?: string | null
+  mainStoneColor?: string | null
+  mainStoneClarity?: string | null
+  mainStoneCut?: string | null
+  /** true = natural diamond, false = lab-grown, null = no stone / not a diamond */
+  mainStoneNatural?: boolean | null
+  metalGrams?: number | null
+  totalCarats?: number | null
+  hasSideStones?: boolean
+  hasMelee?: boolean
+}
+
 /** Extracts "gold" and "18k" from a metal key like "gold-18k-white". */
 export function parseMetalKey(key: string): { metalType: string; karat: string | undefined } {
   if (!key || key === 'platinum') return { metalType: 'platinum', karat: 'platinum' }
@@ -87,6 +102,7 @@ export async function fetchMarketComparison(
   myPrice: number,
   clientId?: number | null,
   stoneType?: string | null,
+  ctx?: QuoteContext | null,
 ): Promise<MarketComparisonResult> {
   const { metalType, karat } = parseMetalKey(metalKey)
   const params = new URLSearchParams({
@@ -97,6 +113,24 @@ export async function fetchMarketComparison(
   if (karat)     params.set('karat', karat)
   if (clientId)  params.set('clientId', String(clientId))
   if (stoneType) params.set('stoneType', stoneType)
+
+  // Rich context for AI analysis — backend uses these to produce piece-specific insights.
+  if (ctx) {
+    if (ctx.mainStoneCarats != null && ctx.mainStoneCarats > 0)
+      params.set('mainStoneCarats', String(ctx.mainStoneCarats))
+    if (ctx.mainStoneShape)   params.set('mainStoneShape',   ctx.mainStoneShape)
+    if (ctx.mainStoneColor)   params.set('mainStoneColor',   ctx.mainStoneColor)
+    if (ctx.mainStoneClarity) params.set('mainStoneClarity', ctx.mainStoneClarity)
+    if (ctx.mainStoneCut)     params.set('mainStoneCut',     ctx.mainStoneCut)
+    if (ctx.mainStoneNatural != null)
+      params.set('mainStoneNatural', String(ctx.mainStoneNatural))
+    if (ctx.metalGrams != null && ctx.metalGrams > 0)
+      params.set('metalGrams', String(Math.round(ctx.metalGrams * 100) / 100))
+    if (ctx.totalCarats != null && ctx.totalCarats > 0)
+      params.set('totalCarats', String(ctx.totalCarats))
+    if (ctx.hasSideStones) params.set('hasSideStones', 'true')
+    if (ctx.hasMelee)      params.set('hasMelee',      'true')
+  }
 
   return api.get<MarketComparisonResult>(`/api/competitor-products/comparison?${params}`)
 }

@@ -2927,18 +2927,36 @@ export function QuoteBuilderPage() {
       </section>
 
       {/* ── Market comparison ──────────────────────────────────────────── */}
-      {customerPrice > 0 && (
-        <section className="mt-6 rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
-          <MarketComparisonPanel
-            jewelryType={jewelryType}
-            metalKey={selectedMetal}
-            myPrice={customerPrice}
-            clientId={client?.id}
-            clientName={client ? `${client.name}${client.surname ? ' ' + client.surname : ''}` : null}
-            stoneType={stones.length > 0 ? 'diamond' : null}
-          />
-        </section>
-      )}
+      {customerPrice > 0 && (() => {
+        const mainStone0 = mainStones[0] ?? null
+        const quoteCtx = {
+          mainStoneCarats:  mainStone0 ? (parseNum(mainStone0.carats) || null) : null,
+          mainStoneShape:   mainStone0?.shape   || null,
+          mainStoneColor:   mainStone0?.color   || null,
+          mainStoneClarity: mainStone0?.clarity || null,
+          mainStoneCut:     mainStone0?.cut     || null,
+          mainStoneNatural: mainStone0 ? mainStone0.stoneType === 'natural' : null,
+          metalGrams:       rnMode && rn
+            ? (rn.avgGrams ?? null)
+            : (metalRows.reduce((s, r) => s + parseNum(r.grams), 0) || null),
+          totalCarats:      pricing.totalCarats > 0 ? pricing.totalCarats : null,
+          hasSideStones:    sideStones.length > 0,
+          hasMelee:         meleeStones.length > 0,
+        }
+        return (
+          <section className="mt-6 rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
+            <MarketComparisonPanel
+              jewelryType={jewelryType}
+              metalKey={selectedMetal}
+              myPrice={customerPrice}
+              clientId={client?.id}
+              clientName={client ? `${client.name}${client.surname ? ' ' + client.surname : ''}` : null}
+              stoneType={stones.length > 0 ? 'diamond' : null}
+              quoteContext={quoteCtx}
+            />
+          </section>
+        )
+      })()}
 
       {savedQuote && <QuoteToast key={savedQuote.id} quote={savedQuote} onClose={() => setSavedQuote(null)} />}
     </div>

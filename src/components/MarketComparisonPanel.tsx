@@ -6,6 +6,7 @@ import {
   type CompetitorProduct,
   type SimilarQuote,
   type MarketComparisonResult,
+  type QuoteContext,
 } from '@/services/marketComparisonService'
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
   clientId?: number | null
   clientName?: string | null
   stoneType?: string | null
+  quoteContext?: QuoteContext | null
   layout?: 'table' | 'cards'
 }
 
@@ -28,20 +30,25 @@ const STORE_COLORS: Record<string, string> = {
   'Blue Nile':               'bg-blue-50 text-blue-700 border-blue-200',
 }
 
-export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId, clientName, stoneType, layout = 'table' }: Props) {
+export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId, clientName, stoneType, quoteContext, layout = 'table' }: Props) {
   const [data, setData]       = useState<MarketComparisonResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
+
+  // Stable cache key so we don't refetch on every render — only when relevant
+  // quote details actually change.
+  const ctxKey = quoteContext ? JSON.stringify(quoteContext) : ''
 
   useEffect(() => {
     if (!myPrice || myPrice <= 0) { setLoading(false); return }
     setLoading(true)
     setError(null)
-    fetchMarketComparison(jewelryType, metalKey, myPrice, clientId, stoneType)
+    fetchMarketComparison(jewelryType, metalKey, myPrice, clientId, stoneType, quoteContext ?? null)
       .then(setData)
       .catch(() => setError('Could not load market data.'))
       .finally(() => setLoading(false))
-  }, [jewelryType, metalKey, myPrice, clientId, stoneType])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jewelryType, metalKey, myPrice, clientId, stoneType, ctxKey])
 
   if (!myPrice || myPrice <= 0) return null
 
