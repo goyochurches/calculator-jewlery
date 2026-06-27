@@ -816,7 +816,7 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
                 <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-400">Verify</span>
               )}
             </div>
-            <input type="text" value={stone.labReport} placeholder="e.g. GIA 1234567890" onChange={e => qb.patchStone(stone.uid, { labReport: e.target.value })} className={miniCls} />
+            <input type="text" value={stone.labReport} placeholder="e.g. IGI 759502426 or GIA 1234567890" onChange={e => qb.patchStone(stone.uid, { labReport: e.target.value })} className={miniCls} />
           </div>
         )}
       </div>

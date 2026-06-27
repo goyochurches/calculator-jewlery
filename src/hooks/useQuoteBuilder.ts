@@ -73,7 +73,13 @@ export function labReportVerifyUrl(raw: string): { url: string; lab: string; val
 
   if (upper.includes('IGI')) {
     const valid = !!number && number.length >= 7
-    return { url: 'https://www.igi.org/verify-your-report/', lab: 'IGI', valid }
+    return {
+      url: number
+        ? `https://www.igi.org/verify-your-report/?r=${number}`
+        : 'https://www.igi.org/verify-your-report/',
+      lab: 'IGI',
+      valid,
+    }
   }
   const valid = !!number && number.length >= 7 && number.length <= 11
   return {
