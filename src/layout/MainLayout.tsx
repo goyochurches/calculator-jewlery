@@ -19,6 +19,10 @@ const pageCopy: Record<string, { title: string; subtitle: string }> = {
     title: 'Quote builder',
     subtitle: 'Estimate jewelry pricing from metal reference, design work and labor.',
   },
+  '/quotes-wizard': {
+    title: 'Quote wizard',
+    subtitle: 'Step-by-step quote creation.',
+  },
   '/gemstones': {
     title: 'Gemstone pricing',
     subtitle: 'Review stones, grades and reference prices for your jewelry quotes.',
@@ -51,13 +55,51 @@ const pageCopy: Record<string, { title: string; subtitle: string }> = {
     title: 'Master tables',
     subtitle: 'Reference data for metals, gemstones and price history.',
   },
+  '/clients': {
+    title: 'Clients',
+    subtitle: 'Manage your client list and view their quote history.',
+  },
+  '/reviews': {
+    title: 'Reviews',
+    subtitle: 'Customer feedback and ratings.',
+  },
+  '/payments': {
+    title: 'Payments',
+    subtitle: 'Track payment plans and installment status.',
+  },
+  '/profile': {
+    title: 'My profile',
+    subtitle: 'Update your name, photo and account settings.',
+  },
+}
+
+const dynamicPageCopy: Array<{ pattern: RegExp; title: string; subtitle: string }> = [
+  {
+    pattern: /^\/quotes-list\/\d+$/,
+    title: 'Quote detail',
+    subtitle: 'Full breakdown, pricing, market comparison and client share link.',
+  },
+  {
+    pattern: /^\/clients\/\d+$/,
+    title: 'Client detail',
+    subtitle: 'Client profile, quote history and contact info.',
+  },
+]
+
+function resolvePageCopy(pathname: string) {
+  const exact = pageCopy[pathname]
+  if (exact) return exact
+  for (const { pattern, title, subtitle } of dynamicPageCopy) {
+    if (pattern.test(pathname)) return { title, subtitle }
+  }
+  return pageCopy['/']
 }
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed'
 
 export function MainLayout() {
   const location = useLocation()
-  const current = pageCopy[location.pathname] ?? pageCopy['/']
+  const current = resolvePageCopy(location.pathname)
   const [panelOpen, setPanelOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
