@@ -1029,6 +1029,7 @@ export default function QuoteDetailPage() {
               myPrice={customerPrice}
               clientId={quote.client?.id}
               clientName={quote.clientName ?? null}
+              stoneType={stones.length > 0 ? 'diamond' : null}
             />
           </Card>
         </div>

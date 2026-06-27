@@ -14,6 +14,7 @@ interface Props {
   myPrice: number
   clientId?: number | null
   clientName?: string | null
+  stoneType?: string | null
 }
 
 const money = (n: number) =>
@@ -26,7 +27,7 @@ const STORE_COLORS: Record<string, string> = {
   'Blue Nile':               'bg-blue-50 text-blue-700 border-blue-200',
 }
 
-export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId, clientName }: Props) {
+export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId, clientName, stoneType }: Props) {
   const [data, setData]       = useState<MarketComparisonResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
@@ -35,11 +36,11 @@ export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId
     if (!myPrice || myPrice <= 0) { setLoading(false); return }
     setLoading(true)
     setError(null)
-    fetchMarketComparison(jewelryType, metalKey, myPrice, clientId)
+    fetchMarketComparison(jewelryType, metalKey, myPrice, clientId, stoneType)
       .then(setData)
       .catch(() => setError('Could not load market data.'))
       .finally(() => setLoading(false))
-  }, [jewelryType, metalKey, myPrice, clientId])
+  }, [jewelryType, metalKey, myPrice, clientId, stoneType])
 
   if (!myPrice || myPrice <= 0) return null
 

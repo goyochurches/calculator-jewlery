@@ -2935,6 +2935,7 @@ export function QuoteBuilderPage() {
             myPrice={customerPrice}
             clientId={client?.id}
             clientName={client ? `${client.name}${client.surname ? ' ' + client.surname : ''}` : null}
+            stoneType={stones.length > 0 ? 'diamond' : null}
           />
         </section>
       )}
