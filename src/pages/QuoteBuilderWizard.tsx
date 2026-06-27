@@ -36,6 +36,7 @@ import {
 } from 'lucide-react'
 import { CreateLabSizeDialog } from '@/components/CreateLabSizeDialog'
 import { configService } from '@/services/configService'
+import { MarketComparisonPanel } from '@/components/MarketComparisonPanel'
 
 const money = (n: number) =>
   '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -395,7 +396,7 @@ function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
                 type="number" min={0} step={0.1}
                 value={qb.metalRows[0].grams}
                 placeholder="0"
-                onChange={e => { qb.setMetalRows([{ ...qb.metalRows[0], grams: e.target.value }]); if (qb.metalGramsError) qb.setMetalGramsError(false) }}
+                onChange={e => { qb.setMetalRows([{ ...qb.metalRows[0], grams: e.target.value }]); if (qb.metalGramsError) { qb.setMetalGramsError(false); qb.setSaveError(null) } }}
                 className={`${inputCls} ${qb.metalGramsError && (qb.metalRows[0].grams === '' || Number(qb.metalRows[0].grams) <= 0) ? 'border-rose-400' : ''}`}
               />
               <button
@@ -437,7 +438,7 @@ function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
                     type="number" min={0} step={0.1}
                     value={row.grams}
                     placeholder="g"
-                    onChange={e => { qb.setMetalRows(prev => prev.map(r => r.uid === row.uid ? { ...r, grams: e.target.value } : r)); if (qb.metalGramsError) qb.setMetalGramsError(false) }}
+                    onChange={e => { qb.setMetalRows(prev => prev.map(r => r.uid === row.uid ? { ...r, grams: e.target.value } : r)); if (qb.metalGramsError) { qb.setMetalGramsError(false); qb.setSaveError(null) } }}
                     className={`w-24 shrink-0 rounded-2xl border bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:bg-white ${qb.metalGramsError && (row.grams === '' || Number(row.grams) <= 0) ? 'border-rose-400' : 'border-slate-200 focus:border-slate-400'}`}
                   />
                   <button
@@ -986,6 +987,12 @@ function StepReview({ qb }: { qb: QuoteBuilderState }) {
             </div>
           </div>
         )}
+
+        <MarketComparisonPanel
+          jewelryType={qb.jewelryType}
+          metalKey={qb.selectedMetal}
+          myPrice={qb.customerPrice}
+        />
       </div>
     </SectionCard>
   )

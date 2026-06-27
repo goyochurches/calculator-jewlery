@@ -163,7 +163,19 @@
       "Bash(python -c \"import base64; data=open\\('public/s&s_logo.png','rb'\\).read\\(\\); print\\(len\\(data\\), 'bytes'\\); print\\(base64.b64encode\\(data\\).decode\\(\\)[:80]+'...'\\)\")",
       "Bash(powershell -Command \"[Convert]::ToBase64String\\([IO.File]::ReadAllBytes\\('D:/wamp64/www/calculator-jewlery/public/s&s_logo.png'\\)\\) | Out-File -FilePath 'C:/Users/goyoc/AppData/Local/Temp/logo_b64.txt' -Encoding ascii -NoNewline; \\(Get-Item 'C:/Users/goyoc/AppData/Local/Temp/logo_b64.txt'\\).Length\")",
       "Bash(python -c \"import base64; data=open\\('D:/wamp64/www/calculator-jewlery/public/s&s_logo.png','rb'\\).read\\(\\); print\\(base64.b64encode\\(data\\).decode\\(\\)\\)\")",
-      "Read(//c/Users/goyoc/AppData/Local/Temp/**)"
+      "Read(//c/Users/goyoc/AppData/Local/Temp/**)",
+      "Bash(xargs cat)",
+      "Bash(mkdir -p D:/wamp64/www/simone-scraper/.github/workflows)",
+      "Bash(mkdir -p D:/wamp64/www/simone-scraper/spiders)",
+      "Bash(mkdir -p D:/wamp64/www/simone-scraper/models)",
+      "Bash(mkdir -p D:/wamp64/www/simone-scraper/utils)",
+      "Bash(cp D:/wamp64/www/calculator-jewlery/scraper/models/product.py D:/wamp64/www/simone-scraper/models/product.py)",
+      "Bash(cp D:/wamp64/www/calculator-jewlery/scraper/models/__init__.py D:/wamp64/www/simone-scraper/models/__init__.py)",
+      "Bash(cp D:/wamp64/www/calculator-jewlery/scraper/utils/normalize.py D:/wamp64/www/simone-scraper/utils/normalize.py)",
+      "Bash(cp D:/wamp64/www/calculator-jewlery/scraper/utils/__init__.py D:/wamp64/www/simone-scraper/utils/__init__.py)",
+      "Bash(cp D:/wamp64/www/calculator-jewlery/scraper/spiders/princess_bride_spider.py D:/wamp64/www/simone-scraper/spiders/princess_bride_spider.py)",
+      "Bash(where gh *)",
+      "Bash(winget list *)"
     ]
   }
 }
