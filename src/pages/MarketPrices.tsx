@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { ExternalLink, Search, SlidersHorizontal, Store, X } from 'lucide-react'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   fetchCompetitorProducts,
@@ -100,8 +99,8 @@ export function MarketPricesPage() {
         <div className="flex items-center gap-2">
           <div className="relative w-64">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              className="pl-9 rounded-full border-slate-200"
+            <input
+              className="w-full rounded-full border border-slate-200 bg-white py-2 pl-9 pr-8 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-400"
               placeholder="Search products…"
               value={draft}
               onChange={e => onSearchChange(e.target.value)}
