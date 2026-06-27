@@ -15,6 +15,7 @@ interface Props {
   clientId?: number | null
   clientName?: string | null
   stoneType?: string | null
+  layout?: 'table' | 'cards'
 }
 
 const money = (n: number) =>
@@ -27,7 +28,7 @@ const STORE_COLORS: Record<string, string> = {
   'Blue Nile':               'bg-blue-50 text-blue-700 border-blue-200',
 }
 
-export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId, clientName, stoneType }: Props) {
+export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId, clientName, stoneType, layout = 'table' }: Props) {
   const [data, setData]       = useState<MarketComparisonResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
@@ -81,7 +82,12 @@ export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId
       ) : hasCompetitors ? (
         <section>
           <SectionLabel icon={Store} label="Competitor products" />
-          <CompetitorTable products={data!.competitorProducts} myPrice={myPrice} />
+          {layout === 'table'
+            ? <CompetitorTable products={data!.competitorProducts} myPrice={myPrice} />
+            : <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                {data!.competitorProducts.map(p => <CompetitorCard key={p.id} product={p} myPrice={myPrice} />)}
+              </div>
+          }
         </section>
       ) : !loading && !error ? (
         <EmptyState label="No competitor products found for this piece type yet." />
