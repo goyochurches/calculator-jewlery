@@ -63,6 +63,12 @@ export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId
         </div>
       </div>
 
+      {/* Price score */}
+      {!loading && !error && data && (
+        <PriceScoreBadge score={data.priceScore} label={data.priceLabel} />
+      )}
+      {loading && <Skeleton className="h-14 w-full rounded-2xl" />}
+
       {/* AI analysis */}
       {loading ? <AiAnalysisSkeleton /> :
        error   ? <ErrorBanner message={error} /> :
@@ -239,6 +245,38 @@ function EmptyState({ label }: { label: string }) {
     <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-3 text-center text-xs text-slate-400">
       {label}
     </p>
+  )
+}
+
+const SCORE_CONFIG = [
+  { min: 1, max: 1, bg: 'bg-rose-50',    border: 'border-rose-200',   text: 'text-rose-700',   dot: 'bg-rose-500'   },
+  { min: 2, max: 2, bg: 'bg-orange-50',  border: 'border-orange-200', text: 'text-orange-700', dot: 'bg-orange-400' },
+  { min: 3, max: 3, bg: 'bg-amber-50',   border: 'border-amber-200',  text: 'text-amber-700',  dot: 'bg-amber-400'  },
+  { min: 4, max: 4, bg: 'bg-emerald-50', border: 'border-emerald-200',text: 'text-emerald-700',dot: 'bg-emerald-500'},
+  { min: 5, max: 5, bg: 'bg-violet-50',  border: 'border-violet-200', text: 'text-violet-700', dot: 'bg-violet-500' },
+]
+
+function PriceScoreBadge({ score, label }: { score: number; label: string }) {
+  const cfg = SCORE_CONFIG.find(c => score >= c.min && score <= c.max) ?? SCORE_CONFIG[2]
+  const dots = Array.from({ length: 5 }, (_, i) => i < score)
+
+  return (
+    <div className={`flex items-center gap-3 rounded-2xl border px-4 py-3 ${cfg.bg} ${cfg.border}`}>
+      <div className="flex gap-1 shrink-0">
+        {dots.map((filled, i) => (
+          <span
+            key={i}
+            className={`h-3 w-3 rounded-full transition ${filled ? cfg.dot : 'bg-slate-200'}`}
+          />
+        ))}
+      </div>
+      <div className="min-w-0">
+        <p className={`text-sm font-bold leading-tight ${cfg.text}`}>
+          {score}/5 — {label}
+        </p>
+        <p className="text-[11px] text-slate-400 mt-0.5">Price vs. competitors</p>
+      </div>
+    </div>
   )
 }
 

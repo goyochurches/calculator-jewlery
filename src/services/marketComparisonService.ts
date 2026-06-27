@@ -67,6 +67,8 @@ export interface MarketComparisonResult {
   myPastQuotes: SimilarQuote[]
   competitorProducts: CompetitorProduct[]
   aiAnalysis: string
+  priceScore: number   // 1–5
+  priceLabel: string   // e.g. "Excellent — well below market"
 }
 
 /** Extracts "gold" and "18k" from a metal key like "gold-18k-white". */
