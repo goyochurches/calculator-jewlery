@@ -81,6 +81,8 @@ export interface QuoteContext {
   /** true = natural diamond, false = lab-grown, null = no stone / not a diamond */
   mainStoneNatural?: boolean | null
   metalGrams?: number | null
+  /** Exact dollar cost of the metal at current spot price — fixed baseline for comparison. */
+  materialCostUsd?: number | null
   totalCarats?: number | null
   hasSideStones?: boolean
   hasMelee?: boolean
@@ -126,6 +128,8 @@ export async function fetchMarketComparison(
       params.set('mainStoneNatural', String(ctx.mainStoneNatural))
     if (ctx.metalGrams != null && ctx.metalGrams > 0)
       params.set('metalGrams', String(Math.round(ctx.metalGrams * 100) / 100))
+    if (ctx.materialCostUsd != null && ctx.materialCostUsd > 0)
+      params.set('materialCostUsd', String(Math.round(ctx.materialCostUsd * 100) / 100))
     if (ctx.totalCarats != null && ctx.totalCarats > 0)
       params.set('totalCarats', String(ctx.totalCarats))
     if (ctx.hasSideStones) params.set('hasSideStones', 'true')

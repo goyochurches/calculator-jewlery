@@ -2939,6 +2939,10 @@ export function QuoteBuilderPage() {
           metalGrams:       rnMode && rn
             ? (rn.avgGrams ?? null)
             : (metalRows.reduce((s, r) => s + parseNum(r.grams), 0) || null),
+          // Exact material cost at current spot price — the fixed baseline; only
+          // the customer-facing total varies store to store (like a Ferrari: same
+          // car, different dealer price).
+          materialCostUsd:  pricing.materialCost > 0 ? pricing.materialCost : null,
           totalCarats:      pricing.totalCarats > 0 ? pricing.totalCarats : null,
           hasSideStones:    sideStones.length > 0,
           hasMelee:         meleeStones.length > 0,
