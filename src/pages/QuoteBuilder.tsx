@@ -2933,6 +2933,8 @@ export function QuoteBuilderPage() {
             jewelryType={jewelryType}
             metalKey={selectedMetal}
             myPrice={customerPrice}
+            clientId={client?.id}
+            clientName={client ? `${client.name}${client.surname ? ' ' + client.surname : ''}` : null}
           />
         </section>
       )}

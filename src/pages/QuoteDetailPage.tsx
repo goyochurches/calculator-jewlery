@@ -1027,6 +1027,8 @@ export default function QuoteDetailPage() {
               jewelryType={quote.jewelryType ?? 'ring'}
               metalKey={quote.metalRows?.[0]?.metalKey ?? quote.metal ?? 'gold-18k-white'}
               myPrice={customerPrice}
+              clientId={quote.client?.id}
+              clientName={quote.clientName ?? null}
             />
           </Card>
         </div>

@@ -992,6 +992,8 @@ function StepReview({ qb }: { qb: QuoteBuilderState }) {
           jewelryType={qb.jewelryType}
           metalKey={qb.selectedMetal}
           myPrice={qb.customerPrice}
+          clientId={qb.client?.id}
+          clientName={qb.client ? `${qb.client.name}${qb.client.surname ? ' ' + qb.client.surname : ''}` : null}
         />
       </div>
     </SectionCard>

@@ -83,6 +83,7 @@ export async function fetchMarketComparison(
   jewelryType: string,
   metalKey: string,
   myPrice: number,
+  clientId?: number | null,
 ): Promise<MarketComparisonResult> {
   const { metalType, karat } = parseMetalKey(metalKey)
   const params = new URLSearchParams({
@@ -90,7 +91,8 @@ export async function fetchMarketComparison(
     metalType,
     myPrice: String(Math.round(myPrice)),
   })
-  if (karat) params.set('karat', karat)
+  if (karat)    params.set('karat', karat)
+  if (clientId) params.set('clientId', String(clientId))
 
   return api.get<MarketComparisonResult>(`/api/competitor-products/comparison?${params}`)
 }

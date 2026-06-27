@@ -12,34 +12,42 @@ interface Props {
   jewelryType: string
   metalKey: string
   myPrice: number
+  clientId?: number | null
+  clientName?: string | null
 }
 
 const money = (n: number) =>
   '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 
-export function MarketComparisonPanel({ jewelryType, metalKey, myPrice }: Props) {
-  const [data, setData]     = useState<MarketComparisonResult | null>(null)
+const STORE_COLORS: Record<string, string> = {
+  'Princess Bride Diamonds': 'bg-rose-50 text-rose-700 border-rose-200',
+  'Happy Jewelers':          'bg-amber-50 text-amber-700 border-amber-200',
+  "Mimi's Jewelry":          'bg-violet-50 text-violet-700 border-violet-200',
+  'Blue Nile':               'bg-blue-50 text-blue-700 border-blue-200',
+}
+
+export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId, clientName }: Props) {
+  const [data, setData]       = useState<MarketComparisonResult | null>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError]   = useState<string | null>(null)
+  const [error, setError]     = useState<string | null>(null)
 
   useEffect(() => {
     if (!myPrice || myPrice <= 0) { setLoading(false); return }
     setLoading(true)
     setError(null)
-    fetchMarketComparison(jewelryType, metalKey, myPrice)
+    fetchMarketComparison(jewelryType, metalKey, myPrice, clientId)
       .then(setData)
       .catch(() => setError('Could not load market data.'))
       .finally(() => setLoading(false))
-  }, [jewelryType, metalKey, myPrice])
-
-  const hasCompetitors = (data?.competitorProducts?.length ?? 0) > 0
-  const hasPastQuotes  = (data?.myPastQuotes?.length ?? 0) > 0
-  const hasAny         = hasCompetitors || hasPastQuotes
+  }, [jewelryType, metalKey, myPrice, clientId])
 
   if (!myPrice || myPrice <= 0) return null
 
+  const hasCompetitors = (data?.competitorProducts?.length ?? 0) > 0
+  const hasPastQuotes  = (data?.myPastQuotes?.length ?? 0) > 0
+
   return (
-    <div className="mt-4 space-y-4">
+    <div className="mt-4 space-y-5">
       {/* Header */}
       <div className="flex items-center gap-2">
         <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-100">
@@ -47,18 +55,18 @@ export function MarketComparisonPanel({ jewelryType, metalKey, myPrice }: Props)
         </div>
         <div>
           <p className="text-sm font-semibold text-slate-800">Market comparison</p>
-          <p className="text-[11px] text-slate-400">Similar pieces in the market vs. your price</p>
+          <p className="text-[11px] text-slate-400">
+            {clientName
+              ? `${clientName}'s history + similar pieces in the market`
+              : 'Similar pieces in the market vs. your price'}
+          </p>
         </div>
       </div>
 
       {/* AI analysis */}
-      {loading ? (
-        <AiAnalysisSkeleton />
-      ) : error ? (
-        <ErrorBanner message={error} />
-      ) : data?.aiAnalysis ? (
-        <AiAnalysisBubble text={data.aiAnalysis} />
-      ) : null}
+      {loading ? <AiAnalysisSkeleton /> :
+       error   ? <ErrorBanner message={error} /> :
+       data?.aiAnalysis ? <AiAnalysisBubble text={data.aiAnalysis} /> : null}
 
       {/* Competitor products */}
       {loading ? (
@@ -76,24 +84,135 @@ export function MarketComparisonPanel({ jewelryType, metalKey, myPrice }: Props)
         <EmptyState label="No competitor products found for this piece type yet." />
       ) : null}
 
-      {/* Past similar quotes */}
-      {loading ? null : hasPastQuotes ? (
+      {/* Past quotes for this client */}
+      {!loading && hasPastQuotes && (
         <section>
-          <SectionLabel icon={Clock} label="Your similar past quotes" />
+          <SectionLabel
+            icon={Clock}
+            label={clientName ? `${clientName}'s past quotes` : 'Similar past quotes'}
+          />
           <div className="mt-2 space-y-2">
             {data!.myPastQuotes.map(q => (
               <PastQuoteRow key={q.id} quote={q} myPrice={myPrice} />
             ))}
           </div>
         </section>
-      ) : !loading && !error && hasAny ? null : !loading && !error ? (
-        <EmptyState label="No past quotes found for this piece type yet." />
-      ) : null}
+      )}
     </div>
   )
 }
 
-// ── Sub-components ───────────────────────────────────────────────────────────
+// ── Competitor card (large image + store + link) ──────────────────────────────
+
+function CompetitorCard({ product: p, myPrice }: { product: CompetitorProduct; myPrice: number }) {
+  const diff      = p.priceUsd - myPrice
+  const pct       = myPrice > 0 ? (diff / myPrice) * 100 : 0
+  const cheaper   = diff < 0
+  const diffLabel = `${cheaper ? '−' : '+'}${Math.abs(Math.round(pct))}%`
+  const storeColor = STORE_COLORS[p.storeName] ?? 'bg-slate-50 text-slate-600 border-slate-200'
+
+  return (
+    <a
+      href={p.productUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition hover:border-violet-200 hover:shadow-md"
+    >
+      {/* Image — full width, square */}
+      <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+        {p.imageUrl ? (
+          <img
+            src={p.imageUrl}
+            alt={p.productName}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <Store className="h-8 w-8 text-slate-300" />
+          </div>
+        )}
+        {/* % badge floating over image */}
+        <span className={`absolute right-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-bold shadow ${
+          cheaper ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'
+        }`}>
+          {cheaper ? '−' : '+'}{Math.abs(Math.round(pct))}% vs yours
+        </span>
+      </div>
+
+      {/* Info */}
+      <div className="flex flex-1 flex-col p-3">
+        {/* Store badge */}
+        <div className="flex items-center justify-between gap-1 mb-1.5">
+          <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${storeColor}`}>
+            {p.storeName}
+          </span>
+          <ExternalLink className="h-3 w-3 text-slate-300 group-hover:text-violet-500 transition shrink-0" />
+        </div>
+
+        {/* Title */}
+        <p className="line-clamp-2 text-xs font-semibold leading-snug text-slate-800 flex-1">
+          {p.productName}
+        </p>
+
+        {/* Meta row */}
+        {(p.karat || p.metalType) && (
+          <p className="mt-1 text-[10px] text-slate-400">
+            {[p.karat, p.metalType].filter(Boolean).join(' · ')}
+          </p>
+        )}
+
+        {/* Price */}
+        <div className="mt-2 flex items-center justify-between">
+          <p className="text-base font-bold text-slate-900">{money(p.priceUsd)}</p>
+          <span className="text-[10px] text-violet-500 font-medium group-hover:underline">
+            View →
+          </span>
+        </div>
+      </div>
+    </a>
+  )
+}
+
+// ── Past quote row ────────────────────────────────────────────────────────────
+
+function PastQuoteRow({ quote: q, myPrice }: { quote: SimilarQuote; myPrice: number }) {
+  const diff = q.customerTotal - myPrice
+  const pct  = myPrice > 0 ? (diff / myPrice) * 100 : 0
+  const date = q.createdAt
+    ? new Date(q.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : ''
+
+  return (
+    <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-slate-800">{q.title}</p>
+        <p className="text-[11px] text-slate-400">
+          {date}
+        </p>
+      </div>
+      <div className="ml-3 shrink-0 text-right">
+        <p className="text-sm font-bold text-slate-900">{money(q.customerTotal)}</p>
+        <p className={`text-[10px] font-medium ${
+          Math.abs(pct) < 5 ? 'text-emerald-600' : 'text-slate-400'
+        }`}>
+          {Math.abs(pct) < 5 ? 'Similar price' : `${diff > 0 ? '+' : ''}${Math.round(pct)}% vs now`}
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function SectionLabel({ icon: Icon, label }: { icon: typeof Store; label: string }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <Icon className="h-3.5 w-3.5 text-slate-400" />
+      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</p>
+    </div>
+  )
+}
 
 function AiAnalysisBubble({ text }: { text: string }) {
   return (
@@ -102,94 +221,6 @@ function AiAnalysisBubble({ text }: { text: string }) {
         <Sparkles className="h-3.5 w-3.5 text-white" />
       </div>
       <p className="text-sm leading-relaxed text-slate-700">{text}</p>
-    </div>
-  )
-}
-
-function CompetitorCard({ product: p, myPrice }: { product: CompetitorProduct; myPrice: number }) {
-  const diff     = p.priceUsd - myPrice
-  const pct      = myPrice > 0 ? ((diff / myPrice) * 100) : 0
-  const cheaper  = diff < 0
-  const diffLabel = `${cheaper ? '−' : '+'}${Math.abs(Math.round(pct))}% vs yours`
-
-  return (
-    <a
-      href={p.productUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="group flex gap-3 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm transition hover:border-violet-200 hover:shadow-md"
-    >
-      {/* Image */}
-      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-slate-100">
-        {p.imageUrl ? (
-          <img
-            src={p.imageUrl}
-            alt={p.productName}
-            className="h-full w-full object-cover transition group-hover:scale-105"
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <Store className="h-5 w-5 text-slate-300" />
-          </div>
-        )}
-      </div>
-
-      {/* Info */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start justify-between gap-1">
-          <p className="line-clamp-2 text-xs font-semibold text-slate-800 leading-tight">{p.productName}</p>
-          <ExternalLink className="mt-0.5 h-3 w-3 shrink-0 text-slate-300 group-hover:text-violet-500" />
-        </div>
-        <p className="mt-0.5 text-[11px] text-slate-400">{p.storeName}</p>
-        <div className="mt-1.5 flex items-center gap-2">
-          <span className="text-sm font-bold text-slate-900">{money(p.priceUsd)}</span>
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-            cheaper
-              ? 'bg-rose-50 text-rose-600'
-              : 'bg-emerald-50 text-emerald-600'
-          }`}>
-            {diffLabel}
-          </span>
-        </div>
-        {(p.karat || p.metalType) && (
-          <p className="mt-0.5 text-[10px] text-slate-400">
-            {[p.karat, p.metalType].filter(Boolean).join(' ')}
-          </p>
-        )}
-      </div>
-    </a>
-  )
-}
-
-function PastQuoteRow({ quote: q, myPrice }: { quote: SimilarQuote; myPrice: number }) {
-  const diff = q.customerTotal - myPrice
-  const pct  = myPrice > 0 ? ((diff / myPrice) * 100) : 0
-  const date = q.createdAt ? new Date(q.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''
-
-  return (
-    <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-semibold text-slate-800">{q.title}</p>
-        <p className="text-[11px] text-slate-400">
-          {q.clientName ? `${q.clientName} · ` : ''}{date}
-        </p>
-      </div>
-      <div className="ml-3 text-right shrink-0">
-        <p className="text-sm font-bold text-slate-900">{money(q.customerTotal)}</p>
-        <p className={`text-[10px] font-medium ${Math.abs(pct) < 5 ? 'text-emerald-600' : 'text-slate-400'}`}>
-          {Math.abs(pct) < 5 ? 'Similar price' : `${diff > 0 ? '+' : ''}${Math.round(pct)}% vs now`}
-        </p>
-      </div>
-    </div>
-  )
-}
-
-function SectionLabel({ icon: Icon, label }: { icon: typeof Store; label: string }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <Icon className="h-3.5 w-3.5 text-slate-400" />
-      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{label}</p>
     </div>
   )
 }
@@ -228,16 +259,15 @@ function CompetitorsSkeleton() {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {[0, 1, 2, 3].map(i => (
-        <div key={i} className="flex gap-3 rounded-2xl border border-slate-100 bg-white p-3">
-          <Skeleton className="h-16 w-16 shrink-0 rounded-xl" />
-          <div className="flex-1 space-y-2 pt-1">
-            <Skeleton className="h-3 w-full" />
+        <div key={i} className="overflow-hidden rounded-2xl border border-slate-100 bg-white">
+          <Skeleton className="aspect-[4/3] w-full rounded-none" />
+          <div className="space-y-2 p-3">
             <Skeleton className="h-3 w-2/3" />
-            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-4 w-1/3 mt-2" />
           </div>
         </div>
       ))}
     </div>
   )
 }
-
