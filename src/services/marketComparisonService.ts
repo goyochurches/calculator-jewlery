@@ -22,8 +22,13 @@ export interface CompetitorProduct {
   imageUrls: string[] | null
   category: string | null
   metalType: string | null
-  karat: string | null
   metalColor: string | null
+  karat: string | null
+  stoneType: string | null
+  stoneCarat: number | null
+  stoneColor: string | null
+  stoneClarity: string | null
+  stoneCut: string | null
   description?: string | null
 }
 

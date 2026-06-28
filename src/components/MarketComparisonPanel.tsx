@@ -170,6 +170,11 @@ function CompetitorCard({ product: p, myPrice }: { product: CompetitorProduct; m
             {[p.karat, p.metalColor, p.metalType].filter(Boolean).join(' ')}
           </p>
         )}
+        {(p.stoneCarat || p.stoneClarity || p.stoneColor) && (
+          <p className="mt-0.5 text-[10px] text-violet-500">
+            {[p.stoneCarat ? `${p.stoneCarat}ct` : null, p.stoneColor, p.stoneClarity, p.stoneCut].filter(Boolean).join(' · ')}
+          </p>
+        )}
         <div className="mt-2 flex items-center justify-between">
           <p className="text-base font-bold text-slate-900">{money(p.priceUsd)}</p>
           <span className="text-[10px] text-violet-500 font-medium group-hover:underline">View →</span>
@@ -233,6 +238,11 @@ function CompetitorRow({ product: p, myPrice }: { product: CompetitorProduct; my
             {(p.karat || p.metalType || p.metalColor) && (
               <p className="text-[10px] text-slate-400">
                 {[p.karat, p.metalColor, p.metalType].filter(Boolean).join(' ')}
+              </p>
+            )}
+            {(p.stoneCarat || p.stoneClarity || p.stoneColor) && (
+              <p className="text-[10px] text-violet-500">
+                {[p.stoneCarat ? `${p.stoneCarat}ct` : null, p.stoneColor, p.stoneClarity, p.stoneCut].filter(Boolean).join(' · ')}
               </p>
             )}
           </div>
