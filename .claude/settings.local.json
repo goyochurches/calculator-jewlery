@@ -175,7 +175,9 @@
       "Bash(cp D:/wamp64/www/calculator-jewlery/scraper/utils/__init__.py D:/wamp64/www/simone-scraper/utils/__init__.py)",
       "Bash(cp D:/wamp64/www/calculator-jewlery/scraper/spiders/princess_bride_spider.py D:/wamp64/www/simone-scraper/spiders/princess_bride_spider.py)",
       "Bash(where gh *)",
-      "Bash(winget list *)"
+      "Bash(winget list *)",
+      "Bash(./mvnw compile *)",
+      "Bash(mvn clean *)"
     ]
   }
 }

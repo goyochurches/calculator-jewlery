@@ -2628,7 +2628,7 @@ export function QuoteBuilderPage() {
             <Button size="lg" className="w-full rounded-2xl px-5 text-white sm:w-auto"
               style={{ backgroundColor: 'var(--theme-primary)' }}
               onClick={handleQuoteReady} disabled={saving}>
-              {saving ? 'Saving…' : 'Quote ready'}
+              {saving ? 'Saving…' : 'Submit'}
             </Button>
             {saveError && (
               <p className="text-xs font-medium text-rose-600">{saveError}</p>
