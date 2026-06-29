@@ -91,7 +91,14 @@ export interface QuoteContext {
   materialCostUsd?: number | null
   totalCarats?: number | null
   hasSideStones?: boolean
+  sideStoneCarats?: number | null
+  sideStoneCount?: number | null
+  sideStoneShape?: string | null
+  sideStoneNatural?: boolean | null
   hasMelee?: boolean
+  meleeCarats?: number | null
+  meleeCount?: number | null
+  meleeNatural?: boolean | null
 }
 
 /** Extracts "gold", "18k", and "white" from a metal key like "gold-18k-white". */
@@ -141,7 +148,20 @@ export async function fetchMarketComparison(
     if (ctx.totalCarats != null && ctx.totalCarats > 0)
       params.set('totalCarats', String(ctx.totalCarats))
     if (ctx.hasSideStones) params.set('hasSideStones', 'true')
+    if (ctx.sideStoneCarats != null && ctx.sideStoneCarats > 0)
+      params.set('sideStoneCarats', String(Math.round(ctx.sideStoneCarats * 10000) / 10000))
+    if (ctx.sideStoneCount != null && ctx.sideStoneCount > 0)
+      params.set('sideStoneCount', String(ctx.sideStoneCount))
+    if (ctx.sideStoneShape)   params.set('sideStoneShape',   ctx.sideStoneShape)
+    if (ctx.sideStoneNatural != null)
+      params.set('sideStoneNatural', String(ctx.sideStoneNatural))
     if (ctx.hasMelee)      params.set('hasMelee',      'true')
+    if (ctx.meleeCarats != null && ctx.meleeCarats > 0)
+      params.set('meleeCarats', String(Math.round(ctx.meleeCarats * 10000) / 10000))
+    if (ctx.meleeCount != null && ctx.meleeCount > 0)
+      params.set('meleeCount', String(ctx.meleeCount))
+    if (ctx.meleeNatural != null)
+      params.set('meleeNatural', String(ctx.meleeNatural))
   }
 
   return api.get<MarketComparisonResult>(`/api/competitor-products/comparison?${params}`)

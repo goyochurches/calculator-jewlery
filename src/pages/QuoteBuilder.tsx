@@ -2929,6 +2929,10 @@ export function QuoteBuilderPage() {
       {/* ── Market comparison ──────────────────────────────────────────── */}
       {customerPrice > 0 && (() => {
         const mainStone0 = mainStones[0] ?? null
+        const sideTotalCarats  = sideStones.reduce((s, st) => s + (parseNum(st.carats) || 0), 0)
+        const sideTotalCount   = sideStones.reduce((s, st) => s + (parseNum(st.amount) || 0), 0)
+        const meleeTotalCarats = meleeStones.reduce((s, st) => s + (parseNum(st.carats) || 0), 0)
+        const meleeTotalCount  = meleeStones.reduce((s, st) => s + (parseNum(st.amount) || 0), 0)
         const quoteCtx = {
           mainStoneCarats:  mainStone0 ? (parseNum(mainStone0.carats) || null) : null,
           mainStoneShape:   mainStone0?.shape   || null,
@@ -2939,13 +2943,17 @@ export function QuoteBuilderPage() {
           metalGrams:       rnMode && rn
             ? (rn.avgGrams ?? null)
             : (metalRows.reduce((s, r) => s + parseNum(r.grams), 0) || null),
-          // Exact material cost at current spot price — the fixed baseline; only
-          // the customer-facing total varies store to store (like a Ferrari: same
-          // car, different dealer price).
           materialCostUsd:  pricing.materialCost > 0 ? pricing.materialCost : null,
           totalCarats:      pricing.totalCarats > 0 ? pricing.totalCarats : null,
           hasSideStones:    sideStones.length > 0,
+          sideStoneCarats:  sideTotalCarats  > 0 ? sideTotalCarats  : null,
+          sideStoneCount:   sideTotalCount   > 0 ? sideTotalCount   : null,
+          sideStoneShape:   sideStones[0]?.shape || null,
+          sideStoneNatural: sideStones.length > 0 ? sideStones[0].stoneType === 'natural' : null,
           hasMelee:         meleeStones.length > 0,
+          meleeCarats:      meleeTotalCarats > 0 ? meleeTotalCarats : null,
+          meleeCount:       meleeTotalCount  > 0 ? meleeTotalCount  : null,
+          meleeNatural:     meleeStones.length > 0 ? meleeStones[0].stoneType === 'natural' : null,
         }
         return (
           <section className="mt-6 rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
