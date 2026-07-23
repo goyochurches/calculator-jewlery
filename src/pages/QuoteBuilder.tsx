@@ -15,14 +15,15 @@ import { configService } from '@/services/configService'
 import { gemstoneService } from '@/services/gemstoneService'
 import { companyService, ENGRAVING_SLIDER_DEFAULTS } from '@/services/companyService'
 import { quotesService } from '@/services/quotesService'
-import type { Client, GemstonePrice, JewelryMetalOption, SavedQuote } from '@/types'
+import { emkayService } from '@/services/emkayService'
+import type { Client, EmkayCatalogProduct, EmkayCategory, GemstonePrice, JewelryMetalOption, SavedQuote } from '@/types'
 import { ClientPicker } from '@/components/ClientPicker'
 import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { Toast } from '@/components/Toast'
 import { MarketComparisonPanel } from '@/components/MarketComparisonPanel'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
-import { Calculator, Camera, Check, ChevronDown, ChevronUp, Copy, Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Pin, PinOff, Ruler, Scale, Sparkles, User, X } from 'lucide-react'
+import { Calculator, Camera, Check, ChevronDown, ChevronUp, Copy, Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Pin, PinOff, Ruler, Scale, Search, Sparkles, User, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -265,6 +266,30 @@ export function QuoteBuilderPage() {
   const customerPhotoInputs = useRef<Record<string, HTMLInputElement | null>>({})
   const customerCameraInputs = useRef<Record<string, HTMLInputElement | null>>({})
 
+  // ── EMKAY catalog stones: real stones bought from the EMKAY Gemstones
+  // Catalog (emkaygemstones.com) — unlike customer stones, the full price
+  // counts as material cost. Snapshotted from the catalog product at the
+  // moment it's added; only quantity/comments stay editable afterward.
+  interface EmkayStoneRow {
+    uid: string
+    emkayProductId: string
+    model: string
+    name: string
+    imageUrl: string | null
+    certImageUrl: string | null
+    priceUsd: number
+    caratWeight: number | null
+    shape: string | null
+    sizeText: string | null
+    treatment: string | null
+    stoneType: string | null
+    countryOfOrigin: string | null
+    href: string | null
+    quantity: string
+    comments: string
+  }
+  const [emkayStones, setEmkayStones] = useState<EmkayStoneRow[]>([])
+
   // ── Internal attachments ─────────────────────────────────────────────
   // Photos the jeweler attaches to a quote for their own records (WhatsApp
   // screenshots, Pinterest references, etc.). NEVER shown to the client.
@@ -413,6 +438,25 @@ export function QuoteBuilderPage() {
       comments: cs.comments ?? '',
     })))
 
+    setEmkayStones((dup.emkayStones ?? []).map(es => ({
+      uid: crypto.randomUUID(),
+      emkayProductId: es.emkayProductId ?? '',
+      model: es.model ?? '',
+      name: es.name,
+      imageUrl: es.imageUrl ?? null,
+      certImageUrl: es.certImageUrl ?? null,
+      priceUsd: es.priceUsd,
+      caratWeight: es.caratWeight ?? null,
+      shape: es.shape ?? null,
+      sizeText: es.sizeText ?? null,
+      treatment: es.treatment ?? null,
+      stoneType: es.stoneType ?? null,
+      countryOfOrigin: es.countryOfOrigin ?? null,
+      href: es.href ?? null,
+      quantity: String(Math.max(1, es.quantity ?? 1)),
+      comments: es.comments ?? '',
+    })))
+
     setAttachments((dup.attachments ?? []).map(a => ({
       uid: crypto.randomUUID(),
       // Drop the backendId on duplicate — the new quote owns its own rows.
@@ -483,6 +527,33 @@ export function QuoteBuilderPage() {
     if (p) p.value = ''
     const c = customerCameraInputs.current[uid]
     if (c) c.value = ''
+  }
+
+  const addEmkayStone = (product: EmkayCatalogProduct) => {
+    setEmkayStones(prev => [...prev, {
+      uid: crypto.randomUUID(),
+      emkayProductId: product.productId,
+      model: product.model ?? '',
+      name: product.name ?? product.model ?? `EMKAY #${product.productId}`,
+      imageUrl: product.imageUrl,
+      certImageUrl: product.certImageUrl,
+      priceUsd: product.price ?? 0,
+      caratWeight: product.caratWeight,
+      shape: product.shape,
+      sizeText: product.size,
+      treatment: product.treatment,
+      stoneType: product.stoneType,
+      countryOfOrigin: product.countryOfOrigin,
+      href: product.href,
+      quantity: '1',
+      comments: '',
+    }])
+  }
+  const removeEmkayStone = (uid: string) => {
+    setEmkayStones(prev => prev.filter(s => s.uid !== uid))
+  }
+  const patchEmkayStone = (uid: string, patch: Partial<EmkayStoneRow>) => {
+    setEmkayStones(prev => prev.map(s => s.uid === uid ? { ...s, ...patch } : s))
   }
 
   const [photo, setPhoto] = useState<string | null>(null)
