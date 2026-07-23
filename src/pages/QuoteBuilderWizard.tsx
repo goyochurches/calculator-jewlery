@@ -900,6 +900,186 @@ function CustomerStones({ qb }: { qb: QuoteBuilderState }) {
   )
 }
 
+// ── EMKAY Gemstones Catalog picker ──────────────────────────────────────────
+// Live search over EMKAY's real inventory (emkaygemstones.com). Selecting a
+// stone snapshots it into the quote as an EmkayStoneRow — the shop buys this
+// stone from EMKAY, unlike Customer Stones where the client brings their own.
+function EmkayCatalogSection({ qb }: { qb: QuoteBuilderState }) {
+  const [open, setOpen] = useState(false)
+  const [configured, setConfigured] = useState<boolean | null>(null)
+  const [categories, setCategories] = useState<EmkayCategory[]>([])
+  const [categoryId, setCategoryId] = useState('')
+  const [searchText, setSearchText] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [page, setPage] = useState(0)
+  const [results, setResults] = useState<EmkayCatalogProduct[]>([])
+  const [totalPages, setTotalPages] = useState(0)
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!open || configured !== null) return
+    emkayService.status().then(setConfigured).catch(() => setConfigured(false))
+    emkayService.categories().then(setCategories).catch(() => setCategories([]))
+  }, [open, configured])
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchText.trim()), 400)
+    return () => clearTimeout(t)
+  }, [searchText])
+
+  useEffect(() => { setPage(0) }, [debouncedSearch, categoryId])
+
+  useEffect(() => {
+    if (!open || configured !== true) return
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    emkayService.browse({ search: debouncedSearch, categoryId: categoryId || undefined, page, size: 12 })
+      .then(res => {
+        if (cancelled) return
+        setResults(res.items)
+        setTotalPages(res.totalPages)
+        setTotal(res.total)
+      })
+      .catch(() => { if (!cancelled) setError('Could not load the EMKAY catalog. Try again.') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [open, configured, debouncedSearch, categoryId, page])
+
+  return (
+    <div className="rounded-2xl border border-amber-100 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <button type="button" onClick={() => setOpen(o => !o)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><Gem className="h-4 w-4" /></span>
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              EMKAY Catalog <span className="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900">{qb.emkayStones.length}</span>
+            </p>
+            <p className="text-xs text-slate-500">Real stones from EMKAY Gemstones — shop buys these directly.</p>
+          </div>
+          {open ? <ChevronUp className="ml-auto h-4 w-4 shrink-0 text-slate-400" /> : <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-slate-400" />}
+        </button>
+      </div>
+
+      {qb.emkayStones.length > 0 && (
+        <div className="mt-3 space-y-3">
+          {qb.emkayStones.map((es, idx) => (
+            <div key={es.uid} className="relative overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/30 p-4">
+              <span className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-400 to-amber-600" aria-hidden />
+              <div className="flex gap-3 pl-2">
+                {es.imageUrl && (
+                  <img src={es.imageUrl} alt={es.name} className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-900">
+                      From EMKAY · #{idx + 1}
+                    </span>
+                    <button type="button" onClick={() => qb.removeEmkayStone(es.uid)} className="text-slate-400 hover:text-rose-600"><X className="h-4 w-4" /></button>
+                  </div>
+                  <p className="truncate text-sm font-semibold text-slate-900">{es.name}</p>
+                  <p className="text-xs text-slate-500">
+                    {[es.model, es.shape, es.caratWeight ? `${es.caratWeight} ct` : null, es.countryOfOrigin].filter(Boolean).join(' · ') || '—'}
+                  </p>
+                  {es.href && (
+                    <a href={es.href} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 hover:text-amber-800">
+                      View on emkaygemstones.com <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    <Field label="Quantity">
+                      <input type="number" min={1} step={1} value={es.quantity} onChange={e => qb.patchEmkayStone(es.uid, { quantity: e.target.value })} className={miniCls} />
+                    </Field>
+                    <Field label="Price each">
+                      <div className={`${miniCls} flex items-center bg-slate-50 text-slate-500`}>{money(es.priceUsd)}</div>
+                    </Field>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <div className="mt-4 space-y-3 border-t border-amber-100 pt-4">
+          {configured === false && (
+            <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
+              EMKAY catalog isn't connected yet — set EMKAY_API_KEY on the backend to enable this panel.
+            </p>
+          )}
+          {configured === true && (
+            <>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <div className="relative flex-1">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={searchText}
+                    onChange={e => setSearchText(e.target.value)}
+                    placeholder="Search by name, shape, type, origin…"
+                    className={`${miniCls} pl-9`}
+                  />
+                </div>
+                <select value={categoryId} onChange={e => setCategoryId(e.target.value)} className={`${miniCls} sm:w-56`}>
+                  <option value="">All categories</option>
+                  {categories.map(c => <option key={c.categoryId} value={c.categoryId}>{c.name ?? c.categoryId}</option>)}
+                </select>
+              </div>
+
+              {error && <p className="text-xs text-rose-600">{error}</p>}
+              {loading && <p className="text-xs text-slate-400">Loading EMKAY catalog…</p>}
+
+              {!loading && results.length === 0 && !error && (
+                <p className="text-xs text-slate-400">No stones match your search.</p>
+              )}
+
+              {results.length > 0 && (
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {results.map(p => (
+                    <button
+                      type="button"
+                      key={p.productId}
+                      onClick={() => qb.addEmkayStone(p)}
+                      className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition hover:border-amber-300 hover:shadow-md"
+                    >
+                      {p.imageUrl && (
+                        <img src={p.imageUrl} alt={p.name ?? p.model ?? ''} className="h-32 w-full object-cover" />
+                      )}
+                      <div className="space-y-1 p-3">
+                        <p className="truncate text-xs font-semibold text-slate-900">{p.name ?? p.model}</p>
+                        <p className="truncate text-[11px] text-slate-500">
+                          {[p.shape, p.caratWeight ? `${p.caratWeight} ct` : null, p.countryOfOrigin].filter(Boolean).join(' · ') || '—'}
+                        </p>
+                        <p className="text-sm font-bold text-amber-700">{p.price != null ? money(p.price) : '—'}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between text-xs text-slate-500">
+                  <span>{total} stones total</span>
+                  <div className="flex items-center gap-2">
+                    <button type="button" disabled={page <= 0} onClick={() => setPage(p => Math.max(0, p - 1))}
+                      className="rounded-full border border-slate-200 px-3 py-1 font-semibold disabled:opacity-40">Prev</button>
+                    <span>Page {page + 1} / {totalPages}</span>
+                    <button type="button" disabled={page >= totalPages - 1} onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                      className="rounded-full border border-slate-200 px-3 py-1 font-semibold disabled:opacity-40">Next</button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Step 4: Pricing ─────────────────────────────────────────────────────────
 function StepPricing({ qb }: { qb: QuoteBuilderState }) {
   return (
