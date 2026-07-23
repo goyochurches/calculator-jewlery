@@ -1038,20 +1038,15 @@ function EmkayCatalogSection({ qb }: { qb: QuoteBuilderState }) {
 
               {results.length > 0 && (
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  {results.map((p, i) => (
+                  {results.map(p => (
                     <button
                       type="button"
                       key={p.productId}
                       onClick={() => qb.addEmkayStone(p)}
-                      style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
-                      className="animate-card-pop-in flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md"
+                      className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition hover:border-amber-300 hover:shadow-md"
                     >
-                      {p.imageUrl ? (
+                      {p.imageUrl && (
                         <img src={p.imageUrl} alt={p.name ?? p.model ?? ''} className="h-32 w-full object-cover" />
-                      ) : (
-                        <div className="flex h-32 w-full items-center justify-center bg-gradient-to-br from-amber-50 to-slate-50 text-amber-300">
-                          <Gem className="h-8 w-8" />
-                        </div>
                       )}
                       <div className="space-y-1 p-3">
                         <p className="truncate text-xs font-semibold text-slate-900">{p.name ?? p.model}</p>
