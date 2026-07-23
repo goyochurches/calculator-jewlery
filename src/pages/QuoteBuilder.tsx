@@ -285,6 +285,7 @@ export function QuoteBuilderPage() {
     stoneType: string | null
     countryOfOrigin: string | null
     href: string | null
+    setterType: string
     quantity: string
     comments: string
   }
@@ -495,6 +496,7 @@ export function QuoteBuilderPage() {
       stoneType: es.stoneType ?? null,
       countryOfOrigin: es.countryOfOrigin ?? null,
       href: es.href ?? null,
+      setterType: es.setterType ?? '',
       quantity: String(Math.max(1, es.quantity ?? 1)),
       comments: es.comments ?? '',
     })))
@@ -587,6 +589,7 @@ export function QuoteBuilderPage() {
       stoneType: product.stoneType,
       countryOfOrigin: product.countryOfOrigin,
       href: product.href,
+      setterType: customerSetters[0]?.typeKey ?? '',
       quantity: '1',
       comments: '',
     }])
@@ -1298,12 +1301,15 @@ export function QuoteBuilderPage() {
     })
 
     // EMKAY-supplied stones: real inventory bought from EMKAY, so (unlike
-    // customer stones) the full price counts as material cost.
+    // customer stones) the full price counts as material cost — plus setter
+    // labor, since someone still has to set the stone into the piece.
     let emkayCost = 0
+    let emkaySettingFee = 0
     let emkayStoneCount = 0
     emkayStones.forEach(es => {
       const qty = Math.max(1, parseNum(es.quantity || '1') || 1)
       emkayCost += qty * es.priceUsd
+      emkaySettingFee += qty * (config.setterMap[es.setterType]?.fee ?? 0)
       emkayStoneCount += qty
     })
 
@@ -1337,6 +1343,7 @@ export function QuoteBuilderPage() {
       eff.customerSettingFee +
       eff.diamondCost +
       emkayCost +
+      emkaySettingFee +
       engravingFeeVal +
       extraCosts
 
@@ -1350,6 +1357,7 @@ export function QuoteBuilderPage() {
       customerStoneCount: eff.customerStoneCount,
       diamondCost: eff.diamondCost,
       emkayCost,
+      emkaySettingFee,
       emkayStoneCount,
       engravingFee: engravingFeeVal,
       totalCarats: Math.round((Number(eff.totalCarats) || 0) * 10000) / 10000,
@@ -1618,6 +1626,7 @@ export function QuoteBuilderPage() {
           stoneType: es.stoneType,
           countryOfOrigin: es.countryOfOrigin,
           href: es.href,
+          setterType: es.setterType,
           quantity: Math.max(1, parseNum(es.quantity || '1') || 1),
           sortOrder: idx,
           comments: es.comments.trim() === '' ? null : es.comments.trim(),
@@ -2737,6 +2746,16 @@ export function QuoteBuilderPage() {
                                   ${es.priceUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                                 </div>
                               </div>
+                              <div className="space-y-1 sm:col-span-2">
+                                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type of setting</label>
+                                <select value={es.setterType}
+                                  onChange={e => patchEmkayStone(es.uid, { setterType: e.target.value })}
+                                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+                                  {customerSetters.map(s => (
+                                    <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>
+                                  ))}
+                                </select>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -2826,10 +2845,11 @@ export function QuoteBuilderPage() {
                   <p className="mt-0.5 text-xs text-slate-300">
                     {pricing.totalAmount} stone{pricing.totalAmount === 1 ? '' : 's'} · {pricing.totalCarats} ct
                     {customerStones.length > 0 ? ` + ${pricing.customerStoneCount} customer` : ''}
+                    {emkayStones.length > 0 ? ` + ${pricing.emkayStoneCount} EMKAY` : ''}
                   </p>
                 </div>
                 <strong className="relative text-2xl font-semibold tracking-tight tabular-nums">
-                  ${(pricing.settingFee + pricing.customerSettingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  ${(pricing.settingFee + pricing.customerSettingFee + pricing.emkaySettingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </strong>
               </div>
             </CardContent>
@@ -3127,7 +3147,7 @@ export function QuoteBuilderPage() {
                     ...(emkayStones.length > 0
                       ? [[
                           `EMKAY stones (${pricing.emkayStoneCount} stone${pricing.emkayStoneCount === 1 ? '' : 's'})`,
-                          pricing.emkayCost, pricing.emkayCost * mk,
+                          pricing.emkayCost + pricing.emkaySettingFee, (pricing.emkayCost + pricing.emkaySettingFee) * mk,
                         ] as [string, number, number]]
                       : []),
                     ['Hand engraving (milgrain)', pricing.engravingFee, pricing.engravingFee * mk],
@@ -3205,14 +3225,15 @@ export function QuoteBuilderPage() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Setting labor</p>
                   <p className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-                    ${(pricing.settingFee + pricing.customerSettingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    ${(pricing.settingFee + pricing.customerSettingFee + pricing.emkaySettingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                   </p>
                 </div>
                 <div className="rounded-2xl bg-rose-50 p-3 text-rose-600"><Diamond className="h-5 w-5" /></div>
               </div>
               <p className="mt-3 text-sm text-slate-500">
                 Aggregated across {pricing.totalAmount} stone{pricing.totalAmount === 1 ? '' : 's'}
-                {customerStones.length > 0 ? ` + ${pricing.customerStoneCount} customer stone${customerStones.length === 1 ? '' : 's'}` : ''}.
+                {customerStones.length > 0 ? ` + ${pricing.customerStoneCount} customer stone${customerStones.length === 1 ? '' : 's'}` : ''}
+                {emkayStones.length > 0 ? ` + ${pricing.emkayStoneCount} EMKAY stone${pricing.emkayStoneCount === 1 ? '' : 's'}` : ''}.
               </p>
             </CardContent>
           </Card>

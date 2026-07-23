@@ -995,6 +995,11 @@ function EmkayCatalogSection({ qb }: { qb: QuoteBuilderState }) {
                     <Field label="Price each">
                       <div className={`${miniCls} flex items-center bg-slate-50 text-slate-500`}>{money(es.priceUsd)}</div>
                     </Field>
+                    <Field label="Type of setting" wide>
+                      <select value={es.setterType} onChange={e => qb.patchEmkayStone(es.uid, { setterType: e.target.value })} className={miniCls}>
+                        {qb.customerSetters.map(s => <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>)}
+                      </select>
+                    </Field>
                   </div>
                 </div>
               </div>
@@ -1226,7 +1231,7 @@ function PriceSummary({ qb }: { qb: QuoteBuilderState }) {
         ['Labor', p.ringLaborFee, p.ringLaborFee * mk],
         ['Setting labor', p.settingFee, p.settingFee * mk],
         [`Supplied diamonds by us — ${qb.rnStoneType === 'lab-grown' ? 'Lab-grown' : 'Natural'} (${p.totalAmount} · ${p.totalCarats} ct)`, p.diamondCost, diamondRetail],
-        ...(qb.emkayStones.length > 0 ? [[`EMKAY stones (${p.emkayStoneCount})`, p.emkayCost, p.emkayCost * mk] as [string, number, number]] : []),
+        ...(qb.emkayStones.length > 0 ? [[`EMKAY stones (${p.emkayStoneCount})`, p.emkayCost + p.emkaySettingFee, (p.emkayCost + p.emkaySettingFee) * mk] as [string, number, number]] : []),
         ['Hand engraving', p.engravingFee, p.engravingFee * mk],
         ['Extra costs', qb.extraCosts, qb.extraCosts * mk],
       ]
@@ -1235,7 +1240,7 @@ function PriceSummary({ qb }: { qb: QuoteBuilderState }) {
         ["CAD design & Jeweler's time", p.ringLaborFee, p.ringLaborFee * mk],
         [`Supplied diamonds (${p.totalAmount} · ${p.totalCarats} ct)`, p.diamondCost + p.settingFee, diamondRetail + p.settingFee * mk],
         ...(qb.customerStones.length > 0 ? [[`Customer diamonds (${p.customerStoneCount})`, p.customerSettingFee, p.customerSettingFee * mk] as [string, number, number]] : []),
-        ...(qb.emkayStones.length > 0 ? [[`EMKAY stones (${p.emkayStoneCount})`, p.emkayCost, p.emkayCost * mk] as [string, number, number]] : []),
+        ...(qb.emkayStones.length > 0 ? [[`EMKAY stones (${p.emkayStoneCount})`, p.emkayCost + p.emkaySettingFee, (p.emkayCost + p.emkaySettingFee) * mk] as [string, number, number]] : []),
         ['Hand engraving', p.engravingFee, p.engravingFee * mk],
         ['Extra costs', qb.extraCosts, qb.extraCosts * mk],
       ]

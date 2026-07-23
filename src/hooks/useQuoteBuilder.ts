@@ -143,6 +143,9 @@ export interface EmkayStoneRow {
   stoneType: string | null
   countryOfOrigin: string | null
   href: string | null
+  /** Same setter list as customer stones — EMKAY stones still need to be
+   *  physically set into the piece. */
+  setterType: string
   quantity: string
   comments: string
 }
@@ -352,6 +355,7 @@ export function useQuoteBuilder() {
       stoneType: es.stoneType ?? null,
       countryOfOrigin: es.countryOfOrigin ?? null,
       href: es.href ?? null,
+      setterType: es.setterType ?? '',
       quantity: String(Math.max(1, es.quantity ?? 1)),
       comments: es.comments ?? '',
     })))
@@ -436,6 +440,7 @@ export function useQuoteBuilder() {
       stoneType: product.stoneType,
       countryOfOrigin: product.countryOfOrigin,
       href: product.href,
+      setterType: customerSetters[0]?.typeKey ?? '',
       quantity: '1',
       comments: '',
     }])
@@ -613,12 +618,15 @@ export function useQuoteBuilder() {
     })
 
     // EMKAY-supplied stones: real inventory bought from EMKAY, so (unlike
-    // customer stones) the full price counts as material cost.
+    // customer stones) the full price counts as material cost — plus setter
+    // labor, since someone still has to set the stone into the piece.
     let emkayCost = 0
+    let emkaySettingFee = 0
     let emkayStoneCount = 0
     emkayStones.forEach(es => {
       const qty = Math.max(1, parseNum(es.quantity || '1') || 1)
       emkayCost += qty * es.priceUsd
+      emkaySettingFee += qty * (config.setterMap[es.setterType]?.fee ?? 0)
       emkayStoneCount += qty
     })
 
@@ -651,6 +659,7 @@ export function useQuoteBuilder() {
       eff.customerSettingFee +
       eff.diamondCost +
       emkayCost +
+      emkaySettingFee +
       engravingFeeVal +
       extraCosts
 
@@ -664,6 +673,7 @@ export function useQuoteBuilder() {
       customerStoneCount: eff.customerStoneCount,
       diamondCost: eff.diamondCost,
       emkayCost,
+      emkaySettingFee,
       emkayStoneCount,
       engravingFee: engravingFeeVal,
       totalCarats: Math.round((Number(eff.totalCarats) || 0) * 10000) / 10000,
@@ -901,6 +911,7 @@ export function useQuoteBuilder() {
           stoneType: es.stoneType,
           countryOfOrigin: es.countryOfOrigin,
           href: es.href,
+          setterType: es.setterType,
           quantity: Math.max(1, parseNum(es.quantity || '1') || 1),
           sortOrder: idx,
           comments: es.comments.trim() === '' ? null : es.comments.trim(),

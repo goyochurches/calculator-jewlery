@@ -124,6 +124,9 @@ export interface QuoteEmkayStone {
   stoneType?: string | null
   countryOfOrigin?: string | null
   href?: string | null
+  /** type_key from setter_config — EMKAY stones still need to be physically
+   *  set by the jeweler, same as customer stones. */
+  setterType?: string | null
   quantity: number
   sortOrder?: number | null
   comments?: string | null
