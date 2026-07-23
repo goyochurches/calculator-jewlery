@@ -970,7 +970,7 @@ function EmkayCatalogSection({ qb }: { qb: QuoteBuilderState }) {
               <span className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-400 to-amber-600" aria-hidden />
               <div className="flex gap-3 pl-2">
                 {es.imageUrl && (
-                  <img src={es.imageUrl} alt={es.name} className="h-12 w-12 shrink-0 rounded-xl object-cover" />
+                  <img src={es.imageUrl} alt={es.name} className="h-16 w-16 shrink-0 rounded-xl object-cover" />
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="mb-1 flex items-center justify-between gap-2">
@@ -1046,7 +1046,7 @@ function EmkayCatalogSection({ qb }: { qb: QuoteBuilderState }) {
                       className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition hover:border-amber-300 hover:shadow-md"
                     >
                       {p.imageUrl && (
-                        <img src={p.imageUrl} alt={p.name ?? p.model ?? ''} className="h-20 w-full object-cover" />
+                        <img src={p.imageUrl} alt={p.name ?? p.model ?? ''} className="h-32 w-full object-cover" />
                       )}
                       <div className="space-y-1 p-3">
                         <p className="truncate text-xs font-semibold text-slate-900">{p.name ?? p.model}</p>
