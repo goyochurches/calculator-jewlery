@@ -3103,6 +3103,19 @@ export function QuoteBuilderPage() {
                       <button
                         type="button"
                         onClick={() => {
+                          setCustomerPriceOverrideText(String(Math.round(customerPrice)))
+                          if (customerPriceOverrideReason.trim() === '') {
+                            setCustomerPriceOverrideReason('Rounded price')
+                          }
+                          setOverrideError(null)
+                        }}
+                        className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-200 transition hover:bg-white/20"
+                      >
+                        Round
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
                           if (customerPriceOverrideText.trim() !== '' && customerPriceOverrideReason.trim() === '') {
                             setOverrideError('Please type a short reason for the override.')
                             return
