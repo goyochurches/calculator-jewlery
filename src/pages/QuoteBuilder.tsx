@@ -817,7 +817,8 @@ export function QuoteBuilderPage() {
     // the typed price. A preset size computes carats × pricePerCarat unless a
     // manual price overrides it.
     const stoneCost = hasManualPrice ? parseNum(stone.manualPrice) : caratsNum * pricePerCarat
-    const stoneSetterFee = config.setterMap[stone.setterType]?.fee ?? 0
+    const stoneFeeOverride = stone.setterFeeOverride.trim()
+    const stoneSetterFee = stoneFeeOverride !== '' ? parseNum(stoneFeeOverride) : (config.setterMap[stone.setterType]?.fee ?? 0)
     const stoneLabor = amountNum * stoneSetterFee
     const stoneTotal = stoneCost + stoneLabor
     const theme = themeForRole(stone.role)
