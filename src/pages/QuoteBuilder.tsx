@@ -737,6 +737,18 @@ export function QuoteBuilderPage() {
     header:'bg-rose-50 text-rose-700 ring-1 ring-rose-200/80',
   }
 
+  // EMKAY-stone theme (amber/gold) — distinct from customer stones (rose),
+  // signals "real inventory the shop buys from EMKAY".
+  const emkayTheme = {
+    bar:   'bg-gradient-to-b from-amber-300 via-amber-500 to-amber-600',
+    dot:   'bg-amber-500',
+    ring:  'border-amber-200/80',
+    tint:  'bg-gradient-to-br from-amber-50/70 via-white to-amber-50/40',
+    chip:  'bg-amber-100 text-amber-900 ring-1 ring-amber-200',
+    btn:   'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500',
+    header:'bg-amber-50 text-amber-700 ring-1 ring-amber-200/80',
+  }
+
   const renderStoneRow = (stone: StoneRow, index: number) => {
     const sizes = stone.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
     const sizeCfg = config.diamondSizeFor(stone.stoneType, stone.sizeKey)
@@ -1243,6 +1255,16 @@ export function QuoteBuilderPage() {
       customerStoneCount += qty
     })
 
+    // EMKAY-supplied stones: real inventory bought from EMKAY, so (unlike
+    // customer stones) the full price counts as material cost.
+    let emkayCost = 0
+    let emkayStoneCount = 0
+    emkayStones.forEach(es => {
+      const qty = Math.max(1, parseNum(es.quantity || '1') || 1)
+      emkayCost += qty * es.priceUsd
+      emkayStoneCount += qty
+    })
+
     // In RN mode the material / labor / setting / diamond figures come from the
     // resolved RN model instead of the manual inputs; engraving and extra costs
     // still apply on top, and the rest of the pipeline (markup/discount/tax) is
@@ -1272,6 +1294,7 @@ export function QuoteBuilderPage() {
       eff.settingFee +
       eff.customerSettingFee +
       eff.diamondCost +
+      emkayCost +
       engravingFeeVal +
       extraCosts
 
@@ -1284,6 +1307,8 @@ export function QuoteBuilderPage() {
       customerSettingFee: eff.customerSettingFee,
       customerStoneCount: eff.customerStoneCount,
       diamondCost: eff.diamondCost,
+      emkayCost,
+      emkayStoneCount,
       engravingFee: engravingFeeVal,
       totalCarats: Math.round((Number(eff.totalCarats) || 0) * 10000) / 10000,
       totalAmount: eff.totalAmount,
@@ -1291,7 +1316,7 @@ export function QuoteBuilderPage() {
       total,
     }
   }, [
-    config, customerStones, engravingFee, extraCosts, ringLabor, ringWidth,
+    config, customerStones, emkayStones, engravingFee, extraCosts, ringLabor, ringWidth,
     metalRows, selectedMetal, stones, rnMode, rn,
   ])
 
@@ -1537,6 +1562,24 @@ export function QuoteBuilderPage() {
             comments: cs.comments.trim() === '' ? null : cs.comments.trim(),
           }
         }),
+        emkayStones: emkayStones.map((es, idx) => ({
+          emkayProductId: es.emkayProductId || null,
+          model: es.model || null,
+          name: es.name,
+          imageUrl: es.imageUrl,
+          certImageUrl: es.certImageUrl,
+          priceUsd: es.priceUsd,
+          caratWeight: es.caratWeight,
+          shape: es.shape,
+          sizeText: es.sizeText,
+          treatment: es.treatment,
+          stoneType: es.stoneType,
+          countryOfOrigin: es.countryOfOrigin,
+          href: es.href,
+          quantity: Math.max(1, parseNum(es.quantity || '1') || 1),
+          sortOrder: idx,
+          comments: es.comments.trim() === '' ? null : es.comments.trim(),
+        })),
       }, user.id)
       setSavedQuote({ id: q.id, title: q.title, total: pricing.total, publicToken: q.publicToken ?? null })
       // Reset every field back to its initial default so the builder is
@@ -1563,6 +1606,7 @@ export function QuoteBuilderPage() {
       setRnFingerSize(0)
       setRnStoneType('natural')
       setCustomerStones([])
+      setEmkayStones([])
       setAttachments([])
       setInternalNotes('')
       setCustomerNotes('')
