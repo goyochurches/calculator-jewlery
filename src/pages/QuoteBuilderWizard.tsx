@@ -993,12 +993,20 @@ function EmkayCatalogSection({ qb }: { qb: QuoteBuilderState }) {
                       <input type="number" min={1} step={1} value={es.quantity} onChange={e => qb.patchEmkayStone(es.uid, { quantity: e.target.value })} className={miniCls} />
                     </Field>
                     <Field label="Price each">
-                      <div className={`${miniCls} flex items-center bg-slate-50 text-slate-500`}>{money(es.priceUsd)}</div>
+                      <input type="number" min={0} step={0.01} value={es.priceUsd}
+                        onChange={e => qb.patchEmkayStone(es.uid, { priceUsd: Number(e.target.value) || 0 })}
+                        className={miniCls} />
                     </Field>
                     <Field label="Type of setting" wide>
                       <select value={es.setterType} onChange={e => qb.patchEmkayStone(es.uid, { setterType: e.target.value })} className={miniCls}>
                         {qb.config.setters.map(s => <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>)}
                       </select>
+                    </Field>
+                    <Field label="Custom setting fee (optional)" wide>
+                      <input type="text" inputMode="decimal" value={es.setterFeeOverride}
+                        placeholder={`Default — $${qb.config.setterMap[es.setterType]?.fee ?? 0}`}
+                        onChange={e => qb.patchEmkayStone(es.uid, { setterFeeOverride: e.target.value })}
+                        className={miniCls} />
                     </Field>
                   </div>
                 </div>

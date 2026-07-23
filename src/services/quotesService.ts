@@ -56,6 +56,7 @@ interface ApiEmkayStone {
   countryOfOrigin?: string | null
   href?: string | null
   setterType?: string | null
+  setterFeeOverride?: number | null
   quantity: number
   sortOrder?: number | null
   comments?: string | null
@@ -247,6 +248,7 @@ function mapEmkayStone(s: ApiEmkayStone): QuoteEmkayStone {
     countryOfOrigin: s.countryOfOrigin ?? null,
     href: s.href ?? null,
     setterType: s.setterType ?? null,
+    setterFeeOverride: s.setterFeeOverride ?? null,
     quantity: s.quantity ?? 1,
     sortOrder: s.sortOrder ?? null,
     comments: s.comments ?? null,

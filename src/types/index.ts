@@ -127,6 +127,10 @@ export interface QuoteEmkayStone {
   /** type_key from setter_config — EMKAY stones still need to be physically
    *  set by the jeweler, same as customer stones. */
   setterType?: string | null
+  /** Overrides the setter_config fee for this stone when the jeweler wants
+   *  to charge something other than the catalog rate. Null = use the fee
+   *  looked up from setterType. */
+  setterFeeOverride?: number | null
   quantity: number
   sortOrder?: number | null
   comments?: string | null

@@ -286,6 +286,7 @@ export function QuoteBuilderPage() {
     countryOfOrigin: string | null
     href: string | null
     setterType: string
+    setterFeeOverride: string
     quantity: string
     comments: string
   }
@@ -497,6 +498,7 @@ export function QuoteBuilderPage() {
       countryOfOrigin: es.countryOfOrigin ?? null,
       href: es.href ?? null,
       setterType: es.setterType ?? '',
+      setterFeeOverride: es.setterFeeOverride != null ? String(es.setterFeeOverride) : '',
       quantity: String(Math.max(1, es.quantity ?? 1)),
       comments: es.comments ?? '',
     })))
@@ -590,6 +592,7 @@ export function QuoteBuilderPage() {
       countryOfOrigin: product.countryOfOrigin,
       href: product.href,
       setterType: config.setters[0]?.typeKey ?? '',
+      setterFeeOverride: '',
       quantity: '1',
       comments: '',
     }])
@@ -1308,8 +1311,10 @@ export function QuoteBuilderPage() {
     let emkayStoneCount = 0
     emkayStones.forEach(es => {
       const qty = Math.max(1, parseNum(es.quantity || '1') || 1)
+      const feeOverride = es.setterFeeOverride.trim()
+      const setterFee = feeOverride !== '' ? parseNum(feeOverride) : (config.setterMap[es.setterType]?.fee ?? 0)
       emkayCost += qty * es.priceUsd
-      emkaySettingFee += qty * (config.setterMap[es.setterType]?.fee ?? 0)
+      emkaySettingFee += qty * setterFee
       emkayStoneCount += qty
     })
 
@@ -1627,6 +1632,7 @@ export function QuoteBuilderPage() {
           countryOfOrigin: es.countryOfOrigin,
           href: es.href,
           setterType: es.setterType,
+          setterFeeOverride: es.setterFeeOverride.trim() === '' ? null : parseNum(es.setterFeeOverride),
           quantity: Math.max(1, parseNum(es.quantity || '1') || 1),
           sortOrder: idx,
           comments: es.comments.trim() === '' ? null : es.comments.trim(),
@@ -2742,9 +2748,9 @@ export function QuoteBuilderPage() {
                               </div>
                               <div className="space-y-1">
                                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Price each</label>
-                                <div className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
-                                  ${es.priceUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                </div>
+                                <input type="number" min={0} step={0.01} value={es.priceUsd}
+                                  onChange={e => patchEmkayStone(es.uid, { priceUsd: Number(e.target.value) || 0 })}
+                                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
                               </div>
                               <div className="space-y-1 sm:col-span-2">
                                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type of setting</label>
@@ -2755,6 +2761,13 @@ export function QuoteBuilderPage() {
                                     <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>
                                   ))}
                                 </select>
+                              </div>
+                              <div className="space-y-1 sm:col-span-2">
+                                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Custom setting fee (optional)</label>
+                                <input type="text" inputMode="decimal" value={es.setterFeeOverride}
+                                  placeholder={`Default — $${config.setterMap[es.setterType]?.fee ?? 0}`}
+                                  onChange={e => patchEmkayStone(es.uid, { setterFeeOverride: e.target.value })}
+                                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
                               </div>
                             </div>
                           </div>

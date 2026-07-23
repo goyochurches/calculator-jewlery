@@ -146,6 +146,9 @@ export interface EmkayStoneRow {
   /** Same setter list as customer stones — EMKAY stones still need to be
    *  physically set into the piece. */
   setterType: string
+  /** Custom setting fee, overriding the catalog fee for `setterType` when
+   *  non-empty. */
+  setterFeeOverride: string
   quantity: string
   comments: string
 }
@@ -356,6 +359,7 @@ export function useQuoteBuilder() {
       countryOfOrigin: es.countryOfOrigin ?? null,
       href: es.href ?? null,
       setterType: es.setterType ?? '',
+      setterFeeOverride: es.setterFeeOverride != null ? String(es.setterFeeOverride) : '',
       quantity: String(Math.max(1, es.quantity ?? 1)),
       comments: es.comments ?? '',
     })))
@@ -441,6 +445,7 @@ export function useQuoteBuilder() {
       countryOfOrigin: product.countryOfOrigin,
       href: product.href,
       setterType: config.setters[0]?.typeKey ?? '',
+      setterFeeOverride: '',
       quantity: '1',
       comments: '',
     }])
@@ -625,8 +630,10 @@ export function useQuoteBuilder() {
     let emkayStoneCount = 0
     emkayStones.forEach(es => {
       const qty = Math.max(1, parseNum(es.quantity || '1') || 1)
+      const feeOverride = es.setterFeeOverride.trim()
+      const setterFee = feeOverride !== '' ? parseNum(feeOverride) : (config.setterMap[es.setterType]?.fee ?? 0)
       emkayCost += qty * es.priceUsd
-      emkaySettingFee += qty * (config.setterMap[es.setterType]?.fee ?? 0)
+      emkaySettingFee += qty * setterFee
       emkayStoneCount += qty
     })
 
@@ -912,6 +919,7 @@ export function useQuoteBuilder() {
           countryOfOrigin: es.countryOfOrigin,
           href: es.href,
           setterType: es.setterType,
+          setterFeeOverride: es.setterFeeOverride.trim() === '' ? null : parseNum(es.setterFeeOverride),
           quantity: Math.max(1, parseNum(es.quantity || '1') || 1),
           sortOrder: idx,
           comments: es.comments.trim() === '' ? null : es.comments.trim(),
