@@ -3028,17 +3028,35 @@ export function QuoteBuilderPage() {
               <div className="rounded-2xl p-5 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}>
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-xs uppercase tracking-[0.18em] text-amber-300">Customer price</p>
-                  <button
-                    type="button"
-                    onClick={() => setEditingOverride(v => !v)}
-                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider transition ${
-                      editingOverride
-                        ? 'bg-white text-slate-900'
-                        : 'bg-white/10 text-amber-200 hover:bg-white/20'
-                    }`}
-                  >
-                    {editingOverride ? 'Close' : (parsedOverride != null ? 'Edit override' : 'Edit total')}
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    {!Number.isInteger(customerPrice) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomerPriceOverrideText(String(Math.round(customerPrice)))
+                          if (customerPriceOverrideReason.trim() === '') {
+                            setCustomerPriceOverrideReason('Rounded price')
+                          }
+                          setOverrideError(null)
+                        }}
+                        title="Round the current price without opening the editor"
+                        className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-200 transition hover:bg-white/20"
+                      >
+                        Round
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setEditingOverride(v => !v)}
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider transition ${
+                        editingOverride
+                          ? 'bg-white text-slate-900'
+                          : 'bg-white/10 text-amber-200 hover:bg-white/20'
+                      }`}
+                    >
+                      {editingOverride ? 'Close' : (parsedOverride != null ? 'Edit override' : 'Edit total')}
+                    </button>
+                  </div>
                 </div>
                 <p className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
                   ${customerPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
