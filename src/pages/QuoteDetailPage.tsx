@@ -294,7 +294,7 @@ export default function QuoteDetailPage() {
     (acc, cs) => acc + Math.max(1, cs.quantity ?? 1), 0)
 
   const emkayStoneCost = (quote.emkayStones ?? []).reduce(
-    (acc, es) => acc + Math.max(1, es.quantity ?? 1) * es.priceUsd, 0)
+    (acc, es) => acc + Math.max(1, es.quantity ?? 1) * (es.priceUsd + (config.setterMap[es.setterType ?? '']?.fee ?? 0)), 0)
   const emkayStoneQty = (quote.emkayStones ?? []).reduce(
     (acc, es) => acc + Math.max(1, es.quantity ?? 1), 0)
 
@@ -806,8 +806,9 @@ export default function QuoteDetailPage() {
                     </p>
                   </div>
                   {(quote.emkayStones ?? []).map((es, idx) => {
+                    const setter = config.setterMap[es.setterType ?? '']
                     const qty = Math.max(1, es.quantity ?? 1)
-                    const lineCost = qty * es.priceUsd
+                    const lineCost = qty * es.priceUsd + qty * (setter?.fee ?? 0)
                     return (
                       <div key={es.id ?? idx}
                         className="relative overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50/70 via-white to-amber-50/40 px-4 py-3 text-sm shadow-sm">
@@ -835,6 +836,7 @@ export default function QuoteDetailPage() {
                                 <div><dt className="font-semibold uppercase tracking-wide text-slate-400">Model</dt><dd className="text-slate-900">{es.model}</dd></div>
                               )}
                               <div><dt className="font-semibold uppercase tracking-wide text-slate-400">Quantity</dt><dd className="text-slate-900">{qty} × ${es.priceUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}</dd></div>
+                              <div><dt className="font-semibold uppercase tracking-wide text-slate-400">Type of setting</dt><dd className="text-slate-900">{setter?.label ?? es.setterType ?? '—'}</dd></div>
                               {(es.shape || es.caratWeight || es.countryOfOrigin) && (
                                 <div className="col-span-2">
                                   <dt className="font-semibold uppercase tracking-wide text-slate-400">Details</dt>
