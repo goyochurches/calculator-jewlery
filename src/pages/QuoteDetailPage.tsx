@@ -293,6 +293,11 @@ export default function QuoteDetailPage() {
   const customerStoneQty = (quote.customerStones ?? []).reduce(
     (acc, cs) => acc + Math.max(1, cs.quantity ?? 1), 0)
 
+  const emkayStoneCost = (quote.emkayStones ?? []).reduce(
+    (acc, es) => acc + Math.max(1, es.quantity ?? 1) * es.priceUsd, 0)
+  const emkayStoneQty = (quote.emkayStones ?? []).reduce(
+    (acc, es) => acc + Math.max(1, es.quantity ?? 1), 0)
+
   const showAdminActions = isAdmin && (
     quote.status === 'pending' || quote.status === 'approved' || quote.status === 'rejected'
   )
@@ -790,6 +795,72 @@ export default function QuoteDetailPage() {
                   })}
                 </div>
               )}
+
+              {/* EMKAY stones */}
+              {(quote.emkayStones?.length ?? 0) > 0 && (
+                <div className="mt-5 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-1 w-6 rounded-full bg-gradient-to-r from-amber-300 to-amber-600" aria-hidden />
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-amber-700">
+                      EMKAY stones · {quote.emkayStones?.length}
+                    </p>
+                  </div>
+                  {(quote.emkayStones ?? []).map((es, idx) => {
+                    const qty = Math.max(1, es.quantity ?? 1)
+                    const lineCost = qty * es.priceUsd
+                    return (
+                      <div key={es.id ?? idx}
+                        className="relative overflow-hidden rounded-2xl border border-amber-200/80 bg-gradient-to-br from-amber-50/70 via-white to-amber-50/40 px-4 py-3 text-sm shadow-sm">
+                        <span className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-amber-300 via-amber-500 to-amber-600" aria-hidden />
+                        <div className="flex gap-3 pl-2">
+                          {es.imageUrl && (
+                            <img src={es.imageUrl} alt={es.name} className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+                          )}
+                          <div className="min-w-0 flex-1 space-y-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 text-amber-900 ring-1 ring-amber-200 px-2.5 py-1 text-xs font-semibold">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden />
+                                From EMKAY · #{idx + 1}
+                              </span>
+                              <span className="text-sm font-semibold text-slate-900 tabular-nums">
+                                ${lineCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                            <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                              <div className="col-span-2">
+                                <dt className="font-semibold uppercase tracking-wide text-slate-400">Stone</dt>
+                                <dd className="text-slate-900 font-medium">{es.name}</dd>
+                              </div>
+                              {es.model && (
+                                <div><dt className="font-semibold uppercase tracking-wide text-slate-400">Model</dt><dd className="text-slate-900">{es.model}</dd></div>
+                              )}
+                              <div><dt className="font-semibold uppercase tracking-wide text-slate-400">Quantity</dt><dd className="text-slate-900">{qty} × ${es.priceUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}</dd></div>
+                              {(es.shape || es.caratWeight || es.countryOfOrigin) && (
+                                <div className="col-span-2">
+                                  <dt className="font-semibold uppercase tracking-wide text-slate-400">Details</dt>
+                                  <dd className="text-slate-900">{[es.shape, es.caratWeight ? `${es.caratWeight} ct` : null, es.treatment, es.countryOfOrigin].filter(Boolean).join(' · ')}</dd>
+                                </div>
+                              )}
+                              {es.comments && (
+                                <div className="col-span-2">
+                                  <dt className="font-semibold uppercase tracking-wide text-slate-400">Additional comments</dt>
+                                  <dd className="whitespace-pre-wrap text-slate-900">{es.comments}</dd>
+                                </div>
+                              )}
+                            </dl>
+                            {es.href && (
+                              <a href={es.href} target="_blank" rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 hover:text-amber-800">
+                                View on emkaygemstones.com <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </Card>
           )}
 
@@ -828,6 +899,10 @@ export default function QuoteDetailPage() {
               {(quote.customerStones?.length ?? 0) > 0 && (
                 <LineItem label={`Setting customer diamonds (${customerStoneQty} stone${customerStoneQty === 1 ? '' : 's'})`}
                   value={`$${customerStoneFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+              )}
+              {(quote.emkayStones?.length ?? 0) > 0 && (
+                <LineItem label={`EMKAY stones (${emkayStoneQty} stone${emkayStoneQty === 1 ? '' : 's'})`}
+                  value={`$${emkayStoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
               )}
               <LineItem label="Hand engraving (milgrain)" value={engravingFeeLabel} />
               {(quote.extraCosts ?? 0) > 0 && (
