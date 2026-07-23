@@ -2785,7 +2785,12 @@ export function QuoteBuilderPage() {
                                   <p className="truncate text-[11px] text-slate-500">
                                     {[p.shape, p.caratWeight ? `${p.caratWeight} ct` : null, p.countryOfOrigin].filter(Boolean).join(' · ') || '—'}
                                   </p>
-                                  <p className="text-sm font-bold text-amber-700">{p.price != null ? `$${p.price.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}</p>
+                                  <div className="flex items-center justify-between gap-2 pt-1">
+                                    <p className="text-sm font-bold text-amber-700">{p.price != null ? `$${p.price.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}</p>
+                                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm">
+                                      + Add
+                                    </span>
+                                  </div>
                                 </div>
                               </button>
                             ))}
