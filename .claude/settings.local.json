@@ -177,7 +177,14 @@
       "Bash(where gh *)",
       "Bash(winget list *)",
       "Bash(./mvnw compile *)",
-      "Bash(mvn clean *)"
+      "Bash(mvn clean *)",
+      "Skill(artifact-design)",
+      "Artifact",
+      "WebFetch(domain:www.instagram.com)",
+      "Bash(cd /d/wamp64/www)",
+      "Bash(ls -la /d/wamp64/www)",
+      "Bash(powershell -c \"Get-ChildItem D:\\\\wamp64\\\\www\")",
+      "Bash(./mvnw.cmd -q -o compile)"
     ]
   }
 }

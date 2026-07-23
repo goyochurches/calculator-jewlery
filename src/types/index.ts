@@ -105,6 +105,30 @@ export interface QuoteCustomerStone {
   comments?: string | null
 }
 
+/** A real gemstone picked from the EMKAY Gemstones Catalog while building
+ *  the quote (the shop buys this stone from EMKAY) — distinct from
+ *  QuoteCustomerStone, where the client brings their own stone. Denormalized
+ *  snapshot of the EMKAY product at the time it was added. */
+export interface QuoteEmkayStone {
+  id?: number | null
+  emkayProductId?: string | null
+  model?: string | null
+  name: string
+  imageUrl?: string | null
+  certImageUrl?: string | null
+  priceUsd: number
+  caratWeight?: number | null
+  shape?: string | null
+  sizeText?: string | null
+  treatment?: string | null
+  stoneType?: string | null
+  countryOfOrigin?: string | null
+  href?: string | null
+  quantity: number
+  sortOrder?: number | null
+  comments?: string | null
+}
+
 /** Internal-only photo attachment on a quote — conversation screenshots,
  *  Pinterest references, etc. Never shown on the public link. */
 export interface QuoteAttachment {
@@ -146,6 +170,7 @@ export interface SavedQuote {
   diamondSize: string
   stones?: QuoteStone[]
   customerStones?: QuoteCustomerStone[]
+  emkayStones?: QuoteEmkayStone[]
   attachments?: QuoteAttachment[]
   weightGrams: number
   ringWidth: number
@@ -222,6 +247,40 @@ export interface SavedQuote {
   paymentTotalCount?: number | null
   paymentPaidCount?: number | null
   paymentFullyPaid?: boolean | null
+}
+
+/** A single product from the live EMKAY Gemstones Catalog proxy — see
+ *  emkayService. Read-only reference data, not persisted here. */
+export interface EmkayCatalogProduct {
+  productId: string
+  model: string | null
+  name: string | null
+  imageUrl: string | null
+  certImageUrl: string | null
+  price: number | null
+  caratWeight: number | null
+  shape: string | null
+  size: string | null
+  treatment: string | null
+  stoneType: string | null
+  countryOfOrigin: string | null
+  pricePerCarat: string | null
+  href: string | null
+  categoryIds: string[]
+  attributes: Record<string, string>
+}
+
+export interface EmkayCategory {
+  categoryId: string
+  name: string | null
+}
+
+export interface EmkayCatalogPage {
+  items: EmkayCatalogProduct[]
+  page: number
+  size: number
+  total: number
+  totalPages: number
 }
 
 export interface GemstonePrice {

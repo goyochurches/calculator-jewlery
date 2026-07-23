@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -37,6 +37,9 @@ import {
 import { CreateLabSizeDialog } from '@/components/CreateLabSizeDialog'
 import { configService } from '@/services/configService'
 import { MarketComparisonPanel } from '@/components/MarketComparisonPanel'
+import { emkayService } from '@/services/emkayService'
+import type { EmkayCatalogProduct, EmkayCategory } from '@/types'
+import { Search } from 'lucide-react'
 
 const money = (n: number) =>
   '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -707,6 +710,7 @@ function StepStones({ qb }: { qb: QuoteBuilderState }) {
         })}
 
         <CustomerStones qb={qb} />
+        <EmkayCatalogSection qb={qb} />
       </div>
     </SectionCard>
   )
@@ -974,7 +978,7 @@ function StepReview({ qb }: { qb: QuoteBuilderState }) {
           <ReviewItem label="Piece" value={qb.jewelryTypeLabel} />
           <ReviewItem label="Metal" value={qb.selectedMetalConfig.label} />
           <ReviewItem label="CAD & time" value={qb.ringLaborLabel || '—'} />
-          <ReviewItem label="Stones" value={`${p.totalAmount} supplied · ${p.customerStoneCount} customer · ${p.totalCarats} ct`} />
+          <ReviewItem label="Stones" value={`${p.totalAmount} supplied · ${p.customerStoneCount} customer · ${p.emkayStoneCount} EMKAY · ${p.totalCarats} ct`} />
         </div>
 
         {(qb.fieldErrors.title || qb.fieldErrors.client) && (
@@ -1033,6 +1037,7 @@ function PriceSummary({ qb }: { qb: QuoteBuilderState }) {
         ['Labor', p.ringLaborFee, p.ringLaborFee * mk],
         ['Setting labor', p.settingFee, p.settingFee * mk],
         [`Supplied diamonds by us — ${qb.rnStoneType === 'lab-grown' ? 'Lab-grown' : 'Natural'} (${p.totalAmount} · ${p.totalCarats} ct)`, p.diamondCost, diamondRetail],
+        ...(qb.emkayStones.length > 0 ? [[`EMKAY stones (${p.emkayStoneCount})`, p.emkayCost, p.emkayCost * mk] as [string, number, number]] : []),
         ['Hand engraving', p.engravingFee, p.engravingFee * mk],
         ['Extra costs', qb.extraCosts, qb.extraCosts * mk],
       ]
@@ -1041,6 +1046,7 @@ function PriceSummary({ qb }: { qb: QuoteBuilderState }) {
         ["CAD design & Jeweler's time", p.ringLaborFee, p.ringLaborFee * mk],
         [`Supplied diamonds (${p.totalAmount} · ${p.totalCarats} ct)`, p.diamondCost + p.settingFee, diamondRetail + p.settingFee * mk],
         ...(qb.customerStones.length > 0 ? [[`Customer diamonds (${p.customerStoneCount})`, p.customerSettingFee, p.customerSettingFee * mk] as [string, number, number]] : []),
+        ...(qb.emkayStones.length > 0 ? [[`EMKAY stones (${p.emkayStoneCount})`, p.emkayCost, p.emkayCost * mk] as [string, number, number]] : []),
         ['Hand engraving', p.engravingFee, p.engravingFee * mk],
         ['Extra costs', qb.extraCosts, qb.extraCosts * mk],
       ]

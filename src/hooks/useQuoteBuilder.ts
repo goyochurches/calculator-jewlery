@@ -6,7 +6,7 @@ import { companyService, ENGRAVING_SLIDER_DEFAULTS } from '@/services/companySer
 import { quotesService } from '@/services/quotesService'
 import { DIAMOND_TYPE_OPTIONS, JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import { computeRnBreakdown, type RnStoneType } from '@/lib/rnPricing'
-import type { Client, GemstonePrice, JewelryMetalOption, QuoteMetal, SavedQuote } from '@/types'
+import type { Client, EmkayCatalogProduct, GemstonePrice, JewelryMetalOption, QuoteMetal, SavedQuote } from '@/types'
 import { useLocation, useNavigate } from 'react-router-dom'
 
 // ── Shared constants ────────────────────────────────────────────────────────
@@ -124,6 +124,29 @@ export interface CustomerStone {
   comments: string
 }
 
+/** A real stone picked from the EMKAY Gemstones Catalog and added to the
+ *  quote — the shop buys this from EMKAY, as opposed to CustomerStone where
+ *  the client brings their own. Snapshotted from the catalog product at the
+ *  moment it's added; only quantity/comments stay editable afterward. */
+export interface EmkayStoneRow {
+  uid: string
+  emkayProductId: string
+  model: string
+  name: string
+  imageUrl: string | null
+  certImageUrl: string | null
+  priceUsd: number
+  caratWeight: number | null
+  shape: string | null
+  sizeText: string | null
+  treatment: string | null
+  stoneType: string | null
+  countryOfOrigin: string | null
+  href: string | null
+  quantity: string
+  comments: string
+}
+
 export interface AttachmentRow {
   uid: string
   backendId?: number | null
@@ -186,6 +209,7 @@ export function useQuoteBuilder() {
   }
 
   const [customerStones, setCustomerStones] = useState<CustomerStone[]>([])
+  const [emkayStones, setEmkayStones] = useState<EmkayStoneRow[]>([])
   const [gemstones, setGemstones] = useState<GemstonePrice[]>([])
   const customerPhotoInputs = useRef<Record<string, HTMLInputElement | null>>({})
   const customerCameraInputs = useRef<Record<string, HTMLInputElement | null>>({})
@@ -313,6 +337,25 @@ export function useQuoteBuilder() {
       comments: cs.comments ?? '',
     })))
 
+    setEmkayStones((dup.emkayStones ?? []).map(es => ({
+      uid: crypto.randomUUID(),
+      emkayProductId: es.emkayProductId ?? '',
+      model: es.model ?? '',
+      name: es.name,
+      imageUrl: es.imageUrl ?? null,
+      certImageUrl: es.certImageUrl ?? null,
+      priceUsd: es.priceUsd,
+      caratWeight: es.caratWeight ?? null,
+      shape: es.shape ?? null,
+      sizeText: es.sizeText ?? null,
+      treatment: es.treatment ?? null,
+      stoneType: es.stoneType ?? null,
+      countryOfOrigin: es.countryOfOrigin ?? null,
+      href: es.href ?? null,
+      quantity: String(Math.max(1, es.quantity ?? 1)),
+      comments: es.comments ?? '',
+    })))
+
     setAttachments((dup.attachments ?? []).map(a => ({
       uid: crypto.randomUUID(),
       backendId: null,
@@ -375,6 +418,33 @@ export function useQuoteBuilder() {
     if (p) p.value = ''
     const c = customerCameraInputs.current[uid]
     if (c) c.value = ''
+  }
+
+  const addEmkayStone = (product: EmkayCatalogProduct) => {
+    setEmkayStones(prev => [...prev, {
+      uid: crypto.randomUUID(),
+      emkayProductId: product.productId,
+      model: product.model ?? '',
+      name: product.name ?? product.model ?? `EMKAY #${product.productId}`,
+      imageUrl: product.imageUrl,
+      certImageUrl: product.certImageUrl,
+      priceUsd: product.price ?? 0,
+      caratWeight: product.caratWeight,
+      shape: product.shape,
+      sizeText: product.size,
+      treatment: product.treatment,
+      stoneType: product.stoneType,
+      countryOfOrigin: product.countryOfOrigin,
+      href: product.href,
+      quantity: '1',
+      comments: '',
+    }])
+  }
+  const removeEmkayStone = (uid: string) => {
+    setEmkayStones(prev => prev.filter(s => s.uid !== uid))
+  }
+  const patchEmkayStone = (uid: string, patch: Partial<EmkayStoneRow>) => {
+    setEmkayStones(prev => prev.map(s => s.uid === uid ? { ...s, ...patch } : s))
   }
 
   const [photo, setPhoto] = useState<string | null>(null)
@@ -542,6 +612,16 @@ export function useQuoteBuilder() {
       customerStoneCount += qty
     })
 
+    // EMKAY-supplied stones: real inventory bought from EMKAY, so (unlike
+    // customer stones) the full price counts as material cost.
+    let emkayCost = 0
+    let emkayStoneCount = 0
+    emkayStones.forEach(es => {
+      const qty = Math.max(1, parseNum(es.quantity || '1') || 1)
+      emkayCost += qty * es.priceUsd
+      emkayStoneCount += qty
+    })
+
     // In RN mode the material / labor / setting / diamond figures come from the
     // resolved RN model instead of the manual inputs; engraving and extra costs
     // still apply on top, and the markup/discount/tax pipeline is untouched.
@@ -570,6 +650,7 @@ export function useQuoteBuilder() {
       eff.settingFee +
       eff.customerSettingFee +
       eff.diamondCost +
+      emkayCost +
       engravingFeeVal +
       extraCosts
 
@@ -582,6 +663,8 @@ export function useQuoteBuilder() {
       customerSettingFee: eff.customerSettingFee,
       customerStoneCount: eff.customerStoneCount,
       diamondCost: eff.diamondCost,
+      emkayCost,
+      emkayStoneCount,
       engravingFee: engravingFeeVal,
       totalCarats: Math.round((Number(eff.totalCarats) || 0) * 10000) / 10000,
       totalAmount: eff.totalAmount,
@@ -589,7 +672,7 @@ export function useQuoteBuilder() {
       total,
     }
   }, [
-    config, customerStones, engravingFee, extraCosts, ringLabor, ringWidth,
+    config, customerStones, emkayStones, engravingFee, extraCosts, ringLabor, ringWidth,
     metalRows, selectedMetal, stones, rnMode, rn,
   ])
 
@@ -804,6 +887,24 @@ export function useQuoteBuilder() {
             comments: cs.comments.trim() === '' ? null : cs.comments.trim(),
           }
         }),
+        emkayStones: emkayStones.map((es, idx) => ({
+          emkayProductId: es.emkayProductId || null,
+          model: es.model || null,
+          name: es.name,
+          imageUrl: es.imageUrl,
+          certImageUrl: es.certImageUrl,
+          priceUsd: es.priceUsd,
+          caratWeight: es.caratWeight,
+          shape: es.shape,
+          sizeText: es.sizeText,
+          treatment: es.treatment,
+          stoneType: es.stoneType,
+          countryOfOrigin: es.countryOfOrigin,
+          href: es.href,
+          quantity: Math.max(1, parseNum(es.quantity || '1') || 1),
+          sortOrder: idx,
+          comments: es.comments.trim() === '' ? null : es.comments.trim(),
+        })),
       }, user.id)
       setSavedQuote({ id: q.id, title: q.title, total: pricing.total, publicToken: q.publicToken ?? null })
       setQuoteTitle('')
@@ -827,6 +928,7 @@ export function useQuoteBuilder() {
       setRnFingerSize(0)
       setRnStoneType('natural')
       setCustomerStones([])
+      setEmkayStones([])
       setAttachments([])
       setInternalNotes('')
       setCustomerNotes('')
@@ -893,6 +995,8 @@ export function useQuoteBuilder() {
     addCustomerStone, removeCustomerStone, patchCustomerStone,
     onCustomerPhotoChange, removeCustomerPhoto,
     customerPhotoInputs, customerCameraInputs,
+    // EMKAY catalog stones
+    emkayStones, addEmkayStone, removeEmkayStone, patchEmkayStone,
     // attachments + notes
     attachments, handleAttachmentsChange, removeAttachment, patchAttachment,
     attachmentInputRef, attachmentCameraRef,

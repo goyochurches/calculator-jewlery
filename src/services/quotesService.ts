@@ -1,5 +1,5 @@
 import { api } from '@/api/apiClient'
-import type { Client, QuoteAttachment, QuoteCustomerStone, QuoteStone, SavedQuote } from '../types'
+import type { Client, QuoteAttachment, QuoteCustomerStone, QuoteEmkayStone, QuoteStone, SavedQuote } from '../types'
 
 interface ApiStone {
   id?: number | null
@@ -40,6 +40,26 @@ interface ApiCustomerStone {
   comments?: string | null
 }
 
+interface ApiEmkayStone {
+  id?: number | null
+  emkayProductId?: string | null
+  model?: string | null
+  name: string
+  imageUrl?: string | null
+  certImageUrl?: string | null
+  priceUsd: number
+  caratWeight?: number | null
+  shape?: string | null
+  sizeText?: string | null
+  treatment?: string | null
+  stoneType?: string | null
+  countryOfOrigin?: string | null
+  href?: string | null
+  quantity: number
+  sortOrder?: number | null
+  comments?: string | null
+}
+
 interface ApiQuote {
   id: number
   title: string
@@ -76,6 +96,7 @@ interface ApiQuote {
   client?: Client | null
   stones?: ApiStone[]
   customerStones?: ApiCustomerStone[]
+  emkayStones?: ApiEmkayStone[]
   attachments?: ApiAttachment[]
   // Sent up by the frontend so the backend can resolve the FK; on responses
   // the backend echoes the full `client` object instead.
@@ -158,6 +179,7 @@ function mapQuote(q: ApiQuote): SavedQuote {
     clientId: q.client?.id ?? q.clientId ?? null,
     stones: (q.stones ?? []).map(mapStone),
     customerStones: (q.customerStones ?? []).map(mapCustomerStone),
+    emkayStones: (q.emkayStones ?? []).map(mapEmkayStone),
     attachments: (q.attachments ?? []).map(mapAttachment),
     publicToken: q.publicToken ?? null,
     publicTokenExpiresAt: q.publicTokenExpiresAt ?? null,
@@ -204,6 +226,28 @@ function mapStone(s: ApiStone): QuoteStone {
     comments: s.comments ?? null,
     markupMultiplier: s.markupMultiplier ?? null,
     contribution: s.contribution ?? null,
+  }
+}
+
+function mapEmkayStone(s: ApiEmkayStone): QuoteEmkayStone {
+  return {
+    id: s.id ?? null,
+    emkayProductId: s.emkayProductId ?? null,
+    model: s.model ?? null,
+    name: s.name,
+    imageUrl: s.imageUrl ?? null,
+    certImageUrl: s.certImageUrl ?? null,
+    priceUsd: s.priceUsd,
+    caratWeight: s.caratWeight ?? null,
+    shape: s.shape ?? null,
+    sizeText: s.sizeText ?? null,
+    treatment: s.treatment ?? null,
+    stoneType: s.stoneType ?? null,
+    countryOfOrigin: s.countryOfOrigin ?? null,
+    href: s.href ?? null,
+    quantity: s.quantity ?? 1,
+    sortOrder: s.sortOrder ?? null,
+    comments: s.comments ?? null,
   }
 }
 
@@ -290,7 +334,7 @@ function mapSummary(q: ApiQuoteSummary): SavedQuote {
     engraving: false, engravingFee: null, setterType: null, jewelryType: null,
     internalNotes: null, customerNotes: null,
     client: null, clientId: null,
-    customerStones: [], attachments: [],
+    customerStones: [], emkayStones: [], attachments: [],
     publicTokenExpiresAt: null, lastOpenedAt: null, openCount: null,
     pendingWhatsappStatus: null, pendingWhatsappTo: null,
     pendingWhatsappError: null, pendingWhatsappSentAt: null,
