@@ -891,7 +891,10 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                       const cost = hasManualPrice ? (s.manualPrice ?? 0) : (s.carats ?? 0) * ppc
                       const labor = amount * (s.setterFeeOverride ?? setter?.fee ?? 0)
                       const stoneTotal = cost + labor
-                      const typeLabel = DIAMOND_TYPE_OPTIONS[s.stoneType as keyof typeof DIAMOND_TYPE_OPTIONS]?.label ?? s.stoneType
+                      const originLabel = DIAMOND_TYPE_OPTIONS[s.stoneType as keyof typeof DIAMOND_TYPE_OPTIONS]?.label ?? s.stoneType
+                      const typeLabel = s.stoneCategory === 'GEMSTONE' && s.gemstoneName
+                        ? `${s.gemstoneName} (${originLabel})`
+                        : originLabel
                       const stoneKey = `${role}-${idx}`
                       const isExpanded = expandedStones.has(stoneKey)
                       const summaryParts = [

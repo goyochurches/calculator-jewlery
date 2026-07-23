@@ -9,6 +9,10 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 export interface PublicQuoteStone {
   role: 'MAIN' | 'SIDE' | 'MELEE'
   stoneType: string
+  /** "DIAMOND" or "GEMSTONE". */
+  stoneCategory?: string | null
+  /** e.g. "Ruby" — only set when stoneCategory = GEMSTONE. */
+  gemstoneName?: string | null
   /** mm size, e.g. "1.3" or "1.6-1.7". */
   sizeKey: string
   /** Human-readable label from Master Tables, e.g. "Ø 1.50 mm". Null for legacy quotes. */

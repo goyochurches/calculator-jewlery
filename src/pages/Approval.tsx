@@ -381,7 +381,11 @@ function StoneRow({ stone, role, index }: { stone: ApprovalStoneDetail; role: 'M
         </div>
 
         <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-          <DefField label="Type">{stone.stoneTypeLabel || '—'}</DefField>
+          <DefField label="Type">
+            {stone.stoneCategory === 'GEMSTONE' && stone.gemstoneName
+              ? `${stone.gemstoneName} (${stone.stoneTypeLabel || '—'})`
+              : (stone.stoneTypeLabel || '—')}
+          </DefField>
           <DefField label="Size">{stone.sizeLabel || stone.sizeKey || '—'}</DefField>
           <DefField label="Shape">{stone.shape || '—'}</DefField>
           <DefField label="Color">{stone.color || '—'}</DefField>

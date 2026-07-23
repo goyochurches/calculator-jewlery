@@ -337,6 +337,7 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
   // stone, skipping any field the jeweler left blank.
   const describeStone = (s: PublicQuoteStone): string => {
     const parts: string[] = []
+    if (s.stoneCategory === 'GEMSTONE' && s.gemstoneName) parts.push(s.gemstoneName)
     // Prefer the label from Master Tables (e.g. "Ø 1.50 mm") over the legacy
     // frontend constant lookup, which only has the old range-style keys.
     const size = s.sizeLabel

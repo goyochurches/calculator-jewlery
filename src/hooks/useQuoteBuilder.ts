@@ -99,6 +99,11 @@ export interface StoneRow {
   uid: string
   role: StoneRole
   stoneType: 'natural' | 'lab-grown'
+  /** Only surfaced on MAIN stones — SIDE/MELEE are always 'diamond'. */
+  stoneCategory: 'diamond' | 'gemstone'
+  /** Gemstone catalog id (as a string, for the <select>) when stoneCategory
+   *  = 'gemstone'. Empty string = none picked yet. */
+  gemstoneId: string
   sizeKey: string
   carats: string
   amount: string
@@ -321,6 +326,8 @@ export function useQuoteBuilder() {
         uid: crypto.randomUUID(),
         role: s.role,
         stoneType: s.stoneType,
+        stoneCategory: s.stoneCategory === 'GEMSTONE' ? 'gemstone' : 'diamond',
+        gemstoneId: s.gemstoneId != null ? String(s.gemstoneId) : '',
         sizeKey: s.sizeKey,
         carats: carats > 0 ? String(carats) : '',
         amount,
@@ -333,7 +340,7 @@ export function useQuoteBuilder() {
         clarity: s.clarity ?? '',
         manualPrice: s.manualPrice != null ? String(s.manualPrice) : '',
         comments: s.comments ?? '',
-        markup: s.markupMultiplier != null ? String(s.markupMultiplier) : '',
+        markup: s.markupMultiplier != null ? String(s.markupMultiplier) : (s.role === 'MAIN' ? String(DEFAULT_MARKUP) : ''),
         collapsed: true,
       }
     }))
@@ -498,7 +505,11 @@ export function useQuoteBuilder() {
       uid: crypto.randomUUID(),
       role,
       stoneType: 'natural',
-      sizeKey: sizes[0]?.sizeKey ?? '',
+      stoneCategory: 'diamond',
+      gemstoneId: '',
+      // MAIN stones are always individually priced (Wholesale cost), never
+      // picked from the melee/side size tiers — sizeKey stays '' for them.
+      sizeKey: role === 'MAIN' ? '' : (sizes[0]?.sizeKey ?? ''),
       carats: '',
       amount: '',
       setterType: firstSetter,
@@ -510,7 +521,9 @@ export function useQuoteBuilder() {
       clarity: '',
       manualPrice: '',
       comments: '',
-      markup: '',
+      // MAIN stones must always carry an explicit markup so it's never
+      // ambiguous whether one applies — pre-fill with the quote's default.
+      markup: role === 'MAIN' ? String(DEFAULT_MARKUP) : '',
       collapsed: false,
     }
   }
@@ -532,7 +545,15 @@ export function useQuoteBuilder() {
     setStones(prev => prev.map(s => {
       if (s.uid !== uid) return s
       const next = { ...s, ...patch }
-      if (patch.stoneType && !patch.sizeKey) {
+      // Switching category clears/(re)seeds the gemstone pick so a stale id
+      // from a previous "Gemstone" selection never survives a bounce back
+      // to "Diamond" and back.
+      if (patch.stoneCategory === 'diamond') {
+        next.gemstoneId = ''
+      } else if (patch.stoneCategory === 'gemstone' && !s.gemstoneId) {
+        next.gemstoneId = gemstones[0]?.id ?? ''
+      }
+      if (patch.stoneType && !patch.sizeKey && s.role !== 'MAIN') {
         const list = patch.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
         const match = list.find(d => normalizeSizeKey(d.sizeKey) === normalizeSizeKey(next.sizeKey))
         if (match) {
@@ -760,6 +781,11 @@ export function useQuoteBuilder() {
       setSaveError('Enter the stone price for any “Custom” size stone before creating the quote.')
       return
     }
+    const mainMissingMarkup = stones.some(s => s.role === 'MAIN' && (s.markup.trim() === '' || !(Number(s.markup) > 0)))
+    if (mainMissingMarkup) {
+      setSaveError('Every main stone needs a markup before creating the quote.')
+      return
+    }
     if (!rnMode && metalRows.some(r => parseGrams(r.grams) <= 0)) {
       setMetalGramsError(true)
       setSaveError('Enter the gram weight for every metal row before creating the quote.')
@@ -876,9 +902,14 @@ export function useQuoteBuilder() {
             const n = Number(txt)
             return Number.isFinite(n) && n > 0 ? n : null
           })()
+          const isGemstone = s.role === 'MAIN' && s.stoneCategory === 'gemstone'
+          const gem = isGemstone ? gemstones.find(g => g.id === s.gemstoneId) : undefined
           return {
             role: s.role,
             stoneType: s.stoneType,
+            stoneCategory: s.role === 'MAIN' ? (isGemstone ? 'GEMSTONE' : 'DIAMOND') : 'DIAMOND',
+            gemstoneId: isGemstone && s.gemstoneId ? Number(s.gemstoneId) : null,
+            gemstoneName: isGemstone ? (gem?.name ?? null) : null,
             sizeKey: s.sizeKey,
             carats: parseNum(s.carats),
             setterType: s.setterType,

@@ -229,6 +229,11 @@ export function QuoteBuilderPage() {
     uid: string
     role: StoneRole
     stoneType: 'natural' | 'lab-grown'
+    /** Only surfaced on MAIN stones — SIDE/MELEE are always 'diamond'. */
+    stoneCategory: 'diamond' | 'gemstone'
+    /** Gemstone catalog id (as a string, for the <select>) when stoneCategory
+     *  = 'gemstone'. Empty string = none picked yet. */
+    gemstoneId: string
     sizeKey: string
     carats: string
     amount: string
@@ -463,6 +468,11 @@ export function QuoteBuilderPage() {
         uid: crypto.randomUUID(),
         role: s.role,
         stoneType: s.stoneType,
+        stoneCategory: s.stoneCategory === 'GEMSTONE' ? 'gemstone' : 'diamond',
+        gemstoneId: s.gemstoneId != null ? String(s.gemstoneId) : '',
+        // Keep the historical sizeKey as-is even for MAIN (the Size picker is
+        // hidden for MAIN going forward, but a duplicated quote must keep
+        // pricing the same way it did originally).
         sizeKey: s.sizeKey,
         carats: carats > 0 ? String(carats) : '',
         amount,
@@ -475,7 +485,7 @@ export function QuoteBuilderPage() {
         clarity: s.clarity ?? '',
         manualPrice: s.manualPrice != null ? String(s.manualPrice) : '',
         comments: s.comments ?? '',
-        markup: s.markupMultiplier != null ? String(s.markupMultiplier) : '',
+        markup: s.markupMultiplier != null ? String(s.markupMultiplier) : (s.role === 'MAIN' ? String(DEFAULT_MARKUP) : ''),
         collapsed: true,
       }
     }))
@@ -648,7 +658,11 @@ export function QuoteBuilderPage() {
       uid: crypto.randomUUID(),
       role,
       stoneType: 'natural',
-      sizeKey: sizes[0]?.sizeKey ?? '',
+      stoneCategory: 'diamond',
+      gemstoneId: '',
+      // MAIN stones are always individually priced (Wholesale cost), never
+      // picked from the melee/side size tiers — sizeKey stays '' for them.
+      sizeKey: role === 'MAIN' ? '' : (sizes[0]?.sizeKey ?? ''),
       carats: '',
       amount: '',
       setterType: firstSetter,
@@ -660,7 +674,9 @@ export function QuoteBuilderPage() {
       clarity: '',
       manualPrice: '',
       comments: '',
-      markup: '',
+      // MAIN stones must always carry an explicit markup so it's never
+      // ambiguous whether one applies — pre-fill with the quote's default.
+      markup: role === 'MAIN' ? String(DEFAULT_MARKUP) : '',
       collapsed: false,
     }
   }
@@ -682,8 +698,16 @@ export function QuoteBuilderPage() {
     setStones(prev => prev.map(s => {
       if (s.uid !== uid) return s
       const next = { ...s, ...patch }
+      // Switching category clears/(re)seeds the gemstone pick so a stale id
+      // from a previous "Gemstone" selection never survives a bounce back
+      // to "Diamond" and back.
+      if (patch.stoneCategory === 'diamond') {
+        next.gemstoneId = ''
+      } else if (patch.stoneCategory === 'gemstone' && !s.gemstoneId) {
+        next.gemstoneId = gemstones[0]?.id ?? ''
+      }
       // If the size or type changed, jump to a valid size for that stoneType.
-      if (patch.stoneType && !patch.sizeKey) {
+      if (patch.stoneType && !patch.sizeKey && s.role !== 'MAIN') {
         const list = patch.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
         const match = list.find(d => normalizeSizeKey(d.sizeKey) === normalizeSizeKey(next.sizeKey))
         if (match) {
@@ -829,7 +853,11 @@ export function QuoteBuilderPage() {
     const stoneLabor = amountNum * stoneSetterFee
     const stoneTotal = stoneCost + stoneLabor
     const theme = themeForRole(stone.role)
-    const typeLabel = DIAMOND_TYPE_OPTIONS[stone.stoneType].label
+    const isGemstone = stone.role === 'MAIN' && stone.stoneCategory === 'gemstone'
+    const gemstoneLabel = isGemstone ? (gemstones.find(g => g.id === stone.gemstoneId)?.name ?? 'Gemstone') : null
+    const typeLabel = isGemstone
+      ? `${gemstoneLabel} (${DIAMOND_TYPE_OPTIONS[stone.stoneType].label})`
+      : DIAMOND_TYPE_OPTIONS[stone.stoneType].label
     const sizeLabel = sizeCfg?.label ?? (stone.sizeKey || 'Custom')
     const setterLabel = config.setterMap[stone.setterType]?.label ?? stone.setterType
 
@@ -927,8 +955,22 @@ export function QuoteBuilderPage() {
         </div>
 
         <div className="grid gap-3 md:grid-cols-2 pl-2">
+          {stone.role === 'MAIN' && (
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Stone category</label>
+              <select value={stone.stoneCategory}
+                onChange={e => patchStone(stone.uid, { stoneCategory: e.target.value as StoneRow['stoneCategory'] })}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+                <option value="diamond">Diamond</option>
+                <option value="gemstone">Gemstone</option>
+              </select>
+            </div>
+          )}
+
           <div className="space-y-1">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type</label>
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {stone.role === 'MAIN' && stone.stoneCategory === 'gemstone' ? 'Origin' : 'Type'}
+            </label>
             <select value={stone.stoneType}
               onChange={e => patchStone(stone.uid, { stoneType: e.target.value as StoneRow['stoneType'] })}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
@@ -938,21 +980,37 @@ export function QuoteBuilderPage() {
             </select>
           </div>
 
-          <div className="space-y-1">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Size</label>
-            <select value={stone.sizeKey}
-              onChange={e => patchStone(stone.uid, { sizeKey: e.target.value })}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
-              {/* Custom: no preset mm size — the jeweler types carats and a
-                  price directly (e.g. "one 3 ct center stone, $X"). */}
-              <option value="">Custom — enter carats &amp; price</option>
-              {sizes.map(d => (
-                <option key={d.id} value={d.sizeKey}>
-                  {d.label} — ${d.basePrice}{d.ctPerStone != null ? '/ct' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+          {stone.role === 'MAIN' && stone.stoneCategory === 'gemstone' && (
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Gemstone</label>
+              <select value={stone.gemstoneId}
+                onChange={e => patchStone(stone.uid, { gemstoneId: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+                {gemstones.length === 0 && <option value="">No gemstones loaded</option>}
+                {gemstones.map(g => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {stone.role !== 'MAIN' && (
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Size</label>
+              <select value={stone.sizeKey}
+                onChange={e => patchStone(stone.uid, { sizeKey: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+                {/* Custom: no preset mm size — the jeweler types carats and a
+                    price directly (e.g. "one 3 ct center stone, $X"). */}
+                <option value="">Custom — enter carats &amp; price</option>
+                {sizes.map(d => (
+                  <option key={d.id} value={d.sizeKey}>
+                    {d.label} — ${d.basePrice}{d.ctPerStone != null ? '/ct' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Natural vs Lab — popup comparing the same stone priced both ways. */}
           <div className="md:col-span-2">
@@ -1064,7 +1122,7 @@ export function QuoteBuilderPage() {
 
           <div className="space-y-1 md:col-span-2">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {customSize ? 'Stone price' : 'Custom price'}{' '}
+              {stone.role === 'MAIN' ? 'Wholesale cost' : (customSize ? 'Stone price' : 'Custom price')}{' '}
               <span className={`font-normal normal-case ${customSize ? 'text-rose-500' : 'text-slate-400'}`}>
                 {customSize
                   ? '(required — enter the price for this stone directly)'
@@ -1085,12 +1143,12 @@ export function QuoteBuilderPage() {
           {stone.role === 'MAIN' && (
             <div className="space-y-1 md:col-span-2">
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Markup for this stone <span className="font-normal normal-case text-slate-400">(optional — overrides the quote-level {parsedMarkup}× markup for this stone's cost + setting labor)</span>
+                Markup for this stone <span className={`font-normal normal-case ${Number(stone.markup) > 0 ? 'text-slate-400' : 'text-rose-500'}`}>(required — overrides the quote-level {parsedMarkup}× markup for this stone's cost + setting labor)</span>
               </label>
               <div className="relative">
-                <input type="text" inputMode="decimal" value={stone.markup} placeholder={`Leave empty to use ${parsedMarkup}×`}
+                <input type="text" inputMode="decimal" value={stone.markup} placeholder={String(parsedMarkup)}
                   onChange={e => patchStone(stone.uid, { markup: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 pr-9 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                  className={`w-full rounded-xl border bg-white px-3 py-2 pr-9 text-sm text-slate-900 outline-none focus:border-slate-400 ${Number(stone.markup) > 0 ? 'border-slate-200' : 'border-rose-300'}`} />
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">×</span>
               </div>
               <p className="text-[10px] text-slate-400">
@@ -1484,6 +1542,11 @@ export function QuoteBuilderPage() {
       setSaveError('Enter the stone price for any "Custom" size stone before creating the quote.')
       return
     }
+    const mainMissingMarkup = stones.some(s => s.role === 'MAIN' && (s.markup.trim() === '' || !(Number(s.markup) > 0)))
+    if (mainMissingMarkup) {
+      setSaveError('Every main stone needs a markup before creating the quote.')
+      return
+    }
     if (!rnMode && metalRows.some(r => parseNum(r.grams) <= 0)) {
       setMetalGramsError(true)
       setSaveError('Enter the gram weight for every metal row before creating the quote.')
@@ -1615,9 +1678,14 @@ export function QuoteBuilderPage() {
             const n = Number(txt)
             return Number.isFinite(n) && n > 0 ? n : null
           })()
+          const isGemstone = s.role === 'MAIN' && s.stoneCategory === 'gemstone'
+          const gem = isGemstone ? gemstones.find(g => g.id === s.gemstoneId) : undefined
           return {
             role: s.role,
             stoneType: s.stoneType,
+            stoneCategory: s.role === 'MAIN' ? (isGemstone ? 'GEMSTONE' : 'DIAMOND') : 'DIAMOND',
+            gemstoneId: isGemstone && s.gemstoneId ? Number(s.gemstoneId) : null,
+            gemstoneName: isGemstone ? (gem?.name ?? null) : null,
             sizeKey: s.sizeKey,
             carats: parseNum(s.carats),
             setterType: s.setterType,

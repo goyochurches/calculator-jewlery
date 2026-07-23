@@ -8,6 +8,8 @@ export interface ApprovalStoneDetail {
   id: number | null
   role: 'MAIN' | 'SIDE' | 'MELEE' | null
   stoneTypeLabel: string | null
+  stoneCategory?: string | null
+  gemstoneName?: string | null
   sizeLabel: string | null
   sizeKey: string | null
   carats: number | null

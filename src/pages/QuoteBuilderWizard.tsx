@@ -725,7 +725,12 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
   const verify = labReportVerifyUrl(stone.labReport)
 
   if (stone.collapsed) {
-    const parts = [stone.shape || DIAMOND_TYPE_OPTIONS[stone.stoneType].label, stone.color ? `color ${stone.color}` : null, qb.parseNum(stone.carats) > 0 ? `${qb.parseNum(stone.carats)} ct` : null].filter(Boolean)
+    const isGemstone = stone.role === 'MAIN' && stone.stoneCategory === 'gemstone'
+    const gemstoneLabel = isGemstone ? (qb.gemstones.find(g => g.id === stone.gemstoneId)?.name ?? 'Gemstone') : null
+    const typeLabel = isGemstone
+      ? `${gemstoneLabel} (${DIAMOND_TYPE_OPTIONS[stone.stoneType].label})`
+      : DIAMOND_TYPE_OPTIONS[stone.stoneType].label
+    const parts = [stone.shape || typeLabel, stone.color ? `color ${stone.color}` : null, qb.parseNum(stone.carats) > 0 ? `${qb.parseNum(stone.carats)} ct` : null].filter(Boolean)
     return (
       <div className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
         <button type="button" onClick={() => qb.toggleCollapsed(stone.uid)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
@@ -750,17 +755,35 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
       </div>
 
       <div className="grid gap-3 pl-2 md:grid-cols-2">
-        <Field label="Type">
+        {stone.role === 'MAIN' && (
+          <Field label="Stone category">
+            <select value={stone.stoneCategory} onChange={e => qb.patchStone(stone.uid, { stoneCategory: e.target.value as StoneRow['stoneCategory'] })} className={miniCls}>
+              <option value="diamond">Diamond</option>
+              <option value="gemstone">Gemstone</option>
+            </select>
+          </Field>
+        )}
+        <Field label={stone.role === 'MAIN' && stone.stoneCategory === 'gemstone' ? 'Origin' : 'Type'}>
           <select value={stone.stoneType} onChange={e => qb.patchStone(stone.uid, { stoneType: e.target.value as StoneRow['stoneType'] })} className={miniCls}>
             {diamondTypeKeys.map(k => <option key={k} value={k}>{DIAMOND_TYPE_OPTIONS[k].label}</option>)}
           </select>
         </Field>
-        <Field label="Size">
-          <select value={stone.sizeKey} onChange={e => qb.patchStone(stone.uid, { sizeKey: e.target.value })} className={miniCls}>
-            <option value="">Custom — enter carats &amp; price</option>
-            {sizes.map(d => <option key={d.id} value={d.sizeKey}>{d.label} — ${d.basePrice}{d.ctPerStone != null ? '/ct' : ''}</option>)}
-          </select>
-        </Field>
+        {stone.role === 'MAIN' && stone.stoneCategory === 'gemstone' && (
+          <Field label="Gemstone" wide>
+            <select value={stone.gemstoneId} onChange={e => qb.patchStone(stone.uid, { gemstoneId: e.target.value })} className={miniCls}>
+              {qb.gemstones.length === 0 && <option value="">No gemstones loaded</option>}
+              {qb.gemstones.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+          </Field>
+        )}
+        {stone.role !== 'MAIN' && (
+          <Field label="Size">
+            <select value={stone.sizeKey} onChange={e => qb.patchStone(stone.uid, { sizeKey: e.target.value })} className={miniCls}>
+              <option value="">Custom — enter carats &amp; price</option>
+              {sizes.map(d => <option key={d.id} value={d.sizeKey}>{d.label} — ${d.basePrice}{d.ctPerStone != null ? '/ct' : ''}</option>)}
+            </select>
+          </Field>
+        )}
         <Field label="Carats">
           <input type="text" inputMode="decimal" value={stone.carats} placeholder="0.0000" onChange={e => qb.onStoneCaratsChange(stone.uid, e.target.value)} className={miniCls} />
         </Field>
@@ -806,15 +829,16 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
             </Field>
           </>
         )}
-        <Field label={customSize ? 'Stone price' : 'Custom price'} hint={customSize ? '(required)' : `(overrides ${money(pricePerCarat)}/ct)`} wide hintError={customSize}>
+        <Field label={stone.role === 'MAIN' ? 'Wholesale cost' : (customSize ? 'Stone price' : 'Custom price')} hint={customSize ? '(required)' : `(overrides ${money(pricePerCarat)}/ct)`} wide hintError={customSize}>
           <input type="number" min={0} step="0.01" value={stone.manualPrice}
             placeholder={customSize ? 'e.g. 4500 (required)' : 'Leave empty to use calculated price'}
             onChange={e => qb.onStoneManualPriceChange(stone.uid, e.target.value)}
             className={`${miniCls} ${customSize && stone.manualPrice.trim() === '' ? 'border-rose-300' : ''}`} />
         </Field>
         {stone.role === 'MAIN' && (
-          <Field label="Markup for this stone (optional)" wide>
-            <input type="text" inputMode="decimal" value={stone.markup} placeholder={`Leave empty to use ${qb.parsedMarkup}×`} onChange={e => qb.patchStone(stone.uid, { markup: e.target.value })} className={miniCls} />
+          <Field label="Markup for this stone" hint="(required)" hintError={!(Number(stone.markup) > 0)} wide>
+            <input type="text" inputMode="decimal" value={stone.markup} placeholder={String(qb.parsedMarkup)} onChange={e => qb.patchStone(stone.uid, { markup: e.target.value })}
+              className={`${miniCls} ${!(Number(stone.markup) > 0) ? 'border-rose-300' : ''}`} />
           </Field>
         )}
         {stone.role !== 'MELEE' && (

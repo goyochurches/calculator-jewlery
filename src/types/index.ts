@@ -71,6 +71,13 @@ export interface QuoteStone {
   id?: number | null
   role: StoneRole
   stoneType: 'natural' | 'lab-grown'
+  /** "DIAMOND" or "GEMSTONE". Only meaningful on MAIN stones — SIDE/MELEE
+   *  are always diamond. Defaults to DIAMOND when absent (historical rows). */
+  stoneCategory?: 'DIAMOND' | 'GEMSTONE' | null
+  /** Pointer + denormalized name into the gemstone catalog, only set when
+   *  stoneCategory = GEMSTONE (e.g. a MAIN ruby or tourmaline). */
+  gemstoneId?: number | null
+  gemstoneName?: string | null
   sizeKey: string
   carats: number
   setterType: string

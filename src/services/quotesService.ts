@@ -5,6 +5,9 @@ interface ApiStone {
   id?: number | null
   role: 'MAIN' | 'SIDE' | 'MELEE'
   stoneType: string
+  stoneCategory?: string | null
+  gemstoneId?: number | null
+  gemstoneName?: string | null
   sizeKey: string
   carats: number
   setterType: string
@@ -217,6 +220,9 @@ function mapStone(s: ApiStone): QuoteStone {
     id: s.id ?? null,
     role: s.role,
     stoneType: s.stoneType as QuoteStone['stoneType'],
+    stoneCategory: (s.stoneCategory as QuoteStone['stoneCategory']) ?? 'DIAMOND',
+    gemstoneId: s.gemstoneId ?? null,
+    gemstoneName: s.gemstoneName ?? null,
     sizeKey: s.sizeKey,
     carats: s.carats,
     setterType: s.setterType,
