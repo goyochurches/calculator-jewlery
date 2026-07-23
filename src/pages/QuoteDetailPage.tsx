@@ -615,7 +615,7 @@ export default function QuoteDetailPage() {
                           const amount = ct > 0 ? Math.round((s.carats ?? 0) / ct) : 0
                           const hasManualPrice = s.manualPrice != null
                           const cost = hasManualPrice ? (s.manualPrice ?? 0) : (s.carats ?? 0) * ppc
-                          const labor = amount * (setter?.fee ?? 0)
+                          const labor = amount * (s.setterFeeOverride ?? setter?.fee ?? 0)
                           const stoneTotal = cost + labor
                           const typeLabel = DIAMOND_TYPE_OPTIONS[s.stoneType as keyof typeof DIAMOND_TYPE_OPTIONS]?.label ?? s.stoneType
                           const stoneKey = `${role}-${idx}`
