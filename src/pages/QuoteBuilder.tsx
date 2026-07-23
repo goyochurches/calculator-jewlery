@@ -191,6 +191,13 @@ export function QuoteBuilderPage() {
   const [customerPriceOverrideReason, setCustomerPriceOverrideReason] = useState('')
   const [editingOverride, setEditingOverride] = useState(false)
   const [overrideError, setOverrideError] = useState<string | null>(null)
+  // True while the current override was set by the "Round" shortcut (as
+  // opposed to a deliberate manual price). Rounded overrides should track
+  // the live computed price — if anything else changes the quote afterward,
+  // the round is stale and gets cleared automatically so the total updates
+  // again; the user can just hit Round once more if they still want it flat.
+  const [overrideIsRounded, setOverrideIsRounded] = useState(false)
+  const roundedFromRef = useRef<number | null>(null)
 
   // ── RN ring mode ─────────────────────────────────────────────────────
   // When ON, the whole ring is priced from a single pre-configured RN model
@@ -1448,6 +1455,20 @@ export function QuoteBuilderPage() {
   })()
   const customerPrice = parsedOverride != null ? parsedOverride : computedCustomerPrice
 
+  // If the active override came from "Round" and the live computed price has
+  // since moved (metal weight, stones, markup, discount, taxes, anything),
+  // the rounded number is now stale — drop the override so the total goes
+  // back to tracking the quote live. A deliberate manual override (typed by
+  // hand) is left alone; only rounding auto-invalidates.
+  useEffect(() => {
+    if (!overrideIsRounded || roundedFromRef.current == null) return
+    if (Math.abs(computedCustomerPrice - roundedFromRef.current) > 0.005) {
+      setCustomerPriceOverrideText('')
+      setOverrideIsRounded(false)
+      roundedFromRef.current = null
+    }
+  }, [computedCustomerPrice, overrideIsRounded])
+
   const handleQuoteReady = async () => {
     if (!user) return
     const errors: { title?: string; client?: string } = {}
@@ -1677,6 +1698,8 @@ export function QuoteBuilderPage() {
       setCustomerPriceOverrideReason('')
       setEditingOverride(false)
       setOverrideError(null)
+      setOverrideIsRounded(false)
+      roundedFromRef.current = null
       setStones([])
       setRnModelKey('')
       setRnFingerSize(0)
@@ -3038,6 +3061,8 @@ export function QuoteBuilderPage() {
                           setCustomerPriceOverrideReason('Rounded price')
                         }
                         setOverrideError(null)
+                        setOverrideIsRounded(true)
+                        roundedFromRef.current = computedCustomerPrice
                       }}
                       title="Round the current price without opening the editor"
                       className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-200 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/10"
@@ -3089,7 +3114,7 @@ export function QuoteBuilderPage() {
                           inputMode="decimal"
                           value={customerPriceOverrideText}
                           placeholder={computedCustomerPrice.toFixed(2)}
-                          onChange={e => { setCustomerPriceOverrideText(e.target.value); setOverrideError(null) }}
+                          onChange={e => { setCustomerPriceOverrideText(e.target.value); setOverrideError(null); setOverrideIsRounded(false); roundedFromRef.current = null }}
                           className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 pl-7 text-sm text-white placeholder:text-slate-400 outline-none focus:border-amber-300"
                         />
                       </div>
@@ -3112,7 +3137,7 @@ export function QuoteBuilderPage() {
                     <div className="flex items-center gap-2 pt-1">
                       <button
                         type="button"
-                        onClick={() => { setCustomerPriceOverrideText(''); setCustomerPriceOverrideReason(''); setOverrideError(null) }}
+                        onClick={() => { setCustomerPriceOverrideText(''); setCustomerPriceOverrideReason(''); setOverrideError(null); setOverrideIsRounded(false); roundedFromRef.current = null }}
                         className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-200 transition hover:bg-white/20"
                       >
                         Clear override
@@ -3125,6 +3150,8 @@ export function QuoteBuilderPage() {
                             setCustomerPriceOverrideReason('Rounded price')
                           }
                           setOverrideError(null)
+                          setOverrideIsRounded(true)
+                          roundedFromRef.current = computedCustomerPrice
                         }}
                         className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-200 transition hover:bg-white/20"
                       >
