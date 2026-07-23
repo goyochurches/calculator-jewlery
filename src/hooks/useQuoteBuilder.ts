@@ -103,6 +103,9 @@ export interface StoneRow {
   carats: string
   amount: string
   setterType: string
+  /** Custom setting fee per stone, overriding the catalog fee for
+   *  `setterType` when non-empty. */
+  setterFeeOverride: string
   labReport: string
   shape: string
   color: string
@@ -118,6 +121,9 @@ export interface CustomerStone {
   uid: string
   gemstoneId: string
   setterType: string
+  /** Custom setting fee per stone, overriding the catalog fee for
+   *  `setterType` when non-empty. */
+  setterFeeOverride: string
   size: string
   quantity: string
   photo: string | null
@@ -319,6 +325,7 @@ export function useQuoteBuilder() {
         carats: carats > 0 ? String(carats) : '',
         amount,
         setterType: s.setterType ?? '',
+        setterFeeOverride: s.setterFeeOverride != null ? String(s.setterFeeOverride) : '',
         labReport: s.labReport ?? '',
         shape: s.shape ?? '',
         color: s.color ?? '',
@@ -337,6 +344,7 @@ export function useQuoteBuilder() {
       uid: crypto.randomUUID(),
       gemstoneId: cs.gemstoneId != null ? String(cs.gemstoneId) : '',
       setterType: cs.setterType ?? '',
+      setterFeeOverride: cs.setterFeeOverride != null ? String(cs.setterFeeOverride) : '',
       size: cs.sizeText ?? '',
       quantity: String(Math.max(1, cs.quantity ?? 1)),
       photo: cs.photo ?? null,
@@ -396,6 +404,7 @@ export function useQuoteBuilder() {
     uid: crypto.randomUUID(),
     gemstoneId: gemstones[0]?.id ?? '',
     setterType: customerSetters[0]?.typeKey ?? '',
+    setterFeeOverride: '',
     size: '',
     quantity: '1',
     photo: null,
@@ -493,6 +502,7 @@ export function useQuoteBuilder() {
       carats: '',
       amount: '',
       setterType: firstSetter,
+      setterFeeOverride: '',
       labReport: '',
       shape: '',
       color: '',
@@ -604,7 +614,8 @@ export function useQuoteBuilder() {
       const amount = parseNum(s.amount)
       const hasManualPrice = s.manualPrice.trim() !== ''
       const cost = hasManualPrice ? parseNum(s.manualPrice) : carats * pricePerCarat
-      const setterFee = config.setterMap[s.setterType]?.fee ?? 0
+      const feeOverride = s.setterFeeOverride.trim()
+      const setterFee = feeOverride !== '' ? parseNum(feeOverride) : (config.setterMap[s.setterType]?.fee ?? 0)
       const labor = amount * setterFee
       diamondCost += cost
       settingFee += labor
@@ -617,7 +628,8 @@ export function useQuoteBuilder() {
     let customerStoneCount = 0
     customerStones.forEach(cs => {
       const qty = parseNum(cs.quantity || '1') || 1
-      const fee = config.setterMap[cs.setterType]?.fee ?? 0
+      const feeOverride = cs.setterFeeOverride.trim()
+      const fee = feeOverride !== '' ? parseNum(feeOverride) : (config.setterMap[cs.setterType]?.fee ?? 0)
       customerSettingFee += qty * fee
       customerStoneCount += qty
     })
@@ -870,6 +882,7 @@ export function useQuoteBuilder() {
             sizeKey: s.sizeKey,
             carats: parseNum(s.carats),
             setterType: s.setterType,
+            setterFeeOverride: s.setterFeeOverride.trim() === '' ? null : parseNum(s.setterFeeOverride),
             labReport: s.role === 'MELEE' ? null : (s.labReport || null),
             sortOrder: idx,
             shape: s.shape || null,
@@ -897,6 +910,7 @@ export function useQuoteBuilder() {
             gemstoneId: cs.gemstoneId ? Number(cs.gemstoneId) : null,
             gemstoneName: gem?.name ?? null,
             setterType: cs.setterType,
+            setterFeeOverride: cs.setterFeeOverride.trim() === '' ? null : parseNum(cs.setterFeeOverride),
             sizeText: cs.size || null,
             quantity: Math.max(1, parseNum(cs.quantity || '1') || 1),
             photo: cs.photo ?? null,

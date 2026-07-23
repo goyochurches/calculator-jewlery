@@ -74,6 +74,9 @@ export interface QuoteStone {
   sizeKey: string
   carats: number
   setterType: string
+  /** Overrides the setter_config fee for this stone. Null = use the fee
+   *  looked up from setterType. */
+  setterFeeOverride?: number | null
   labReport?: string | null
   sortOrder?: number | null
   shape?: string | null
@@ -98,6 +101,9 @@ export interface QuoteCustomerStone {
   gemstoneId?: number | null
   gemstoneName?: string | null
   setterType: string
+  /** Overrides the setter_config fee for this stone. Null = use the fee
+   *  looked up from setterType. */
+  setterFeeOverride?: number | null
   sizeText?: string | null
   quantity: number
   photo?: string | null

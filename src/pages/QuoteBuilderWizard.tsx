@@ -772,6 +772,12 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
             {qb.config.setters.map(s => <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>)}
           </select>
         </Field>
+        <Field label="Custom setting fee (optional)" wide>
+          <input type="text" inputMode="decimal" value={stone.setterFeeOverride}
+            placeholder={`Default — $${qb.config.setterMap[stone.setterType]?.fee ?? 0}`}
+            onChange={e => qb.patchStone(stone.uid, { setterFeeOverride: e.target.value })}
+            className={miniCls} />
+        </Field>
         <Field label="Shape (optional)">
           <select value={stone.shape} onChange={e => qb.patchStone(stone.uid, { shape: e.target.value })} className={miniCls}>
             <option value="">—</option>
@@ -863,7 +869,8 @@ function CustomerStones({ qb }: { qb: QuoteBuilderState }) {
       {qb.customerStones.length > 0 && (
         <div className="mt-3 space-y-3">
           {qb.customerStones.map((cs, idx) => {
-            const fee = qb.config.setterMap[cs.setterType]?.fee ?? 0
+            const feeOverride = cs.setterFeeOverride.trim()
+            const fee = feeOverride !== '' ? qb.parseNum(feeOverride) : (qb.config.setterMap[cs.setterType]?.fee ?? 0)
             const qty = qb.parseNum(cs.quantity || '1') || 1
             return (
               <div key={cs.uid} className="rounded-2xl border border-rose-100 bg-rose-50/30 p-4">
@@ -882,6 +889,12 @@ function CustomerStones({ qb }: { qb: QuoteBuilderState }) {
                     <select value={cs.setterType} onChange={e => qb.patchCustomerStone(cs.uid, { setterType: e.target.value })} className={miniCls}>
                       {qb.customerSetters.map(s => <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>)}
                     </select>
+                  </Field>
+                  <Field label="Custom setting fee (optional)">
+                    <input type="text" inputMode="decimal" value={cs.setterFeeOverride}
+                      placeholder={`Default — $${qb.config.setterMap[cs.setterType]?.fee ?? 0}`}
+                      onChange={e => qb.patchCustomerStone(cs.uid, { setterFeeOverride: e.target.value })}
+                      className={miniCls} />
                   </Field>
                   <Field label="Size">
                     <input type="text" value={cs.size} placeholder="e.g. 6×4 mm oval" onChange={e => qb.patchCustomerStone(cs.uid, { size: e.target.value })} className={miniCls} />

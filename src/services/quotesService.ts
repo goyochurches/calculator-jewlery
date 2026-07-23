@@ -8,6 +8,7 @@ interface ApiStone {
   sizeKey: string
   carats: number
   setterType: string
+  setterFeeOverride?: number | null
   labReport?: string | null
   sortOrder?: number | null
   shape?: string | null
@@ -33,6 +34,7 @@ interface ApiCustomerStone {
   gemstoneId?: number | null
   gemstoneName?: string | null
   setterType: string
+  setterFeeOverride?: number | null
   sizeText?: string | null
   quantity: number
   photo?: string | null
@@ -218,6 +220,7 @@ function mapStone(s: ApiStone): QuoteStone {
     sizeKey: s.sizeKey,
     carats: s.carats,
     setterType: s.setterType,
+    setterFeeOverride: s.setterFeeOverride ?? null,
     labReport: s.labReport ?? null,
     sortOrder: s.sortOrder ?? null,
     shape: s.shape ?? null,
@@ -271,6 +274,7 @@ function mapCustomerStone(s: ApiCustomerStone): QuoteCustomerStone {
     gemstoneId: s.gemstoneId ?? null,
     gemstoneName: s.gemstoneName ?? null,
     setterType: s.setterType,
+    setterFeeOverride: s.setterFeeOverride ?? null,
     sizeText: s.sizeText ?? null,
     quantity: s.quantity ?? 1,
     photo: s.photo ?? null,

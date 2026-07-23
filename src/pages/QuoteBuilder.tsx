@@ -226,6 +226,7 @@ export function QuoteBuilderPage() {
     carats: string
     amount: string
     setterType: string
+    setterFeeOverride: string
     labReport: string
     shape: string
     color: string
@@ -256,6 +257,7 @@ export function QuoteBuilderPage() {
     uid: string
     gemstoneId: string
     setterType: string
+    setterFeeOverride: string
     size: string
     quantity: string
     photo: string | null
@@ -458,6 +460,7 @@ export function QuoteBuilderPage() {
         carats: carats > 0 ? String(carats) : '',
         amount,
         setterType: s.setterType ?? '',
+        setterFeeOverride: s.setterFeeOverride != null ? String(s.setterFeeOverride) : '',
         labReport: s.labReport ?? '',
         shape: s.shape ?? '',
         color: s.color ?? '',
@@ -476,6 +479,7 @@ export function QuoteBuilderPage() {
       uid: crypto.randomUUID(),
       gemstoneId: cs.gemstoneId != null ? String(cs.gemstoneId) : '',
       setterType: cs.setterType ?? '',
+      setterFeeOverride: cs.setterFeeOverride != null ? String(cs.setterFeeOverride) : '',
       size: cs.sizeText ?? '',
       quantity: String(Math.max(1, cs.quantity ?? 1)),
       photo: cs.photo ?? null,
@@ -543,6 +547,7 @@ export function QuoteBuilderPage() {
     uid: crypto.randomUUID(),
     gemstoneId: gemstones[0]?.id ?? '',
     setterType: customerSetters[0]?.typeKey ?? '',
+    setterFeeOverride: '',
     size: '',
     quantity: '1',
     photo: null,
@@ -640,6 +645,7 @@ export function QuoteBuilderPage() {
       carats: '',
       amount: '',
       setterType: firstSetter,
+      setterFeeOverride: '',
       labReport: '',
       shape: '',
       color: '',
@@ -979,6 +985,14 @@ export function QuoteBuilderPage() {
             </select>
           </div>
 
+          <div className="space-y-1 md:col-span-2">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Custom setting fee (optional)</label>
+            <input type="text" inputMode="decimal" value={stone.setterFeeOverride}
+              placeholder={`Default — $${config.setterMap[stone.setterType]?.fee ?? 0}`}
+              onChange={e => patchStone(stone.uid, { setterFeeOverride: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+          </div>
+
           <div className="space-y-1">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Shape <span className="font-normal normal-case text-slate-400">(optional)</span>
@@ -1283,7 +1297,8 @@ export function QuoteBuilderPage() {
       // Custom (no preset) size → price comes from the typed amount; a preset
       // size computes carats × pricePerCarat unless a manual price overrides it.
       const cost = hasManualPrice ? parseNum(s.manualPrice) : carats * pricePerCarat
-      const setterFee = config.setterMap[s.setterType]?.fee ?? 0
+      const feeOverride = s.setterFeeOverride.trim()
+      const setterFee = feeOverride !== '' ? parseNum(feeOverride) : (config.setterMap[s.setterType]?.fee ?? 0)
       const labor = amount * setterFee
       diamondCost += cost
       settingFee += labor
@@ -1298,7 +1313,8 @@ export function QuoteBuilderPage() {
     let customerStoneCount = 0
     customerStones.forEach(cs => {
       const qty = parseNum(cs.quantity || '1') || 1
-      const fee = config.setterMap[cs.setterType]?.fee ?? 0
+      const feeOverride = cs.setterFeeOverride.trim()
+      const fee = feeOverride !== '' ? parseNum(feeOverride) : (config.setterMap[cs.setterType]?.fee ?? 0)
       customerSettingFee += qty * fee
       customerStoneCount += qty
     })
@@ -1583,6 +1599,7 @@ export function QuoteBuilderPage() {
             sizeKey: s.sizeKey,
             carats: parseNum(s.carats),
             setterType: s.setterType,
+            setterFeeOverride: s.setterFeeOverride.trim() === '' ? null : parseNum(s.setterFeeOverride),
             labReport: s.role === 'MELEE' ? null : (s.labReport || null),
             sortOrder: idx,
             shape: s.shape || null,
@@ -1610,6 +1627,7 @@ export function QuoteBuilderPage() {
             gemstoneId: cs.gemstoneId ? Number(cs.gemstoneId) : null,
             gemstoneName: gem?.name ?? null,
             setterType: cs.setterType,
+            setterFeeOverride: cs.setterFeeOverride.trim() === '' ? null : parseNum(cs.setterFeeOverride),
             sizeText: cs.size || null,
             quantity: Math.max(1, parseNum(cs.quantity || '1') || 1),
             photo: cs.photo ?? null,
@@ -2560,7 +2578,8 @@ export function QuoteBuilderPage() {
                   <div className="mt-3 pl-2 space-y-3">
                     {customerStones.map((cs, idx) => {
                       const qtyNum = parseNum(cs.quantity || '1') || 1
-                      const setterFee = config.setterMap[cs.setterType]?.fee ?? 0
+                      const csFeeOverride = cs.setterFeeOverride.trim()
+                      const setterFee = csFeeOverride !== '' ? parseNum(csFeeOverride) : (config.setterMap[cs.setterType]?.fee ?? 0)
                       const lineFee = qtyNum * setterFee
                       const gem = gemstones.find(g => g.id === cs.gemstoneId)
                       return (
@@ -2601,6 +2620,14 @@ export function QuoteBuilderPage() {
                                   <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>
                                 ))}
                               </select>
+                            </div>
+
+                            <div className="space-y-1 md:col-span-2">
+                              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Custom setting fee (optional)</label>
+                              <input type="text" inputMode="decimal" value={cs.setterFeeOverride}
+                                placeholder={`Default — $${config.setterMap[cs.setterType]?.fee ?? 0}`}
+                                onChange={e => patchCustomerStone(cs.uid, { setterFeeOverride: e.target.value })}
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
                             </div>
 
                             <div className="space-y-1">

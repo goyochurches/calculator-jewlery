@@ -280,7 +280,7 @@ export default function QuoteDetailPage() {
     const amount = ct > 0 ? Math.round((s.carats ?? 0) / ct) : 0
     const stoneCost = s.manualPrice != null ? s.manualPrice : (s.carats ?? 0) * pricePerCarat
     acc.cost += stoneCost
-    acc.labor += amount * (config.setterMap[s.setterType]?.fee ?? 0)
+    acc.labor += amount * (s.setterFeeOverride ?? config.setterMap[s.setterType]?.fee ?? 0)
     acc.carats += s.carats ?? 0
     acc.amount += amount
     return acc
@@ -288,7 +288,7 @@ export default function QuoteDetailPage() {
 
   const customerStoneFee = (quote.customerStones ?? []).reduce((acc, cs) => {
     const qty = Math.max(1, cs.quantity ?? 1)
-    return acc + qty * (config.setterMap[cs.setterType]?.fee ?? 0)
+    return acc + qty * (cs.setterFeeOverride ?? config.setterMap[cs.setterType]?.fee ?? 0)
   }, 0)
   const customerStoneQty = (quote.customerStones ?? []).reduce(
     (acc, cs) => acc + Math.max(1, cs.quantity ?? 1), 0)
@@ -579,7 +579,7 @@ export default function QuoteDetailPage() {
                       const amount = ct > 0 ? Math.round((s.carats ?? 0) / ct) : 0
                       const stoneCost = s.manualPrice != null ? s.manualPrice : (s.carats ?? 0) * ppc
                       acc.cost += stoneCost
-                      acc.labor += amount * (config.setterMap[s.setterType]?.fee ?? 0)
+                      acc.labor += amount * (s.setterFeeOverride ?? config.setterMap[s.setterType]?.fee ?? 0)
                       acc.carats += s.carats ?? 0
                       acc.amount += amount
                       return acc
@@ -690,7 +690,12 @@ export default function QuoteDetailPage() {
                                   )}
                                   <div className="col-span-2">
                                     <dt className="font-semibold uppercase tracking-wide text-slate-400">Type of setting</dt>
-                                    <dd className="text-slate-900">{setter?.label ?? s.setterType ?? '—'}{setter ? ` — $${setter.fee.toLocaleString('en-US', { minimumFractionDigits: 2 })}/stone` : ''}</dd>
+                                    <dd className="text-slate-900">
+                                      {setter?.label ?? s.setterType ?? '—'}
+                                      {s.setterFeeOverride != null
+                                        ? ` — $${s.setterFeeOverride.toLocaleString('en-US', { minimumFractionDigits: 2 })}/stone (custom)`
+                                        : (setter ? ` — $${setter.fee.toLocaleString('en-US', { minimumFractionDigits: 2 })}/stone` : '')}
+                                    </dd>
                                   </div>
                                   {s.role !== 'MELEE' && (
                                     <div className="col-span-2">
@@ -753,8 +758,9 @@ export default function QuoteDetailPage() {
                   </div>
                   {(quote.customerStones ?? []).map((cs, idx) => {
                     const setter = config.setterMap[cs.setterType]
+                    const csSetterFee = cs.setterFeeOverride ?? setter?.fee ?? 0
                     const qty = Math.max(1, cs.quantity ?? 1)
-                    const lineFee = qty * (setter?.fee ?? 0)
+                    const lineFee = qty * csSetterFee
                     return (
                       <div key={cs.id ?? idx}
                         className="relative overflow-hidden rounded-2xl border border-rose-200/80 bg-gradient-to-br from-rose-50/70 via-white to-pink-50/40 px-4 py-3 text-sm shadow-sm">
@@ -774,8 +780,8 @@ export default function QuoteDetailPage() {
                               <dt className="font-semibold uppercase tracking-wide text-slate-400">Type of stone</dt>
                               <dd className={cs.gemstoneName ? 'text-slate-900 font-medium' : 'text-slate-400'}>{cs.gemstoneName || '—'}</dd>
                             </div>
-                            <div><dt className="font-semibold uppercase tracking-wide text-slate-400">Type of setting</dt><dd className="text-slate-900">{setter?.label ?? cs.setterType ?? '—'}</dd></div>
-                            <div><dt className="font-semibold uppercase tracking-wide text-slate-400">Quantity</dt><dd className="text-slate-900">{qty}{setter ? ` × $${setter.fee}` : ''}</dd></div>
+                            <div><dt className="font-semibold uppercase tracking-wide text-slate-400">Type of setting</dt><dd className="text-slate-900">{setter?.label ?? cs.setterType ?? '—'}{cs.setterFeeOverride != null ? ' (custom)' : ''}</dd></div>
+                            <div><dt className="font-semibold uppercase tracking-wide text-slate-400">Quantity</dt><dd className="text-slate-900">{qty} × ${csSetterFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</dd></div>
                             <div className="col-span-2"><dt className="font-semibold uppercase tracking-wide text-slate-400">Size</dt><dd className={cs.sizeText ? 'text-slate-900' : 'text-slate-400'}>{cs.sizeText || '—'}</dd></div>
                             {cs.comments && (
                               <div className="col-span-2">
