@@ -1066,14 +1066,18 @@ function EmkayCatalogSection({ qb }: { qb: QuoteBuilderState }) {
               )}
 
               {totalPages > 1 && (
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span>{total} stones total</span>
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+                  <span className="text-xs text-slate-500">{total} stones total</span>
+                  <div className="flex items-center gap-3">
                     <button type="button" disabled={page <= 0} onClick={() => setPage(p => Math.max(0, p - 1))}
-                      className="rounded-full border border-slate-200 px-3 py-1 font-semibold disabled:opacity-40">Prev</button>
-                    <span>Page {page + 1} / {totalPages}</span>
+                      className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-amber-400 hover:text-amber-700 disabled:opacity-40 disabled:hover:border-slate-300 disabled:hover:text-slate-700">
+                      <ChevronDown className="h-4 w-4 rotate-90" /> Prev
+                    </button>
+                    <span className="text-sm font-semibold text-slate-700">Page {page + 1} / {totalPages}</span>
                     <button type="button" disabled={page >= totalPages - 1} onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                      className="rounded-full border border-slate-200 px-3 py-1 font-semibold disabled:opacity-40">Next</button>
+                      className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-amber-400 hover:text-amber-700 disabled:opacity-40 disabled:hover:border-slate-300 disabled:hover:text-slate-700">
+                      Next <ChevronDown className="h-4 w-4 -rotate-90" />
+                    </button>
                   </div>
                 </div>
               )}
