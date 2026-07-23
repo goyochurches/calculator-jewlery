@@ -440,7 +440,7 @@ export function useQuoteBuilder() {
       stoneType: product.stoneType,
       countryOfOrigin: product.countryOfOrigin,
       href: product.href,
-      setterType: customerSetters[0]?.typeKey ?? '',
+      setterType: config.setters[0]?.typeKey ?? '',
       quantity: '1',
       comments: '',
     }])

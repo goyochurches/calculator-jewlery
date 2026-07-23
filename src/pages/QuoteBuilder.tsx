@@ -589,7 +589,7 @@ export function QuoteBuilderPage() {
       stoneType: product.stoneType,
       countryOfOrigin: product.countryOfOrigin,
       href: product.href,
-      setterType: customerSetters[0]?.typeKey ?? '',
+      setterType: config.setters[0]?.typeKey ?? '',
       quantity: '1',
       comments: '',
     }])
@@ -2751,7 +2751,7 @@ export function QuoteBuilderPage() {
                                 <select value={es.setterType}
                                   onChange={e => patchEmkayStone(es.uid, { setterType: e.target.value })}
                                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
-                                  {customerSetters.map(s => (
+                                  {config.setters.map(s => (
                                     <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>
                                   ))}
                                 </select>

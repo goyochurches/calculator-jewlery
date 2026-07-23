@@ -997,7 +997,7 @@ function EmkayCatalogSection({ qb }: { qb: QuoteBuilderState }) {
                     </Field>
                     <Field label="Type of setting" wide>
                       <select value={es.setterType} onChange={e => qb.patchEmkayStone(es.uid, { setterType: e.target.value })} className={miniCls}>
-                        {qb.customerSetters.map(s => <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>)}
+                        {qb.config.setters.map(s => <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>)}
                       </select>
                     </Field>
                   </div>

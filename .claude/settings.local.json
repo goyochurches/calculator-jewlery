@@ -184,7 +184,8 @@
       "Bash(cd /d/wamp64/www)",
       "Bash(ls -la /d/wamp64/www)",
       "Bash(powershell -c \"Get-ChildItem D:\\\\wamp64\\\\www\")",
-      "Bash(./mvnw.cmd -q -o compile)"
+      "Bash(./mvnw.cmd -q -o compile)",
+      "Bash(xargs -I{} echo {})"
     ]
   }
 }
