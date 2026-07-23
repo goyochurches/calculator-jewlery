@@ -3029,22 +3029,21 @@ export function QuoteBuilderPage() {
                 <div className="flex items-start justify-between gap-2">
                   <p className="text-xs uppercase tracking-[0.18em] text-amber-300">Customer price</p>
                   <div className="flex items-center gap-1.5">
-                    {!Number.isInteger(customerPrice) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCustomerPriceOverrideText(String(Math.round(customerPrice)))
-                          if (customerPriceOverrideReason.trim() === '') {
-                            setCustomerPriceOverrideReason('Rounded price')
-                          }
-                          setOverrideError(null)
-                        }}
-                        title="Round the current price without opening the editor"
-                        className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-200 transition hover:bg-white/20"
-                      >
-                        Round
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      disabled={Number.isInteger(customerPrice)}
+                      onClick={() => {
+                        setCustomerPriceOverrideText(String(Math.round(customerPrice)))
+                        if (customerPriceOverrideReason.trim() === '') {
+                          setCustomerPriceOverrideReason('Rounded price')
+                        }
+                        setOverrideError(null)
+                      }}
+                      title="Round the current price without opening the editor"
+                      className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-200 transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white/10"
+                    >
+                      Round
+                    </button>
                     <button
                       type="button"
                       onClick={() => setEditingOverride(v => !v)}
