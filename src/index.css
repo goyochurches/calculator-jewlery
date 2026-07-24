@@ -49,3 +49,41 @@
     font: inherit;
   }
 }
+
+/* ── Guided tour (driver.js) — themed to match the app's cards ─────────── */
+.sj-tour-popover.driver-popover {
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.24);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  font-family: "Geist Variable", sans-serif;
+}
+.sj-tour-popover .driver-popover-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+.sj-tour-popover .driver-popover-description {
+  color: #475569;
+  font-size: 0.875rem;
+}
+.sj-tour-popover .driver-popover-progress-text {
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+.sj-tour-popover button.driver-popover-next-btn,
+.sj-tour-popover button.driver-popover-prev-btn {
+  background: var(--theme-primary);
+  color: #fff;
+  text-shadow: none;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+}
+.sj-tour-popover button.driver-popover-prev-btn {
+  background: #e2e8f0;
+  color: #334155;
+}
+.sj-tour-popover button.driver-popover-close-btn {
+  color: #94a3b8;
+}

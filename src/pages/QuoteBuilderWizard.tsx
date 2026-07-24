@@ -8,6 +8,8 @@ import { CopyShareLinkButton } from '@/components/CopyShareLinkButton'
 import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { Toast } from '@/components/Toast'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
+import { useTourOnce } from '@/hooks/useTourOnce'
+import type { TourStep } from '@/lib/tour'
 import { useNavigate } from 'react-router-dom'
 import { DIAMOND_TYPE_OPTIONS, JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import type { JewelryMetalOption } from '@/types'
@@ -31,7 +33,7 @@ import {
   type StoneRole,
 } from '@/hooks/useQuoteBuilder'
 import {
-  ArrowLeft, ArrowRight, Camera, Check, ChevronDown, ChevronUp, CircleDollarSign,
+  ArrowLeft, ArrowRight, Camera, Check, ChevronDown, ChevronUp, CircleDollarSign, Compass,
   Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Sparkles, User, X,
 } from 'lucide-react'
 import { CreateLabSizeDialog } from '@/components/CreateLabSizeDialog'
@@ -58,10 +60,35 @@ const roleMeta: Record<StoneRole, { label: string; icon: typeof Crown; accent: s
   MELEE: { label: 'Melee', icon: Sparkles, accent: 'emerald', chip: 'bg-emerald-100 text-emerald-900', bar: 'from-teal-300 to-emerald-700' },
 }
 
+const QUOTE_WIZARD_TOUR_STEPS: TourStep[] = [
+  {
+    element: '#tour-wizard-stepper',
+    popover: {
+      title: 'Step by step',
+      description: 'Move through Client, Material, Stones, Pricing and Review — click any reached step to jump back to it.',
+    },
+  },
+  {
+    element: '#tour-wizard-content',
+    popover: {
+      title: 'Fill in each step',
+      description: 'This card shows the current step\'s fields. Use Back / Next at the bottom to move between steps.',
+    },
+  },
+  {
+    element: '#tour-wizard-summary',
+    popover: {
+      title: 'Live summary',
+      description: 'Your estimated total updates here as you go, so you always know where the quote stands.',
+    },
+  },
+]
+
 export function QuoteBuilderWizardPage() {
   const qb = useQuoteBuilder()
   const [step, setStep] = useState(0)
   const [maxVisited, setMaxVisited] = useState(0)
+  const { replay: replayTour } = useTourOnce('quote-wizard', QUOTE_WIZARD_TOUR_STEPS, { enabled: !qb.config.loading })
 
   if (qb.config.loading) {
     return <WizardSkeleton />
@@ -93,19 +120,31 @@ export function QuoteBuilderWizardPage() {
                 Same pricing engine as the classic builder — just guided. Your live total updates as you go.
               </p>
             </div>
-            <Link to="/quotes" className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/20">
-              Switch to classic builder
-            </Link>
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={replayTour}
+                className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:bg-white/20"
+              >
+                <Compass className="h-3.5 w-3.5" />
+                Tutorial
+              </button>
+              <Link to="/quotes" className="rounded-full bg-white/10 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/20">
+                Switch to classic builder
+              </Link>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Stepper */}
-      <Stepper step={step} maxVisited={maxVisited} onJump={goTo} />
+      <div id="tour-wizard-stepper">
+        <Stepper step={step} maxVisited={maxVisited} onJump={goTo} />
+      </div>
 
       <section className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
         {/* Step content */}
-        <div className="min-w-0 space-y-4">
+        <div id="tour-wizard-content" className="min-w-0 space-y-4">
           {step === 0 && <StepClient qb={qb} />}
           {step === 1 && <StepMaterial qb={qb} />}
           {step === 2 && <StepStones qb={qb} />}
@@ -148,7 +187,7 @@ export function QuoteBuilderWizardPage() {
         </div>
 
         {/* Live summary */}
-        <div className="space-y-4">
+        <div id="tour-wizard-summary" className="space-y-4">
           <PriceSummary qb={qb} />
         </div>
       </section>

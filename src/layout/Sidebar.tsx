@@ -6,10 +6,14 @@ import { FEATURES, isFeatureKey } from '@/lib/featureFlags'
 import { canSeePayments } from '@/lib/paymentsAccess'
 import { useFeatures } from '@/hooks/useFeatures'
 import { useInboxUnread } from '@/hooks/useInboxUnread'
+import { useTourOnce } from '@/hooks/useTourOnce'
+import type { TourStep } from '@/lib/tour'
+import { useMemo } from 'react'
 import {
   Calculator,
   ClipboardList,
   CircleDollarSign,
+  Compass,
   Contact,
   CreditCard,
   Diamond,
@@ -45,6 +49,23 @@ const navItems: { to: string; label: string; icon: typeof LayoutDashboard; key: 
   { to: '/master-tables', label: 'Master Tables', icon: ClipboardList, key: 'master-tables' },
 ]
 
+// One line per section, shown as the tour walks the sidebar top to bottom.
+const navTourCopy: Partial<Record<NavKey, string>> = {
+  dashboard: 'Reports and activity across your business at a glance.',
+  metals: 'Live metal pricing and market context for your quotes.',
+  quotes: 'The classic quote builder — full control over every field.',
+  'quotes-wizard': 'The same pricing engine, guided one step at a time.',
+  'quotes-list': 'Every saved quote, with status and full breakdown.',
+  messages: 'WhatsApp and SMS conversations with your clients, in one inbox.',
+  clients: 'Your client list and each client\'s quote history.',
+  gemstones: 'Reference prices for diamonds and gemstones.',
+  users: 'Manage who has access, and what role they have.',
+  payments: 'Track payment plans and installment status.',
+  reviews: 'Customer feedback and ratings.',
+  configuration: 'Workspace settings — branding, API, preferences.',
+  'master-tables': 'Reference data for metals, gemstones and price history.',
+}
+
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Administrator',
   MANAGER: 'Store Manager',
@@ -64,10 +85,15 @@ function SidebarContent({
   onNavigate,
   collapsed = false,
   onToggleCollapsed,
+  // The sidebar is rendered twice (desktop `aside` + mobile drawer) — only
+  // one instance should carry tour target ids / auto-start the tour, or
+  // `document.querySelector` would hit whichever copy comes first in the DOM.
+  tourIds = false,
 }: {
   onNavigate?: () => void
   collapsed?: boolean
   onToggleCollapsed?: () => void
+  tourIds?: boolean
 }) {
   const { user, logout } = useAuth()
   const { companyName, logo } = useBrand()
@@ -85,9 +111,38 @@ function SidebarContent({
   })
   const goToProfile = () => { onNavigate?.(); navigate('/profile') }
 
+  // Built from the *visible* nav items so a role that can't see e.g. "Users"
+  // never gets a step pointing at a hidden link.
+  const navTourSteps = useMemo<TourStep[]>(() => [
+    {
+      element: '#tour-sidebar-brand',
+      popover: {
+        title: 'Welcome!',
+        description: 'Quick tour of the workspace — where everything lives and what it\'s for.',
+      },
+    },
+    ...visibleNavItems.map(({ key, label }) => ({
+      element: `#tour-nav-${key}`,
+      popover: {
+        title: label,
+        description: navTourCopy[key] ?? '',
+      },
+    })),
+    {
+      element: '#tour-sidebar-help',
+      popover: {
+        title: 'Replay anytime',
+        description: 'Click here whenever you want to see this tour again.',
+      },
+    },
+  ], [visibleNavItems])
+
+  const { replay: replayNavTour } = useTourOnce('app-navigation', navTourSteps, { enabled: tourIds })
+
   return (
     <div className="flex min-h-full flex-col">
       <div
+        id={tourIds ? 'tour-sidebar-brand' : undefined}
         className={cn(
           'border-b border-white/10 py-7',
           collapsed ? 'px-3' : 'px-6'
@@ -107,6 +162,18 @@ function SidebarContent({
               className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white lg:flex"
             >
               <Menu className="h-4 w-4" />
+            </button>
+          )}
+          {tourIds && (
+            <button
+              id="tour-sidebar-help"
+              type="button"
+              onClick={replayNavTour}
+              aria-label="Replay workspace tour"
+              title="Replay workspace tour"
+              className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white lg:flex"
+            >
+              <Compass className="h-4 w-4" />
             </button>
           )}
           {logo ? (
@@ -138,6 +205,7 @@ function SidebarContent({
           {visibleNavItems.map(({ to, label, icon: Icon, key }) => (
             <NavLink
               key={to}
+              id={tourIds ? `tour-nav-${key}` : undefined}
               to={to}
               end={to === '/'}
               onClick={onNavigate}
@@ -249,7 +317,7 @@ export function Sidebar({
         style={{ backgroundColor: 'var(--theme-primary)' }}
       >
         <div className="sticky top-0 min-h-screen">
-          <SidebarContent collapsed={collapsed} onToggleCollapsed={onToggleCollapsed} />
+          <SidebarContent collapsed={collapsed} onToggleCollapsed={onToggleCollapsed} tourIds />
         </div>
       </aside>
 

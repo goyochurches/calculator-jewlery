@@ -23,9 +23,49 @@ import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { Toast } from '@/components/Toast'
 import { MarketComparisonPanel } from '@/components/MarketComparisonPanel'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
-import { Calculator, Camera, Check, ChevronDown, ChevronUp, Copy, Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Pin, PinOff, Ruler, Scale, Search, Sparkles, User, X } from 'lucide-react'
+import { useTourOnce } from '@/hooks/useTourOnce'
+import type { TourStep } from '@/lib/tour'
+import { Calculator, Camera, Check, ChevronDown, ChevronUp, Compass, Copy, Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Pin, PinOff, Ruler, Scale, Search, Sparkles, User, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+
+const QUOTE_BUILDER_TOUR_STEPS: TourStep[] = [
+  {
+    element: '#tour-qb-details',
+    popover: {
+      title: 'Quote details',
+      description: 'Start here: give the quote a title, pick the client and choose what type of piece you\'re pricing.',
+    },
+  },
+  {
+    element: '#tour-qb-material',
+    popover: {
+      title: "CAD Design & Jeweler's Time",
+      description: 'Choose the metal, enter the weight and set the ring dimensions and labor — this drives the body cost of the piece.',
+    },
+  },
+  {
+    element: '#tour-qb-stones',
+    popover: {
+      title: 'Stone Setting',
+      description: 'Add diamonds and colored gemstones with their own pricing, one row per stone.',
+    },
+  },
+  {
+    element: '#tour-qb-total',
+    popover: {
+      title: 'Estimated total',
+      description: 'The live price updates as you fill in the form — markup, taxes and discounts all show up here instantly.',
+    },
+  },
+  {
+    element: '#tour-qb-submit',
+    popover: {
+      title: 'Submit',
+      description: 'When everything looks right, submit to save the quote and get a shareable client link.',
+    },
+  },
+]
 
 const HAND_ENGRAVING_FEE = 150
 const DEFAULT_MARKUP = 2.5
@@ -136,6 +176,7 @@ export function QuoteBuilderPage() {
   const config = useQuoteConfig()
   const location = useLocation()
   const navigate = useNavigate()
+  const { replay: replayTour } = useTourOnce('quote-builder', QUOTE_BUILDER_TOUR_STEPS, { enabled: !config.loading })
   // Source quote when the user landed here via "Duplicate" — drives the
   // banner and the one-shot prefill effect below. Cleared after consuming so
   // refreshing the page doesn't re-apply the duplicate.
@@ -1856,6 +1897,14 @@ export function QuoteBuilderPage() {
         <Card className="rounded-[30px] border-0 text-white shadow-[0_30px_80px_rgba(15,23,42,0.24)]" style={{ backgroundColor: 'var(--theme-primary)' }}>
           <CardContent className="relative p-5 sm:p-8">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.24),transparent_25%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.18),transparent_28%)]" />
+            <button
+              type="button"
+              onClick={replayTour}
+              className="absolute right-5 top-5 z-10 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20 sm:right-8 sm:top-8"
+            >
+              <Compass className="h-3.5 w-3.5" />
+              Tutorial
+            </button>
             <div className="relative">
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-amber-300">
                 <Calculator className="h-4 w-4" />
@@ -1899,7 +1948,7 @@ export function QuoteBuilderPage() {
         {/* ── Columna izquierda: cabecera + 2 secciones apiladas ─────────── */}
         <div className="space-y-4">
           {/* Cabecera del quote */}
-          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <Card id="tour-qb-details" className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
             <CardHeader className="border-b border-slate-100">
               <CardTitle className="text-base font-semibold text-slate-900">Quote details</CardTitle>
               <p className="text-sm text-slate-500">Title, client and reference photo.</p>
@@ -2261,7 +2310,7 @@ export function QuoteBuilderPage() {
           )}
 
           {/* Sección 1: CAD Design & Jeweler's Time */}
-          <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <Card id="tour-qb-material" className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
             <CardHeader className="border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <Layers3 className="h-4 w-4 text-slate-500" />
@@ -2594,7 +2643,7 @@ export function QuoteBuilderPage() {
 
           {/* Sección 2: STONE SETTING (hidden in RN mode — stones come from the model) */}
           {!rnMode && (
-          <Card className="relative overflow-hidden rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          <Card id="tour-qb-stones" className="relative overflow-hidden rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.10),transparent_45%),radial-gradient(circle_at_top_right,rgba(244,63,94,0.08),transparent_50%)]" aria-hidden />
             <CardHeader className="relative border-b border-slate-100">
               <div className="flex items-center gap-3">
@@ -3079,7 +3128,7 @@ export function QuoteBuilderPage() {
           </Card>
 
           <div className="space-y-2">
-            <Button size="lg" className="w-full rounded-2xl px-5 text-white sm:w-auto"
+            <Button id="tour-qb-submit" size="lg" className="w-full rounded-2xl px-5 text-white sm:w-auto"
               style={{ backgroundColor: 'var(--theme-primary)' }}
               onClick={handleQuoteReady} disabled={saving}>
               {saving ? 'Saving…' : 'Submit'}
@@ -3092,7 +3141,7 @@ export function QuoteBuilderPage() {
 
         {/* ── Columna derecha: estimated total (sticky) + mini-cards ─────── */}
         <div className="space-y-4">
-          <Card className={`rounded-[30px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] ${pinSummary ? 'xl:sticky xl:top-32 xl:z-10' : ''}`}>
+          <Card id="tour-qb-total" className={`rounded-[30px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] ${pinSummary ? 'xl:sticky xl:top-32 xl:z-10' : ''}`}>
             <CardHeader className="border-b border-slate-100">
               <div className="flex items-start justify-between gap-2">
                 <div>

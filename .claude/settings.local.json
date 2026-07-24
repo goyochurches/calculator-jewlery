@@ -185,7 +185,12 @@
       "Bash(ls -la /d/wamp64/www)",
       "Bash(powershell -c \"Get-ChildItem D:\\\\wamp64\\\\www\")",
       "Bash(./mvnw.cmd -q -o compile)",
-      "Bash(xargs -I{} echo {})"
+      "Bash(xargs -I{} echo {})",
+      "Bash(sort -t V -k2 -n)",
+      "Bash(taskkill //F //PID 14516)",
+      "Bash(taskkill //F //PID 8380)",
+      "Bash(npm view *)",
+      "Bash(taskkill //F //IM node.exe)"
     ]
   }
 }
