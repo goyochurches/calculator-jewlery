@@ -69,6 +69,25 @@ export async function fetchFilterOptions(): Promise<FilterOptions> {
   return api.get<FilterOptions>('/api/competitor-products/filter-options')
 }
 
+export interface CategoryComparison {
+  category: string
+  myAvgPrice: number
+  myCount: number
+  competitorAvgPrice: number | null
+  competitorCount: number
+}
+
+export interface MarketDashboardData {
+  categories: CategoryComparison[]
+  priceScoreDistribution: Record<string, number> // "1".."5" -> count
+  myOverallAvg: number
+  competitorOverallAvg: number
+}
+
+export async function fetchMarketDashboard(): Promise<MarketDashboardData> {
+  return api.get<MarketDashboardData>('/api/competitor-products/dashboard')
+}
+
 export interface MarketComparisonResult {
   myPastQuotes: SimilarQuote[]
   competitorProducts: CompetitorProduct[]

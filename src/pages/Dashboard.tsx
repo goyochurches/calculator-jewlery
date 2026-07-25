@@ -1,4 +1,5 @@
 import { DashboardAnalytics } from '@/components/DashboardAnalytics'
+import { MarketDashboardWidget } from '@/components/MarketDashboardWidget'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { clientService } from '@/services/clientService'
 import { quotesService, type UserQuoteStats } from '@/services/quotesService'
@@ -552,6 +553,8 @@ export function Dashboard() {
       </section>
 
       <QuoteStatusWidget />
+
+      <MarketDashboardWidget />
 
       <TeamQuotesWidget />
     </div>

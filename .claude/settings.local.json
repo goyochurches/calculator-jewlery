@@ -190,7 +190,8 @@
       "Bash(taskkill //F //PID 14516)",
       "Bash(taskkill //F //PID 8380)",
       "Bash(npm view *)",
-      "Bash(taskkill //F //IM node.exe)"
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(jobs -l)"
     ]
   }
 }
