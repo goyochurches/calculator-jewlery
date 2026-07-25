@@ -1,3 +1,4 @@
+import { ChatWidget } from '@/components/ChatWidget'
 import { NotificationPanel } from '@/components/NotificationPanel'
 import { Toast } from '@/components/Toast'
 import { useNotifications } from '@/hooks/useNotifications'
@@ -212,6 +213,8 @@ export function MainLayout() {
           onClose={dismissLastPush}
         />
       )}
+
+      <ChatWidget />
     </div>
   )
 }

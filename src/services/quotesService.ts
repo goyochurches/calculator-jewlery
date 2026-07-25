@@ -500,6 +500,19 @@ export const quotesService = {
     const qs = year ? `?year=${year}` : ''
     return api.get<{ year: number; total: number }>(`/api/quotes/stats/revenue-year${qs}`)
   },
+
+  /** Deterministic stats-based greeting for the chat widget — instant, no AI call. */
+  async assistantGreeting(userName?: string): Promise<string> {
+    const qs = userName ? `?userName=${encodeURIComponent(userName)}` : ''
+    const data = await api.get<{ greeting: string }>(`/api/quotes/assistant/greeting${qs}`)
+    return data.greeting
+  },
+
+  /** Free-form Q&A over the shop's quote stats, answered by Groq/Gemini. */
+  async assistantChat(message: string): Promise<string> {
+    const data = await api.post<{ reply: string }>('/api/quotes/assistant/chat', { message })
+    return data.reply
+  },
 }
 
 export interface UserQuoteStats {
