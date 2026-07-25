@@ -508,9 +508,14 @@ export const quotesService = {
     return data.greeting
   },
 
-  /** Free-form Q&A over the shop's quote stats, answered by Groq/Gemini. */
-  async assistantChat(message: string): Promise<string> {
-    const data = await api.post<{ reply: string }>('/api/quotes/assistant/chat', { message })
+  /**
+   * Free-form Q&A over the shop's data (quotes, clients, metals/gemstones,
+   * payments, team, reviews), answered by Gemini/Groq. `history` is prior
+   * turns in this open chat session (oldest first) so follow-ups resolve
+   * correctly — pass [] for a one-shot question with no memory.
+   */
+  async assistantChat(message: string, history: { role: 'user' | 'assistant'; content: string }[] = []): Promise<string> {
+    const data = await api.post<{ reply: string }>('/api/quotes/assistant/chat', { message, history })
     return data.reply
   },
 }

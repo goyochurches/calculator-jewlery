@@ -35,11 +35,12 @@ export function ChatWidget() {
   async function send() {
     const text = input.trim()
     if (!text || loading) return
+    const history = messages.map(m => ({ role: m.role, content: m.text }))
     setInput('')
     setMessages(m => [...m, { role: 'user', text }])
     setLoading(true)
     try {
-      const reply = await quotesService.assistantChat(text)
+      const reply = await quotesService.assistantChat(text, history)
       setMessages(m => [...m, { role: 'assistant', text: reply }])
     } catch {
       setMessages(m => [...m, { role: 'assistant', text: "Sorry, something went wrong answering that — try again." }])
