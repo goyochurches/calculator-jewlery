@@ -37,6 +37,18 @@ export function MarketDashboardWidget() {
     competitorCount: c.competitorCount,
   }))
 
+  const storeData = data
+    ? [
+        { name: 'Us', avgPrice: Math.round(data.myOverallAvg), count: null as number | null, isMe: true },
+        ...data.stores.map(s => ({
+          name: s.storeName,
+          avgPrice: Math.round(s.avgPrice),
+          count: s.count,
+          isMe: false,
+        })),
+      ].sort((a, b) => a.avgPrice - b.avgPrice)
+    : []
+
   const scoreData = [1, 2, 3, 4, 5].map(score => ({
     score,
     label: SCORE_META[score].label,
@@ -117,6 +129,53 @@ export function MarketDashboardWidget() {
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+            </div>
+
+            <div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                Us vs. each competitor store (avg. price, all categories)
+              </p>
+              {storeData.length <= 1 ? (
+                <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
+                  No scraped competitor stores yet.
+                </p>
+              ) : (
+                <div style={{ height: Math.max(storeData.length * 36, 120) }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={storeData} layout="vertical" margin={{ left: 8 }}>
+                      <CartesianGrid horizontal={false} stroke="#f1f5f9" />
+                      <XAxis
+                        type="number"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 10, fill: '#94a3b8' }}
+                        tickFormatter={v => money(v)}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        axisLine={false}
+                        tickLine={false}
+                        width={130}
+                        tick={{ fontSize: 11, fill: '#475569' }}
+                      />
+                      <Tooltip
+                        cursor={{ fill: '#f8fafc' }}
+                        contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }}
+                        formatter={((v: number, _name: string, item: { payload: typeof storeData[number] }) => [
+                          item.payload.isMe ? money(v) : `${money(v)} (${item.payload.count} products)`,
+                          item.payload.isMe ? 'Our avg' : 'Store avg',
+                        ]) as never}
+                      />
+                      <Bar dataKey="avgPrice" radius={[0, 6, 6, 0]}>
+                        {storeData.map(s => (
+                          <Cell key={s.name} fill={s.isMe ? MY_COLOR : COMPETITOR_COLOR} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
 
             <div>

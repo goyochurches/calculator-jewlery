@@ -77,8 +77,15 @@ export interface CategoryComparison {
   competitorCount: number
 }
 
+export interface StoreComparison {
+  storeName: string
+  avgPrice: number
+  count: number
+}
+
 export interface MarketDashboardData {
   categories: CategoryComparison[]
+  stores: StoreComparison[]
   priceScoreDistribution: Record<string, number> // "1".."5" -> count
   myOverallAvg: number
   competitorOverallAvg: number
