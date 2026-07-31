@@ -25,7 +25,7 @@ import { MarketComparisonPanel } from '@/components/MarketComparisonPanel'
 import { copyToClipboard, publicQuoteUrl } from '@/lib/share'
 import { useTourOnce } from '@/hooks/useTourOnce'
 import type { TourStep } from '@/lib/tour'
-import { Calculator, Camera, Check, ChevronDown, ChevronUp, Compass, Copy, Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Pin, PinOff, Ruler, Scale, Search, Sparkles, User, X } from 'lucide-react'
+import { Calculator, Camera, Check, ChevronDown, ChevronUp, Compass, Copy, Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Pin, PinOff, Plus, Ruler, Scale, Search, Sparkles, User, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -2860,12 +2860,12 @@ export function QuoteBuilderPage() {
               {/* ── EMKAY Gemstones Catalog ─────────────────────────────── */}
               <div className="group/section relative overflow-hidden rounded-2xl border border-amber-100 bg-white p-4 shadow-sm transition hover:shadow-md">
                 <span className={`absolute left-0 top-0 bottom-0 w-1 ${emkayTheme.bar} opacity-80`} aria-hidden />
-                <button type="button" onClick={() => setEmkayOpen(o => !o)} className="flex w-full items-center justify-between gap-3 pl-2 text-left">
-                  <div className="flex items-center gap-3">
+                <div className="flex w-full items-center justify-between gap-3 pl-2">
+                  <button type="button" onClick={() => setEmkayOpen(o => !o)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
                     <span className={`h-9 w-9 rounded-xl ${emkayTheme.header} flex items-center justify-center shadow-sm`}>
                       <Gem className="h-4 w-4" />
                     </span>
-                    <div>
+                    <div className="min-w-0">
                       <h3 className="text-sm font-semibold text-slate-900">
                         EMKAY Catalog
                         <span className={`ml-2 inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${emkayTheme.chip}`}>
@@ -2874,9 +2874,20 @@ export function QuoteBuilderPage() {
                       </h3>
                       <p className="text-xs text-slate-500">Real stones from EMKAY Gemstones — shop buys these directly.</p>
                     </div>
-                  </div>
-                  {emkayOpen ? <ChevronUp className="h-4 w-4 shrink-0 text-slate-400" /> : <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />}
-                </button>
+                  </button>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEmkayOpen(true)}
+                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm transition hover:brightness-95 ${emkayTheme.header}`}
+                    >
+                      <Plus className="h-3.5 w-3.5" /> Add
+                    </button>
+                    <button type="button" onClick={() => setEmkayOpen(o => !o)} aria-label={emkayOpen ? 'Collapse' : 'Expand'}>
+                      {emkayOpen ? <ChevronUp className="h-4 w-4 shrink-0 text-slate-400" /> : <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />}
+                    </button>
+                  </span>
+                </div>
 
                 {emkayStones.length > 0 && (
                   <div className="mt-3 pl-2 space-y-3">

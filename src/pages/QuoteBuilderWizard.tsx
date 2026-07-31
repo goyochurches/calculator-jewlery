@@ -34,7 +34,7 @@ import {
 } from '@/hooks/useQuoteBuilder'
 import {
   ArrowLeft, ArrowRight, Camera, Check, ChevronDown, ChevronUp, CircleDollarSign, Compass,
-  Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Sparkles, User, X,
+  Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Plus, Sparkles, User, X,
 } from 'lucide-react'
 import { CreateLabSizeDialog } from '@/components/CreateLabSizeDialog'
 import { configService } from '@/services/configService'
@@ -1036,6 +1036,13 @@ function EmkayCatalogSection({ qb }: { qb: QuoteBuilderState }) {
             <p className="text-xs text-slate-500">Real stones from EMKAY Gemstones — shop buys these directly.</p>
           </div>
           {open ? <ChevronUp className="ml-auto h-4 w-4 shrink-0 text-slate-400" /> : <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-slate-400" />}
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900 shadow-sm transition hover:bg-amber-200"
+        >
+          <Plus className="h-3.5 w-3.5" /> Add
         </button>
       </div>
 
