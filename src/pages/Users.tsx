@@ -7,8 +7,8 @@ import { Toast } from '@/components/Toast'
 import { ROLE_LABELS } from '@/constants/config'
 import { userService } from '@/services/userService'
 import { useAuth } from '@/context/AuthContext'
-import type { Usuario } from '@/types'
-import { ImagePlus, Pencil, Plus, Trash2, X } from 'lucide-react'
+import type { InviteStatus, Usuario } from '@/types'
+import { CircleCheck, ImagePlus, Mail, MailOpen, MousePointerClick, Pencil, Plus, Send, Trash2, X } from 'lucide-react'
 
 const AVATAR_COLORS: Record<string, string> = {
   admin: 'bg-slate-900 text-white',
@@ -28,6 +28,79 @@ function computeAvatar(name: string): string {
   return name.trim().split(/\s+/).map(w => w[0]?.toUpperCase() ?? '').slice(0, 2).join('')
 }
 
+function formatWhen(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    dateStyle: 'medium', timeStyle: 'short',
+  })
+}
+
+type InviteStepState = 'done' | 'failed' | 'pending'
+
+function InviteStep({ icon: Icon, label, state, when }: {
+  icon: typeof Mail
+  label: string
+  state: InviteStepState
+  when: string | null
+}) {
+  const styles: Record<InviteStepState, string> = {
+    done: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    failed: 'bg-rose-50 text-rose-700 border-rose-200',
+    pending: 'bg-slate-50 text-slate-400 border-slate-200',
+  }
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium ${styles[state]}`}
+      title={when ? formatWhen(when) : 'Not yet'}
+    >
+      <Icon className="h-3 w-3" />
+      {label}
+    </span>
+  )
+}
+
+/** Compact log of the invite → set-password flow for one user, built from
+ *  their most recent password-setup token. */
+function InviteStatusLog({ invite }: { invite: InviteStatus | null | undefined }) {
+  if (!invite) return null
+
+  if (invite.completedAt) {
+    return (
+      <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-emerald-600">
+        <CircleCheck className="h-3 w-3" />
+        Password set {formatWhen(invite.completedAt)}
+      </p>
+    )
+  }
+
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+      <InviteStep
+        icon={Mail}
+        label={invite.emailSendFailed ? 'Send failed' : invite.emailSentAt ? 'Email sent' : 'Sending…'}
+        state={invite.emailSendFailed ? 'failed' : invite.emailSentAt ? 'done' : 'pending'}
+        when={invite.emailSentAt}
+      />
+      <InviteStep
+        icon={MailOpen}
+        label={invite.emailOpenedAt ? 'Email opened' : 'Not opened'}
+        state={invite.emailOpenedAt ? 'done' : 'pending'}
+        when={invite.emailOpenedAt}
+      />
+      <InviteStep
+        icon={MousePointerClick}
+        label={invite.linkOpenedAt ? 'Link clicked' : 'Not clicked'}
+        state={invite.linkOpenedAt ? 'done' : 'pending'}
+        when={invite.linkOpenedAt}
+      />
+      {invite.expired && (
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700">
+          Invite link expired
+        </span>
+      )}
+    </div>
+  )
+}
+
 export function UsersPage() {
   const { user: currentUser, refreshUser } = useAuth()
   const currentUserId = currentUser ? String(currentUser.id) : null
@@ -44,6 +117,8 @@ export function UsersPage() {
   const [confirmTarget, setConfirmTarget] = useState<Usuario | null>(null)
   const [errorToast, setErrorToast] = useState<{ id: string; title: string; description: string } | null>(null)
   const [editingUser, setEditingUser] = useState<Usuario | null>(null)
+  const [resendingId, setResendingId] = useState<string | null>(null)
+  const [resentInvite, setResentInvite] = useState<{ id: string; name: string } | null>(null)
 
   useEffect(() => {
     userService.getAll().then((data) => { setUsers(data); setLoading(false) })
@@ -53,6 +128,23 @@ export function UsersPage() {
     const next = current === 'active' ? 'inactive' : 'active'
     await userService.updateStatus(id, next)
     setUsers(prev => prev.map(u => u.id === id ? { ...u, status: next } : u))
+  }
+
+  const resendInvite = async (u: Usuario) => {
+    setResendingId(u.id)
+    try {
+      const updated = await userService.resendInvite(u.id)
+      setUsers(prev => prev.map(x => x.id === u.id ? updated : x))
+      setResentInvite({ id: u.id, name: u.name })
+    } catch (err: unknown) {
+      setErrorToast({
+        id: `${u.id}-${Date.now()}`,
+        title: 'Failed to resend invite',
+        description: err instanceof Error ? err.message : 'Please contact the administrator.',
+      })
+    } finally {
+      setResendingId(null)
+    }
   }
 
   const confirmDelete = async () => {
@@ -199,6 +291,7 @@ export function UsersPage() {
               {u.bio && (
                 <p className="mt-1 text-xs leading-snug text-slate-500 line-clamp-2">{u.bio}</p>
               )}
+              <InviteStatusLog invite={u.invite} />
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
@@ -214,6 +307,18 @@ export function UsersPage() {
               <Button variant="outline" size="lg" onClick={() => toggleStatus(u.id, u.status)}>
                 {u.status === 'active' ? 'Disable' : 'Enable'}
               </Button>
+              {u.invite && !u.invite.completedAt && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => resendInvite(u)}
+                  disabled={resendingId === u.id}
+                  title="Send a fresh 24h setup-password link"
+                >
+                  <Send className="mr-1.5 h-4 w-4" />
+                  {resendingId === u.id ? 'Sending…' : 'Resend invite'}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="lg"
@@ -236,6 +341,15 @@ export function UsersPage() {
           title="User created · invitation sent"
           description={`${createdUser.name} · ${createdUser.role}`}
           onClose={() => setCreatedUser(null)}
+        />
+      )}
+
+      {resentInvite && (
+        <Toast
+          key={`resent-${resentInvite.id}-${Date.now()}`}
+          title="Invite resent"
+          description={`New setup link sent to ${resentInvite.name}`}
+          onClose={() => setResentInvite(null)}
         />
       )}
 

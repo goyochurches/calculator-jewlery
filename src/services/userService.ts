@@ -1,5 +1,14 @@
 import { api } from '@/api/apiClient'
-import type { Usuario } from '../types'
+import type { InviteStatus, Usuario } from '../types'
+
+interface ApiInviteStatus {
+  emailSentAt: string | null
+  emailSendFailed: boolean
+  emailOpenedAt: string | null
+  linkOpenedAt: string | null
+  completedAt: string | null
+  expired: boolean
+}
 
 interface ApiUser {
   id: number
@@ -11,6 +20,7 @@ interface ApiUser {
   bio?: string | null
   photo?: string | null
   phone?: string | null
+  invite?: ApiInviteStatus | null
 }
 
 function mapUser(u: ApiUser): Usuario {
@@ -24,6 +34,7 @@ function mapUser(u: ApiUser): Usuario {
     bio: u.bio ?? null,
     photo: u.photo ?? null,
     phone: u.phone ?? null,
+    invite: (u.invite ?? null) as InviteStatus | null,
   }
 }
 
@@ -61,6 +72,13 @@ export const userService = {
 
   async getById(id: string): Promise<Usuario> {
     const data = await api.get<ApiUser>(`/api/users/${id}`)
+    return mapUser(data)
+  },
+
+  /** Sends a fresh 24h setup-password invite — for a brand-new user whose
+   *  email never arrived, or one whose earlier link expired. */
+  async resendInvite(id: string): Promise<Usuario> {
+    const data = await api.post<ApiUser>(`/api/users/${id}/resend-invite`, {})
     return mapUser(data)
   },
 }

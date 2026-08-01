@@ -40,6 +40,20 @@ export interface Usuario {
   /** Full international format without "whatsapp:" prefix (e.g. "+34612345678").
    *  Used by backend to send WhatsApp on quote approval. Internal only. */
   phone?: string | null
+  /** Where the user is in the invite → set-password flow. Null if the user
+   *  was never sent (or has no) an invite (e.g. seeded accounts). */
+  invite?: InviteStatus | null
+}
+
+export interface InviteStatus {
+  emailSentAt: string | null
+  emailSendFailed: boolean
+  /** Best-effort — many mail clients block remote images, so a null here
+   *  doesn't necessarily mean the email went unread. */
+  emailOpenedAt: string | null
+  linkOpenedAt: string | null
+  completedAt: string | null
+  expired: boolean
 }
 
 export interface AppConfig {
