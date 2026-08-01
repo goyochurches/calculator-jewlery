@@ -1153,35 +1153,45 @@ export function QuoteBuilderPage() {
             </div>
           )}
 
-          <div className="space-y-1 md:col-span-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {stone.role === 'MAIN' ? 'Wholesale cost' : (customSize ? 'Stone price' : 'Custom price')}{' '}
-              <span className={`font-normal normal-case ${customSize ? 'text-rose-500' : 'text-slate-400'}`}>
-                {customSize
-                  ? '(required — enter the price for this stone directly)'
-                  : `(optional — overrides carats × $${pricePerCarat.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct)`}
+          {/* Grouped so it's unmistakable these two overrides are related
+              (price and setting fee) yet independent of each other — the
+              live total at the bottom proves it. */}
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3 md:col-span-2">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Pricing overrides</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {stone.role === 'MAIN' ? 'Wholesale cost' : 'Gross cost for this batch of stones'}{' '}
+                  <span className={`font-normal normal-case ${customSize ? 'text-rose-500' : 'text-slate-400'}`}>
+                    {customSize
+                      ? '(required — total for all stones in this batch)'
+                      : `(optional — overrides $${pricePerCarat.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct × total carats)`}
+                  </span>
+                </label>
+                <input type="number" min={0} step="0.01" value={stone.manualPrice}
+                  placeholder={customSize ? 'e.g. 4500 (required)' : 'Leave empty to use calculated price'}
+                  onChange={e => onStoneManualPriceChange(stone.uid, e.target.value)}
+                  className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 ${
+                    customSize && stone.manualPrice.trim() === '' ? 'border-rose-300' : 'border-slate-200'
+                  }`} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Custom setting fee (optional)</label>
+                <input type="text" inputMode="decimal" value={stone.setterFeeOverride}
+                  placeholder={`Default — $${config.setterMap[stone.setterType]?.fee ?? 0}`}
+                  onChange={e => patchStone(stone.uid, { setterFeeOverride: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-white px-3 py-2 text-[11px] text-slate-500">
+              <span>
+                Stone <strong className="text-slate-700">${stoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                {' + '}
+                Setting <strong className="text-slate-700">${stoneLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                <span className="text-slate-400"> ({amountNum} × ${stoneSetterFee.toLocaleString('en-US', { minimumFractionDigits: 2 })})</span>
               </span>
-            </label>
-            <input type="number" min={0} step="0.01" value={stone.manualPrice}
-              placeholder={customSize ? 'e.g. 4500 (required)' : 'Leave empty to use calculated price'}
-              onChange={e => onStoneManualPriceChange(stone.uid, e.target.value)}
-              className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 ${
-                customSize && stone.manualPrice.trim() === '' ? 'border-rose-300' : 'border-slate-200'
-              }`} />
-            <p className="text-[10px] text-slate-400">
-              Setting labor (amount × setter fee) is added on top of this price.
-            </p>
-          </div>
-
-          <div className="space-y-1 md:col-span-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Custom setting fee (optional)</label>
-            <input type="text" inputMode="decimal" value={stone.setterFeeOverride}
-              placeholder={`Default — $${config.setterMap[stone.setterType]?.fee ?? 0}`}
-              onChange={e => patchStone(stone.uid, { setterFeeOverride: e.target.value })}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
-            <p className="text-[10px] text-slate-400">
-              Overrides the setter-type fee above for this stone only — independent of its price.
-            </p>
+              <span className="font-semibold text-slate-900">= ${stoneTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+            </div>
           </div>
 
           {stone.role === 'MAIN' && (

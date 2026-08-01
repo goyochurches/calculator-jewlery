@@ -763,6 +763,15 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
   const pricePerCarat = (sizeCfg?.basePrice ?? 0) * DIAMOND_TYPE_OPTIONS[stone.stoneType].multiplier
   const verify = labReportVerifyUrl(stone.labReport)
 
+  const caratsNum = qb.parseNum(stone.carats)
+  const amountNum = qb.parseNum(stone.amount)
+  const hasManualPrice = stone.manualPrice.trim() !== ''
+  const stoneCost = hasManualPrice ? qb.parseNum(stone.manualPrice) : caratsNum * pricePerCarat
+  const stoneFeeOverride = stone.setterFeeOverride.trim()
+  const stoneSetterFee = stoneFeeOverride !== '' ? qb.parseNum(stoneFeeOverride) : (qb.config.setterMap[stone.setterType]?.fee ?? 0)
+  const stoneLabor = amountNum * stoneSetterFee
+  const stoneTotal = stoneCost + stoneLabor
+
   if (stone.collapsed) {
     const isGemstone = stone.role === 'MAIN' && stone.stoneCategory === 'gemstone'
     const gemstoneLabel = isGemstone ? (qb.gemstones.find(g => g.id === stone.gemstoneId)?.name ?? 'Gemstone') : null
@@ -862,18 +871,35 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
             </Field>
           </>
         )}
-        <Field label={stone.role === 'MAIN' ? 'Wholesale cost' : (customSize ? 'Stone price' : 'Custom price')} hint={customSize ? '(required)' : `(overrides ${money(pricePerCarat)}/ct)`} wide hintError={customSize}>
-          <input type="number" min={0} step="0.01" value={stone.manualPrice}
-            placeholder={customSize ? 'e.g. 4500 (required)' : 'Leave empty to use calculated price'}
-            onChange={e => qb.onStoneManualPriceChange(stone.uid, e.target.value)}
-            className={`${miniCls} ${customSize && stone.manualPrice.trim() === '' ? 'border-rose-300' : ''}`} />
-        </Field>
-        <Field label="Custom setting fee (optional)" hint="(independent of this price)" wide>
-          <input type="text" inputMode="decimal" value={stone.setterFeeOverride}
-            placeholder={`Default — $${qb.config.setterMap[stone.setterType]?.fee ?? 0}`}
-            onChange={e => qb.patchStone(stone.uid, { setterFeeOverride: e.target.value })}
-            className={miniCls} />
-        </Field>
+        {/* Grouped so it's unmistakable these two overrides are related
+            (price and setting fee) yet independent of each other — the
+            live total at the bottom proves it. */}
+        <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3 md:col-span-2">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Pricing overrides</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label={stone.role === 'MAIN' ? 'Wholesale cost' : 'Gross cost for this batch of stones'} hint={customSize ? '(required — total for all stones in this batch)' : `(overrides ${money(pricePerCarat)}/ct × total carats)`} hintError={customSize}>
+              <input type="number" min={0} step="0.01" value={stone.manualPrice}
+                placeholder={customSize ? 'e.g. 4500 (required)' : 'Leave empty to use calculated price'}
+                onChange={e => qb.onStoneManualPriceChange(stone.uid, e.target.value)}
+                className={`${miniCls} ${customSize && stone.manualPrice.trim() === '' ? 'border-rose-300' : ''}`} />
+            </Field>
+            <Field label="Custom setting fee (optional)">
+              <input type="text" inputMode="decimal" value={stone.setterFeeOverride}
+                placeholder={`Default — $${qb.config.setterMap[stone.setterType]?.fee ?? 0}`}
+                onChange={e => qb.patchStone(stone.uid, { setterFeeOverride: e.target.value })}
+                className={miniCls} />
+            </Field>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-white px-3 py-2 text-[11px] text-slate-500">
+            <span>
+              Stone <strong className="text-slate-700">{money(stoneCost)}</strong>
+              {' + '}
+              Setting <strong className="text-slate-700">{money(stoneLabor)}</strong>
+              <span className="text-slate-400"> ({amountNum} × {money(stoneSetterFee)})</span>
+            </span>
+            <span className="font-semibold text-slate-900">= {money(stoneTotal)}</span>
+          </div>
+        </div>
         {stone.role === 'MAIN' && (
           <Field label="Markup for this stone" hint="(required)" hintError={!(Number(stone.markup) > 0)} wide>
             <input type="text" inputMode="decimal" value={stone.markup} placeholder={String(qb.parsedMarkup)} onChange={e => qb.patchStone(stone.uid, { markup: e.target.value })}
