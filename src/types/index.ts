@@ -48,6 +48,9 @@ export interface Usuario {
 export interface InviteStatus {
   emailSentAt: string | null
   emailSendFailed: boolean
+  /** Why the send/delivery failed — bounce message, spam complaint, or the
+   *  error Resend's API returned. Null unless emailSendFailed is true. */
+  emailFailureReason: string | null
   /** Best-effort — many mail clients block remote images, so a null here
    *  doesn't necessarily mean the email went unread. */
   emailOpenedAt: string | null

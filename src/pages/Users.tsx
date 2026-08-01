@@ -73,29 +73,34 @@ function InviteStatusLog({ invite }: { invite: InviteStatus | null | undefined }
   }
 
   return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-      <InviteStep
-        icon={Mail}
-        label={invite.emailSendFailed ? 'Send failed' : invite.emailSentAt ? 'Email sent' : 'Sending…'}
-        state={invite.emailSendFailed ? 'failed' : invite.emailSentAt ? 'done' : 'pending'}
-        when={invite.emailSentAt}
-      />
-      <InviteStep
-        icon={MailOpen}
-        label={invite.emailOpenedAt ? 'Email opened' : 'Not opened'}
-        state={invite.emailOpenedAt ? 'done' : 'pending'}
-        when={invite.emailOpenedAt}
-      />
-      <InviteStep
-        icon={MousePointerClick}
-        label={invite.linkOpenedAt ? 'Link clicked' : 'Not clicked'}
-        state={invite.linkOpenedAt ? 'done' : 'pending'}
-        when={invite.linkOpenedAt}
-      />
-      {invite.expired && (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700">
-          Invite link expired
-        </span>
+    <div>
+      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+        <InviteStep
+          icon={Mail}
+          label={invite.emailSendFailed ? 'Send failed' : invite.emailSentAt ? 'Email sent' : 'Sending…'}
+          state={invite.emailSendFailed ? 'failed' : invite.emailSentAt ? 'done' : 'pending'}
+          when={invite.emailSentAt}
+        />
+        <InviteStep
+          icon={MailOpen}
+          label={invite.emailOpenedAt ? 'Email opened' : 'Not opened'}
+          state={invite.emailOpenedAt ? 'done' : 'pending'}
+          when={invite.emailOpenedAt}
+        />
+        <InviteStep
+          icon={MousePointerClick}
+          label={invite.linkOpenedAt ? 'Link clicked' : 'Not clicked'}
+          state={invite.linkOpenedAt ? 'done' : 'pending'}
+          when={invite.linkOpenedAt}
+        />
+        {invite.expired && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700">
+            Invite link expired
+          </span>
+        )}
+      </div>
+      {invite.emailSendFailed && invite.emailFailureReason && (
+        <p className="mt-1 text-[11px] text-rose-600">{invite.emailFailureReason}</p>
       )}
     </div>
   )

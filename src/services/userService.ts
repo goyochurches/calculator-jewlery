@@ -4,6 +4,7 @@ import type { InviteStatus, Usuario } from '../types'
 interface ApiInviteStatus {
   emailSentAt: string | null
   emailSendFailed: boolean
+  emailFailureReason: string | null
   emailOpenedAt: string | null
   linkOpenedAt: string | null
   completedAt: string | null

@@ -39,8 +39,12 @@ export default function SetupPasswordPage() {
   }, [token])
 
   const validate = () => {
-    if (password.length < 8) return 'Password must be at least 8 characters.'
+    if (password.length < 6) return 'Password must be at least 6 characters.'
     if (password.length > 100) return 'Password must be at most 100 characters.'
+    if (!/[a-z]/.test(password)) return 'Password must include a lowercase letter.'
+    if (!/[A-Z]/.test(password)) return 'Password must include an uppercase letter.'
+    if (!/\d/.test(password)) return 'Password must include a number.'
+    if (!/[^A-Za-z0-9]/.test(password)) return 'Password must include a special character (e.g. !@#$%).'
     if (password !== confirm) return 'Passwords do not match.'
     return null
   }
@@ -125,7 +129,7 @@ export default function SetupPasswordPage() {
                       autoComplete="new-password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      placeholder="At least 8 characters"
+                      placeholder="e.g. Sparkle#42"
                       className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-10 pr-10 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-amber-200"
                       disabled={status === 'submitting'}
                     />
@@ -138,6 +142,9 @@ export default function SetupPasswordPage() {
                       {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
+                  <p className="mt-1.5 text-[11px] text-slate-400">
+                    At least 6 characters, with uppercase, lowercase, a number and a special character.
+                  </p>
                 </div>
 
                 <div>
