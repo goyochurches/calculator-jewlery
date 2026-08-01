@@ -1092,14 +1092,6 @@ export function QuoteBuilderPage() {
             </select>
           </div>
 
-          <div className="space-y-1 md:col-span-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Custom setting fee (optional)</label>
-            <input type="text" inputMode="decimal" value={stone.setterFeeOverride}
-              placeholder={`Default — $${config.setterMap[stone.setterType]?.fee ?? 0}`}
-              onChange={e => patchStone(stone.uid, { setterFeeOverride: e.target.value })}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
-          </div>
-
           <div className="space-y-1">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Shape <span className="font-normal normal-case text-slate-400">(optional)</span>
@@ -1178,6 +1170,17 @@ export function QuoteBuilderPage() {
               }`} />
             <p className="text-[10px] text-slate-400">
               Setting labor (amount × setter fee) is added on top of this price.
+            </p>
+          </div>
+
+          <div className="space-y-1 md:col-span-2">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Custom setting fee (optional)</label>
+            <input type="text" inputMode="decimal" value={stone.setterFeeOverride}
+              placeholder={`Default — $${config.setterMap[stone.setterType]?.fee ?? 0}`}
+              onChange={e => patchStone(stone.uid, { setterFeeOverride: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+            <p className="text-[10px] text-slate-400">
+              Overrides the setter-type fee above for this stone only — independent of its price.
             </p>
           </div>
 
@@ -2926,12 +2929,6 @@ export function QuoteBuilderPage() {
                                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
                               </div>
                               <div className="space-y-1">
-                                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Price each</label>
-                                <input type="number" min={0} step={0.01} value={es.priceUsd}
-                                  onChange={e => patchEmkayStone(es.uid, { priceUsd: Number(e.target.value) || 0 })}
-                                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
-                              </div>
-                              <div className="space-y-1 sm:col-span-2">
                                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type of setting</label>
                                 <select value={es.setterType}
                                   onChange={e => patchEmkayStone(es.uid, { setterType: e.target.value })}
@@ -2941,7 +2938,13 @@ export function QuoteBuilderPage() {
                                   ))}
                                 </select>
                               </div>
-                              <div className="space-y-1 sm:col-span-2">
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Price each</label>
+                                <input type="number" min={0} step={0.01} value={es.priceUsd}
+                                  onChange={e => patchEmkayStone(es.uid, { priceUsd: Number(e.target.value) || 0 })}
+                                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                              </div>
+                              <div className="space-y-1">
                                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Custom setting fee (optional)</label>
                                 <input type="text" inputMode="decimal" value={es.setterFeeOverride}
                                   placeholder={`Default — $${config.setterMap[es.setterType]?.fee ?? 0}`}

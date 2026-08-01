@@ -834,12 +834,6 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
             {qb.config.setters.map(s => <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>)}
           </select>
         </Field>
-        <Field label="Custom setting fee (optional)" wide>
-          <input type="text" inputMode="decimal" value={stone.setterFeeOverride}
-            placeholder={`Default — $${qb.config.setterMap[stone.setterType]?.fee ?? 0}`}
-            onChange={e => qb.patchStone(stone.uid, { setterFeeOverride: e.target.value })}
-            className={miniCls} />
-        </Field>
         <Field label="Shape (optional)">
           <select value={stone.shape} onChange={e => qb.patchStone(stone.uid, { shape: e.target.value })} className={miniCls}>
             <option value="">—</option>
@@ -873,6 +867,12 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
             placeholder={customSize ? 'e.g. 4500 (required)' : 'Leave empty to use calculated price'}
             onChange={e => qb.onStoneManualPriceChange(stone.uid, e.target.value)}
             className={`${miniCls} ${customSize && stone.manualPrice.trim() === '' ? 'border-rose-300' : ''}`} />
+        </Field>
+        <Field label="Custom setting fee (optional)" hint="(independent of this price)" wide>
+          <input type="text" inputMode="decimal" value={stone.setterFeeOverride}
+            placeholder={`Default — $${qb.config.setterMap[stone.setterType]?.fee ?? 0}`}
+            onChange={e => qb.patchStone(stone.uid, { setterFeeOverride: e.target.value })}
+            className={miniCls} />
         </Field>
         {stone.role === 'MAIN' && (
           <Field label="Markup for this stone" hint="(required)" hintError={!(Number(stone.markup) > 0)} wide>
@@ -1075,17 +1075,17 @@ function EmkayCatalogSection({ qb }: { qb: QuoteBuilderState }) {
                     <Field label="Quantity">
                       <input type="number" min={1} step={1} value={es.quantity} onChange={e => qb.patchEmkayStone(es.uid, { quantity: e.target.value })} className={miniCls} />
                     </Field>
+                    <Field label="Type of setting">
+                      <select value={es.setterType} onChange={e => qb.patchEmkayStone(es.uid, { setterType: e.target.value })} className={miniCls}>
+                        {qb.config.setters.map(s => <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>)}
+                      </select>
+                    </Field>
                     <Field label="Price each">
                       <input type="number" min={0} step={0.01} value={es.priceUsd}
                         onChange={e => qb.patchEmkayStone(es.uid, { priceUsd: Number(e.target.value) || 0 })}
                         className={miniCls} />
                     </Field>
-                    <Field label="Type of setting" wide>
-                      <select value={es.setterType} onChange={e => qb.patchEmkayStone(es.uid, { setterType: e.target.value })} className={miniCls}>
-                        {qb.config.setters.map(s => <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Custom setting fee (optional)" wide>
+                    <Field label="Custom setting fee (optional)" hint="(independent of this price)">
                       <input type="text" inputMode="decimal" value={es.setterFeeOverride}
                         placeholder={`Default — $${qb.config.setterMap[es.setterType]?.fee ?? 0}`}
                         onChange={e => qb.patchEmkayStone(es.uid, { setterFeeOverride: e.target.value })}
