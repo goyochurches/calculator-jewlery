@@ -58,11 +58,14 @@ function InviteStep({ icon: Icon, label, state, when }: {
   )
 }
 
-/** Log of the invite → set-password flow for one user: a compact summary of
- *  the most recent send, plus an expandable table of every invite/reset
- *  ever sent (who triggered it and what happened). */
-function InviteHistoryPanel({ history }: { history: InviteStatus[] }) {
-  const [expanded, setExpanded] = useState(false)
+/** Compact summary of the most recent invite/reset send, plus a toggle to
+ *  reveal the full history table (rendered separately, full-width, by the
+ *  caller — see InviteHistoryTable). */
+function InviteStatusSummary({ history, expanded, onToggle }: {
+  history: InviteStatus[]
+  expanded: boolean
+  onToggle: () => void
+}) {
   if (history.length === 0) return null
   const latest = history[0]
 
@@ -104,59 +107,91 @@ function InviteHistoryPanel({ history }: { history: InviteStatus[] }) {
         <p className="mt-1 text-[11px] text-rose-600">{latest.emailFailureReason}</p>
       )}
 
-      <button
-        type="button"
-        onClick={() => setExpanded(e => !e)}
-        className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-slate-700"
-      >
-        <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
-        {expanded ? 'Hide' : 'Show'} history ({history.length})
-      </button>
-
-      {expanded && (
-        <div className="mt-2 overflow-x-auto rounded-lg border border-slate-200">
-          <table className="w-full text-left text-[11px]">
-            <thead className="bg-slate-50 text-slate-500">
-              <tr>
-                <th className="whitespace-nowrap px-2 py-1.5 font-medium">Sent</th>
-                <th className="whitespace-nowrap px-2 py-1.5 font-medium">By</th>
-                <th className="whitespace-nowrap px-2 py-1.5 font-medium">Email</th>
-                <th className="whitespace-nowrap px-2 py-1.5 font-medium">Opened</th>
-                <th className="whitespace-nowrap px-2 py-1.5 font-medium">Clicked</th>
-                <th className="whitespace-nowrap px-2 py-1.5 font-medium">Result</th>
-              </tr>
-            </thead>
-            <tbody>
-              {history.map((h, i) => (
-                <tr key={i} className="border-t border-slate-100">
-                  <td className="whitespace-nowrap px-2 py-1.5 text-slate-600">{formatWhen(h.createdAt)}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5 text-slate-600">{h.requestedByName ?? '—'}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5">
-                    {h.emailSendFailed ? (
-                      <span className="text-rose-600">Failed{h.emailFailureReason ? `: ${h.emailFailureReason}` : ''}</span>
-                    ) : h.emailSentAt ? (
-                      <span className="text-emerald-600">Sent {formatWhen(h.emailSentAt)}</span>
-                    ) : (
-                      <span className="text-slate-400">Pending</span>
-                    )}
-                  </td>
-                  <td className="whitespace-nowrap px-2 py-1.5 text-slate-600">{h.emailOpenedAt ? formatWhen(h.emailOpenedAt) : '—'}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5 text-slate-600">{h.linkOpenedAt ? formatWhen(h.linkOpenedAt) : '—'}</td>
-                  <td className="whitespace-nowrap px-2 py-1.5">
-                    {h.completedAt ? (
-                      <span className="text-emerald-600">Password set {formatWhen(h.completedAt)}</span>
-                    ) : h.expired ? (
-                      <span className="text-amber-600">Expired</span>
-                    ) : (
-                      <span className="text-slate-400">Pending</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {history.length > 0 && (
+        <button
+          type="button"
+          onClick={onToggle}
+          className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-slate-700"
+        >
+          <ChevronDown className={`h-3 w-3 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+          {expanded ? 'Hide' : 'Show'} history ({history.length})
+        </button>
       )}
+    </div>
+  )
+}
+
+function InviteResultBadge({ h }: { h: InviteStatus }) {
+  if (h.completedAt) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
+        <CircleCheck className="h-3 w-3" /> Password set
+      </span>
+    )
+  }
+  if (h.expired) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-700">
+        Expired
+      </span>
+    )
+  }
+  return (
+    <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500">
+      Pending
+    </span>
+  )
+}
+
+/** Full, full-width history table for one user: every invite/reset ever
+ *  sent (who triggered it, delivery/open/click status, and the outcome). */
+function InviteHistoryTable({ history }: { history: InviteStatus[] }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm md:ml-16">
+      <table className="w-full text-left text-xs">
+        <thead>
+          <tr className="bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            <th className="px-4 py-2.5">Sent</th>
+            <th className="px-4 py-2.5">By</th>
+            <th className="px-4 py-2.5">Email</th>
+            <th className="px-4 py-2.5">Opened</th>
+            <th className="px-4 py-2.5">Clicked</th>
+            <th className="px-4 py-2.5">Result</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {history.map((h, i) => (
+            <tr key={i} className="even:bg-slate-50/60">
+              <td className="whitespace-nowrap px-4 py-2.5 font-medium text-slate-700">{formatWhen(h.createdAt)}</td>
+              <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">
+                {h.requestedByName ?? <span className="text-slate-400">—</span>}
+              </td>
+              <td className="px-4 py-2.5">
+                {h.emailSendFailed ? (
+                  <span className="inline-flex max-w-xs items-start gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-medium text-rose-700">
+                    Failed{h.emailFailureReason ? `: ${h.emailFailureReason}` : ''}
+                  </span>
+                ) : h.emailSentAt ? (
+                  <span className="inline-flex items-center whitespace-nowrap rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700">
+                    Sent {formatWhen(h.emailSentAt)}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-500">
+                    Pending
+                  </span>
+                )}
+              </td>
+              <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">
+                {h.emailOpenedAt ? formatWhen(h.emailOpenedAt) : <span className="text-slate-400">—</span>}
+              </td>
+              <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">
+                {h.linkOpenedAt ? formatWhen(h.linkOpenedAt) : <span className="text-slate-400">—</span>}
+              </td>
+              <td className="whitespace-nowrap px-4 py-2.5"><InviteResultBadge h={h} /></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
@@ -179,6 +214,15 @@ export function UsersPage() {
   const [editingUser, setEditingUser] = useState<Usuario | null>(null)
   const [resendingId, setResendingId] = useState<string | null>(null)
   const [resentInvite, setResentInvite] = useState<{ id: string; name: string } | null>(null)
+  const [expandedHistoryIds, setExpandedHistoryIds] = useState<Set<string>>(new Set())
+
+  const toggleHistory = (id: string) => {
+    setExpandedHistoryIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
 
   useEffect(() => {
     userService.getAll().then((data) => { setUsers(data); setLoading(false) })
@@ -336,61 +380,72 @@ export function UsersPage() {
 
       <CardContent className="divide-y divide-slate-100">
         {users.map((u) => (
-          <div key={u.id} className="flex flex-col gap-4 py-5 md:flex-row md:items-center">
-            {u.photo ? (
-              <img src={u.photo} alt={u.name}
-                className="h-12 w-12 shrink-0 rounded-2xl object-cover ring-1 ring-slate-200" />
-            ) : (
-              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-semibold ${AVATAR_COLORS[u.role]}`}>
-                {u.avatar}
+          <div key={u.id} className="py-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center">
+              {u.photo ? (
+                <img src={u.photo} alt={u.name}
+                  className="h-12 w-12 shrink-0 rounded-2xl object-cover ring-1 ring-slate-200" />
+              ) : (
+                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-sm font-semibold ${AVATAR_COLORS[u.role]}`}>
+                  {u.avatar}
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-slate-900">{u.name}</p>
+                <p className="text-sm text-slate-500">{u.email}</p>
+                {u.bio && (
+                  <p className="mt-1 text-xs leading-snug text-slate-500 line-clamp-2">{u.bio}</p>
+                )}
+                <InviteStatusSummary
+                  history={u.inviteHistory}
+                  expanded={expandedHistoryIds.has(u.id)}
+                  onToggle={() => toggleHistory(u.id)}
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                  {ROLE_LABELS[u.role]}
+                </span>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${u.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
+                  {u.status === 'active' ? 'Active' : 'Inactive'}
+                </span>
+                <Button variant="outline" size="lg" onClick={() => setEditingUser(u)}>
+                  <Pencil className="mr-1.5 h-4 w-4" />
+                  Edit profile
+                </Button>
+                <Button variant="outline" size="lg" onClick={() => toggleStatus(u.id, u.status)}>
+                  {u.status === 'active' ? 'Disable' : 'Enable'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => resendInvite(u)}
+                  disabled={resendingId === u.id}
+                  title="Send a fresh 24h link to set a new password"
+                >
+                  <Send className="mr-1.5 h-4 w-4" />
+                  {resendingId === u.id
+                    ? 'Sending…'
+                    : u.inviteHistory[0]?.completedAt ? 'Reset password' : 'Resend invite'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={() => setConfirmTarget(u)}
+                  disabled={u.id === currentUserId || deletingId === u.id}
+                  title={u.id === currentUserId ? "You can't delete your own account" : 'Delete user'}
+                  className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-40"
+                >
+                  <Trash2 className="mr-1.5 h-4 w-4" />
+                  {deletingId === u.id ? 'Deleting…' : 'Delete'}
+                </Button>
+              </div>
+            </div>
+            {expandedHistoryIds.has(u.id) && u.inviteHistory.length > 0 && (
+              <div className="mt-3">
+                <InviteHistoryTable history={u.inviteHistory} />
               </div>
             )}
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-900">{u.name}</p>
-              <p className="text-sm text-slate-500">{u.email}</p>
-              {u.bio && (
-                <p className="mt-1 text-xs leading-snug text-slate-500 line-clamp-2">{u.bio}</p>
-              )}
-              <InviteHistoryPanel history={u.inviteHistory} />
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                {ROLE_LABELS[u.role]}
-              </span>
-              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${u.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                {u.status === 'active' ? 'Active' : 'Inactive'}
-              </span>
-              <Button variant="outline" size="lg" onClick={() => setEditingUser(u)}>
-                <Pencil className="mr-1.5 h-4 w-4" />
-                Edit profile
-              </Button>
-              <Button variant="outline" size="lg" onClick={() => toggleStatus(u.id, u.status)}>
-                {u.status === 'active' ? 'Disable' : 'Enable'}
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => resendInvite(u)}
-                disabled={resendingId === u.id}
-                title="Send a fresh 24h link to set a new password"
-              >
-                <Send className="mr-1.5 h-4 w-4" />
-                {resendingId === u.id
-                  ? 'Sending…'
-                  : u.inviteHistory[0]?.completedAt ? 'Reset password' : 'Resend invite'}
-              </Button>
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => setConfirmTarget(u)}
-                disabled={u.id === currentUserId || deletingId === u.id}
-                title={u.id === currentUserId ? "You can't delete your own account" : 'Delete user'}
-                className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:text-rose-700 disabled:opacity-40"
-              >
-                <Trash2 className="mr-1.5 h-4 w-4" />
-                {deletingId === u.id ? 'Deleting…' : 'Delete'}
-              </Button>
-            </div>
           </div>
         ))}
       </CardContent>
