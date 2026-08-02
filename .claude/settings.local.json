@@ -193,7 +193,8 @@
       "Bash(taskkill //F //IM node.exe)",
       "Bash(jobs -l)",
       "Bash(netstat -ano)",
-      "Bash(taskkill *)"
+      "Bash(taskkill *)",
+      "WebFetch(domain:developers.brevo.com)"
     ]
   }
 }

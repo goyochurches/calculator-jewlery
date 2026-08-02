@@ -2,6 +2,8 @@ import { api } from '@/api/apiClient'
 import type { InviteStatus, Usuario } from '../types'
 
 interface ApiInviteStatus {
+  createdAt: string
+  requestedByName: string | null
   emailSentAt: string | null
   emailSendFailed: boolean
   emailFailureReason: string | null
@@ -21,7 +23,7 @@ interface ApiUser {
   bio?: string | null
   photo?: string | null
   phone?: string | null
-  invite?: ApiInviteStatus | null
+  inviteHistory?: ApiInviteStatus[]
 }
 
 function mapUser(u: ApiUser): Usuario {
@@ -35,7 +37,7 @@ function mapUser(u: ApiUser): Usuario {
     bio: u.bio ?? null,
     photo: u.photo ?? null,
     phone: u.phone ?? null,
-    invite: (u.invite ?? null) as InviteStatus | null,
+    inviteHistory: (u.inviteHistory ?? []) as InviteStatus[],
   }
 }
 

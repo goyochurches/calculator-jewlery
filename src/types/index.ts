@@ -40,12 +40,16 @@ export interface Usuario {
   /** Full international format without "whatsapp:" prefix (e.g. "+34612345678").
    *  Used by backend to send WhatsApp on quote approval. Internal only. */
   phone?: string | null
-  /** Where the user is in the invite → set-password flow. Null if the user
-   *  was never sent (or has no) an invite (e.g. seeded accounts). */
-  invite?: InviteStatus | null
+  /** Full history of invite/reset-password sends for this user, newest
+   *  first. Empty if one was never sent (e.g. seeded accounts). */
+  inviteHistory: InviteStatus[]
 }
 
 export interface InviteStatus {
+  createdAt: string
+  /** Name of the admin who triggered this send. Null for historic rows
+   *  created before this was tracked. */
+  requestedByName: string | null
   emailSentAt: string | null
   emailSendFailed: boolean
   /** Why the send/delivery failed — bounce message, spam complaint, or the
