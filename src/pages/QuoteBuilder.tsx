@@ -1393,10 +1393,10 @@ export function QuoteBuilderPage() {
 
   const pricing = useMemo(() => {
     const materialCost = metalRows.reduce((sum, row) => {
-      const cfg = JEWELRY_METAL_OPTIONS[row.metal]
-      return sum + (cfg ? cfg.pricePerGram * parseNum(row.grams) : 0)
+      const pricePerGram = config.metalPriceMap[row.metal]
+      return sum + (pricePerGram ? pricePerGram * parseNum(row.grams) : 0)
     }, 0)
-    const metalPricePerGram = JEWELRY_METAL_OPTIONS[selectedMetal]?.pricePerGram ?? 0
+    const metalPricePerGram = config.metalPriceMap[selectedMetal] ?? 0
     const ringLaborFee = config.ringLaborMap[ringLabor]?.fee ?? 0
     const cadFee = 0
     const engravingFeeVal = Math.max(0, engravingFee)
@@ -2352,7 +2352,7 @@ export function QuoteBuilderPage() {
                     <optgroup key={g.group} label={g.group}>
                       {g.keys.map(key => (
                         <option key={key} value={key}>
-                          {JEWELRY_METAL_OPTIONS[key].label} — ${JEWELRY_METAL_OPTIONS[key].pricePerGram}/g
+                          {JEWELRY_METAL_OPTIONS[key].label} — ${config.metalPriceMap[key].toFixed(2)}/g
                         </option>
                       ))}
                     </optgroup>
@@ -2411,7 +2411,7 @@ export function QuoteBuilderPage() {
                           <optgroup key={g.group} label={g.group}>
                             {g.keys.map(key => (
                               <option key={key} value={key}>
-                                {JEWELRY_METAL_OPTIONS[key].label} — ${JEWELRY_METAL_OPTIONS[key].pricePerGram}/g
+                                {JEWELRY_METAL_OPTIONS[key].label} — ${config.metalPriceMap[key].toFixed(2)}/g
                               </option>
                             ))}
                           </optgroup>
@@ -2439,7 +2439,7 @@ export function QuoteBuilderPage() {
                   <p className="text-xs font-medium text-rose-600">All metal rows require a gram weight</p>
                 )}
                 <p className="text-xs text-slate-400">
-                  Total material cost: <strong className="text-slate-700">${metalRows.reduce((s, r) => s + (JEWELRY_METAL_OPTIONS[r.metal]?.pricePerGram ?? 0) * parseNum(r.grams), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                  Total material cost: <strong className="text-slate-700">${metalRows.reduce((s, r) => s + (config.metalPriceMap[r.metal] ?? 0) * parseNum(r.grams), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
                 </p>
               </div>
               )}

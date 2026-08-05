@@ -14,6 +14,8 @@ import {
 import type { GemstonePrice } from '../types'
 import { Check, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useMetals } from '@/hooks/useMetals'
+import { computePricePerGram, markupPercentFromTarget, type MetalCategory } from '@/lib/metalPricing'
 
 const QUALITY_STYLES: Record<GemstonePrice['quality'], string> = {
   standard: 'bg-slate-50 text-slate-600',
@@ -932,9 +934,110 @@ export function MasterTablesPage() {
         </CardContent>
       </Card>
 
+      {/* ── Metal Pricing ── */}
+      <MetalPricingSection />
+
       {/* ── RN Ring Models ── */}
       <RnRingsSection />
     </div>
+  )
+}
+
+// ── Metal Pricing section (spot-tied $/gram) ────────────────────────────────
+// Admins type the $/gram they want; we back-solve + store it as a markup %
+// over the live gold/platinum spot price (see src/lib/metalPricing.ts), so
+// the number keeps floating with the market from then on instead of going
+// stale like the old hardcoded constant did.
+function MetalPricingSection() {
+  const { metals } = useMetals()
+  const [settings, setSettings] = useState<CompanySettings | null>(null)
+  const [draft, setDraft] = useState({ g14: '', g18: '', pt: '' })
+  const [seeded, setSeeded] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    companyService.get().then(setSettings).catch(console.error)
+  }, [])
+
+  const goldSpot = metals.find(m => m.symbol === 'XAU')?.price ?? null
+  const platinumSpot = metals.find(m => m.symbol === 'XPT')?.price ?? null
+
+  const live = {
+    g14: settings && goldSpot != null && settings.metalMarkupGold14k != null
+      ? computePricePerGram(goldSpot, '14k', settings.metalMarkupGold14k) : null,
+    g18: settings && goldSpot != null && settings.metalMarkupGold18k != null
+      ? computePricePerGram(goldSpot, '18k', settings.metalMarkupGold18k) : null,
+    pt: settings && platinumSpot != null && settings.metalMarkupPlatinum != null
+      ? computePricePerGram(platinumSpot, 'platinum', settings.metalMarkupPlatinum) : null,
+  }
+
+  // Pre-fill the editable target once, from the live computed price — don't
+  // stomp on an in-progress edit every time the 2-min spot poll ticks.
+  useEffect(() => {
+    if (seeded || live.g14 == null || live.g18 == null || live.pt == null) return
+    setDraft({ g14: live.g14.toFixed(2), g18: live.g18.toFixed(2), pt: live.pt.toFixed(2) })
+    setSeeded(true)
+  }, [seeded, live.g14, live.g18, live.pt])
+
+  const save = async () => {
+    if (!settings || goldSpot == null || platinumSpot == null) return
+    setSaving(true)
+    try {
+      const updated = await companyService.save({
+        ...settings,
+        metalMarkupGold14k: markupPercentFromTarget(goldSpot, '14k', Number(draft.g14) || 0),
+        metalMarkupGold18k: markupPercentFromTarget(goldSpot, '18k', Number(draft.g18) || 0),
+        metalMarkupPlatinum: markupPercentFromTarget(platinumSpot, 'platinum', Number(draft.pt) || 0),
+      })
+      setSettings(updated)
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const ROWS: Array<{ key: 'g14' | 'g18' | 'pt'; label: string; category: MetalCategory; spot: number | null; symbol: string }> = [
+    { key: 'g14', label: '14K Gold', category: '14k',      spot: goldSpot,     symbol: 'XAU' },
+    { key: 'g18', label: '18K Gold', category: '18k',      spot: goldSpot,     symbol: 'XAU' },
+    { key: 'pt',  label: 'Platinum', category: 'platinum', spot: platinumSpot, symbol: 'XPT' },
+  ]
+
+  return (
+    <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+      <CardHeader className="border-b border-slate-100">
+        <CardTitle className="text-base font-semibold text-slate-900">Metal Pricing</CardTitle>
+        <p className="text-sm text-slate-500">
+          $/gram tied to the live gold &amp; platinum spot price. Type the price you want today — it's saved
+          as a markup over spot, so it keeps moving with the market automatically from then on.
+        </p>
+      </CardHeader>
+      <CardContent className="p-6 space-y-4">
+        <div className="grid gap-4 sm:grid-cols-3">
+          {ROWS.map(row => (
+            <div key={row.key} className="space-y-1">
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{row.label} ($/g)</label>
+              <TInput
+                type="number" min={0} step="0.01"
+                value={draft[row.key]}
+                onChange={e => setDraft(d => ({ ...d, [row.key]: e.target.value }))}
+              />
+              <p className="text-[11px] text-slate-400">
+                Spot ({row.symbol}): {row.spot != null ? `$${row.spot.toLocaleString('en-US', { minimumFractionDigits: 2 })}/oz` : '—'}
+              </p>
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center gap-3">
+          <Button size="sm" className="text-white" style={{ backgroundColor: 'var(--theme-primary)' }}
+            onClick={save} disabled={saving || !settings || goldSpot == null || platinumSpot == null}>
+            {saving ? 'Saving…' : 'Save'}
+          </Button>
+          {saved && <span className="text-xs font-medium text-emerald-600">Saved</span>}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 

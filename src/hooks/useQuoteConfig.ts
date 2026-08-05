@@ -7,6 +7,11 @@ import {
   type SetterConfig,
   type StoneType,
 } from '@/services/configService'
+import { companyService } from '@/services/companyService'
+import { metalsService } from '@/services/metalService'
+import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
+import { categoryForMetalKey, computePricePerGram } from '@/lib/metalPricing'
+import type { JewelryMetalOption } from '@/types'
 import { useCallback, useEffect, useState } from 'react'
 
 // Quote stones use lowercase 'natural' / 'lab-grown' (with a legacy
@@ -42,15 +47,25 @@ export interface QuoteConfig {
   cadMap: Record<string, PricingTier>
   ringLaborMap: Record<string, PricingTier>
   setterMap: Record<string, SetterConfig>
+  /** Live $/gram per metal key — spot × purity × markup where the metal is
+   *  tied to the spot feed (gold, platinum), falling back to the static
+   *  JEWELRY_METAL_OPTIONS default (e.g. silver, or if the spot/markup data
+   *  hasn't loaded yet) otherwise. See src/lib/metalPricing.ts. */
+  metalPriceMap: Record<JewelryMetalOption, number>
   loading: boolean
   /** Re-fetch all config data from the backend. */
   refresh: () => void
 }
 
+const STATIC_METAL_PRICES = Object.fromEntries(
+  Object.entries(JEWELRY_METAL_OPTIONS).map(([key, cfg]) => [key, cfg.pricePerGram])
+) as Record<JewelryMetalOption, number>
+
 const EMPTY: QuoteConfig = {
   diamondSizes: [], fingerSizes: [], cadTiers: [], ringLaborTiers: [], setters: [], rnRings: [],
   diamondSizeFor: () => undefined,
   fingerSizeMap: {}, cadMap: {}, ringLaborMap: {}, setterMap: {},
+  metalPriceMap: STATIC_METAL_PRICES,
   loading: true,
   refresh: () => {},
 }
@@ -71,11 +86,38 @@ export function useQuoteConfig(): QuoteConfig {
       // RN models live behind a newer endpoint; if the backend hasn't shipped
       // it yet, degrade to an empty list instead of breaking the whole builder.
       configService.getRnRings().catch(() => [] as Awaited<ReturnType<typeof configService.getRnRings>>),
+      // Live spot feed + markup settings, for metalPriceMap below. Either can
+      // fail independently (feed down, settings row missing markup yet) —
+      // degrade to the static defaults rather than breaking the builder.
+      metalsService.getPrices().catch(() => [] as Awaited<ReturnType<typeof metalsService.getPrices>>),
+      companyService.get().catch(() => null),
     ])
-      .then(([diamondSizes, fingerSizes, cadTiers, ringLaborTiers, setters, rnRings]) => {
+      .then(([diamondSizes, fingerSizes, cadTiers, ringLaborTiers, setters, rnRings, metals, settings]) => {
         const byTypeAndKey: Record<string, DiamondSizeConfig> = Object.fromEntries(
           diamondSizes.map(d => [`${d.stoneType}|${normalizeSizeKey(d.sizeKey)}`, d])
         )
+
+        const goldSpot = metals.find(m => m.symbol === 'XAU')?.price
+        const platinumSpot = metals.find(m => m.symbol === 'XPT')?.price
+        const markupByCategory = {
+          '14k': settings?.metalMarkupGold14k,
+          '18k': settings?.metalMarkupGold18k,
+          platinum: settings?.metalMarkupPlatinum,
+        } as const
+        const spotByCategory = { '14k': goldSpot, '18k': goldSpot, platinum: platinumSpot } as const
+
+        const metalPriceMap = Object.fromEntries(
+          Object.keys(JEWELRY_METAL_OPTIONS).map((key) => {
+            const category = categoryForMetalKey(key)
+            const spot = category ? spotByCategory[category] : undefined
+            const markup = category ? markupByCategory[category] : undefined
+            const price = category != null && spot != null && markup != null
+              ? computePricePerGram(spot, category, markup)
+              : STATIC_METAL_PRICES[key as JewelryMetalOption]
+            return [key, price]
+          })
+        ) as Record<JewelryMetalOption, number>
+
         setConfig({
           diamondSizes,
           fingerSizes,
@@ -89,6 +131,7 @@ export function useQuoteConfig(): QuoteConfig {
           cadMap: Object.fromEntries(cadTiers.map(t => [t.tierKey, t])),
           ringLaborMap: Object.fromEntries(ringLaborTiers.map(t => [t.tierKey, t])),
           setterMap: Object.fromEntries(setters.map(s => [s.typeKey, s])),
+          metalPriceMap,
           loading: false,
           refresh,
         })

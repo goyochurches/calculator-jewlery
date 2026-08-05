@@ -615,10 +615,10 @@ export function useQuoteBuilder() {
   const parseGrams = (s: string) => { const n = Number(s); return Number.isFinite(n) ? n : 0 }
   const pricing = useMemo(() => {
     const materialCost = metalRows.reduce((sum, row) => {
-      const cfg = JEWELRY_METAL_OPTIONS[row.metal]
-      return sum + (cfg ? cfg.pricePerGram * parseGrams(row.grams) : 0)
+      const pricePerGram = config.metalPriceMap[row.metal]
+      return sum + (pricePerGram ? pricePerGram * parseGrams(row.grams) : 0)
     }, 0)
-    const metalPricePerGram = JEWELRY_METAL_OPTIONS[selectedMetal]?.pricePerGram ?? 0
+    const metalPricePerGram = config.metalPriceMap[selectedMetal] ?? 0
     const ringLaborFee = config.ringLaborMap[ringLabor]?.fee ?? 0
     const cadFee = 0
     const engravingFeeVal = Math.max(0, engravingFee)

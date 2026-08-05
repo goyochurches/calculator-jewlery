@@ -50,6 +50,12 @@ export interface CompanySettings {
   engravingStep?: number | null
   /** Pre-selected engraving fee for a fresh quote (dollars). */
   engravingDefault?: number | null
+  // ── Metal pricing markup (Master Tables) ──
+  // % over pure metal content used to derive the live $/gram from spot —
+  // see src/lib/metalPricing.ts for the formula. Editable from Master Tables.
+  metalMarkupGold14k?: number | null
+  metalMarkupGold18k?: number | null
+  metalMarkupPlatinum?: number | null
 }
 
 /** Fallback engraving slider bounds when the backend hasn't been configured

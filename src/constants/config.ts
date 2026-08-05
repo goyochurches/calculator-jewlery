@@ -59,19 +59,23 @@ export const JEWELRY_METAL_OPTIONS: Record<
   {
     label: string
     group: '14K Gold' | '18K Gold' | 'Platinum' | 'Silver'
+    /** Fallback $/gram used only while the live spot feed / markup settings
+     *  haven't loaded yet (or fail to load) — see src/lib/metalPricing.ts and
+     *  useQuoteConfig's metalPriceMap for the live, spot-tied price actually
+     *  used in the builder. */
     pricePerGram: number
   }
 > = {
-  'gold-14k-white':  { label: '14K White Gold',  group: '14K Gold', pricePerGram: 105 },
-  'gold-14k-yellow': { label: '14K Yellow Gold', group: '14K Gold', pricePerGram: 105 },
-  'gold-14k-rose':   { label: '14K Rose Gold',   group: '14K Gold', pricePerGram: 105 },
-  'gold-18k-white':  { label: '18K White Gold',  group: '18K Gold', pricePerGram: 130 },
-  'gold-18k-yellow': { label: '18K Yellow Gold', group: '18K Gold', pricePerGram: 130 },
-  'gold-18k-rose':   { label: '18K Rose Gold',   group: '18K Gold', pricePerGram: 130 },
-  platinum:          { label: 'Platinum',        group: 'Platinum', pricePerGram: 75  },
+  'gold-14k-white':  { label: '14K White Gold',  group: '14K Gold', pricePerGram: 95  },
+  'gold-14k-yellow': { label: '14K Yellow Gold', group: '14K Gold', pricePerGram: 95  },
+  'gold-14k-rose':   { label: '14K Rose Gold',   group: '14K Gold', pricePerGram: 95  },
+  'gold-18k-white':  { label: '18K White Gold',  group: '18K Gold', pricePerGram: 120 },
+  'gold-18k-yellow': { label: '18K Yellow Gold', group: '18K Gold', pricePerGram: 120 },
+  'gold-18k-rose':   { label: '18K Rose Gold',   group: '18K Gold', pricePerGram: 120 },
+  platinum:          { label: 'Platinum',        group: 'Platinum', pricePerGram: 92  },
   // Legacy keys mapped to current pricing so historical quotes still render
-  'gold-14k':        { label: '14K Gold',        group: '14K Gold', pricePerGram: 105 },
-  'gold-18k':        { label: '18K Gold',        group: '18K Gold', pricePerGram: 130 },
+  'gold-14k':        { label: '14K Gold',        group: '14K Gold', pricePerGram: 95  },
+  'gold-18k':        { label: '18K Gold',        group: '18K Gold', pricePerGram: 120 },
   silver:            { label: 'Silver',          group: 'Silver',   pricePerGram: 0   },
 }
 

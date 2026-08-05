@@ -411,13 +411,13 @@ function StepClient({ qb }: { qb: QuoteBuilderState }) {
 }
 
 // ── Step 2: Material ────────────────────────────────────────────────────────
-function MetalSelect({ row, onChange }: { row: MetalRow; onChange: (metal: JewelryMetalOption) => void }) {
+function MetalSelect({ row, onChange, metalPriceMap }: { row: MetalRow; onChange: (metal: JewelryMetalOption) => void; metalPriceMap: Record<JewelryMetalOption, number> }) {
   return (
     <select value={row.metal} onChange={e => onChange(e.target.value as JewelryMetalOption)} className={inputCls}>
       {METAL_GROUPS.map(g => (
         <optgroup key={g.group} label={g.group}>
           {g.keys.map(key => (
-            <option key={key} value={key}>{JEWELRY_METAL_OPTIONS[key].label} — ${JEWELRY_METAL_OPTIONS[key].pricePerGram}/g</option>
+            <option key={key} value={key}>{JEWELRY_METAL_OPTIONS[key].label} — ${metalPriceMap[key].toFixed(2)}/g</option>
           ))}
         </optgroup>
       ))}
@@ -435,7 +435,7 @@ function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
           {/* Single-metal: classic two-field layout */}
           <div>
             <label className={labelCls}>Metal</label>
-            <MetalSelect row={qb.metalRows[0]} onChange={metal => qb.setMetalRows([{ ...qb.metalRows[0], metal }])} />
+            <MetalSelect row={qb.metalRows[0]} onChange={metal => qb.setMetalRows([{ ...qb.metalRows[0], metal }])} metalPriceMap={qb.config.metalPriceMap} />
           </div>
           <div ref={qb.gramsErrorRef}>
             <label className={labelCls}>Weight (grams)</label>
@@ -480,7 +480,7 @@ function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
               {qb.metalRows.map(row => (
                 <div key={row.uid} className="flex items-center gap-2">
                   <div className="min-w-0 flex-1">
-                    <MetalSelect row={row} onChange={metal => qb.setMetalRows(prev => prev.map(r => r.uid === row.uid ? { ...r, metal } : r))} />
+                    <MetalSelect row={row} onChange={metal => qb.setMetalRows(prev => prev.map(r => r.uid === row.uid ? { ...r, metal } : r))} metalPriceMap={qb.config.metalPriceMap} />
                   </div>
                   <input
                     type="number" min={0} step={0.1}
@@ -504,7 +504,7 @@ function StepMaterial({ qb }: { qb: QuoteBuilderState }) {
             )}
             <p className="text-xs text-slate-400">
               Total material cost: <strong className="text-slate-700">
-                ${qb.metalRows.reduce((s, r) => s + (JEWELRY_METAL_OPTIONS[r.metal]?.pricePerGram ?? 0) * (Number(r.grams) || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                ${qb.metalRows.reduce((s, r) => s + (qb.config.metalPriceMap[r.metal] ?? 0) * (Number(r.grams) || 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </strong>
             </p>
           </div>
