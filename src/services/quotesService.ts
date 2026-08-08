@@ -1,5 +1,12 @@
 import { api } from '@/api/apiClient'
-import type { Client, QuoteAttachment, QuoteCustomerStone, QuoteEmkayStone, QuoteStone, SavedQuote } from '../types'
+import type { Client, QuoteAttachment, QuoteCustomerStone, QuoteEmkayStone, QuoteMetal, QuoteStone, SavedQuote } from '../types'
+
+interface ApiMetalRow {
+  id?: number | null
+  metalKey: string
+  weightGrams: number
+  position?: number | null
+}
 
 interface ApiStone {
   id?: number | null
@@ -101,6 +108,7 @@ interface ApiQuote {
   jewelryType?: string | null
   applyTaxes?: boolean | null
   client?: Client | null
+  metalRows?: ApiMetalRow[]
   stones?: ApiStone[]
   customerStones?: ApiCustomerStone[]
   emkayStones?: ApiEmkayStone[]
@@ -184,6 +192,7 @@ function mapQuote(q: ApiQuote): SavedQuote {
     applyTaxes: q.applyTaxes ?? false,
     client: q.client ?? null,
     clientId: q.client?.id ?? q.clientId ?? null,
+    metalRows: (q.metalRows ?? []).map(mapMetalRow),
     stones: (q.stones ?? []).map(mapStone),
     customerStones: (q.customerStones ?? []).map(mapCustomerStone),
     emkayStones: (q.emkayStones ?? []).map(mapEmkayStone),
@@ -212,6 +221,15 @@ function mapQuote(q: ApiQuote): SavedQuote {
     paymentTotalCount: q.paymentTotalCount ?? null,
     paymentPaidCount: q.paymentPaidCount ?? null,
     paymentFullyPaid: q.paymentFullyPaid ?? null,
+  }
+}
+
+function mapMetalRow(r: ApiMetalRow): QuoteMetal {
+  return {
+    id: r.id ?? null,
+    metalKey: r.metalKey as QuoteMetal['metalKey'],
+    weightGrams: r.weightGrams,
+    position: r.position ?? 0,
   }
 }
 
