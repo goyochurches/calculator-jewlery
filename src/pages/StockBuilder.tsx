@@ -423,13 +423,33 @@ export function StockBuilderPage() {
             contribution: b?.contribution ?? null,
           }
         }),
+        emkayStones: emkayStones.map((es, i) => ({
+          emkayProductId: es.emkayProductId || null,
+          model: es.model || null,
+          name: es.name,
+          imageUrl: es.imageUrl,
+          certImageUrl: es.certImageUrl,
+          priceUsd: es.priceUsd,
+          caratWeight: es.caratWeight,
+          shape: es.shape,
+          sizeText: es.sizeText,
+          treatment: es.treatment,
+          stoneType: es.stoneType,
+          countryOfOrigin: es.countryOfOrigin,
+          href: es.href,
+          setterType: es.setterType,
+          setterFeeOverride: es.setterFeeOverride.trim() !== '' ? parseNum(es.setterFeeOverride) : null,
+          quantity: Math.max(1, parseNum(es.quantity || '1') || 1),
+          sortOrder: i,
+          comments: es.comments.trim() || null,
+        })),
       }
       await stockService.create(payload, Number(user.id))
       setToast({ variant: 'success', title: 'Stock piece saved', description: `"${title.trim()}" was added to stock.` })
       // Reset for the next entry, same UX as the quote builder after submit.
       setTitle(''); setSku(''); setQuantity('1'); setStatus('AVAILABLE')
       setMetalRows([{ uid: nextUid(), metalKey: 'gold-14k-yellow', grams: '' }])
-      setStones([]); setPhoto(null); setInternalNotes('')
+      setStones([]); setEmkayStones([]); setPhoto(null); setInternalNotes('')
       setExtraCosts('0'); setEngravingFee('0')
     } catch (err) {
       console.error(err)
@@ -493,7 +513,7 @@ export function StockBuilderPage() {
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Stone + setting</p>
-                  <p className="mt-2 text-2xl font-semibold">${(stoneCost + settingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                  <p className="mt-2 text-2xl font-semibold">${(stoneCost + settingFee + emkayCost + emkaySettingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
                   <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Internal cost</p>
