@@ -78,6 +78,7 @@ export function QuotesListPage() {
 
   const [deleteTarget, setDeleteTarget] = useState<SavedQuote | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null)
 
   // ── Server-side pagination state ─────────────────────────────────────────
   const [quotes, setQuotes] = useState<SavedQuote[]>([])      // current page
@@ -161,6 +162,23 @@ export function QuotesListPage() {
       console.error(err)
     } finally {
       setDeleting(false)
+    }
+  }
+
+  // Always fetch the FULL quote before duplicating — the paginated-list
+  // summary (mapSummary in quotesService) omits client, real metal rows,
+  // notes, customer/EMKAY stones and attachments, so prefilling straight
+  // from it silently dropped most of the quote. Mirrors what
+  // QuoteDetailPage / QuoteDetailPanel already do correctly.
+  const handleDuplicate = async (quote: SavedQuote) => {
+    setDuplicatingId(quote.id)
+    try {
+      const full = await quotesService.getById(quote.id)
+      navigate('/quotes', { state: { duplicateFrom: full } })
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setDuplicatingId(null)
     }
   }
 
@@ -370,7 +388,8 @@ export function QuotesListPage() {
                         kind="parent"
                         isSelected={false}
                         onSelect={() => navigate(`/quotes-list/${group.parent.id}`)}
-                        onDuplicate={() => navigate('/quotes', { state: { duplicateFrom: group.parent } })}
+                        onDuplicate={() => handleDuplicate(group.parent)}
+                        duplicating={duplicatingId === group.parent.id}
                         childCount={childCount}
                         expanded={expanded}
                         canToggle={childCount > 0}
@@ -389,7 +408,8 @@ export function QuotesListPage() {
                             isLastChild={idx === group.children.length - 1}
                             isSelected={false}
                             onSelect={() => navigate(`/quotes-list/${child.id}`)}
-                            onDuplicate={() => navigate('/quotes', { state: { duplicateFrom: child } })}
+                            onDuplicate={() => handleDuplicate(child)}
+                            duplicating={duplicatingId === child.id}
                             viewerUser={user}
                             revisionIndex={idx + 1}
                             totalRevisions={group.children.length}
@@ -604,7 +624,7 @@ function QuotesListSkeleton() {
  *   · child        — indented with a ↳ arrow, shaded background, smaller chip
  */
 function QuoteRow({
-  quote, kind, isSelected, onSelect, onDuplicate,
+  quote, kind, isSelected, onSelect, onDuplicate, duplicating,
   childCount, expanded, canToggle, onToggle, isLastChild, viewerUser,
   revisionIndex, totalRevisions, onDelete,
 }: {
@@ -613,6 +633,9 @@ function QuoteRow({
   isSelected: boolean
   onSelect: () => void
   onDuplicate: () => void
+  /** True while the full quote is being fetched before prefilling the
+   *  duplicate form (see handleDuplicate in QuotesListPage). */
+  duplicating?: boolean
   childCount?: number
   expanded?: boolean
   canToggle?: boolean
@@ -900,10 +923,11 @@ function QuoteRow({
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setActionsOpen(false); onDuplicate() }}
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50"
+                disabled={duplicating}
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               >
                 <Copy className="h-4 w-4 text-slate-400" />
-                <span>Duplicate</span>
+                <span>{duplicating ? 'Loading…' : 'Duplicate'}</span>
               </button>
               {onDelete && (
                 <>
