@@ -1,5 +1,27 @@
 import { api } from '@/api/apiClient'
-import type { QuoteMetal, StockItem, StockStatus, StockStone } from '../types'
+import type { QuoteEmkayStone, QuoteMetal, StockItem, StockStatus, StockStone } from '../types'
+
+interface ApiEmkayStone {
+  id?: number | null
+  emkayProductId?: string | null
+  model?: string | null
+  name: string
+  imageUrl?: string | null
+  certImageUrl?: string | null
+  priceUsd: number
+  caratWeight?: number | null
+  shape?: string | null
+  sizeText?: string | null
+  treatment?: string | null
+  stoneType?: string | null
+  countryOfOrigin?: string | null
+  href?: string | null
+  setterType?: string | null
+  setterFeeOverride?: number | null
+  quantity: number
+  sortOrder?: number | null
+  comments?: string | null
+}
 
 interface ApiMetalRow {
   id?: number | null
@@ -54,6 +76,7 @@ interface ApiStockItem {
   archived?: boolean | null
   metalRows?: ApiMetalRow[]
   stones?: ApiStockStone[]
+  emkayStones?: ApiEmkayStone[]
   retailPrice?: number | null
 }
 
@@ -101,6 +124,30 @@ function mapStone(s: ApiStockStone): StockStone {
   }
 }
 
+function mapEmkayStone(s: ApiEmkayStone): QuoteEmkayStone {
+  return {
+    id: s.id ?? null,
+    emkayProductId: s.emkayProductId ?? null,
+    model: s.model ?? null,
+    name: s.name,
+    imageUrl: s.imageUrl ?? null,
+    certImageUrl: s.certImageUrl ?? null,
+    priceUsd: s.priceUsd,
+    caratWeight: s.caratWeight ?? null,
+    shape: s.shape ?? null,
+    sizeText: s.sizeText ?? null,
+    treatment: s.treatment ?? null,
+    stoneType: s.stoneType ?? null,
+    countryOfOrigin: s.countryOfOrigin ?? null,
+    href: s.href ?? null,
+    setterType: s.setterType ?? null,
+    setterFeeOverride: s.setterFeeOverride ?? null,
+    quantity: s.quantity ?? 1,
+    sortOrder: s.sortOrder ?? null,
+    comments: s.comments ?? null,
+  }
+}
+
 function mapStockItem(s: ApiStockItem): StockItem {
   return {
     id: String(s.id),
@@ -126,6 +173,7 @@ function mapStockItem(s: ApiStockItem): StockItem {
     engravingFee: s.engravingFee ?? null,
     setterType: s.setterType ?? null,
     stones: (s.stones ?? []).map(mapStone),
+    emkayStones: (s.emkayStones ?? []).map(mapEmkayStone),
     archived: s.archived ?? false,
     retailPrice: s.retailPrice ?? null,
   }

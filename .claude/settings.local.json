@@ -194,7 +194,11 @@
       "Bash(jobs -l)",
       "Bash(netstat -ano)",
       "Bash(taskkill *)",
-      "WebFetch(domain:developers.brevo.com)"
+      "WebFetch(domain:developers.brevo.com)",
+      "WebFetch(domain:api.gold-api.com)",
+      "Bash(mvn -version)",
+      "Bash(mvn -q -o test -Dtest=MetalRepositoryTest)",
+      "Read(//d//**)"
     ]
   }
 }

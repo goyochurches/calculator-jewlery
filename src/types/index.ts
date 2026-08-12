@@ -457,6 +457,9 @@ export interface StockItem {
   engravingFee?: number | null
   setterType?: string | null
   stones?: StockStone[]
+  /** Real gemstones picked from the EMKAY Gemstones Catalog — same shape as
+   *  QuoteEmkayStone, reused as-is. */
+  emkayStones?: QuoteEmkayStone[]
   archived?: boolean | null
   /** Server-computed: total * markup, discount applied. Read-only. */
   retailPrice?: number | null

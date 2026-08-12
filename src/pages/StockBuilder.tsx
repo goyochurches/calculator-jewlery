@@ -3,9 +3,13 @@ import { DIAMOND_TYPE_OPTIONS, JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import { useAuth } from '@/context/AuthContext'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { stockService } from '@/services/stockService'
+import { emkayService } from '@/services/emkayService'
 import { Toast } from '@/components/Toast'
-import type { JewelryMetalOption, StockItem, StockStone } from '@/types'
-import { Boxes, Camera, Copy, Crown, Diamond, ImageOff, Loader2, Package, Plus, Sparkles, Trash2, Upload, X } from 'lucide-react'
+import type { EmkayCatalogProduct, EmkayCategory, JewelryMetalOption, QuoteEmkayStone, StockItem, StockStone } from '@/types'
+import {
+  Boxes, Camera, ChevronDown, ChevronUp, Copy, Crown, Diamond, ExternalLink, Gem,
+  ImageOff, Loader2, Package, Plus, Search, Sparkles, Trash2, Upload, X,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -68,8 +72,39 @@ const STONE_ROLE_THEME: Record<StockStone['role'], {
   },
 }
 
+// Same amber treatment as the Quote builder's EMKAY panel, distinguished
+// from MAIN stones (also amber) by icon (Gem) and copy.
+const emkayTheme = {
+  bar: 'bg-gradient-to-b from-amber-300 via-amber-500 to-amber-600',
+  ring: 'border-amber-200/80',
+  tint: 'bg-gradient-to-br from-amber-50/70 via-white to-amber-50/40',
+  chip: 'bg-amber-100 text-amber-900 ring-1 ring-amber-200',
+  header: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200/80',
+}
+
 let uidCounter = 0
 const nextUid = () => `row-${Date.now()}-${uidCounter++}`
+
+interface EmkayStoneRowState {
+  uid: string
+  emkayProductId: string
+  model: string
+  name: string
+  imageUrl: string | null
+  certImageUrl: string | null
+  priceUsd: number
+  caratWeight: number | null
+  shape: string | null
+  sizeText: string | null
+  treatment: string | null
+  stoneType: string | null
+  countryOfOrigin: string | null
+  href: string | null
+  setterType: string
+  setterFeeOverride: string
+  quantity: string
+  comments: string
+}
 
 interface MetalRowState {
   uid: string
@@ -132,6 +167,76 @@ export function StockBuilderPage() {
     { uid: nextUid(), metalKey: 'gold-14k-yellow', grams: '' },
   ])
   const [stones, setStones] = useState<StoneRowState[]>([])
+
+  // ── EMKAY Gemstones Catalog — real stones the shop buys from EMKAY,
+  // full price counts as material cost (unlike a customer-supplied stone). ──
+  const [emkayStones, setEmkayStones] = useState<EmkayStoneRowState[]>([])
+  const [emkayOpen, setEmkayOpen] = useState(false)
+  const [emkayConfigured, setEmkayConfigured] = useState<boolean | null>(null)
+  const [emkayCategories, setEmkayCategories] = useState<EmkayCategory[]>([])
+  const [emkayCategoryId, setEmkayCategoryId] = useState('')
+  const [emkaySearchText, setEmkaySearchText] = useState('')
+  const [emkayDebouncedSearch, setEmkayDebouncedSearch] = useState('')
+  const [emkayPage, setEmkayPage] = useState(0)
+  const [emkayResults, setEmkayResults] = useState<EmkayCatalogProduct[]>([])
+  const [emkayTotalPages, setEmkayTotalPages] = useState(0)
+  const [emkayLoading, setEmkayLoading] = useState(false)
+  const [emkayError, setEmkayError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!emkayOpen || emkayConfigured !== null) return
+    emkayService.status().then(setEmkayConfigured).catch(() => setEmkayConfigured(false))
+    emkayService.categories().then(setEmkayCategories).catch(() => setEmkayCategories([]))
+  }, [emkayOpen, emkayConfigured])
+
+  useEffect(() => {
+    const t = setTimeout(() => setEmkayDebouncedSearch(emkaySearchText.trim()), 400)
+    return () => clearTimeout(t)
+  }, [emkaySearchText])
+
+  useEffect(() => { setEmkayPage(0) }, [emkayDebouncedSearch, emkayCategoryId])
+
+  useEffect(() => {
+    if (!emkayOpen || emkayConfigured !== true) return
+    let cancelled = false
+    setEmkayLoading(true)
+    setEmkayError(null)
+    emkayService.browse({ search: emkayDebouncedSearch, categoryId: emkayCategoryId || undefined, page: emkayPage, size: 12 })
+      .then(res => {
+        if (cancelled) return
+        setEmkayResults(res.items)
+        setEmkayTotalPages(res.totalPages)
+      })
+      .catch(() => { if (!cancelled) setEmkayError('Could not load the EMKAY catalog. Try again.') })
+      .finally(() => { if (!cancelled) setEmkayLoading(false) })
+    return () => { cancelled = true }
+  }, [emkayOpen, emkayConfigured, emkayDebouncedSearch, emkayCategoryId, emkayPage])
+
+  const addEmkayStone = (product: EmkayCatalogProduct) => {
+    setEmkayStones(prev => [...prev, {
+      uid: nextUid(),
+      emkayProductId: product.productId,
+      model: product.model ?? '',
+      name: product.name ?? product.model ?? `EMKAY #${product.productId}`,
+      imageUrl: product.imageUrl,
+      certImageUrl: product.certImageUrl,
+      priceUsd: product.price ?? 0,
+      caratWeight: product.caratWeight,
+      shape: product.shape,
+      sizeText: product.size,
+      treatment: product.treatment,
+      stoneType: product.stoneType,
+      countryOfOrigin: product.countryOfOrigin,
+      href: product.href,
+      setterType: config.setters[0]?.typeKey ?? '',
+      setterFeeOverride: '',
+      quantity: '1',
+      comments: '',
+    }])
+  }
+  const removeEmkayStone = (uid: string) => setEmkayStones(prev => prev.filter(s => s.uid !== uid))
+  const patchEmkayStone = (uid: string, patch: Partial<EmkayStoneRowState>) =>
+    setEmkayStones(prev => prev.map(s => (s.uid === uid ? { ...s, ...patch } : s)))
 
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ variant: 'success' | 'error'; title: string; description?: string } | null>(null)
