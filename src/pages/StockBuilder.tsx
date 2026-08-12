@@ -5,7 +5,7 @@ import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { stockService } from '@/services/stockService'
 import { emkayService } from '@/services/emkayService'
 import { Toast } from '@/components/Toast'
-import type { EmkayCatalogProduct, EmkayCategory, JewelryMetalOption, QuoteEmkayStone, StockItem, StockStone } from '@/types'
+import type { EmkayCatalogProduct, EmkayCategory, JewelryMetalOption, StockItem, StockStone } from '@/types'
 import {
   Boxes, Camera, ChevronDown, ChevronUp, Copy, Crown, Diamond, ExternalLink, Gem,
   ImageOff, Loader2, Package, Plus, Search, Sparkles, Trash2, Upload, X,
@@ -720,6 +720,171 @@ export function StockBuilderPage() {
                   </div>
                 )
               })}
+
+              {/* ── EMKAY Gemstones Catalog ─────────────────────────────── */}
+              <div className="group/section relative overflow-hidden rounded-2xl border border-amber-100 bg-white p-4 shadow-sm transition hover:shadow-md">
+                <span className={`absolute inset-y-0 left-0 w-1 ${emkayTheme.bar} opacity-80`} aria-hidden />
+                <div className="flex w-full items-center justify-between gap-3 pl-2">
+                  <button type="button" onClick={() => setEmkayOpen(o => !o)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                    <span className={`flex h-9 w-9 items-center justify-center rounded-xl shadow-sm ${emkayTheme.header}`}>
+                      <Gem className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold text-slate-900">
+                        EMKAY Catalog
+                        <span className={`ml-2 inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${emkayTheme.chip}`}>
+                          {emkayStones.length}
+                        </span>
+                      </h3>
+                      <p className="text-xs text-slate-500">Real stones from EMKAY Gemstones — shop buys these directly.</p>
+                    </div>
+                  </button>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <button type="button" onClick={() => setEmkayOpen(true)}
+                      className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold shadow-sm transition hover:brightness-95 ${emkayTheme.header}`}>
+                      <Plus className="h-3.5 w-3.5" /> Add
+                    </button>
+                    <button type="button" onClick={() => setEmkayOpen(o => !o)} aria-label={emkayOpen ? 'Collapse' : 'Expand'}>
+                      {emkayOpen ? <ChevronUp className="h-4 w-4 shrink-0 text-slate-400" /> : <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />}
+                    </button>
+                  </span>
+                </div>
+
+                {emkayStones.length > 0 && (
+                  <div className="mt-3 space-y-3 pl-2">
+                    {emkayStones.map((es, idx) => (
+                      <div key={es.uid} className={`relative overflow-hidden rounded-2xl border ${emkayTheme.ring} ${emkayTheme.tint} p-4 shadow-sm transition hover:shadow-md`}>
+                        <span className={`absolute inset-y-0 left-0 w-1.5 ${emkayTheme.bar}`} aria-hidden />
+                        <div className="flex gap-3 pl-2">
+                          {es.imageUrl && (
+                            <img src={es.imageUrl} alt={es.name} className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="mb-1 flex items-center justify-between gap-2">
+                              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${emkayTheme.chip}`}>
+                                From EMKAY · #{idx + 1}
+                              </span>
+                              <button type="button" onClick={() => removeEmkayStone(es.uid)} aria-label="Remove EMKAY stone"
+                                className="flex h-7 w-7 items-center justify-center rounded-full bg-white/70 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600">
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                            <p className="truncate text-sm font-semibold text-slate-900">{es.name}</p>
+                            <p className="text-xs text-slate-500">
+                              {[es.model, es.shape, es.caratWeight ? `${es.caratWeight} ct` : null, es.countryOfOrigin].filter(Boolean).join(' · ') || '—'}
+                            </p>
+                            {es.href && (
+                              <a href={es.href} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 hover:text-amber-800">
+                                View on emkaygemstones.com <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quantity</label>
+                                <input type="number" min={1} step={1} value={es.quantity}
+                                  onChange={e => patchEmkayStone(es.uid, { quantity: e.target.value })}
+                                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type of setting</label>
+                                <select value={es.setterType} onChange={e => patchEmkayStone(es.uid, { setterType: e.target.value })}
+                                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+                                  {config.setters.map(s => (
+                                    <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Price each</label>
+                                <input type="number" min={0} step={0.01} value={es.priceUsd}
+                                  onChange={e => patchEmkayStone(es.uid, { priceUsd: Number(e.target.value) || 0 })}
+                                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                              </div>
+                              <div className="space-y-1">
+                                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Custom setting fee (optional)</label>
+                                <input type="text" inputMode="decimal" value={es.setterFeeOverride}
+                                  placeholder={`Default — $${config.setterMap[es.setterType]?.fee ?? 0}`}
+                                  onChange={e => patchEmkayStone(es.uid, { setterFeeOverride: e.target.value })}
+                                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {emkayOpen && (
+                  <div className="mt-4 space-y-3 border-t border-amber-100 pl-2 pt-4">
+                    {emkayConfigured === false && (
+                      <p className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                        EMKAY catalog isn't connected yet — set EMKAY_API_KEY on the backend to enable this panel.
+                      </p>
+                    )}
+                    {emkayConfigured === true && (
+                      <>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <select value={emkayCategoryId} onChange={e => setEmkayCategoryId(e.target.value)}
+                            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 sm:w-56">
+                            <option value="">All categories</option>
+                            {emkayCategories.map(c => <option key={c.categoryId} value={c.categoryId}>{c.name ?? c.categoryId}</option>)}
+                          </select>
+                          <div className="relative flex-1">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input type="text" value={emkaySearchText} onChange={e => setEmkaySearchText(e.target.value)}
+                              placeholder="Search by name, shape, type, origin…"
+                              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                          </div>
+                        </div>
+
+                        {emkayError && <p className="text-xs text-rose-600">{emkayError}</p>}
+                        {emkayLoading && <p className="text-xs text-slate-400">Loading EMKAY catalog…</p>}
+                        {!emkayLoading && emkayResults.length === 0 && !emkayError && (
+                          <p className="text-xs text-slate-400">No stones match your search.</p>
+                        )}
+
+                        {emkayResults.length > 0 && (
+                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                            {emkayResults.map(p => (
+                              <button type="button" key={p.productId} onClick={() => addEmkayStone(p)}
+                                className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-left shadow-sm transition hover:border-amber-300 hover:shadow-md">
+                                {p.imageUrl && <img src={p.imageUrl} alt={p.name ?? p.model ?? ''} className="h-32 w-full object-cover" />}
+                                <div className="space-y-1 p-3">
+                                  <p className="truncate text-xs font-semibold text-slate-900">{p.name ?? p.model}</p>
+                                  <p className="truncate text-[11px] text-slate-500">
+                                    {[p.shape, p.caratWeight ? `${p.caratWeight} ct` : null, p.countryOfOrigin].filter(Boolean).join(' · ') || '—'}
+                                  </p>
+                                  <div className="flex items-center justify-between gap-2 pt-1">
+                                    <p className="text-sm font-bold text-amber-700">{p.price != null ? `$${p.price.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}</p>
+                                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm">
+                                      + Add
+                                    </span>
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {emkayTotalPages > 1 && (
+                          <div className="flex items-center justify-between pt-1">
+                            <button type="button" onClick={() => setEmkayPage(p => Math.max(0, p - 1))} disabled={emkayPage === 0}
+                              className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 disabled:opacity-40">
+                              Previous
+                            </button>
+                            <span className="text-xs text-slate-400">Page {emkayPage + 1} of {emkayTotalPages}</span>
+                            <button type="button" onClick={() => setEmkayPage(p => Math.min(emkayTotalPages - 1, p + 1))} disabled={emkayPage >= emkayTotalPages - 1}
+                              className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600 disabled:opacity-40">
+                              Next
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
