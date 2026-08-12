@@ -1,10 +1,11 @@
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DIAMOND_TYPE_OPTIONS, JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import { useAuth } from '@/context/AuthContext'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { stockService } from '@/services/stockService'
 import { Toast } from '@/components/Toast'
 import type { JewelryMetalOption, StockItem, StockStone } from '@/types'
-import { Camera, ImageOff, Loader2, Plus, Trash2, Upload } from 'lucide-react'
+import { Boxes, Camera, Copy, ImageOff, Loader2, Package, Plus, Trash2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -58,25 +59,12 @@ function parseNum(v: string): number {
   return Number.isFinite(n) ? n : 0
 }
 
-function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-2xl border border-slate-100 bg-white p-5 shadow-sm ${className}`}>
-      {children}
-    </div>
-  )
-}
-
-function SectionLabel({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
-      {children}
-    </p>
-  )
-}
-
+// Same input/label treatment as the Quote builder (rounded-2xl, slate-50 fill,
+// focus:border-slate-400) so both builders read as the same product.
 const inputClass =
-  'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white'
-const labelClass = 'mb-1.5 block text-xs font-semibold text-slate-500'
+  'w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white'
+const labelClass = 'text-sm font-semibold text-slate-900'
+const cardClass = 'rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]'
 
 export function StockBuilderPage() {
   const { user } = useAuth()
@@ -85,6 +73,7 @@ export function StockBuilderPage() {
   const location = useLocation()
   const duplicateFrom = (location.state as { duplicateFrom?: StockItem } | null)?.duplicateFrom ?? null
   const prefillApplied = useRef(false)
+  const [dismissedDuplicateBanner, setDismissedDuplicateBanner] = useState(false)
 
   const [title, setTitle] = useState('')
   const [sku, setSku] = useState('')
@@ -212,6 +201,7 @@ export function StockBuilderPage() {
   const retailPrice = retailBeforeDiscount * (1 - discount / 100)
 
   const canSave = title.trim() !== '' && !saving
+  const showDuplicateBanner = duplicateFrom && !dismissedDuplicateBanner
 
   const handleSave = async () => {
     if (!user || !canSave) return
@@ -276,253 +266,348 @@ export function StockBuilderPage() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-      <div className="space-y-6 lg:col-span-2">
-        {/* Basics */}
-        <Card>
-          <SectionLabel>Piece details</SectionLabel>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <label className={labelClass}>Title</label>
-              <input className={inputClass} value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. 18K Yellow Gold Tennis Bracelet" />
+    <div className="space-y-6">
+      {/* ── Duplicate banner — same sky treatment as the Quote builder ─────── */}
+      {showDuplicateBanner && (
+        <Card className="rounded-[24px] border border-sky-200 bg-sky-50/60 shadow-[0_20px_60px_rgba(56,189,248,0.16)]">
+          <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
+                <Copy className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">Duplicating stock piece</p>
+                <p className="mt-1 text-sm text-slate-700">
+                  Prefilled from <strong>{duplicateFrom?.title}</strong>. Adjust anything — saving creates a{' '}
+                  <strong>new</strong> stock piece and leaves the original untouched.
+                </p>
+              </div>
             </div>
-            <div>
-              <label className={labelClass}>SKU</label>
-              <input className={inputClass} value={sku} onChange={e => setSku(e.target.value)} placeholder="Optional" />
-            </div>
-            <div>
-              <label className={labelClass}>Quantity in stock</label>
-              <input type="number" min={0} className={inputClass} value={quantity} onChange={e => setQuantity(e.target.value)} />
-            </div>
-            <div>
-              <label className={labelClass}>Jewelry type</label>
-              <select className={inputClass} value={jewelryType} onChange={e => setJewelryType(e.target.value)}>
-                {JEWELRY_TYPE_OPTIONS.map(j => <option key={j.key} value={j.key}>{j.label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Status</label>
-              <select className={inputClass} value={status} onChange={e => setStatus(e.target.value as StockItem['status'])}>
-                {STATUS_OPTIONS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-              </select>
-            </div>
-          </div>
+            <button
+              type="button"
+              onClick={() => setDismissedDuplicateBanner(true)}
+              className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-white hover:text-slate-700"
+            >
+              Dismiss
+            </button>
+          </CardContent>
         </Card>
+      )}
 
-        {/* Metal rows */}
-        <Card>
-          <div className="mb-3 flex items-center justify-between">
-            <SectionLabel>Metal</SectionLabel>
-            {metalRows.length < 3 && (
-              <button type="button" onClick={addMetalRow} className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 hover:text-slate-900">
-                <Plus className="h-3.5 w-3.5" /> Add metal
-              </button>
-            )}
-          </div>
-          <div className="space-y-3">
-            {metalRows.map(row => (
-              <div key={row.uid} className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_140px_auto]">
-                <div>
-                  <label className={labelClass}>Metal</label>
-                  <select className={inputClass} value={row.metalKey} onChange={e => updateMetalRow(row.uid, { metalKey: e.target.value as JewelryMetalOption })}>
-                    {Object.entries(JEWELRY_METAL_OPTIONS).filter(([k]) => !['gold-14k', 'gold-18k'].includes(k)).map(([key, opt]) => (
-                      <option key={key} value={key}>{opt.label} — ${(config.metalPriceMap[key as JewelryMetalOption] ?? 0).toFixed(2)}/g</option>
-                    ))}
-                  </select>
+      {/* ── Hero — same theme-primary treatment as the Quote builder ───────── */}
+      <section>
+        <Card className="rounded-[30px] border-0 text-white shadow-[0_30px_80px_rgba(15,23,42,0.24)]" style={{ backgroundColor: 'var(--theme-primary)' }}>
+          <CardContent className="relative p-5 sm:p-8">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(250,204,21,0.24),transparent_25%),radial-gradient(circle_at_bottom_left,rgba(59,130,246,0.18),transparent_28%)]" />
+            <div className="relative">
+              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-amber-300">
+                <Boxes className="h-4 w-4" />
+                Stock pricing engine
+              </div>
+              <h2 className="mt-4 max-w-xl text-2xl font-semibold tracking-tight sm:text-3xl lg:text-4xl">
+                Price and catalog a piece the store already has in stock.
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:mt-4">
+                Same pricing engine as the Quote builder — metal, stones and labor — plus a{' '}
+                <strong>SKU</strong> and <strong>quantity</strong> so it lives in your own inventory, not a customer order.
+              </p>
+
+              <div className="mt-6 grid gap-3 sm:mt-8 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Material cost</p>
+                  <p className="mt-2 text-2xl font-semibold">${materialCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
                 </div>
-                <div>
-                  <label className={labelClass}>Grams</label>
-                  <input type="number" min={0} step="0.01" className={inputClass} value={row.grams} onChange={e => updateMetalRow(row.uid, { grams: e.target.value })} />
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Stone + setting</p>
+                  <p className="mt-2 text-2xl font-semibold">${(stoneCost + settingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
                 </div>
-                <button type="button" onClick={() => removeMetalRow(row.uid)} disabled={metalRows.length === 1}
-                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-40">
-                  <Trash2 className="h-4 w-4" />
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Internal cost</p>
+                  <p className="mt-2 text-2xl font-semibold">${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-sm">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Retail price</p>
+                  <p className="mt-2 text-2xl font-semibold text-amber-300">${retailPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+        <div className="space-y-4">
+          {/* Basics */}
+          <Card className={cardClass}>
+            <CardHeader className="border-b border-slate-100">
+              <CardTitle className="text-base font-semibold text-slate-900">Piece details</CardTitle>
+              <p className="text-sm text-slate-500">Title, SKU, quantity and type.</p>
+            </CardHeader>
+            <CardContent className="grid gap-5 pt-6 md:grid-cols-2">
+              <div className="space-y-2 md:col-span-2">
+                <label className={labelClass}>Title</label>
+                <input className={inputClass} value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. 18K Yellow Gold Tennis Bracelet" />
+              </div>
+              <div className="space-y-2">
+                <label className={labelClass}>SKU</label>
+                <input className={inputClass} value={sku} onChange={e => setSku(e.target.value)} placeholder="Optional" />
+              </div>
+              <div className="space-y-2">
+                <label className={labelClass}>Quantity in stock</label>
+                <input type="number" min={0} className={inputClass} value={quantity} onChange={e => setQuantity(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className={labelClass}>Jewelry type</label>
+                <select className={inputClass} value={jewelryType} onChange={e => setJewelryType(e.target.value)}>
+                  {JEWELRY_TYPE_OPTIONS.map(j => <option key={j.key} value={j.key}>{j.label}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className={labelClass}>Status</label>
+                <select className={inputClass} value={status} onChange={e => setStatus(e.target.value as StockItem['status'])}>
+                  {STATUS_OPTIONS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Metal rows */}
+          <Card className={cardClass}>
+            <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100">
+              <div>
+                <CardTitle className="text-base font-semibold text-slate-900">Metal</CardTitle>
+                <p className="text-sm text-slate-500">Live spot-tied $/gram, same as the Quote builder.</p>
+              </div>
+              {metalRows.length < 3 && (
+                <button type="button" onClick={addMetalRow} className="inline-flex items-center gap-1 rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800">
+                  <Plus className="h-3.5 w-3.5" /> Add metal
+                </button>
+              )}
+            </CardHeader>
+            <CardContent className="space-y-3 pt-6">
+              {metalRows.map(row => (
+                <div key={row.uid} className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[1fr_140px_auto]">
+                  <div className="space-y-2">
+                    <label className={labelClass}>Metal</label>
+                    <select className={inputClass} value={row.metalKey} onChange={e => updateMetalRow(row.uid, { metalKey: e.target.value as JewelryMetalOption })}>
+                      {Object.entries(JEWELRY_METAL_OPTIONS).filter(([k]) => !['gold-14k', 'gold-18k'].includes(k)).map(([key, opt]) => (
+                        <option key={key} value={key}>{opt.label} — ${(config.metalPriceMap[key as JewelryMetalOption] ?? 0).toFixed(2)}/g</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className={labelClass}>Grams</label>
+                    <input type="number" min={0} step="0.01" className={inputClass} value={row.grams} onChange={e => updateMetalRow(row.uid, { grams: e.target.value })} />
+                  </div>
+                  <button type="button" onClick={() => removeMetalRow(row.uid)} disabled={metalRows.length === 1}
+                    className="flex h-[46px] w-[46px] items-center justify-center rounded-2xl border border-slate-200 text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-40">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+              <p className="pt-1 text-xs text-slate-400">
+                Material cost: <strong className="text-slate-700">${materialCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Stones */}
+          <Card className={cardClass}>
+            <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100">
+              <div>
+                <CardTitle className="text-base font-semibold text-slate-900">Stones</CardTitle>
+                <p className="text-sm text-slate-500">Main, side and melee — same pricing lookups as the Quote builder.</p>
+              </div>
+              <div className="flex gap-2">
+                {STONE_ROLES.map(role => (
+                  <button key={role} type="button" onClick={() => addStoneRow(role)}
+                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:border-slate-400">
+                    <Plus className="h-3 w-3" /> {role}
+                  </button>
+                ))}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-6">
+              {stones.length === 0 && <p className="text-sm text-slate-400">No stones added.</p>}
+              {stones.map(s => {
+                const b = stoneBreakdown.find(x => x.uid === s.uid)
+                return (
+                  <div key={s.uid} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">{s.role}</span>
+                      <button type="button" onClick={() => removeStoneRow(s.uid)} className="text-slate-300 hover:text-rose-500">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-slate-500">Type</label>
+                        <select className={inputClass} value={s.stoneType} onChange={e => updateStoneRow(s.uid, { stoneType: e.target.value as StoneRowState['stoneType'] })}>
+                          <option value="natural">Natural</option>
+                          <option value="lab-grown">Lab</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-slate-500">Size key</label>
+                        <input className={inputClass} value={s.sizeKey} onChange={e => updateStoneRow(s.uid, { sizeKey: e.target.value })} placeholder="e.g. 1" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-slate-500">Carats</label>
+                        <input type="number" min={0} step="0.01" className={inputClass} value={s.carats} onChange={e => updateStoneRow(s.uid, { carats: e.target.value })} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-slate-500">Qty</label>
+                        <input type="number" min={1} className={inputClass} value={s.quantity} onChange={e => updateStoneRow(s.uid, { quantity: e.target.value })} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-slate-500">Setter</label>
+                        <select className={inputClass} value={s.setterType} onChange={e => updateStoneRow(s.uid, { setterType: e.target.value })}>
+                          <option value="">—</option>
+                          {config.setters.map(st => <option key={st.typeKey} value={st.typeKey}>{st.label}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-slate-500">Setter fee override</label>
+                        <input type="number" min={0} className={inputClass} value={s.setterFeeOverride} onChange={e => updateStoneRow(s.uid, { setterFeeOverride: e.target.value })} placeholder={`$${config.setterMap[s.setterType]?.fee ?? 0}`} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold text-slate-500">Manual price override</label>
+                        <input type="number" min={0} className={inputClass} value={s.manualPrice} onChange={e => updateStoneRow(s.uid, { manualPrice: e.target.value })} placeholder="Optional" />
+                      </div>
+                      <div className="flex items-end pb-3">
+                        <p className="text-xs text-slate-500">
+                          Cost ${b ? b.cost.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'} + labor ${b ? b.labor.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </CardContent>
+          </Card>
+
+          {/* Labor / extras */}
+          <Card className={cardClass}>
+            <CardHeader className="border-b border-slate-100">
+              <CardTitle className="text-base font-semibold text-slate-900">Labor & extras</CardTitle>
+              <p className="text-sm text-slate-500">Ring labor tier, dimensions and one-off fees.</p>
+            </CardHeader>
+            <CardContent className="grid gap-5 pt-6 sm:grid-cols-3">
+              <div className="space-y-2">
+                <label className={labelClass}>Ring labor tier</label>
+                <select className={inputClass} value={ringLabor} onChange={e => setRingLabor(e.target.value)}>
+                  <option value="none">None</option>
+                  {Object.entries(config.ringLaborMap).map(([key, tier]) => (
+                    <option key={key} value={key}>{tier.label} — ${tier.fee}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className={labelClass}>Ring width (mm)</label>
+                <input type="number" min={0} step="0.1" className={inputClass} value={ringWidth} onChange={e => setRingWidth(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className={labelClass}>Finger size</label>
+                <input type="number" min={0} step="0.25" className={inputClass} value={fingerSize} onChange={e => setFingerSize(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className={labelClass}>Extra costs ($)</label>
+                <input type="number" min={0} className={inputClass} value={extraCosts} onChange={e => setExtraCosts(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className={labelClass}>Engraving fee ($)</label>
+                <input type="number" min={0} className={inputClass} value={engravingFee} onChange={e => setEngravingFee(e.target.value)} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Notes */}
+          <Card className={cardClass}>
+            <CardHeader className="border-b border-slate-100">
+              <CardTitle className="text-base font-semibold text-slate-900">Internal notes</CardTitle>
+              <p className="text-sm text-slate-500">Sourcing, condition, reminders — never shown outside the workspace.</p>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <textarea rows={3} className={inputClass} value={internalNotes} onChange={e => setInternalNotes(e.target.value)} placeholder="Sourcing, condition, reminders…" />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sidebar: photo + pricing + save */}
+        <div className="space-y-4">
+          <Card className={cardClass}>
+            <CardHeader className="border-b border-slate-100">
+              <CardTitle className="text-base font-semibold text-slate-900">Photo</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              {photo ? (
+                <div className="relative">
+                  <img src={photo} alt="Stock piece" className="aspect-square w-full rounded-2xl object-cover" />
+                  <button type="button" onClick={handleRemovePhoto} className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-200 text-slate-300">
+                  <ImageOff className="h-8 w-8" />
+                  <span className="text-xs">No photo</span>
+                </div>
+              )}
+              <div className="mt-3 flex gap-2">
+                <button type="button" onClick={() => photoInputRef.current?.click()} className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border border-slate-200 py-2.5 text-xs font-semibold text-slate-600 transition hover:border-slate-400">
+                  <Upload className="h-3.5 w-3.5" /> Upload
+                </button>
+                <button type="button" onClick={() => cameraInputRef.current?.click()} className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border border-slate-200 py-2.5 text-xs font-semibold text-slate-600 transition hover:border-slate-400">
+                  <Camera className="h-3.5 w-3.5" /> Camera
                 </button>
               </div>
-            ))}
-          </div>
-          <p className="mt-3 text-xs text-slate-400">
-            Material cost: <strong className="text-slate-700">${materialCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
-          </p>
-        </Card>
+              <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
+              <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
+            </CardContent>
+          </Card>
 
-        {/* Stones */}
-        <Card>
-          <div className="mb-3 flex items-center justify-between">
-            <SectionLabel>Stones</SectionLabel>
-            <div className="flex gap-2">
-              {STONE_ROLES.map(role => (
-                <button key={role} type="button" onClick={() => addStoneRow(role)}
-                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:border-slate-400">
-                  <Plus className="h-3 w-3" /> {role}
-                </button>
-              ))}
-            </div>
-          </div>
-          {stones.length === 0 && <p className="text-sm text-slate-400">No stones added.</p>}
-          <div className="space-y-4">
-            {stones.map(s => {
-              const b = stoneBreakdown.find(x => x.uid === s.uid)
-              return (
-                <div key={s.uid} className="rounded-xl border border-slate-100 p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">{s.role}</span>
-                    <button type="button" onClick={() => removeStoneRow(s.uid)} className="text-slate-300 hover:text-rose-500">
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div>
-                      <label className={labelClass}>Type</label>
-                      <select className={inputClass} value={s.stoneType} onChange={e => updateStoneRow(s.uid, { stoneType: e.target.value as StoneRowState['stoneType'] })}>
-                        <option value="natural">Natural</option>
-                        <option value="lab-grown">Lab</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className={labelClass}>Size key</label>
-                      <input className={inputClass} value={s.sizeKey} onChange={e => updateStoneRow(s.uid, { sizeKey: e.target.value })} placeholder="e.g. 1" />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Carats</label>
-                      <input type="number" min={0} step="0.01" className={inputClass} value={s.carats} onChange={e => updateStoneRow(s.uid, { carats: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Qty</label>
-                      <input type="number" min={1} className={inputClass} value={s.quantity} onChange={e => updateStoneRow(s.uid, { quantity: e.target.value })} />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Setter</label>
-                      <select className={inputClass} value={s.setterType} onChange={e => updateStoneRow(s.uid, { setterType: e.target.value })}>
-                        <option value="">—</option>
-                        {config.setters.map(st => <option key={st.typeKey} value={st.typeKey}>{st.label}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className={labelClass}>Setter fee override</label>
-                      <input type="number" min={0} className={inputClass} value={s.setterFeeOverride} onChange={e => updateStoneRow(s.uid, { setterFeeOverride: e.target.value })} placeholder={`$${config.setterMap[s.setterType]?.fee ?? 0}`} />
-                    </div>
-                    <div>
-                      <label className={labelClass}>Manual price override</label>
-                      <input type="number" min={0} className={inputClass} value={s.manualPrice} onChange={e => updateStoneRow(s.uid, { manualPrice: e.target.value })} placeholder="Optional" />
-                    </div>
-                    <div className="flex items-end">
-                      <p className="text-xs text-slate-500">
-                        Cost ${b ? b.cost.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'} + labor ${b ? b.labor.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'}
-                      </p>
-                    </div>
-                  </div>
+          <Card className={cardClass}>
+            <CardHeader className="border-b border-slate-100">
+              <CardTitle className="text-base font-semibold text-slate-900">Pricing</CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className={labelClass}>Markup ×</label>
+                  <input type="number" min={1} step="0.1" className={inputClass} value={markupMultiplier} onChange={e => setMarkupMultiplier(e.target.value)} />
                 </div>
-              )
-            })}
-          </div>
-        </Card>
+                <div className="space-y-2">
+                  <label className={labelClass}>Discount %</label>
+                  <input type="number" min={0} max={100} className={inputClass} value={discountPercent} onChange={e => setDiscountPercent(e.target.value)} />
+                </div>
+              </div>
+              <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-4 text-sm">
+                <div className="flex justify-between text-slate-500"><span>Internal cost</span><span>${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+                {discount > 0 && (
+                  <div className="flex justify-between text-emerald-600"><span>Discount</span><span>−{discount}%</span></div>
+                )}
+                <div className="flex justify-between text-base font-bold text-slate-900"><span>Retail price</span><span>${retailPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Labor / extras */}
-        <Card>
-          <SectionLabel>Labor & extras</SectionLabel>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div>
-              <label className={labelClass}>Ring labor tier</label>
-              <select className={inputClass} value={ringLabor} onChange={e => setRingLabor(e.target.value)}>
-                <option value="none">None</option>
-                {Object.entries(config.ringLaborMap).map(([key, tier]) => (
-                  <option key={key} value={key}>{tier.label} — ${tier.fee}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Ring width (mm)</label>
-              <input type="number" min={0} step="0.1" className={inputClass} value={ringWidth} onChange={e => setRingWidth(e.target.value)} />
-            </div>
-            <div>
-              <label className={labelClass}>Finger size</label>
-              <input type="number" min={0} step="0.25" className={inputClass} value={fingerSize} onChange={e => setFingerSize(e.target.value)} />
-            </div>
-            <div>
-              <label className={labelClass}>Extra costs ($)</label>
-              <input type="number" min={0} className={inputClass} value={extraCosts} onChange={e => setExtraCosts(e.target.value)} />
-            </div>
-            <div>
-              <label className={labelClass}>Engraving fee ($)</label>
-              <input type="number" min={0} className={inputClass} value={engravingFee} onChange={e => setEngravingFee(e.target.value)} />
-            </div>
-          </div>
-        </Card>
-
-        {/* Notes */}
-        <Card>
-          <SectionLabel>Internal notes</SectionLabel>
-          <textarea rows={3} className={inputClass} value={internalNotes} onChange={e => setInternalNotes(e.target.value)} placeholder="Sourcing, condition, reminders…" />
-        </Card>
-      </div>
-
-      {/* Sidebar: photo + pricing + save */}
-      <div className="space-y-6">
-        <Card>
-          <SectionLabel>Photo</SectionLabel>
-          {photo ? (
-            <div className="relative">
-              <img src={photo} alt="Stock piece" className="aspect-square w-full rounded-xl object-cover" />
-              <button type="button" onClick={handleRemovePhoto} className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80">
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-200 text-slate-300">
-              <ImageOff className="h-8 w-8" />
-              <span className="text-xs">No photo</span>
-            </div>
-          )}
-          <div className="mt-3 flex gap-2">
-            <button type="button" onClick={() => photoInputRef.current?.click()} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 py-2 text-xs font-semibold text-slate-600 hover:border-slate-400">
-              <Upload className="h-3.5 w-3.5" /> Upload
-            </button>
-            <button type="button" onClick={() => cameraInputRef.current?.click()} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-slate-200 py-2 text-xs font-semibold text-slate-600 hover:border-slate-400">
-              <Camera className="h-3.5 w-3.5" /> Camera
-            </button>
-          </div>
-          <input ref={photoInputRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
-          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
-        </Card>
-
-        <Card>
-          <SectionLabel>Pricing</SectionLabel>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelClass}>Markup ×</label>
-              <input type="number" min={1} step="0.1" className={inputClass} value={markupMultiplier} onChange={e => setMarkupMultiplier(e.target.value)} />
-            </div>
-            <div>
-              <label className={labelClass}>Discount %</label>
-              <input type="number" min={0} max={100} className={inputClass} value={discountPercent} onChange={e => setDiscountPercent(e.target.value)} />
-            </div>
-          </div>
-          <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-4 text-sm">
-            <div className="flex justify-between text-slate-500"><span>Internal cost</span><span>${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
-            {discount > 0 && (
-              <div className="flex justify-between text-emerald-600"><span>Discount</span><span>−{discount}%</span></div>
-            )}
-            <div className="flex justify-between text-base font-bold text-slate-900"><span>Retail price</span><span>${retailPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
-          </div>
-        </Card>
-
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={!canSave}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-          {saving ? 'Saving…' : 'Save stock piece'}
-        </button>
-        <button
-          type="button"
-          onClick={() => navigate('/stock-list')}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:border-slate-400"
-        >
-          View all stock
-        </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!canSave}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3.5 text-sm font-semibold text-white shadow-[0_20px_40px_rgba(15,23,42,0.18)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            {saving ? 'Saving…' : 'Save stock piece'}
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/stock-list')}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-slate-400"
+          >
+            <Package className="h-4 w-4" /> View all stock
+          </button>
+        </div>
       </div>
 
       {toast && (
