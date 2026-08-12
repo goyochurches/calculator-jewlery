@@ -278,6 +278,28 @@ export function StockBuilderPage() {
         comments: s.comments ?? '',
       })))
     }
+    if (duplicateFrom.emkayStones?.length) {
+      setEmkayStones(duplicateFrom.emkayStones.map(es => ({
+        uid: nextUid(),
+        emkayProductId: es.emkayProductId ?? '',
+        model: es.model ?? '',
+        name: es.name,
+        imageUrl: es.imageUrl ?? null,
+        certImageUrl: es.certImageUrl ?? null,
+        priceUsd: es.priceUsd,
+        caratWeight: es.caratWeight ?? null,
+        shape: es.shape ?? null,
+        sizeText: es.sizeText ?? null,
+        treatment: es.treatment ?? null,
+        stoneType: es.stoneType ?? null,
+        countryOfOrigin: es.countryOfOrigin ?? null,
+        href: es.href ?? null,
+        setterType: es.setterType ?? '',
+        setterFeeOverride: es.setterFeeOverride != null ? String(es.setterFeeOverride) : '',
+        quantity: String(es.quantity ?? 1),
+        comments: es.comments ?? '',
+      })))
+    }
   }, [duplicateFrom])
 
   const addMetalRow = () => {
@@ -332,8 +354,19 @@ export function StockBuilderPage() {
   const stoneCost = stoneBreakdown.reduce((s, b) => s + b.cost, 0)
   const settingFee = stoneBreakdown.reduce((s, b) => s + b.labor, 0)
 
+  // EMKAY-supplied stones: real inventory bought from EMKAY, so the full
+  // price counts as material cost, same as the Quote builder.
+  const emkayBreakdown = emkayStones.map(es => {
+    const qty = Math.max(1, parseNum(es.quantity || '1') || 1)
+    const feeOverride = es.setterFeeOverride.trim()
+    const setterFee = feeOverride !== '' ? parseNum(feeOverride) : (config.setterMap[es.setterType]?.fee ?? 0)
+    return { uid: es.uid, cost: qty * es.priceUsd, labor: qty * setterFee }
+  })
+  const emkayCost = emkayBreakdown.reduce((s, b) => s + b.cost, 0)
+  const emkaySettingFee = emkayBreakdown.reduce((s, b) => s + b.labor, 0)
+
   const totalCost =
-    materialCost + ringLaborFee + settingFee + stoneCost +
+    materialCost + ringLaborFee + settingFee + stoneCost + emkayCost + emkaySettingFee +
     Math.max(0, parseNum(engravingFee)) + parseNum(extraCosts)
 
   const markup = parseNum(markupMultiplier) || 2.5
