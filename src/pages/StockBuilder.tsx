@@ -5,7 +5,7 @@ import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { stockService } from '@/services/stockService'
 import { Toast } from '@/components/Toast'
 import type { JewelryMetalOption, StockItem, StockStone } from '@/types'
-import { Boxes, Camera, Copy, ImageOff, Loader2, Package, Plus, Trash2, Upload } from 'lucide-react'
+import { Boxes, Camera, Copy, Crown, Diamond, ImageOff, Loader2, Package, Plus, Sparkles, Trash2, Upload, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
@@ -31,6 +31,42 @@ const STATUS_OPTIONS: Array<{ key: StockItem['status']; label: string }> = [
 ]
 
 const STONE_ROLES: StockStone['role'][] = ['MAIN', 'SIDE', 'MELEE']
+
+// Same per-role palette as the Quote builder's Stone Setting section
+// (themeForRole in QuoteBuilder.tsx) — MAIN = gold, SIDE = sapphire,
+// MELEE = platinum/teal — so a stone row reads the same in both builders.
+const STONE_ROLE_THEME: Record<StockStone['role'], {
+  label: string; icon: typeof Crown
+  bar: string; ring: string; tint: string; chip: string; btn: string; header: string
+}> = {
+  MAIN: {
+    label: 'Main', icon: Crown,
+    bar: 'bg-gradient-to-b from-amber-300 via-amber-500 to-yellow-600',
+    ring: 'border-amber-200/80',
+    tint: 'bg-gradient-to-br from-amber-50/70 via-white to-yellow-50/40',
+    chip: 'bg-amber-100 text-amber-900 ring-1 ring-amber-200',
+    btn: 'bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-400 hover:to-yellow-500',
+    header: 'bg-amber-50 text-amber-700 ring-1 ring-amber-200/80',
+  },
+  SIDE: {
+    label: 'Side', icon: Diamond,
+    bar: 'bg-gradient-to-b from-sky-400 via-blue-500 to-indigo-600',
+    ring: 'border-blue-200/80',
+    tint: 'bg-gradient-to-br from-sky-50/70 via-white to-indigo-50/40',
+    chip: 'bg-blue-100 text-blue-900 ring-1 ring-blue-200',
+    btn: 'bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500',
+    header: 'bg-blue-50 text-blue-700 ring-1 ring-blue-200/80',
+  },
+  MELEE: {
+    label: 'Melee', icon: Sparkles,
+    bar: 'bg-gradient-to-b from-teal-300 via-emerald-500 to-emerald-700',
+    ring: 'border-emerald-200/80',
+    tint: 'bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/40',
+    chip: 'bg-emerald-100 text-emerald-900 ring-1 ring-emerald-200',
+    btn: 'bg-gradient-to-r from-teal-500 to-emerald-600 hover:from-teal-400 hover:to-emerald-500',
+    header: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/80',
+  },
+}
 
 let uidCounter = 0
 const nextUid = () => `row-${Date.now()}-${uidCounter++}`
@@ -411,74 +447,117 @@ export function StockBuilderPage() {
             </CardContent>
           </Card>
 
-          {/* Stones */}
-          <Card className={cardClass}>
-            <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100">
-              <div>
-                <CardTitle className="text-base font-semibold text-slate-900">Stones</CardTitle>
-                <p className="text-sm text-slate-500">Main, side and melee — same pricing lookups as the Quote builder.</p>
-              </div>
-              <div className="flex gap-2">
-                {STONE_ROLES.map(role => (
-                  <button key={role} type="button" onClick={() => addStoneRow(role)}
-                    className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:border-slate-400">
-                    <Plus className="h-3 w-3" /> {role}
-                  </button>
-                ))}
+          {/* Stones — same MAIN/SIDE/MELEE grouping + gold/sapphire/emerald
+              palette as the Quote builder's Stone Setting section. */}
+          <Card id="stock-stones" className={`relative overflow-hidden ${cardClass}`}>
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.10),transparent_45%),radial-gradient(circle_at_top_right,rgba(244,63,94,0.08),transparent_50%)]" aria-hidden />
+            <CardHeader className="relative border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 via-rose-100 to-blue-100 text-slate-700 shadow-sm ring-1 ring-white/80">
+                  <Diamond className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle className="text-base font-semibold text-slate-900">Stone Setting</CardTitle>
+                  <p className="text-xs text-slate-500">Main, side and melee — same pricing lookups as the Quote builder.</p>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
-              {stones.length === 0 && <p className="text-sm text-slate-400">No stones added.</p>}
-              {stones.map(s => {
-                const b = stoneBreakdown.find(x => x.uid === s.uid)
+              {STONE_ROLES.map(role => {
+                const theme = STONE_ROLE_THEME[role]
+                const Icon = theme.icon
+                const items = stones.filter(s => s.role === role)
+                const hint = role === 'MAIN' ? 'Center stones. Add one or several.'
+                  : role === 'SIDE' ? 'Accent stones. Add as many as you need.'
+                  : 'Pavé / melee. Add as many as you need.'
                 return (
-                  <div key={s.uid} className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
-                    <div className="mb-3 flex items-center justify-between">
-                      <span className="rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white">{s.role}</span>
-                      <button type="button" onClick={() => removeStoneRow(s.uid)} className="text-slate-300 hover:text-rose-500">
-                        <Trash2 className="h-4 w-4" />
+                  <div key={role} className="group/section relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:shadow-md">
+                    <span className={`absolute inset-y-0 left-0 w-1 ${theme.bar} opacity-80`} aria-hidden />
+                    <div className="flex items-center justify-between gap-3 pl-2">
+                      <div className="flex items-center gap-3">
+                        <span className={`flex h-9 w-9 items-center justify-center rounded-xl shadow-sm ${theme.header}`}>
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        <div>
+                          <h3 className="text-sm font-semibold text-slate-900">
+                            {theme.label} stones
+                            <span className={`ml-2 inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${theme.chip}`}>
+                              {items.length}
+                            </span>
+                          </h3>
+                          <p className="text-xs text-slate-500">{hint}</p>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => addStoneRow(role)}
+                        className={`inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition ${theme.btn}`}>
+                        <Plus className="h-3 w-3" /> Add {theme.label.toLowerCase()}
                       </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-500">Type</label>
-                        <select className={inputClass} value={s.stoneType} onChange={e => updateStoneRow(s.uid, { stoneType: e.target.value as StoneRowState['stoneType'] })}>
-                          <option value="natural">Natural</option>
-                          <option value="lab-grown">Lab</option>
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-500">Size key</label>
-                        <input className={inputClass} value={s.sizeKey} onChange={e => updateStoneRow(s.uid, { sizeKey: e.target.value })} placeholder="e.g. 1" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-500">Carats</label>
-                        <input type="number" min={0} step="0.01" className={inputClass} value={s.carats} onChange={e => updateStoneRow(s.uid, { carats: e.target.value })} />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-500">Qty</label>
-                        <input type="number" min={1} className={inputClass} value={s.quantity} onChange={e => updateStoneRow(s.uid, { quantity: e.target.value })} />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-500">Setter</label>
-                        <select className={inputClass} value={s.setterType} onChange={e => updateStoneRow(s.uid, { setterType: e.target.value })}>
-                          <option value="">—</option>
-                          {config.setters.map(st => <option key={st.typeKey} value={st.typeKey}>{st.label}</option>)}
-                        </select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-500">Setter fee override</label>
-                        <input type="number" min={0} className={inputClass} value={s.setterFeeOverride} onChange={e => updateStoneRow(s.uid, { setterFeeOverride: e.target.value })} placeholder={`$${config.setterMap[s.setterType]?.fee ?? 0}`} />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold text-slate-500">Manual price override</label>
-                        <input type="number" min={0} className={inputClass} value={s.manualPrice} onChange={e => updateStoneRow(s.uid, { manualPrice: e.target.value })} placeholder="Optional" />
-                      </div>
-                      <div className="flex items-end pb-3">
-                        <p className="text-xs text-slate-500">
-                          Cost ${b ? b.cost.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'} + labor ${b ? b.labor.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'}
-                        </p>
-                      </div>
+                    <div className="mt-3 pl-2">
+                      {items.length === 0 ? (
+                        <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-3 text-xs text-slate-400">None yet.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {items.map(s => {
+                            const b = stoneBreakdown.find(x => x.uid === s.uid)
+                            return (
+                              <div key={s.uid} className={`relative overflow-hidden rounded-2xl border ${theme.ring} ${theme.tint} p-4 shadow-sm transition hover:shadow-md`}>
+                                <span className={`absolute inset-y-0 left-0 w-1.5 ${theme.bar}`} aria-hidden />
+                                <div className="flex items-center justify-between gap-2 pl-2">
+                                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.chip}`}>
+                                    <Icon className="h-3 w-3" /> {theme.label} stone
+                                  </span>
+                                  <button type="button" onClick={() => removeStoneRow(s.uid)} aria-label="Remove stone"
+                                    className="flex h-7 w-7 items-center justify-center rounded-full bg-white/70 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600">
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </div>
+                                <div className="mt-3 grid grid-cols-2 gap-3 pl-2 sm:grid-cols-4">
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type</label>
+                                    <select className={inputClass} value={s.stoneType} onChange={e => updateStoneRow(s.uid, { stoneType: e.target.value as StoneRowState['stoneType'] })}>
+                                      <option value="natural">Natural</option>
+                                      <option value="lab-grown">Lab</option>
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Size key</label>
+                                    <input className={inputClass} value={s.sizeKey} onChange={e => updateStoneRow(s.uid, { sizeKey: e.target.value })} placeholder="e.g. 1" />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Carats</label>
+                                    <input type="number" min={0} step="0.01" className={inputClass} value={s.carats} onChange={e => updateStoneRow(s.uid, { carats: e.target.value })} />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Qty</label>
+                                    <input type="number" min={1} className={inputClass} value={s.quantity} onChange={e => updateStoneRow(s.uid, { quantity: e.target.value })} />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Setter</label>
+                                    <select className={inputClass} value={s.setterType} onChange={e => updateStoneRow(s.uid, { setterType: e.target.value })}>
+                                      <option value="">—</option>
+                                      {config.setters.map(st => <option key={st.typeKey} value={st.typeKey}>{st.label}</option>)}
+                                    </select>
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Setter fee override</label>
+                                    <input type="number" min={0} className={inputClass} value={s.setterFeeOverride} onChange={e => updateStoneRow(s.uid, { setterFeeOverride: e.target.value })} placeholder={`$${config.setterMap[s.setterType]?.fee ?? 0}`} />
+                                  </div>
+                                  <div className="space-y-1.5">
+                                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Manual price override</label>
+                                    <input type="number" min={0} className={inputClass} value={s.manualPrice} onChange={e => updateStoneRow(s.uid, { manualPrice: e.target.value })} placeholder="Optional" />
+                                  </div>
+                                  <div className="flex items-end pb-3">
+                                    <p className="text-xs text-slate-500">
+                                      Cost ${b ? b.cost.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'} + labor ${b ? b.labor.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )

@@ -1,12 +1,57 @@
 import { api } from '@/api/apiClient'
 import type { Client } from '@/types'
 
+interface SpringPage<T> {
+  content: T[]
+  page?: { totalElements: number; totalPages: number; number: number; size: number }
+  totalElements?: number
+  totalPages?: number
+  number?: number
+}
+
+export interface ClientPage {
+  items: Client[]
+  totalPages: number
+  totalElements: number
+  currentPage: number
+}
+
+export interface ClientSummary {
+  total: number
+  withEmail: number
+  withPhone: number
+}
+
 export const clientService = {
   list: (): Promise<Client[]> =>
     api.get('/api/clients'),
 
   search: (q: string): Promise<Client[]> =>
     api.get(`/api/clients?q=${encodeURIComponent(q)}`),
+
+  /** Server-side paginated + searchable list for the Clients page — keeps
+   *  the page fast as the client list grows. `list`/`search` above stay
+   *  unpaged for ClientPicker's full-list autocomplete dropdown. */
+  async getPage(params: { page?: number; size?: number; q?: string }): Promise<ClientPage> {
+    const { page = 0, size = 20, q } = params
+    let url = `/api/clients/page?page=${page}&size=${size}&sort=name,asc`
+    if (q && q.trim()) url += `&q=${encodeURIComponent(q.trim())}`
+    const data = await api.get<SpringPage<Client>>(url)
+    const meta = data.page
+    return {
+      items: data.content ?? [],
+      totalPages: meta?.totalPages ?? data.totalPages ?? 1,
+      totalElements: meta?.totalElements ?? data.totalElements ?? 0,
+      currentPage: meta?.number ?? data.number ?? 0,
+    }
+  },
+
+  summary: (): Promise<ClientSummary> =>
+    api.get<Record<string, number>>('/api/clients/stats/summary').then(d => ({
+      total: d.total ?? 0,
+      withEmail: d.withEmail ?? 0,
+      withPhone: d.withPhone ?? 0,
+    })),
 
   getById: (id: number): Promise<Client> =>
     api.get(`/api/clients/${id}`),

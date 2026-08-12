@@ -1,24 +1,36 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { clientService } from '@/services/clientService'
+import { clientService, type ClientSummary } from '@/services/clientService'
 import { NoticeDialog } from '@/components/NoticeDialog'
 import type { Client } from '@/types'
 import {
-  Check, ChevronRight, FileText, Loader2, Mail, Pencil, Phone,
+  Check, ChevronLeft, ChevronRight, FileText, Loader2, Mail, Pencil, Phone,
   Plus, Search, Trash2, UserPlus, X,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 type Draft = Omit<Client, 'id' | 'createdAt'>
 const BLANK: Draft = { name: '', surname: '', phone: '', email: '', preferredChannel: 'SMS' }
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50]
+const DEFAULT_PAGE_SIZE = 25
+
 export function ClientsPage() {
   const navigate = useNavigate()
+
+  // ── Server-side pagination state — same pattern as QuotesList/StockList,
+  // so the page stays fast as the client list keeps growing. ──────────────
   const [clients, setClients] = useState<Client[]>([])
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalElements, setTotalElements] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(0)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+
   const [query, setQuery] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [searching, setSearching] = useState(false)
 
   // Inline create panel
@@ -32,53 +44,55 @@ export function ClientsPage() {
   const [editDraft, setEditDraft] = useState<Client | null>(null)
   const [notice, setNotice] = useState<{ title: string; description?: string } | null>(null)
 
-  const reqIdRef = useRef(0)
+  const [stats, setStats] = useState<ClientSummary>({ total: 0, withEmail: 0, withPhone: 0 })
 
+  // Debounce search
   useEffect(() => {
-    setLoading(true)
-    clientService.list()
-      .then(setClients)
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [])
-
-  // Debounced server-side search (name, surname, email, phone)
-  useEffect(() => {
-    const handle = window.setTimeout(() => {
-      const id = ++reqIdRef.current
-      setSearching(true)
-      const promise = query.trim()
-        ? clientService.search(query.trim())
-        : clientService.list()
-      promise
-        .then(rows => { if (id === reqIdRef.current) setClients(rows) })
-        .catch(console.error)
-        .finally(() => { if (id === reqIdRef.current) setSearching(false) })
-    }, 200)
-    return () => window.clearTimeout(handle)
+    const t = setTimeout(() => setDebouncedSearch(query), 300)
+    return () => clearTimeout(t)
   }, [query])
 
-  const stats = useMemo(() => {
-    const total = clients.length
-    const withEmail = clients.filter(c => !!c.email).length
-    const withPhone = clients.filter(c => !!c.phone).length
-    return { total, withEmail, withPhone }
-  }, [clients])
+  // Reset to first page when search / page-size changes
+  useEffect(() => { setPage(0) }, [debouncedSearch, pageSize])
+
+  // Fetch the current page from the server — also called directly after
+  // create/delete so the table stays in sync without a full page reload.
+  const refresh = useCallback(() => {
+    setLoading(true)
+    setSearching(!!debouncedSearch.trim())
+    return clientService.getPage({ page, size: pageSize, q: debouncedSearch || undefined })
+      .then(({ items, totalPages: tp, totalElements: te }) => {
+        setClients(items)
+        setTotalPages(tp)
+        setTotalElements(te)
+      })
+      .catch(console.error)
+      .finally(() => { setLoading(false); setSearching(false) })
+  }, [page, pageSize, debouncedSearch])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  const loadStats = () => clientService.summary().then(setStats).catch(console.error)
+  useEffect(() => { loadStats() }, [])
+
+  const pageStart = page * pageSize
+  const pageEnd = Math.min(pageStart + pageSize, totalElements)
 
   const submitNew = async () => {
     if (!createDraft.name.trim()) { setCreateError('Name is required'); return }
     setSaving(true); setCreateError(null)
     try {
-      const created = await clientService.create({
+      await clientService.create({
         name: createDraft.name.trim(),
         surname: createDraft.surname?.trim() || null,
         phone: createDraft.phone?.trim() || null,
         email: createDraft.email?.trim() || null,
         preferredChannel: createDraft.preferredChannel || 'SMS',
       })
-      setClients(prev => [created, ...prev])
       setCreateDraft({ ...BLANK })
       setShowCreate(false)
+      refresh()
+      loadStats()
     } catch (e) {
       setCreateError(e instanceof Error ? e.message : 'Failed to save client')
     } finally {
@@ -99,6 +113,7 @@ export function ClientsPage() {
       })
       setClients(prev => prev.map(c => c.id === updated.id ? updated : c))
       setEditId(null); setEditDraft(null)
+      loadStats()
     } catch (e) {
       // Most likely a duplicate phone/email — surface the backend message.
       setNotice({ title: "Couldn't save the client", description: e instanceof Error ? e.message : 'Failed to save client' })
@@ -108,7 +123,8 @@ export function ClientsPage() {
   const remove = async (id: number) => {
     if (!confirm('Delete this client? Existing quotes will keep their saved client name.')) return
     await clientService.delete(id)
-    setClients(prev => prev.filter(c => c.id !== id))
+    refresh()
+    loadStats()
   }
 
   return (
@@ -366,8 +382,78 @@ export function ClientsPage() {
               </table>
             </div>
           )}
+          {totalElements > 0 && (
+            <PaginationBar
+              page={page + 1}
+              totalPages={totalPages}
+              pageStart={pageStart}
+              pageEnd={pageEnd}
+              total={totalElements}
+              pageSize={pageSize}
+              loading={loading}
+              onPageChange={p => setPage(p - 1)}
+              onPageSizeChange={setPageSize}
+            />
+          )}
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+function getPageNumbers(current: number, total: number): (number | 'gap')[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const pages = new Set<number>([1, total, current, current - 1, current + 1])
+  const sorted = [...pages].filter(n => n >= 1 && n <= total).sort((a, b) => a - b)
+  const out: (number | 'gap')[] = []
+  let prev = 0
+  for (const n of sorted) {
+    if (n - prev > 1) out.push('gap')
+    out.push(n)
+    prev = n
+  }
+  return out
+}
+
+function PaginationBar({
+  page, totalPages, pageStart, pageEnd, total, pageSize, loading, onPageChange, onPageSizeChange,
+}: {
+  page: number; totalPages: number; pageStart: number; pageEnd: number; total: number
+  pageSize: number; loading?: boolean; onPageChange: (p: number) => void; onPageSizeChange: (size: number) => void
+}) {
+  const pages = getPageNumbers(page, totalPages)
+  const canPrev = page > 1 && !loading
+  const canNext = page < totalPages && !loading
+  return (
+    <div className="flex flex-col gap-3 border-t border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      <div className="flex items-center gap-3 text-xs text-slate-500">
+        <span className="font-medium">{pageStart + 1}–{pageEnd} of {total}</span>
+        <label className="hidden items-center gap-2 sm:flex">
+          <span>Rows</span>
+          <select value={pageSize} onChange={e => onPageSizeChange(Number(e.target.value))}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 outline-none transition focus:border-slate-400">
+            {PAGE_SIZE_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="flex items-center gap-1">
+        <button onClick={() => onPageChange(page - 1)} disabled={!canPrev} aria-label="Previous page"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        {pages.map((p, i) => p === 'gap' ? (
+          <span key={`gap-${i}`} className="px-1 text-xs text-slate-400">…</span>
+        ) : (
+          <button key={p} onClick={() => onPageChange(p)} aria-current={p === page ? 'page' : undefined}
+            className={`min-w-[2rem] rounded-lg px-2.5 py-1.5 text-xs font-semibold transition ${p === page ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}>
+            {p}
+          </button>
+        ))}
+        <button onClick={() => onPageChange(page + 1)} disabled={!canNext} aria-label="Next page"
+          className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
     </div>
   )
 }
