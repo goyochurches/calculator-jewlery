@@ -8,6 +8,8 @@ export type NavKey =
   | 'quotes'
   | 'quotes-wizard'
   | 'quotes-list'
+  | 'stock'
+  | 'stock-list'
   | 'clients'
   | 'gemstones'
   | 'charts'
@@ -27,6 +29,8 @@ export const ROLE_PERMISSIONS: Record<Role, NavKey[]> = {
     'quotes',
     'quotes-wizard',
     'quotes-list',
+    'stock',
+    'stock-list',
     'clients',
     'gemstones',
     'charts',
@@ -39,10 +43,10 @@ export const ROLE_PERMISSIONS: Record<Role, NavKey[]> = {
     'reviews',
     'market-prices',
   ],
-  MANAGER: ['quotes', 'quotes-wizard', 'quotes-list', 'gemstones', 'messages', 'market-prices'],
-  JEWELER: ['quotes', 'quotes-wizard', 'quotes-list', 'gemstones', 'messages', 'market-prices'],
-  SALES:   ['quotes', 'quotes-wizard', 'quotes-list', 'gemstones', 'messages', 'market-prices'],
-  VIEWER:  ['quotes', 'quotes-wizard', 'quotes-list', 'gemstones', 'messages', 'market-prices'],
+  MANAGER: ['quotes', 'quotes-wizard', 'quotes-list', 'stock', 'stock-list', 'gemstones', 'messages', 'market-prices'],
+  JEWELER: ['quotes', 'quotes-wizard', 'quotes-list', 'stock', 'stock-list', 'gemstones', 'messages', 'market-prices'],
+  SALES:   ['quotes', 'quotes-wizard', 'quotes-list', 'stock', 'stock-list', 'gemstones', 'messages', 'market-prices'],
+  VIEWER:  ['quotes', 'quotes-wizard', 'quotes-list', 'stock', 'stock-list', 'gemstones', 'messages', 'market-prices'],
 }
 
 export function canAccess(role: Role | undefined, key: NavKey): boolean {

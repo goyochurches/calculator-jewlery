@@ -48,6 +48,14 @@ const pageCopy: Record<string, { title: string; subtitle: string }> = {
     title: 'All quotes',
     subtitle: 'Browse every saved quote, see who created it and review the full breakdown.',
   },
+  '/stock': {
+    title: 'Stock builder',
+    subtitle: 'Price and catalog a piece the store already has in stock.',
+  },
+  '/stock-list': {
+    title: 'Stock',
+    subtitle: 'Browse every piece in stock, with quantity and status.',
+  },
   '/messages': {
     title: 'Messages',
     subtitle: 'WhatsApp and SMS conversations with your clients — all in one inbox.',
@@ -79,6 +87,11 @@ const dynamicPageCopy: Array<{ pattern: RegExp; title: string; subtitle: string 
     pattern: /^\/quotes-list\/\d+$/,
     title: 'Quote detail',
     subtitle: 'Full breakdown, pricing, market comparison and client share link.',
+  },
+  {
+    pattern: /^\/stock-list\/\d+$/,
+    title: 'Stock detail',
+    subtitle: 'Full breakdown, pricing and status for this piece.',
   },
   {
     pattern: /^\/clients\/\d+$/,

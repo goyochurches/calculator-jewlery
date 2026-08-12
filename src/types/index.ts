@@ -402,3 +402,63 @@ export interface InboxEvent {
   createdAt: string
 }
 
+// ── Stock builder ───────────────────────────────────────────────────────
+// A piece the shop itself holds in stock (already made, not tied to a
+// customer order). Deliberate sibling of SavedQuote: same metal/stone/labor
+// pricing shape, no client/approval/payment/public-link fields, plus its own
+// sku + quantity.
+
+export type StockStatus = 'AVAILABLE' | 'RESERVED' | 'SOLD'
+
+/** Mirrors QuoteStone minus the EMKAY-catalog linkage (gemstoneId/gemstoneName) —
+ *  stock pieces are priced from raw carats + size/setter lookups. */
+export interface StockStone {
+  id?: number | null
+  role: StoneRole
+  stoneType: 'natural' | 'lab-grown'
+  stoneCategory?: 'DIAMOND' | 'GEMSTONE' | null
+  sizeKey: string
+  carats: number
+  setterType: string
+  setterFeeOverride?: number | null
+  labReport?: string | null
+  sortOrder?: number | null
+  shape?: string | null
+  color?: string | null
+  cut?: string | null
+  clarity?: string | null
+  manualPrice?: number | null
+  comments?: string | null
+  markupMultiplier?: number | null
+  contribution?: number | null
+}
+
+export interface StockItem {
+  id: string
+  title: string
+  sku?: string | null
+  quantity: number
+  createdBy?: string | null
+  createdAt: string
+  status: StockStatus
+  jewelryType?: string | null
+  metalRows?: QuoteMetal[] | null
+  ringLabor?: string | null
+  ringWidth?: number | null
+  fingerSize?: number | null
+  laborHours?: number | null
+  hourlyRate?: number | null
+  extraCosts?: number | null
+  total: number
+  markupMultiplier?: number | null
+  discountPercent?: number | null
+  photo?: string | null
+  internalNotes?: string | null
+  engravingFee?: number | null
+  setterType?: string | null
+  stones?: StockStone[]
+  archived?: boolean | null
+  /** Server-computed: total * markup, discount applied. Read-only. */
+  retailPrice?: number | null
+}
+
