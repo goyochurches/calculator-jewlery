@@ -12,6 +12,19 @@ export interface DiamondSizeConfig {
   ctPerStone?: number | null
 }
 
+/** One MM size -> price/ct row for a "fancy" (non-round) lab-grown melee
+ *  shape (Oval, Princess, Pear, ...). No HPHT/CVD or VVS/VS split - that's
+ *  a round-only concept and round isn't wired into this table. */
+export interface FancyMeleePrice {
+  id: number
+  shape: string
+  sizeKey: string
+  pointerLabel?: string | null
+  ctPerStone: number
+  pricePerCarat: number
+  sortOrder?: number | null
+}
+
 export interface FingerSizeConfig {
   id: number
   size: number
@@ -79,6 +92,18 @@ export const configService = {
 
   deleteDiamondSize: (id: number): Promise<void> =>
     api.delete(`/api/config/diamond-sizes/${id}`),
+
+  getFancyMeleePrices: (): Promise<FancyMeleePrice[]> =>
+    api.get('/api/config/fancy-melee-prices'),
+
+  updateFancyMeleePrice: (id: number, update: Partial<Omit<FancyMeleePrice, 'id'>>): Promise<FancyMeleePrice> =>
+    api.put(`/api/config/fancy-melee-prices/${id}`, update),
+
+  createFancyMeleePrice: (input: Omit<FancyMeleePrice, 'id'>): Promise<FancyMeleePrice> =>
+    api.post('/api/config/fancy-melee-prices', input),
+
+  deleteFancyMeleePrice: (id: number): Promise<void> =>
+    api.delete(`/api/config/fancy-melee-prices/${id}`),
 
   getFingerSizes: (): Promise<FingerSizeConfig[]> =>
     api.get('/api/config/finger-sizes'),

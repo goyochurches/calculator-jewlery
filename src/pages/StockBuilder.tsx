@@ -375,6 +375,39 @@ export function StockBuilderPage() {
     LAB: config.diamondSizes.filter(d => d.stoneType === 'LAB'),
   }), [config.diamondSizes])
 
+  // Resolves the effective per-carat price + ct-per-stone for a stone, given
+  // its Type and Shape. Lab-grown stones whose Shape matches a fancy melee
+  // price-sheet entry (Oval, Princess, Baguette, ...) price from that table
+  // instead of the generic diamond_size_config lookup — Round and shapes
+  // without price-sheet data fall back to the original per-mm behavior
+  // unchanged. Mirrors QuoteBuilder.tsx's sizePricingFor.
+  const sizePricingFor = (stone: Pick<StoneRowState, 'stoneType' | 'shape' | 'sizeKey'>) => {
+    if (stone.stoneType === 'lab-grown' && stone.shape && stone.sizeKey) {
+      const fancyRow = config.fancyMeleePriceFor(stone.shape, stone.sizeKey)
+      if (fancyRow) {
+        return {
+          pricePerCarat: fancyRow.pricePerCarat,
+          ctPerStone: fancyRow.ctPerStone,
+          label: `${fancyRow.sizeKey}${fancyRow.pointerLabel ? ` · ${fancyRow.pointerLabel}` : ''}`,
+          fancy: true as const,
+        }
+      }
+    }
+    const sizeCfg = config.diamondSizeFor(stone.stoneType, stone.sizeKey)
+    const mult = DIAMOND_TYPE_OPTIONS[stone.stoneType]?.multiplier ?? 1
+    return {
+      pricePerCarat: (sizeCfg?.basePrice ?? 0) * mult,
+      ctPerStone: sizeCfg?.ctPerStone ?? 0,
+      label: sizeCfg?.label ?? (stone.sizeKey || 'Custom'),
+      fancy: false as const,
+    }
+  }
+
+  const shapeOptions = useMemo(
+    () => Array.from(new Set<string>([...STONE_SHAPES, ...config.fancyShapes])),
+    [config.fancyShapes],
+  )
+
   const defaultStoneFor = (role: StoneRoleKey): StoneRowState => {
     const sizes = sizesByStoneType.NATURAL
     const firstSetter = config.setters[0]?.typeKey ?? ''
@@ -429,7 +462,7 @@ export function StockBuilderPage() {
   const onStoneCaratsChange = (uid: string, caratsText: string) => {
     setStones(prev => prev.map(s => {
       if (s.uid !== uid) return s
-      const ct = config.diamondSizeFor(s.stoneType, s.sizeKey)?.ctPerStone ?? 0
+      const ct = sizePricingFor(s).ctPerStone
       // Custom (no-preset) size: the total is derived from $/ct × carats, so
       // it has to be recalculated whenever carats changes too.
       const isCustom = s.sizeKey === ''
@@ -450,7 +483,7 @@ export function StockBuilderPage() {
   const onStoneAmountChange = (uid: string, amountText: string) => {
     setStones(prev => prev.map(s => {
       if (s.uid !== uid) return s
-      const ct = config.diamondSizeFor(s.stoneType, s.sizeKey)?.ctPerStone ?? 0
+      const ct = sizePricingFor(s).ctPerStone
       if (amountText === '') return { ...s, amount: '', carats: '' }
       const amount = parseNum(amountText)
       const carats = ct > 0 ? String(Math.round(amount * ct * 10000) / 10000) : s.carats
@@ -554,7 +587,7 @@ export function StockBuilderPage() {
     }
     if (duplicateFrom.stones?.length) {
       setStones(duplicateFrom.stones.map(s => {
-        const ct = config.diamondSizeFor(s.stoneType, s.sizeKey)?.ctPerStone ?? 0
+        const ct = sizePricingFor({ stoneType: s.stoneType, shape: s.shape ?? '', sizeKey: s.sizeKey ?? '' }).ctPerStone
         const carats = s.carats ?? 0
         const amount = ct > 0 && carats > 0 ? String(Math.round(carats / ct)) : ''
         return {
@@ -654,9 +687,7 @@ export function StockBuilderPage() {
   const manualRingLaborFee = config.ringLaborMap[ringLabor]?.fee ?? 0
 
   const stoneBreakdown = stones.map(s => {
-    const sizeCfg = config.diamondSizeFor(s.stoneType, s.sizeKey)
-    const mult = DIAMOND_TYPE_OPTIONS[s.stoneType].multiplier
-    const pricePerCarat = (sizeCfg?.basePrice ?? 0) * mult
+    const { pricePerCarat } = sizePricingFor(s)
     const carats = parseNum(s.carats)
     const amount = parseNum(s.amount)
     const hasManualPrice = s.manualPrice.trim() !== ''
@@ -913,10 +944,11 @@ export function StockBuilderPage() {
   // ── Renders a single stone row: collapsed summary card or the full form,
   // full parity with the Quote builder's renderStoneRow. ─────────────────
   const renderStoneRow = (stone: StoneRowState, index: number) => {
+    const isFancyShape = stone.stoneType === 'lab-grown' && config.fancyShapes.includes(stone.shape)
+    const fancySizes = isFancyShape ? config.fancyMeleePrices.filter(p => p.shape === stone.shape) : []
     const sizes = stone.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
-    const sizeCfg = config.diamondSizeFor(stone.stoneType, stone.sizeKey)
     const customSize = stone.sizeKey === ''
-    const pricePerCarat = (sizeCfg?.basePrice ?? 0) * DIAMOND_TYPE_OPTIONS[stone.stoneType].multiplier
+    const { pricePerCarat, label: sizeLabel } = sizePricingFor(stone)
     const caratsNum = parseNum(stone.carats)
     const amountNum = parseNum(stone.amount)
     const hasManualPrice = stone.manualPrice.trim() !== ''
@@ -931,7 +963,6 @@ export function StockBuilderPage() {
     const typeLabel = isGemstone
       ? `${gemstoneLabel} (${DIAMOND_TYPE_OPTIONS[stone.stoneType].label})`
       : DIAMOND_TYPE_OPTIONS[stone.stoneType].label
-    const sizeLabel = sizeCfg?.label ?? (stone.sizeKey || 'Custom')
     const setterLabel = config.setterMap[stone.setterType]?.label ?? stone.setterType
 
     if (stone.collapsed) {
@@ -1077,15 +1108,27 @@ export function StockBuilderPage() {
                 onChange={e => patchStone(stone.uid, { sizeKey: e.target.value })}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
                 <option value="">Custom — enter carats &amp; price</option>
-                {sizes.map(d => (
-                  <option key={d.id} value={d.sizeKey}>
-                    {d.label} — ${d.basePrice}{d.ctPerStone != null ? '/ct' : ''}
-                  </option>
-                ))}
+                {isFancyShape
+                  ? fancySizes.map(p => (
+                      <option key={p.id} value={p.sizeKey}>
+                        {p.sizeKey}{p.pointerLabel ? ` — ${p.pointerLabel}` : ''} · ${p.pricePerCarat}/ct
+                      </option>
+                    ))
+                  : sizes.map(d => (
+                      <option key={d.id} value={d.sizeKey}>
+                        {d.label} — ${d.basePrice}{d.ctPerStone != null ? '/ct' : ''}
+                      </option>
+                    ))}
               </select>
+              {isFancyShape && (
+                <p className="text-[10px] text-slate-400">Priced from the {stone.shape} melee sheet.</p>
+              )}
             </div>
           )}
 
+          {/* Natural vs Lab — hidden for fancy-shape sizes: the fancy melee
+              sheet is Lab-only, so there's no equivalent Natural price. */}
+          {!isFancyShape && (
           <div className="md:col-span-2">
             <button type="button" onClick={() => setCompareUid(stone.uid)}
               className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">
@@ -1098,6 +1141,7 @@ export function StockBuilderPage() {
               )}
             </button>
           </div>
+          )}
 
           <div className="space-y-1">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Carats</label>
@@ -1130,7 +1174,7 @@ export function StockBuilderPage() {
               onChange={e => patchStone(stone.uid, { shape: e.target.value })}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
               <option value="">—</option>
-              {STONE_SHAPES.map(sh => <option key={sh} value={sh}>{sh}</option>)}
+              {shapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
             </select>
           </div>
 

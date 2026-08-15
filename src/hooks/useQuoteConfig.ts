@@ -1,6 +1,7 @@
 import {
   configService,
   type DiamondSizeConfig,
+  type FancyMeleePrice,
   type FingerSizeConfig,
   type PricingTier,
   type RnRingModelConfig,
@@ -32,6 +33,7 @@ export function normalizeSizeKey(k: string): string {
 
 export interface QuoteConfig {
   diamondSizes: DiamondSizeConfig[]
+  fancyMeleePrices: FancyMeleePrice[]
   fingerSizes: FingerSizeConfig[]
   cadTiers: PricingTier[]
   ringLaborTiers: PricingTier[]
@@ -43,6 +45,12 @@ export interface QuoteConfig {
    *  sizeKey alone silently picked whichever row loaded last and made the
    *  carats↔amount sync wrong for LAB stones. */
   diamondSizeFor: (stoneType: string | undefined | null, sizeKey: string) => DiamondSizeConfig | undefined
+  /** Distinct fancy shape names, in a stable order (most sizes first — the
+   *  order the price sheet listed them). Round is deliberately not in this
+   *  list; it isn't wired into fancyMeleePrices. */
+  fancyShapes: string[]
+  /** Look up a fancy-shape price row for a (shape, sizeKey) pair. */
+  fancyMeleePriceFor: (shape: string | undefined | null, sizeKey: string | undefined | null) => FancyMeleePrice | undefined
   fingerSizeMap: Record<number, FingerSizeConfig>
   cadMap: Record<string, PricingTier>
   ringLaborMap: Record<string, PricingTier>
@@ -62,8 +70,10 @@ const STATIC_METAL_PRICES = Object.fromEntries(
 ) as Record<JewelryMetalOption, number>
 
 const EMPTY: QuoteConfig = {
-  diamondSizes: [], fingerSizes: [], cadTiers: [], ringLaborTiers: [], setters: [], rnRings: [],
+  diamondSizes: [], fancyMeleePrices: [], fingerSizes: [], cadTiers: [], ringLaborTiers: [], setters: [], rnRings: [],
   diamondSizeFor: () => undefined,
+  fancyShapes: [],
+  fancyMeleePriceFor: () => undefined,
   fingerSizeMap: {}, cadMap: {}, ringLaborMap: {}, setterMap: {},
   metalPriceMap: STATIC_METAL_PRICES,
   loading: true,
@@ -79,6 +89,9 @@ export function useQuoteConfig(): QuoteConfig {
   useEffect(() => {
     Promise.all([
       configService.getDiamondSizes(),
+      // Fancy-shape melee prices live behind a newer endpoint; degrade to an
+      // empty list instead of breaking the whole builder if it's not there yet.
+      configService.getFancyMeleePrices().catch(() => [] as Awaited<ReturnType<typeof configService.getFancyMeleePrices>>),
       configService.getFingerSizes(),
       configService.getCadTiers(),
       configService.getRingLaborTiers(),
@@ -92,10 +105,19 @@ export function useQuoteConfig(): QuoteConfig {
       metalsService.getPrices().catch(() => [] as Awaited<ReturnType<typeof metalsService.getPrices>>),
       companyService.get().catch(() => null),
     ])
-      .then(([diamondSizes, fingerSizes, cadTiers, ringLaborTiers, setters, rnRings, metals, settings]) => {
+      .then(([diamondSizes, fancyMeleePrices, fingerSizes, cadTiers, ringLaborTiers, setters, rnRings, metals, settings]) => {
         const byTypeAndKey: Record<string, DiamondSizeConfig> = Object.fromEntries(
           diamondSizes.map(d => [`${d.stoneType}|${normalizeSizeKey(d.sizeKey)}`, d])
         )
+        const byShapeAndSize: Record<string, FancyMeleePrice> = Object.fromEntries(
+          fancyMeleePrices.map(p => [`${p.shape.toLowerCase()}|${p.sizeKey.toLowerCase()}`, p])
+        )
+        // Order shapes by how many sizes they have (most first) — matches the
+        // order the price sheet listed them, and surfaces the common shapes
+        // first in the picker.
+        const shapeCounts = new Map<string, number>()
+        fancyMeleePrices.forEach(p => shapeCounts.set(p.shape, (shapeCounts.get(p.shape) ?? 0) + 1))
+        const fancyShapes = [...shapeCounts.entries()].sort((a, b) => b[1] - a[1]).map(([shape]) => shape)
 
         const goldSpot = metals.find(m => m.symbol === 'XAU')?.price
         const platinumSpot = metals.find(m => m.symbol === 'XPT')?.price
@@ -120,6 +142,7 @@ export function useQuoteConfig(): QuoteConfig {
 
         setConfig({
           diamondSizes,
+          fancyMeleePrices,
           fingerSizes,
           cadTiers,
           ringLaborTiers,
@@ -127,6 +150,9 @@ export function useQuoteConfig(): QuoteConfig {
           rnRings,
           diamondSizeFor: (stoneType, sizeKey) =>
             byTypeAndKey[`${normalizeStoneType(stoneType)}|${normalizeSizeKey(sizeKey)}`],
+          fancyShapes,
+          fancyMeleePriceFor: (shape, sizeKey) =>
+            shape && sizeKey ? byShapeAndSize[`${shape.toLowerCase()}|${sizeKey.toLowerCase()}`] : undefined,
           fingerSizeMap: Object.fromEntries(fingerSizes.map(f => [f.size, f])),
           cadMap: Object.fromEntries(cadTiers.map(t => [t.tierKey, t])),
           ringLaborMap: Object.fromEntries(ringLaborTiers.map(t => [t.tierKey, t])),
