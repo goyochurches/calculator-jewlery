@@ -270,6 +270,10 @@ export function QuoteBuilderPage() {
     uid: string
     role: StoneRole
     stoneType: 'natural' | 'lab-grown'
+    /** False until the jeweler explicitly picks Natural or Lab — the stone
+     *  can't be collapsed/saved on the default value alone. See
+     *  `stoneTypeChosen` gating in renderStoneRow and handleQuoteReady. */
+    stoneTypeChosen: boolean
     /** Only surfaced on MAIN stones — SIDE/MELEE are always 'diamond'. */
     stoneCategory: 'diamond' | 'gemstone'
     /** Gemstone catalog id (as a string, for the <select>) when stoneCategory
@@ -287,8 +291,14 @@ export function QuoteBuilderPage() {
     cut: string
     clarity: string
     // Raw input. When non-empty, overrides carats × pricePerCarat for this
-    // stone's cost. Setting labor is unaffected.
+    // stone's cost. Setting labor is unaffected. For a custom (no-preset)
+    // size this is DERIVED — kept in sync from manualPricePerCarat × carats
+    // rather than typed directly; see onStoneManualPricePerCaratChange.
     manualPrice: string
+    /** Cost per carat the jeweler types by hand for a custom (no-preset)
+     *  size — the system multiplies by carats to get manualPrice/the total.
+     *  Only used/shown when sizeKey === '' (no size/cut match in the system). */
+    manualPricePerCarat: string
     // Free-form notes the jeweler wants to attach to this stone (rendered on
     // the MAIN row only for now).
     comments: string
@@ -509,6 +519,8 @@ export function QuoteBuilderPage() {
         uid: crypto.randomUUID(),
         role: s.role,
         stoneType: s.stoneType,
+        // A duplicated stone already had a type picked historically.
+        stoneTypeChosen: true,
         stoneCategory: s.stoneCategory === 'GEMSTONE' ? 'gemstone' : 'diamond',
         gemstoneId: s.gemstoneId != null ? String(s.gemstoneId) : '',
         // Keep the historical sizeKey as-is even for MAIN (the Size picker is
@@ -525,6 +537,12 @@ export function QuoteBuilderPage() {
         cut: s.cut ?? '',
         clarity: s.clarity ?? '',
         manualPrice: s.manualPrice != null ? String(s.manualPrice) : '',
+        // Back-derive $/ct from the stored total so a duplicated custom-size
+        // stone's per-carat field isn't blank — the user just typed a total
+        // historically, so this is our best reconstruction of it.
+        manualPricePerCarat: s.sizeKey === '' && s.manualPrice != null && carats > 0
+          ? String(Math.round((s.manualPrice / carats) * 100) / 100)
+          : '',
         comments: s.comments ?? '',
         markup: s.markupMultiplier != null ? String(s.markupMultiplier) : (s.role === 'MAIN' ? String(DEFAULT_MARKUP) : ''),
         collapsed: true,
@@ -699,6 +717,7 @@ export function QuoteBuilderPage() {
       uid: crypto.randomUUID(),
       role,
       stoneType: 'natural',
+      stoneTypeChosen: false,
       stoneCategory: 'diamond',
       gemstoneId: '',
       // MAIN stones are always individually priced (Wholesale cost), never
@@ -714,6 +733,7 @@ export function QuoteBuilderPage() {
       cut: '',
       clarity: '',
       manualPrice: '',
+      manualPricePerCarat: '',
       comments: '',
       // MAIN stones must always carry an explicit markup so it's never
       // ambiguous whether one applies — pre-fill with the quote's default.
@@ -768,10 +788,21 @@ export function QuoteBuilderPage() {
     setStones(prev => prev.map(s => {
       if (s.uid !== uid) return s
       const ct = config.diamondSizeFor(s.stoneType, s.sizeKey)?.ctPerStone ?? 0
-      if (caratsText === '') return { ...s, carats: '', amount: '' }
+      // Custom (no-preset) size: the total is derived from $/ct × carats, so
+      // it has to be recalculated whenever carats changes too.
+      const isCustom = s.sizeKey === ''
+      if (caratsText === '') {
+        return {
+          ...s, carats: '', amount: '',
+          manualPrice: isCustom ? '' : s.manualPrice,
+        }
+      }
       const carats = parseNum(caratsText)
       const amount = ct > 0 ? String(Math.round(carats / ct)) : s.amount
-      return { ...s, carats: caratsText, amount }
+      const manualPrice = isCustom && s.manualPricePerCarat.trim() !== ''
+        ? String(Math.round(carats * parseNum(s.manualPricePerCarat) * 100) / 100)
+        : s.manualPrice
+      return { ...s, carats: caratsText, amount, manualPrice }
     }))
   }
   const onStoneAmountChange = (uid: string, amountText: string) => {
@@ -797,6 +828,21 @@ export function QuoteBuilderPage() {
       if (s.uid !== uid) return s
       const shouldSeedAmount = priceText.trim() !== '' && s.amount.trim() === ''
       return { ...s, manualPrice: priceText, amount: shouldSeedAmount ? '1' : s.amount }
+    }))
+  }
+
+  // Custom (no-preset) size: the jeweler types $/ct by hand instead of a flat
+  // total — the system multiplies by carats and keeps manualPrice (the value
+  // every cost formula and the save payload actually read) in sync.
+  const onStoneManualPricePerCaratChange = (uid: string, perCaratText: string) => {
+    setStones(prev => prev.map(s => {
+      if (s.uid !== uid) return s
+      const carats = parseNum(s.carats)
+      const shouldSeedAmount = perCaratText.trim() !== '' && s.amount.trim() === ''
+      const manualPrice = perCaratText.trim() === ''
+        ? ''
+        : String(Math.round(carats * parseNum(perCaratText) * 100) / 100)
+      return { ...s, manualPricePerCarat: perCaratText, manualPrice, amount: shouldSeedAmount ? '1' : s.amount }
     }))
   }
 
@@ -982,9 +1028,10 @@ export function QuoteBuilderPage() {
             {theme.label} stone #{index + 1}
           </span>
           <div className="flex items-center gap-1.5">
-            <button type="button" onClick={() => toggleCollapsed(stone.uid)}
-              aria-label="Collapse"
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-white/70 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+            <button type="button" onClick={() => stone.stoneTypeChosen && toggleCollapsed(stone.uid)}
+              aria-label="Collapse" disabled={!stone.stoneTypeChosen}
+              title={stone.stoneTypeChosen ? undefined : 'Choose Natural or Lab first'}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-white/70 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40">
               <ChevronUp className="h-4 w-4" />
             </button>
             <button type="button" onClick={() => removeStone(stone.uid)}
@@ -1008,17 +1055,35 @@ export function QuoteBuilderPage() {
             </div>
           )}
 
-          <div className="space-y-1">
+          <div className="space-y-1 md:col-span-2">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {stone.role === 'MAIN' && stone.stoneCategory === 'gemstone' ? 'Origin' : 'Type'}
+              {stone.role === 'MAIN' && stone.stoneCategory === 'gemstone' ? 'Origin' : 'Type'}{' '}
+              <span className="font-normal normal-case text-rose-500">(required — pick one)</span>
             </label>
-            <select value={stone.stoneType}
-              onChange={e => patchStone(stone.uid, { stoneType: e.target.value as StoneRow['stoneType'] })}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
-              {diamondTypeKeys.map(key => (
-                <option key={key} value={key}>{DIAMOND_TYPE_OPTIONS[key].label}</option>
-              ))}
-            </select>
+            <div className="grid grid-cols-2 gap-2">
+              {diamondTypeKeys.map(key => {
+                const active = stone.stoneTypeChosen && stone.stoneType === key
+                return (
+                  <button key={key} type="button"
+                    onClick={() => patchStone(stone.uid, { stoneType: key, stoneTypeChosen: true })}
+                    className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
+                      active
+                        ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                    }`}>
+                    {DIAMOND_TYPE_OPTIONS[key].label}
+                  </button>
+                )
+              })}
+            </div>
+            {!stone.stoneTypeChosen && (
+              <p className="flex items-center gap-1.5 rounded-xl bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600">
+                <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                  <path d="M12 9v4m0 4h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.42 0Z" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                You must choose Natural or Lab before this stone can be saved.
+              </p>
+            )}
           </div>
 
           {stone.role === 'MAIN' && stone.stoneCategory === 'gemstone' && (
@@ -1161,19 +1226,40 @@ export function QuoteBuilderPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {stone.role === 'MAIN' ? 'Wholesale cost' : 'Gross cost for this batch of stones'}{' '}
-                  <span className={`font-normal normal-case ${customSize ? 'text-rose-500' : 'text-slate-400'}`}>
-                    {customSize
-                      ? '(required — total for all stones in this batch)'
-                      : `(optional — overrides $${pricePerCarat.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct × total carats)`}
-                  </span>
+                  {customSize ? (
+                    <>Cost per carat{' '}
+                      <span className="font-normal normal-case text-rose-500">
+                        (required — size/cut not in the system; the total is calculated automatically)
+                      </span>
+                    </>
+                  ) : (
+                    <>{stone.role === 'MAIN' ? 'Wholesale cost' : 'Gross cost for this batch of stones'}{' '}
+                      <span className="font-normal normal-case text-slate-400">
+                        (optional — overrides ${pricePerCarat.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct × total carats)
+                      </span>
+                    </>
+                  )}
                 </label>
-                <input type="number" min={0} step="0.01" value={stone.manualPrice}
-                  placeholder={customSize ? 'e.g. 4500 (required)' : 'Leave empty to use calculated price'}
-                  onChange={e => onStoneManualPriceChange(stone.uid, e.target.value)}
-                  className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 ${
-                    customSize && stone.manualPrice.trim() === '' ? 'border-rose-300' : 'border-slate-200'
-                  }`} />
+                {customSize ? (
+                  <>
+                    <input type="number" min={0} step="0.01" value={stone.manualPricePerCarat}
+                      placeholder="e.g. 1500 per carat"
+                      onChange={e => onStoneManualPricePerCaratChange(stone.uid, e.target.value)}
+                      className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 ${
+                        stone.manualPricePerCarat.trim() === '' ? 'border-rose-300' : 'border-slate-200'
+                      }`} />
+                    <p className="text-[11px] text-slate-500">
+                      {caratsNum > 0 && stone.manualPricePerCarat.trim() !== ''
+                        ? `= $${stoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} total (${caratsNum} ct × $${parseNum(stone.manualPricePerCarat).toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct)`
+                        : 'Enter carats and cost per carat — the total is calculated for you.'}
+                    </p>
+                  </>
+                ) : (
+                  <input type="number" min={0} step="0.01" value={stone.manualPrice}
+                    placeholder="Leave empty to use calculated price"
+                    onChange={e => onStoneManualPriceChange(stone.uid, e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                )}
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Custom setting fee (optional)</label>
@@ -1299,7 +1385,9 @@ export function QuoteBuilderPage() {
           <button
             type="button"
             onClick={() => collapseStone(stone.uid)}
-            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition ${theme.btn}`}
+            disabled={!stone.stoneTypeChosen}
+            title={stone.stoneTypeChosen ? undefined : 'Choose Natural or Lab first'}
+            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition ${theme.btn} disabled:cursor-not-allowed disabled:opacity-40`}
           >
             <Check className="h-3.5 w-3.5" /> Done
           </button>
@@ -1588,12 +1676,19 @@ export function QuoteBuilderPage() {
     if (!client) errors.client = 'Please select or create a client.'
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
+    // Every main/side/melee stone must have an explicit Natural-vs-Lab choice
+    // — no silently defaulting to Natural.
+    const missingStoneType = !rnMode && stones.some(s => !s.stoneTypeChosen)
+    if (missingStoneType) {
+      setSaveError('Choose Natural or Lab for every stone (Main, Side, Melee) before creating the quote.')
+      return
+    }
     // A "Custom" (no-preset) size has no per-carat base, so its price must be
     // typed in — otherwise the stone would contribute $0. Only required for
     // custom-size stones; preset sizes price themselves.
-    const customMissingPrice = stones.some(s => s.sizeKey === '' && s.manualPrice.trim() === '')
+    const customMissingPrice = stones.some(s => s.sizeKey === '' && (s.manualPricePerCarat.trim() === '' || parseNum(s.carats) <= 0))
     if (customMissingPrice) {
-      setSaveError('Enter the stone price for any "Custom" size stone before creating the quote.')
+      setSaveError('Enter the carats and cost per carat for any stone whose size/cut isn\'t in the system before creating the quote.')
       return
     }
     const mainMissingMarkup = stones.some(s => s.role === 'MAIN' && (s.markup.trim() === '' || !(Number(s.markup) > 0)))
@@ -3057,6 +3152,72 @@ export function QuoteBuilderPage() {
                   ${(pricing.settingFee + pricing.customerSettingFee + pricing.emkaySettingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}
                 </strong>
               </div>
+
+              {/* ── Stone total breakdown — every stone's own contribution,
+                  so it's obvious what makes up the aggregate total. ────── */}
+              {(mainStones.length + sideStones.length + meleeStones.length + customerStones.length + emkayStones.length) > 0 && (
+                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Stone total — breakdown</p>
+                  <div className="space-y-1.5 text-sm">
+                    {([['MAIN', mainStones], ['SIDE', sideStones], ['MELEE', meleeStones]] as const).flatMap(([role, items]) =>
+                      items.map((s, i) => {
+                        const b = stoneBreakdownByUid[s.uid]
+                        const contribution = b ? b.cost + b.labor : 0
+                        const theme = themeForRole(role)
+                        const typeLabel = s.stoneTypeChosen ? DIAMOND_TYPE_OPTIONS[s.stoneType].label : 'Not chosen yet'
+                        const desc = [typeLabel, parseNum(s.carats) > 0 ? `${s.carats} ct` : null, s.shape || null].filter(Boolean).join(' · ')
+                        return (
+                          <div key={s.uid} className="flex items-center justify-between gap-3">
+                            <span className="flex min-w-0 items-center gap-2 text-slate-600">
+                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${theme.dot}`} aria-hidden />
+                              <span className="shrink-0 font-semibold text-slate-700">{theme.label} #{i + 1}</span>
+                              <span className="truncate text-slate-400">{desc || '—'}</span>
+                            </span>
+                            <strong className="shrink-0 tabular-nums text-slate-900">${contribution.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                          </div>
+                        )
+                      })
+                    )}
+                    {customerStones.map((cs, i) => {
+                      const qty = Math.max(1, parseNum(cs.quantity || '1') || 1)
+                      const feeOverride = cs.setterFeeOverride.trim()
+                      const fee = feeOverride !== '' ? parseNum(feeOverride) : (config.setterMap[cs.setterType]?.fee ?? 0)
+                      const contribution = qty * fee
+                      const gem = gemstones.find(g => g.id === cs.gemstoneId)
+                      return (
+                        <div key={cs.uid} className="flex items-center justify-between gap-3">
+                          <span className="flex min-w-0 items-center gap-2 text-slate-600">
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500" aria-hidden />
+                            <span className="shrink-0 font-semibold text-slate-700">Customer #{i + 1}</span>
+                            <span className="truncate text-slate-400">{gem?.name ?? 'Customer stone'} (setting only)</span>
+                          </span>
+                          <strong className="shrink-0 tabular-nums text-slate-900">${contribution.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                        </div>
+                      )
+                    })}
+                    {emkayStones.map((es, i) => {
+                      const qty = Math.max(1, parseNum(es.quantity || '1') || 1)
+                      const feeOverride = es.setterFeeOverride.trim()
+                      const fee = feeOverride !== '' ? parseNum(feeOverride) : (config.setterMap[es.setterType]?.fee ?? 0)
+                      const contribution = qty * es.priceUsd + qty * fee
+                      return (
+                        <div key={es.uid} className="flex items-center justify-between gap-3">
+                          <span className="flex min-w-0 items-center gap-2 text-slate-600">
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden />
+                            <span className="shrink-0 font-semibold text-slate-700">EMKAY #{i + 1}</span>
+                            <span className="truncate text-slate-400">{es.name}</span>
+                          </span>
+                          <strong className="shrink-0 tabular-nums text-slate-900">${contribution.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                        </div>
+                      )
+                    })}
+                    <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-base font-bold text-slate-900">
+                      <span>Total</span>
+                      <span>${(pricing.diamondCost + pricing.settingFee + pricing.customerSettingFee + pricing.emkayCost + pricing.emkaySettingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
           )}
