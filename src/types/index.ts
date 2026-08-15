@@ -417,6 +417,10 @@ export interface StockStone {
   role: StoneRole
   stoneType: 'natural' | 'lab-grown'
   stoneCategory?: 'DIAMOND' | 'GEMSTONE' | null
+  /** Pointer + denormalized name into the gemstone catalog, only set when
+   *  stoneCategory = GEMSTONE (e.g. a MAIN ruby or tourmaline). */
+  gemstoneId?: number | null
+  gemstoneName?: string | null
   sizeKey: string
   carats: number
   setterType: string
@@ -460,6 +464,9 @@ export interface StockItem {
   /** Real gemstones picked from the EMKAY Gemstones Catalog — same shape as
    *  QuoteEmkayStone, reused as-is. */
   emkayStones?: QuoteEmkayStone[]
+  /** Internal-only photos (sourcing, condition, references) — same shape as
+   *  QuoteAttachment, reused as-is. */
+  attachments?: QuoteAttachment[]
   archived?: boolean | null
   /** Server-computed: total * markup, discount applied. Read-only. */
   retailPrice?: number | null

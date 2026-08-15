@@ -1,23 +1,33 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DIAMOND_TYPE_OPTIONS, JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import { useAuth } from '@/context/AuthContext'
-import { useQuoteConfig } from '@/hooks/useQuoteConfig'
+import { useQuoteConfig, normalizeSizeKey } from '@/hooks/useQuoteConfig'
+import { computeRnBreakdown, type RnStoneType } from '@/lib/rnPricing'
+import { compareStoneTypes } from '@/lib/stoneTypeCompare'
+import { StoneTypeCompareDialog } from '@/components/StoneTypeCompareDialog'
+import { CreateLabSizeDialog } from '@/components/CreateLabSizeDialog'
+import { configService } from '@/services/configService'
+import { gemstoneService } from '@/services/gemstoneService'
+import { companyService, ENGRAVING_SLIDER_DEFAULTS } from '@/services/companyService'
 import { stockService } from '@/services/stockService'
 import { emkayService } from '@/services/emkayService'
 import { Toast } from '@/components/Toast'
-import type { EmkayCatalogProduct, EmkayCategory, JewelryMetalOption, StockItem, StockStone } from '@/types'
+import type {
+  EmkayCatalogProduct, EmkayCategory, GemstonePrice, JewelryMetalOption, StockItem, StockStone,
+} from '@/types'
 import {
-  Boxes, Camera, ChevronDown, ChevronUp, Copy, Crown, Diamond, ExternalLink, Gem,
-  ImageOff, Loader2, Package, Plus, Search, Sparkles, Trash2, Upload, X,
+  Boxes, Camera, Check, ChevronDown, ChevronUp, Copy, Crown, Diamond, ExternalLink, Gem,
+  ImageOff, ImagePlus, Loader2, Package, Plus, Scale, Search, Sparkles, Trash2, Upload, X,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-// Same catalogue as the Quote builder, minus the "RN ring" configurator —
-// that's a separate structured model/finger-size/band flow tied to the
-// quote-specific rn_ring_models config, out of scope for a v1 stock catalog.
+// Same catalogue as the Quote builder, including the "RN ring" configurator —
+// v2: full parity with the Quote builder's pre-configured RN model/finger-size
+// /band flow, tied to the same quote-specific rn_ring_models config.
 const JEWELRY_TYPE_OPTIONS: Array<{ key: string; label: string }> = [
   { key: 'ring', label: 'Ring' },
+  { key: 'rn', label: 'RN ring' },
   { key: 'pendant', label: 'Pendant' },
   { key: 'necklace', label: 'Necklace' },
   { key: 'bracelet', label: 'Bracelet' },
@@ -34,18 +44,56 @@ const STATUS_OPTIONS: Array<{ key: StockItem['status']; label: string }> = [
   { key: 'SOLD', label: 'Sold' },
 ]
 
-const STONE_ROLES: StockStone['role'][] = ['MAIN', 'SIDE', 'MELEE']
+type StoneRoleKey = StockStone['role']
+
+const DEFAULT_MARKUP = 2.5
+const MARKUP_PRESETS = [2, 2.5, 3] as const
+const DISCOUNT_PRESETS = [5, 10, 15, 20, 25, 30] as const
+
+const diamondTypeKeys = Object.keys(DIAMOND_TYPE_OPTIONS) as Array<keyof typeof DIAMOND_TYPE_OPTIONS>
+
+// Standard diamond shapes offered to the user. Empty value = unspecified.
+const STONE_SHAPES = [
+  'Round', 'Princess', 'Oval', 'Cushion', 'Emerald',
+  'Pear', 'Marquise', 'Asscher', 'Radiant', 'Heart',
+] as const
+const STONE_COLORS = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'] as const
+const STONE_CUTS = ['Excellent', 'Very Good', 'Good', 'Fair', 'Poor'] as const
+const STONE_CLARITIES = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'I1', 'I2', 'I3'] as const
+
+// Turn a free-text lab report like "GIA 1234567890" into a deep-link to the
+// issuing lab's online verification page. Mirrors QuoteBuilder's helper 1:1.
+function labReportVerifyUrl(raw: string): { url: string; lab: string; valid: boolean } | null {
+  const text = (raw ?? '').trim()
+  if (!text) return null
+  const upper = text.toUpperCase()
+  const number = text.replace(/[\s-]/g, '').match(/\d{4,}/)?.[0]
+
+  if (upper.includes('IGI')) {
+    const valid = !!number && number.length >= 7
+    return { url: 'https://www.igi.org/verify-your-report/', lab: 'IGI', valid }
+  }
+  const valid = !!number && number.length >= 7 && number.length <= 11
+  return {
+    url: number
+      ? `https://www.gia.edu/report-check?reportno=${number}`
+      : 'https://www.gia.edu/report-check',
+    lab: 'GIA',
+    valid,
+  }
+}
 
 // Same per-role palette as the Quote builder's Stone Setting section
 // (themeForRole in QuoteBuilder.tsx) — MAIN = gold, SIDE = sapphire,
 // MELEE = platinum/teal — so a stone row reads the same in both builders.
-const STONE_ROLE_THEME: Record<StockStone['role'], {
+const STONE_ROLE_THEME: Record<StoneRoleKey, {
   label: string; icon: typeof Crown
-  bar: string; ring: string; tint: string; chip: string; btn: string; header: string
+  bar: string; dot: string; ring: string; tint: string; chip: string; btn: string; header: string
 }> = {
   MAIN: {
     label: 'Main', icon: Crown,
     bar: 'bg-gradient-to-b from-amber-300 via-amber-500 to-yellow-600',
+    dot: 'bg-amber-500',
     ring: 'border-amber-200/80',
     tint: 'bg-gradient-to-br from-amber-50/70 via-white to-yellow-50/40',
     chip: 'bg-amber-100 text-amber-900 ring-1 ring-amber-200',
@@ -55,6 +103,7 @@ const STONE_ROLE_THEME: Record<StockStone['role'], {
   SIDE: {
     label: 'Side', icon: Diamond,
     bar: 'bg-gradient-to-b from-sky-400 via-blue-500 to-indigo-600',
+    dot: 'bg-blue-500',
     ring: 'border-blue-200/80',
     tint: 'bg-gradient-to-br from-sky-50/70 via-white to-indigo-50/40',
     chip: 'bg-blue-100 text-blue-900 ring-1 ring-blue-200',
@@ -64,6 +113,7 @@ const STONE_ROLE_THEME: Record<StockStone['role'], {
   MELEE: {
     label: 'Melee', icon: Sparkles,
     bar: 'bg-gradient-to-b from-teal-300 via-emerald-500 to-emerald-700',
+    dot: 'bg-emerald-500',
     ring: 'border-emerald-200/80',
     tint: 'bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/40',
     chip: 'bg-emerald-100 text-emerald-900 ring-1 ring-emerald-200',
@@ -112,17 +162,39 @@ interface MetalRowState {
   grams: string
 }
 
+// Full parity with the Quote builder's StoneRow: category, gemstone linkage,
+// grading fields, lab report, per-stone markup, collapse/expand.
 interface StoneRowState {
   uid: string
-  role: StockStone['role']
+  role: StoneRoleKey
   stoneType: 'natural' | 'lab-grown'
+  /** Only surfaced on MAIN stones — SIDE/MELEE are always 'diamond'. */
+  stoneCategory: 'diamond' | 'gemstone'
+  gemstoneId: string
   sizeKey: string
   carats: string
-  quantity: string
+  amount: string
   setterType: string
   setterFeeOverride: string
+  labReport: string
+  shape: string
+  color: string
+  cut: string
+  clarity: string
   manualPrice: string
   comments: string
+  /** Optional per-stone markup. MAIN only — overrides the piece-level markup
+   *  just for this stone's (cost + setting labor). */
+  markup: string
+  collapsed: boolean
+}
+
+interface AttachmentRowState {
+  uid: string
+  backendId?: number | null
+  photo: string
+  caption: string
+  createdAt: string
 }
 
 function parseNum(v: string): number {
@@ -136,6 +208,16 @@ const inputClass =
   'w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-400 focus:bg-white'
 const labelClass = 'text-sm font-semibold text-slate-900'
 const cardClass = 'rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]'
+
+/** One label/value row in the RN breakdown panel. Mirrors QuoteBuilder's RnRow. */
+function RnRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 text-slate-600">
+      <dt>{label}</dt>
+      <dd className="font-medium tabular-nums text-slate-900">{value}</dd>
+    </div>
+  )
+}
 
 export function StockBuilderPage() {
   const { user } = useAuth()
@@ -151,22 +233,44 @@ export function StockBuilderPage() {
   const [quantity, setQuantity] = useState('1')
   const [status, setStatus] = useState<StockItem['status']>('AVAILABLE')
   const [jewelryType, setJewelryType] = useState('ring')
+  const rnMode = jewelryType === 'rn'
   const [ringLabor, setRingLabor] = useState('none')
   const [ringWidth, setRingWidth] = useState('')
   const [fingerSize, setFingerSize] = useState('')
   const [extraCosts, setExtraCosts] = useState('0')
-  const [engravingFee, setEngravingFee] = useState('0')
-  const [markupMultiplier, setMarkupMultiplier] = useState('2.5')
-  const [discountPercent, setDiscountPercent] = useState('0')
+  const [engravingFee, setEngravingFee] = useState(0)
+  const [engravingBounds, setEngravingBounds] = useState<{ min: number; max: number; step: number; default: number }>(
+    { ...ENGRAVING_SLIDER_DEFAULTS },
+  )
+  const [markupText, setMarkupText] = useState(String(DEFAULT_MARKUP))
+  const [discountText, setDiscountText] = useState('')
   const [internalNotes, setInternalNotes] = useState('')
   const [photo, setPhoto] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const [metalRows, setMetalRows] = useState<MetalRowState[]>([
     { uid: nextUid(), metalKey: 'gold-14k-yellow', grams: '' },
   ])
+  const selectedMetal = metalRows[0]?.metalKey ?? 'gold-14k-yellow'
   const [stones, setStones] = useState<StoneRowState[]>([])
+  const [gemstones, setGemstones] = useState<GemstonePrice[]>([])
+  const [compareUid, setCompareUid] = useState<string | null>(null)
+
+  // ── RN ring mode ─────────────────────────────────────────────────────
+  const [rnModelKey, setRnModelKey] = useState('')
+  const [rnFingerSize, setRnFingerSize] = useState<number>(0)
+  const [rnStoneType, setRnStoneType] = useState<RnStoneType>('natural')
+  const [rnBandMode, setRnBandMode] = useState<'eternity' | 'other'>('eternity')
+  const [rnCustomStones, setRnCustomStones] = useState('')
+  const [showCreateLabRn, setShowCreateLabRn] = useState(false)
+  const [linkingLabRn, setLinkingLabRn] = useState(false)
+
+  // ── Internal attachments (multi-photo + captions) ───────────────────
+  const [attachments, setAttachments] = useState<AttachmentRowState[]>([])
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
+  const attachmentCameraRef = useRef<HTMLInputElement>(null)
 
   // ── EMKAY Gemstones Catalog — real stones the shop buys from EMKAY,
   // full price counts as material cost (unlike a customer-supplied stone). ──
@@ -182,6 +286,22 @@ export function StockBuilderPage() {
   const [emkayTotalPages, setEmkayTotalPages] = useState(0)
   const [emkayLoading, setEmkayLoading] = useState(false)
   const [emkayError, setEmkayError] = useState<string | null>(null)
+
+  useEffect(() => {
+    gemstoneService.getAll().then(setGemstones).catch(console.error)
+  }, [])
+
+  // Hand-engraving slider bounds configured in Master Tables.
+  useEffect(() => {
+    companyService.get().then(s => {
+      setEngravingBounds({
+        min: s.engravingMin ?? ENGRAVING_SLIDER_DEFAULTS.min,
+        max: s.engravingMax ?? ENGRAVING_SLIDER_DEFAULTS.max,
+        step: s.engravingStep ?? ENGRAVING_SLIDER_DEFAULTS.step,
+        default: s.engravingDefault ?? ENGRAVING_SLIDER_DEFAULTS.default,
+      })
+    }).catch(console.error)
+  }, [])
 
   useEffect(() => {
     if (!emkayOpen || emkayConfigured !== null) return
@@ -241,22 +361,153 @@ export function StockBuilderPage() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ variant: 'success' | 'error'; title: string; description?: string } | null>(null)
 
+  const sizesByStoneType = useMemo(() => ({
+    NATURAL: config.diamondSizes.filter(d => d.stoneType === 'NATURAL'),
+    LAB: config.diamondSizes.filter(d => d.stoneType === 'LAB'),
+  }), [config.diamondSizes])
+
+  const defaultStoneFor = (role: StoneRoleKey): StoneRowState => {
+    const sizes = sizesByStoneType.NATURAL
+    const firstSetter = config.setters[0]?.typeKey ?? ''
+    return {
+      uid: nextUid(),
+      role,
+      stoneType: 'natural',
+      stoneCategory: 'diamond',
+      gemstoneId: '',
+      sizeKey: role === 'MAIN' ? '' : (sizes[0]?.sizeKey ?? ''),
+      carats: '',
+      amount: '',
+      setterType: firstSetter,
+      setterFeeOverride: '',
+      labReport: '',
+      shape: '',
+      color: '',
+      cut: '',
+      clarity: '',
+      manualPrice: '',
+      comments: '',
+      markup: role === 'MAIN' ? String(DEFAULT_MARKUP) : '',
+      collapsed: false,
+    }
+  }
+
+  const addStoneRow = (role: StoneRoleKey) => setStones(prev => [...prev, defaultStoneFor(role)])
+  const removeStoneRow = (uid: string) => setStones(rows => rows.filter(r => r.uid !== uid))
+  const patchStone = (uid: string, patch: Partial<StoneRowState>) => {
+    setStones(prev => prev.map(s => {
+      if (s.uid !== uid) return s
+      const next = { ...s, ...patch }
+      if (patch.stoneCategory === 'diamond') {
+        next.gemstoneId = ''
+      } else if (patch.stoneCategory === 'gemstone' && !s.gemstoneId) {
+        next.gemstoneId = gemstones[0]?.id ?? ''
+      }
+      if (patch.stoneType && !patch.sizeKey && s.role !== 'MAIN') {
+        const list = patch.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
+        const match = list.find(d => normalizeSizeKey(d.sizeKey) === normalizeSizeKey(next.sizeKey))
+        next.sizeKey = match ? match.sizeKey : (list[0]?.sizeKey ?? '')
+      }
+      return next
+    }))
+  }
+  const toggleCollapsed = (uid: string) => setStones(prev => prev.map(s => s.uid === uid ? { ...s, collapsed: !s.collapsed } : s))
+  const collapseStone = (uid: string) => setStones(prev => prev.map(s => s.uid === uid ? { ...s, collapsed: true } : s))
+
+  // Two-way sync between carats and amount for a single stone via ctPerStone.
+  const onStoneCaratsChange = (uid: string, caratsText: string) => {
+    setStones(prev => prev.map(s => {
+      if (s.uid !== uid) return s
+      const ct = config.diamondSizeFor(s.stoneType, s.sizeKey)?.ctPerStone ?? 0
+      if (caratsText === '') return { ...s, carats: '', amount: '' }
+      const carats = parseNum(caratsText)
+      const amount = ct > 0 ? String(Math.round(carats / ct)) : s.amount
+      return { ...s, carats: caratsText, amount }
+    }))
+  }
+  const onStoneAmountChange = (uid: string, amountText: string) => {
+    setStones(prev => prev.map(s => {
+      if (s.uid !== uid) return s
+      const ct = config.diamondSizeFor(s.stoneType, s.sizeKey)?.ctPerStone ?? 0
+      if (amountText === '') return { ...s, amount: '', carats: '' }
+      const amount = parseNum(amountText)
+      const carats = ct > 0 ? String(Math.round(amount * ct * 10000) / 10000) : s.carats
+      return { ...s, amount: amountText, carats }
+    }))
+  }
+  const onStoneManualPriceChange = (uid: string, priceText: string) => {
+    setStones(prev => prev.map(s => {
+      if (s.uid !== uid) return s
+      const shouldSeedAmount = priceText.trim() !== '' && s.amount.trim() === ''
+      return { ...s, manualPrice: priceText, amount: shouldSeedAmount ? '1' : s.amount }
+    }))
+  }
+
+  const mainStones = stones.filter(s => s.role === 'MAIN')
+  const sideStones = stones.filter(s => s.role === 'SIDE')
+  const meleeStones = stones.filter(s => s.role === 'MELEE')
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => setPhoto(reader.result as string)
+    reader.readAsDataURL(file)
+  }
+  const handleRemovePhoto = () => {
+    setPhoto(null)
+    if (photoInputRef.current) photoInputRef.current.value = ''
+    if (cameraInputRef.current) cameraInputRef.current.value = ''
+  }
+
+  const handleAttachmentsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    if (files.length === 0) return
+    let remaining = files.length
+    const newOnes: AttachmentRowState[] = []
+    files.forEach(file => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        newOnes.push({
+          uid: nextUid(),
+          backendId: null,
+          photo: reader.result as string,
+          caption: '',
+          createdAt: new Date().toISOString(),
+        })
+        remaining -= 1
+        if (remaining === 0) {
+          setAttachments(prev => [...prev, ...newOnes])
+          if (attachmentInputRef.current) attachmentInputRef.current.value = ''
+          if (attachmentCameraRef.current) attachmentCameraRef.current.value = ''
+        }
+      }
+      reader.readAsDataURL(file)
+    })
+  }
+  const removeAttachment = (uid: string) => setAttachments(prev => prev.filter(a => a.uid !== uid))
+  const patchAttachment = (uid: string, patch: Partial<AttachmentRowState>) =>
+    setAttachments(prev => prev.map(a => a.uid === uid ? { ...a, ...patch } : a))
+
   // ── Prefill from "Duplicate" (navigated with the full StockItem in state) ──
   useEffect(() => {
     if (!duplicateFrom || prefillApplied.current) return
+    if (config.loading) return
     prefillApplied.current = true
     setTitle(duplicateFrom.title ? `${duplicateFrom.title} (copy)` : '')
     setSku(duplicateFrom.sku ?? '')
     setQuantity(String(duplicateFrom.quantity ?? 1))
     setStatus('AVAILABLE')
+    // RN pieces duplicate with jewelryType='rn' but an empty model picker —
+    // same behavior as the Quote builder's duplicate flow: reselect the model.
     setJewelryType(duplicateFrom.jewelryType ?? 'ring')
     setRingLabor(duplicateFrom.ringLabor ?? 'none')
     setRingWidth(duplicateFrom.ringWidth ? String(duplicateFrom.ringWidth) : '')
     setFingerSize(duplicateFrom.fingerSize ? String(duplicateFrom.fingerSize) : '')
     setExtraCosts(String(duplicateFrom.extraCosts ?? 0))
-    setEngravingFee(String(duplicateFrom.engravingFee ?? 0))
-    setMarkupMultiplier(String(duplicateFrom.markupMultiplier ?? 2.5))
-    setDiscountPercent(String(duplicateFrom.discountPercent ?? 0))
+    setEngravingFee(duplicateFrom.engravingFee ?? 0)
+    setMarkupText(String(duplicateFrom.markupMultiplier ?? DEFAULT_MARKUP))
+    setDiscountText(duplicateFrom.discountPercent && duplicateFrom.discountPercent > 0 ? String(duplicateFrom.discountPercent) : '')
     setInternalNotes(duplicateFrom.internalNotes ?? '')
     setPhoto(duplicateFrom.photo ?? null)
     if (duplicateFrom.metalRows?.length) {
@@ -265,18 +516,32 @@ export function StockBuilderPage() {
       })))
     }
     if (duplicateFrom.stones?.length) {
-      setStones(duplicateFrom.stones.map(s => ({
-        uid: nextUid(),
-        role: s.role,
-        stoneType: s.stoneType,
-        sizeKey: s.sizeKey ?? '',
-        carats: String(s.carats ?? ''),
-        quantity: '1',
-        setterType: s.setterType ?? '',
-        setterFeeOverride: s.setterFeeOverride != null ? String(s.setterFeeOverride) : '',
-        manualPrice: s.manualPrice != null ? String(s.manualPrice) : '',
-        comments: s.comments ?? '',
-      })))
+      setStones(duplicateFrom.stones.map(s => {
+        const ct = config.diamondSizeFor(s.stoneType, s.sizeKey)?.ctPerStone ?? 0
+        const carats = s.carats ?? 0
+        const amount = ct > 0 && carats > 0 ? String(Math.round(carats / ct)) : ''
+        return {
+          uid: nextUid(),
+          role: s.role,
+          stoneType: s.stoneType,
+          stoneCategory: s.stoneCategory === 'GEMSTONE' ? 'gemstone' : 'diamond',
+          gemstoneId: s.gemstoneId != null ? String(s.gemstoneId) : '',
+          sizeKey: s.sizeKey ?? '',
+          carats: carats > 0 ? String(carats) : '',
+          amount,
+          setterType: s.setterType ?? '',
+          setterFeeOverride: s.setterFeeOverride != null ? String(s.setterFeeOverride) : '',
+          labReport: s.labReport ?? '',
+          shape: s.shape ?? '',
+          color: s.color ?? '',
+          cut: s.cut ?? '',
+          clarity: s.clarity ?? '',
+          manualPrice: s.manualPrice != null ? String(s.manualPrice) : '',
+          comments: s.comments ?? '',
+          markup: s.markupMultiplier != null ? String(s.markupMultiplier) : (s.role === 'MAIN' ? String(DEFAULT_MARKUP) : ''),
+          collapsed: true,
+        }
+      }))
     }
     if (duplicateFrom.emkayStones?.length) {
       setEmkayStones(duplicateFrom.emkayStones.map(es => ({
@@ -300,7 +565,16 @@ export function StockBuilderPage() {
         comments: es.comments ?? '',
       })))
     }
-  }, [duplicateFrom])
+    if (duplicateFrom.attachments?.length) {
+      setAttachments(duplicateFrom.attachments.map(a => ({
+        uid: nextUid(),
+        backendId: null,
+        photo: a.photo,
+        caption: a.caption ?? '',
+        createdAt: a.createdAt ?? new Date().toISOString(),
+      })))
+    }
+  }, [duplicateFrom, config.loading, config.diamondSizeFor])
 
   const addMetalRow = () => {
     if (metalRows.length >= 3) return
@@ -310,52 +584,57 @@ export function StockBuilderPage() {
   const updateMetalRow = (uid: string, patch: Partial<MetalRowState>) =>
     setMetalRows(rows => rows.map(r => (r.uid === uid ? { ...r, ...patch } : r)))
 
-  const addStoneRow = (role: StockStone['role']) =>
-    setStones(rows => [...rows, {
-      uid: nextUid(), role, stoneType: 'natural', sizeKey: '', carats: '', quantity: '1',
-      setterType: config.setters[0]?.typeKey ?? '', setterFeeOverride: '', manualPrice: '', comments: '',
-    }])
-  const removeStoneRow = (uid: string) => setStones(rows => rows.filter(r => r.uid !== uid))
-  const updateStoneRow = (uid: string, patch: Partial<StoneRowState>) =>
-    setStones(rows => rows.map(r => (r.uid === uid ? { ...r, ...patch } : r)))
-
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => setPhoto(reader.result as string)
-    reader.readAsDataURL(file)
-  }
-  const handleRemovePhoto = () => {
-    setPhoto(null)
-    if (photoInputRef.current) photoInputRef.current.value = ''
-    if (cameraInputRef.current) cameraInputRef.current.value = ''
-  }
+  // ── RN ring derived metrics — resolves the selected model + finger size +
+  // metal into the full cost breakdown. Null whenever RN mode is off. ──────
+  const rn = useMemo(() => {
+    if (!rnMode) return null
+    const model = config.rnRings.find(m => m.modelKey === rnModelKey) ?? null
+    const sizeRow = model?.sizes.find(s => s.fingerSize === rnFingerSize) ?? null
+    const base = { model, sizeRow, metal: selectedMetal, diamondSizeFor: config.diamondSizeFor }
+    const customStones = rnBandMode === 'other' ? (parseInt(rnCustomStones) || 0) : 0
+    const otherBase = customStones > 0 ? { ...base, customNumStones: customStones } : null
+    const naturalEternity = computeRnBreakdown({ ...base, stoneType: 'natural' })
+    const labEternity = computeRnBreakdown({ ...base, stoneType: 'lab-grown' })
+    const naturalOther = otherBase ? computeRnBreakdown({ ...otherBase, stoneType: 'natural' }) : null
+    const labOther = otherBase ? computeRnBreakdown({ ...otherBase, stoneType: 'lab-grown' }) : null
+    const natural = (rnBandMode === 'other' && naturalOther) ? naturalOther : naturalEternity
+    const lab = (rnBandMode === 'other' && labOther) ? labOther : labEternity
+    const selected = rnStoneType === 'lab-grown' ? lab : natural
+    return { model, sizeRow, natural, lab, naturalEternity, labEternity, naturalOther, labOther, ...selected }
+  }, [rnMode, config, rnModelKey, rnFingerSize, selectedMetal, rnStoneType, rnBandMode, rnCustomStones])
 
   // ── Live cost breakdown — same formula as the Quote builder ────────────────
-  const materialCost = metalRows.reduce(
+  const manualMaterialCost = metalRows.reduce(
     (sum, r) => sum + (config.metalPriceMap[r.metalKey] ?? 0) * parseNum(r.grams), 0,
   )
-  const ringLaborFee = config.ringLaborMap[ringLabor]?.fee ?? 0
+  const manualRingLaborFee = config.ringLaborMap[ringLabor]?.fee ?? 0
 
   const stoneBreakdown = stones.map(s => {
     const sizeCfg = config.diamondSizeFor(s.stoneType, s.sizeKey)
     const mult = DIAMOND_TYPE_OPTIONS[s.stoneType].multiplier
     const pricePerCarat = (sizeCfg?.basePrice ?? 0) * mult
     const carats = parseNum(s.carats)
+    const amount = parseNum(s.amount)
     const hasManualPrice = s.manualPrice.trim() !== ''
     const cost = hasManualPrice ? parseNum(s.manualPrice) : carats * pricePerCarat
-    const qty = Math.max(1, parseNum(s.quantity || '1') || 1)
     const feeOverride = s.setterFeeOverride.trim()
     const setterFee = feeOverride !== '' ? parseNum(feeOverride) : (config.setterMap[s.setterType]?.fee ?? 0)
-    const labor = qty * setterFee
+    const labor = amount * setterFee
     return { uid: s.uid, cost, labor, contribution: cost + labor }
   })
-  const stoneCost = stoneBreakdown.reduce((s, b) => s + b.cost, 0)
-  const settingFee = stoneBreakdown.reduce((s, b) => s + b.labor, 0)
+  const manualStoneCost = stoneBreakdown.reduce((s, b) => s + b.cost, 0)
+  const manualSettingFee = stoneBreakdown.reduce((s, b) => s + b.labor, 0)
+
+  // In RN mode the material / labor / setting / diamond figures come from the
+  // resolved RN model instead of the manual inputs.
+  const materialCost = rnMode && rn ? rn.goldCost : manualMaterialCost
+  const ringLaborFee = rnMode && rn ? rn.casting : manualRingLaborFee
+  const settingFee = rnMode && rn ? rn.settingLabor : manualSettingFee
+  const stoneCost = rnMode && rn ? rn.diamondCost : manualStoneCost
 
   // EMKAY-supplied stones: real inventory bought from EMKAY, so the full
-  // price counts as material cost, same as the Quote builder.
+  // price counts as material cost, same as the Quote builder. Independent of
+  // RN mode — a store-bought stone can still ride along an RN band.
   const emkayBreakdown = emkayStones.map(es => {
     const qty = Math.max(1, parseNum(es.quantity || '1') || 1)
     const feeOverride = es.setterFeeOverride.trim()
@@ -367,60 +646,167 @@ export function StockBuilderPage() {
 
   const totalCost =
     materialCost + ringLaborFee + settingFee + stoneCost + emkayCost + emkaySettingFee +
-    Math.max(0, parseNum(engravingFee)) + parseNum(extraCosts)
+    Math.max(0, engravingFee) + parseNum(extraCosts)
 
-  const markup = parseNum(markupMultiplier) || 2.5
-  const discount = Math.max(0, Math.min(100, parseNum(discountPercent)))
-  const retailBeforeDiscount = totalCost * markup
-  const retailPrice = retailBeforeDiscount * (1 - discount / 100)
+  // Parse markup/discount the same way the Quote builder does.
+  const parsedMarkup = (() => {
+    const n = Number(markupText)
+    return Number.isFinite(n) && n > 0 ? n : DEFAULT_MARKUP
+  })()
+  const parsedDiscount = (() => {
+    const n = Number(discountText)
+    if (!Number.isFinite(n) || n <= 0) return 0
+    return Math.min(n, 100)
+  })()
 
-  const canSave = title.trim() !== '' && !saving
+  // Per-stone MAIN markup override pool — mirrors the backend's
+  // StockItem.computeRetailPrice() so the live preview matches what gets saved.
+  const stoneBreakdownByUid: Record<string, { cost: number; labor: number }> = {}
+  stoneBreakdown.forEach(b => { stoneBreakdownByUid[b.uid] = { cost: b.cost, labor: b.labor } })
+  let customMainRaw = 0
+  let customMainMarkedUp = 0
+  stones.forEach(s => {
+    if (s.role !== 'MAIN') return
+    const txt = s.markup.trim()
+    if (txt === '') return
+    const n = Number(txt)
+    if (!Number.isFinite(n) || n <= 0) return
+    const b = stoneBreakdownByUid[s.uid]
+    if (!b) return
+    const contrib = b.cost + b.labor
+    customMainRaw += contrib
+    customMainMarkedUp += contrib * n
+  })
+  const genericPool = totalCost - customMainRaw
+  const retailBeforeDiscount = genericPool * parsedMarkup + customMainMarkedUp
+  const discountAmount = retailBeforeDiscount * (parsedDiscount / 100)
+  const retailPrice = retailBeforeDiscount - discountAmount
+
   const showDuplicateBanner = duplicateFrom && !dismissedDuplicateBanner
 
   const handleSave = async () => {
-    if (!user || !canSave) return
+    if (!user) return
+    if (!title.trim()) {
+      setSaveError('Please enter a title.')
+      return
+    }
+    const customMissingPrice = !rnMode && stones.some(s => s.sizeKey === '' && s.manualPrice.trim() === '')
+    if (customMissingPrice) {
+      setSaveError('Enter the stone price for any "Custom" size stone before saving.')
+      return
+    }
+    const mainMissingMarkup = !rnMode && stones.some(s => s.role === 'MAIN' && (s.markup.trim() === '' || !(Number(s.markup) > 0)))
+    if (mainMissingMarkup) {
+      setSaveError('Every main stone needs a markup before saving.')
+      return
+    }
+    if (rnMode) {
+      if (!rn?.model || !rn?.sizeRow) {
+        setSaveError('Pick an RN model and a ring size before saving.')
+        return
+      }
+      if (!rn.metalCat) {
+        setSaveError('RN rings are only available in 14K / 18K gold or platinum — pick one of those metals.')
+        return
+      }
+    }
+    if (totalCost <= 0) {
+      setSaveError('This piece is still $0 — add metal weight, a stone, EMKAY stone or an extra cost before saving.')
+      return
+    }
     setSaving(true)
+    setSaveError(null)
     try {
+      const rnDiamondType: 'natural' | 'lab-grown' = rn?.stoneType ?? 'natural'
+      const rnStones = rnMode && rn?.model && rn?.sizeRow
+        ? [{
+            role: 'MELEE' as const,
+            stoneType: rnDiamondType,
+            stoneCategory: 'DIAMOND' as const,
+            gemstoneId: null,
+            gemstoneName: null,
+            sizeKey: rn.sizeKey,
+            carats: rn.ctw,
+            setterType: '',
+            setterFeeOverride: null,
+            labReport: null,
+            sortOrder: 0,
+            shape: null, color: null, cut: null, clarity: null,
+            manualPrice: Math.round(rn.diamondCost * 100) / 100,
+            comments: `${rn.model.modelKey} · SZ ${rn.sizeRow.fingerSize} · ${rn.numStones} stones · ${rn.ctw.toFixed(2)}ct`,
+            markupMultiplier: null,
+            contribution: Math.round((rn.diamondCost + rn.settingLabor) * 100) / 100,
+          }]
+        : null
+      const rnNote = rnMode && rn?.model
+        ? [
+            `RN ${rn.model.modelKey} · SZ ${rn.sizeRow?.fingerSize ?? '—'} · ${JEWELRY_METAL_OPTIONS[selectedMetal].label} · ${rn.stoneType === 'lab-grown' ? 'Lab' : 'Natural'}`,
+            `Gold: ${rn.avgGrams}g × $${rn.goldPerGram}/g = $${rn.goldCost.toFixed(2)}`,
+            `Labor: $${rn.casting.toFixed(2)}`,
+            `Setting: ${rn.numStones} × $${rn.settingPerStone} = $${rn.settingLabor.toFixed(2)}`,
+            `Stones: ${rn.ctw.toFixed(2)}ct × $${rn.pricePerCarat}/ct = $${rn.diamondCost.toFixed(2)}`,
+          ].join('\n')
+        : null
+      const mergedInternalNotes = rnMode
+        ? ([rnNote, internalNotes.trim() || null].filter(Boolean).join('\n\n') || null)
+        : (internalNotes.trim() === '' ? null : internalNotes.trim())
+
       const payload = {
         title: title.trim(),
         sku: sku.trim() || null,
         quantity: Math.max(1, parseNum(quantity) || 1),
         status,
         jewelryType,
-        ringLabor,
-        ringWidth: parseNum(ringWidth) || null,
-        fingerSize: parseNum(fingerSize) || null,
+        ringLabor: rnMode ? '' : ringLabor,
+        ringWidth: rnMode ? null : (parseNum(ringWidth) || null),
+        fingerSize: rnMode ? rnFingerSize : (parseNum(fingerSize) || null),
         laborHours: null,
         hourlyRate: null,
         extraCosts: parseNum(extraCosts),
         total: totalCost,
-        markupMultiplier: markup,
-        discountPercent: discount,
+        markupMultiplier: parsedMarkup,
+        discountPercent: parsedDiscount,
         photo,
-        internalNotes: internalNotes.trim() || null,
-        engravingFee: parseNum(engravingFee),
+        internalNotes: mergedInternalNotes,
+        engravingFee: Math.max(0, engravingFee),
         setterType: null,
         archived: false,
-        metalRows: metalRows
-          .filter(r => parseNum(r.grams) > 0)
-          .map((r, i) => ({ metalKey: r.metalKey, weightGrams: parseNum(r.grams), position: i })),
-        stones: stones.map((s, i) => {
-          const b = stoneBreakdown.find(x => x.uid === s.uid)
+        metalRows: rnMode
+          ? [{ metalKey: selectedMetal, weightGrams: rn?.avgGrams ?? 0, position: 0 }]
+          : metalRows
+              .filter(r => parseNum(r.grams) > 0)
+              .map((r, i) => ({ metalKey: r.metalKey, weightGrams: parseNum(r.grams), position: i })),
+        stones: rnMode ? (rnStones ?? []) : stones.map((s, i) => {
+          const b = stoneBreakdownByUid[s.uid]
+          const isGemstone = s.role === 'MAIN' && s.stoneCategory === 'gemstone'
+          const gem = isGemstone ? gemstones.find(g => g.id === s.gemstoneId) : undefined
+          const markupNum = (() => {
+            if (s.role !== 'MAIN') return null
+            const txt = s.markup.trim()
+            if (txt === '') return null
+            const n = Number(txt)
+            return Number.isFinite(n) && n > 0 ? n : null
+          })()
           return {
             role: s.role,
             stoneType: s.stoneType,
-            stoneCategory: 'DIAMOND',
+            stoneCategory: (s.role === 'MAIN' ? (isGemstone ? 'GEMSTONE' : 'DIAMOND') : 'DIAMOND') as 'DIAMOND' | 'GEMSTONE',
+            gemstoneId: isGemstone && s.gemstoneId ? Number(s.gemstoneId) : null,
+            gemstoneName: isGemstone ? (gem?.name ?? null) : null,
             sizeKey: s.sizeKey,
             carats: parseNum(s.carats),
             setterType: s.setterType,
             setterFeeOverride: s.setterFeeOverride.trim() !== '' ? parseNum(s.setterFeeOverride) : null,
-            labReport: null,
+            labReport: s.role === 'MELEE' ? null : (s.labReport || null),
             sortOrder: i,
-            shape: null, color: null, cut: null, clarity: null,
+            shape: s.shape || null,
+            color: s.color || null,
+            cut: s.role === 'MAIN' ? (s.cut || null) : null,
+            clarity: s.role === 'MAIN' ? (s.clarity || null) : null,
             manualPrice: s.manualPrice.trim() !== '' ? parseNum(s.manualPrice) : null,
             comments: s.comments.trim() || null,
-            markupMultiplier: null,
-            contribution: b?.contribution ?? null,
+            markupMultiplier: markupNum,
+            contribution: b ? b.cost + b.labor : null,
           }
         }),
         emkayStones: emkayStones.map((es, i) => ({
@@ -443,20 +829,466 @@ export function StockBuilderPage() {
           sortOrder: i,
           comments: es.comments.trim() || null,
         })),
+        attachments: attachments.map((a, idx) => ({
+          photo: a.photo,
+          caption: a.caption.trim() === '' ? null : a.caption.trim(),
+          sortOrder: idx,
+        })),
       }
       await stockService.create(payload, Number(user.id))
       setToast({ variant: 'success', title: 'Stock piece saved', description: `"${title.trim()}" was added to stock.` })
-      // Reset for the next entry, same UX as the quote builder after submit.
+      // Reset every field back to its initial default, same UX as the Quote builder.
       setTitle(''); setSku(''); setQuantity('1'); setStatus('AVAILABLE')
+      setJewelryType('ring')
       setMetalRows([{ uid: nextUid(), metalKey: 'gold-14k-yellow', grams: '' }])
-      setStones([]); setEmkayStones([]); setPhoto(null); setInternalNotes('')
-      setExtraCosts('0'); setEngravingFee('0')
+      setRingLabor('none'); setRingWidth(''); setFingerSize('')
+      setExtraCosts('0'); setEngravingFee(engravingBounds.default)
+      setMarkupText(String(DEFAULT_MARKUP)); setDiscountText('')
+      setStones([]); setEmkayStones([]); setAttachments([])
+      setRnModelKey(''); setRnFingerSize(0); setRnStoneType('natural'); setRnBandMode('eternity'); setRnCustomStones('')
+      setPhoto(null); setInternalNotes('')
+      setSaveError(null)
+      if (photoInputRef.current) photoInputRef.current.value = ''
+      if (cameraInputRef.current) cameraInputRef.current.value = ''
     } catch (err) {
       console.error(err)
       setToast({ variant: 'error', title: 'Could not save', description: 'Please check the form and try again.' })
+      setSaveError('Failed to save. Please try again.')
     } finally {
       setSaving(false)
     }
+  }
+
+  const canSave = title.trim() !== '' && !saving
+
+  // ── Renders a single stone row: collapsed summary card or the full form,
+  // full parity with the Quote builder's renderStoneRow. ─────────────────
+  const renderStoneRow = (stone: StoneRowState, index: number) => {
+    const sizes = stone.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
+    const sizeCfg = config.diamondSizeFor(stone.stoneType, stone.sizeKey)
+    const customSize = stone.sizeKey === ''
+    const pricePerCarat = (sizeCfg?.basePrice ?? 0) * DIAMOND_TYPE_OPTIONS[stone.stoneType].multiplier
+    const caratsNum = parseNum(stone.carats)
+    const amountNum = parseNum(stone.amount)
+    const hasManualPrice = stone.manualPrice.trim() !== ''
+    const stoneCostVal = hasManualPrice ? parseNum(stone.manualPrice) : caratsNum * pricePerCarat
+    const stoneFeeOverride = stone.setterFeeOverride.trim()
+    const stoneSetterFee = stoneFeeOverride !== '' ? parseNum(stoneFeeOverride) : (config.setterMap[stone.setterType]?.fee ?? 0)
+    const stoneLabor = amountNum * stoneSetterFee
+    const stoneTotal = stoneCostVal + stoneLabor
+    const theme = STONE_ROLE_THEME[stone.role]
+    const isGemstone = stone.role === 'MAIN' && stone.stoneCategory === 'gemstone'
+    const gemstoneLabel = isGemstone ? (gemstones.find(g => g.id === stone.gemstoneId)?.name ?? 'Gemstone') : null
+    const typeLabel = isGemstone
+      ? `${gemstoneLabel} (${DIAMOND_TYPE_OPTIONS[stone.stoneType].label})`
+      : DIAMOND_TYPE_OPTIONS[stone.stoneType].label
+    const sizeLabel = sizeCfg?.label ?? (stone.sizeKey || 'Custom')
+    const setterLabel = config.setterMap[stone.setterType]?.label ?? stone.setterType
+
+    if (stone.collapsed) {
+      const summaryParts = [
+        stone.shape || typeLabel,
+        stone.color ? `color ${stone.color}` : null,
+        caratsNum > 0 ? `${caratsNum} ct` : null,
+        amountNum > 0 ? `${amountNum} stone${amountNum === 1 ? '' : 's'}` : null,
+      ].filter(Boolean)
+      return (
+        <div key={stone.uid}
+          className={`group relative overflow-hidden rounded-2xl border ${theme.ring} bg-white shadow-sm transition hover:shadow-md hover:-translate-y-0.5`}>
+          <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${theme.bar}`} aria-hidden />
+          <button type="button" onClick={() => toggleCollapsed(stone.uid)}
+            className="flex w-full items-center justify-between gap-3 pl-5 pr-3 py-3 text-left">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.chip}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${theme.dot}`} aria-hidden />
+                {theme.label} #{index + 1}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-semibold text-slate-900">
+                  {summaryParts.length > 0 ? summaryParts.join(' · ') : 'Not configured yet'}
+                </p>
+                <p className="truncate text-xs text-slate-500">{sizeLabel} · {setterLabel || 'no setter'}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-right">
+                <p className="text-sm font-semibold text-slate-900 tabular-nums">
+                  ${stoneTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                </p>
+                {hasManualPrice && (
+                  <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">custom</span>
+                )}
+              </div>
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition group-hover:bg-slate-200 group-hover:text-slate-700">
+                <ChevronDown className="h-4 w-4" />
+              </span>
+            </div>
+          </button>
+          <button type="button" onClick={() => removeStoneRow(stone.uid)} aria-label="Remove stone"
+            className="absolute right-12 top-1/2 hidden h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 sm:flex">
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )
+    }
+
+    const compareData = compareStoneTypes({
+      sizeKey: stone.sizeKey,
+      carats: caratsNum,
+      amount: amountNum,
+      setterFee: stoneSetterFee,
+      manualPrice: hasManualPrice ? parseNum(stone.manualPrice) : null,
+      diamondSizeFor: config.diamondSizeFor,
+    })
+    const cheaperLabel = compareData.cheaper === 'natural' ? 'Natural' : 'Lab'
+
+    return (
+      <div key={stone.uid} className={`relative rounded-2xl border ${theme.ring} ${theme.tint} p-4 space-y-3 overflow-hidden shadow-sm transition hover:shadow-md`}>
+        <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${theme.bar}`} aria-hidden />
+
+        <div className="flex items-center justify-between gap-2 pl-2">
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.chip}`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${theme.dot}`} aria-hidden />
+            {theme.label} stone #{index + 1}
+          </span>
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={() => toggleCollapsed(stone.uid)} aria-label="Collapse"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-white/70 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
+              <ChevronUp className="h-4 w-4" />
+            </button>
+            <button type="button" onClick={() => removeStoneRow(stone.uid)} aria-label="Remove stone"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-white/70 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2 pl-2">
+          {stone.role === 'MAIN' && (
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Stone category</label>
+              <select value={stone.stoneCategory}
+                onChange={e => patchStone(stone.uid, { stoneCategory: e.target.value as StoneRowState['stoneCategory'] })}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+                <option value="diamond">Diamond</option>
+                <option value="gemstone">Gemstone</option>
+              </select>
+            </div>
+          )}
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {stone.role === 'MAIN' && stone.stoneCategory === 'gemstone' ? 'Origin' : 'Type'}
+            </label>
+            <select value={stone.stoneType}
+              onChange={e => patchStone(stone.uid, { stoneType: e.target.value as StoneRowState['stoneType'] })}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+              {diamondTypeKeys.map(key => (
+                <option key={key} value={key}>{DIAMOND_TYPE_OPTIONS[key].label}</option>
+              ))}
+            </select>
+          </div>
+
+          {stone.role === 'MAIN' && stone.stoneCategory === 'gemstone' && (
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Gemstone</label>
+              <select value={stone.gemstoneId}
+                onChange={e => patchStone(stone.uid, { gemstoneId: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+                {gemstones.length === 0 && <option value="">No gemstones loaded</option>}
+                {gemstones.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+              </select>
+            </div>
+          )}
+
+          {stone.role !== 'MAIN' && (
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Size</label>
+              <select value={stone.sizeKey}
+                onChange={e => patchStone(stone.uid, { sizeKey: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+                <option value="">Custom — enter carats &amp; price</option>
+                {sizes.map(d => (
+                  <option key={d.id} value={d.sizeKey}>
+                    {d.label} — ${d.basePrice}{d.ctPerStone != null ? '/ct' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="md:col-span-2">
+            <button type="button" onClick={() => setCompareUid(stone.uid)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">
+              <Scale className="h-3.5 w-3.5 text-slate-400" />
+              Natural vs Lab
+              {compareData.cheaper && (
+                <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">
+                  {compareData.cheaper === stone.stoneType ? 'best price' : `${cheaperLabel} cheaper`}
+                </span>
+              )}
+            </button>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Carats</label>
+            <input type="text" inputMode="decimal" value={stone.carats} placeholder="0.0000"
+              onChange={e => onStoneCaratsChange(stone.uid, e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quantity</label>
+            <input type="text" inputMode="numeric" value={stone.amount} placeholder="0"
+              onChange={e => onStoneAmountChange(stone.uid, e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+          </div>
+
+          <div className="space-y-1 md:col-span-2">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type of setting</label>
+            <select value={stone.setterType}
+              onChange={e => patchStone(stone.uid, { setterType: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+              {config.setters.map(s => <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>)}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Shape <span className="font-normal normal-case text-slate-400">(optional)</span>
+            </label>
+            <select value={stone.shape}
+              onChange={e => patchStone(stone.uid, { shape: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+              <option value="">—</option>
+              {STONE_SHAPES.map(sh => <option key={sh} value={sh}>{sh}</option>)}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Color <span className="font-normal normal-case text-slate-400">(optional)</span>
+            </label>
+            <select value={stone.color}
+              onChange={e => patchStone(stone.uid, { color: e.target.value })}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+              <option value="">—</option>
+              {STONE_COLORS.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+
+          {stone.role === 'MAIN' && (
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Cut <span className="font-normal normal-case text-slate-400">(optional)</span>
+              </label>
+              <select value={stone.cut}
+                onChange={e => patchStone(stone.uid, { cut: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+                <option value="">—</option>
+                {STONE_CUTS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          )}
+
+          {stone.role === 'MAIN' && (
+            <div className="space-y-1">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Clarity <span className="font-normal normal-case text-slate-400">(optional)</span>
+              </label>
+              <select value={stone.clarity}
+                onChange={e => patchStone(stone.uid, { clarity: e.target.value })}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
+                <option value="">—</option>
+                {STONE_CLARITIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          )}
+
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3 md:col-span-2">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Pricing overrides</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {stone.role === 'MAIN' ? 'Wholesale cost' : 'Gross cost for this batch of stones'}{' '}
+                  <span className={`font-normal normal-case ${customSize ? 'text-rose-500' : 'text-slate-400'}`}>
+                    {customSize
+                      ? '(required — total for all stones in this batch)'
+                      : `(optional — overrides $${pricePerCarat.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct × total carats)`}
+                  </span>
+                </label>
+                <input type="number" min={0} step="0.01" value={stone.manualPrice}
+                  placeholder={customSize ? 'e.g. 4500 (required)' : 'Leave empty to use calculated price'}
+                  onChange={e => onStoneManualPriceChange(stone.uid, e.target.value)}
+                  className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 ${
+                    customSize && stone.manualPrice.trim() === '' ? 'border-rose-300' : 'border-slate-200'
+                  }`} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Custom setting fee (optional)</label>
+                <input type="text" inputMode="decimal" value={stone.setterFeeOverride}
+                  placeholder={`Default — $${config.setterMap[stone.setterType]?.fee ?? 0}`}
+                  onChange={e => patchStone(stone.uid, { setterFeeOverride: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-white px-3 py-2 text-[11px] text-slate-500">
+              <span>
+                Stone <strong className="text-slate-700">${stoneCostVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                {' + '}
+                Setting <strong className="text-slate-700">${stoneLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                <span className="text-slate-400"> ({amountNum} × ${stoneSetterFee.toLocaleString('en-US', { minimumFractionDigits: 2 })})</span>
+              </span>
+              <span className="font-semibold text-slate-900">= ${stoneTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+            </div>
+          </div>
+
+          {stone.role === 'MAIN' && (
+            <div className="space-y-1 md:col-span-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Markup for this stone <span className={`font-normal normal-case ${Number(stone.markup) > 0 ? 'text-slate-400' : 'text-rose-500'}`}>(required — overrides the piece-level {parsedMarkup}× markup for this stone's cost + setting labor)</span>
+              </label>
+              <div className="relative">
+                <input type="text" inputMode="decimal" value={stone.markup} placeholder={String(parsedMarkup)}
+                  onChange={e => patchStone(stone.uid, { markup: e.target.value })}
+                  className={`w-full rounded-xl border bg-white px-3 py-2 pr-9 text-sm text-slate-900 outline-none focus:border-slate-400 ${Number(stone.markup) > 0 ? 'border-slate-200' : 'border-rose-300'}`} />
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">×</span>
+              </div>
+              <p className="text-[10px] text-slate-400">Useful when the center stone has a different margin than the rest of the piece.</p>
+            </div>
+          )}
+
+          {stone.role !== 'MELEE' && (() => {
+            const verify = labReportVerifyUrl(stone.labReport)
+            return (
+              <div className="space-y-1 md:col-span-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Lab report <span className="font-normal normal-case text-slate-400">(optional)</span>
+                  </label>
+                  {verify && (
+                    <a href={verify.url} target="_blank" rel="noopener noreferrer"
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold no-underline shadow-sm transition hover:shadow ${
+                        verify.valid
+                          ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:border-emerald-400 hover:bg-emerald-100'
+                          : 'border-rose-300 bg-rose-50 text-rose-700 hover:border-rose-400 hover:bg-rose-100'
+                      }`}
+                      title={verify.valid
+                        ? `Looks like a valid ${verify.lab} number — opens ${verify.lab}'s report check in a new tab to confirm`
+                        : `This doesn't look like a valid ${verify.lab} report number yet — opens ${verify.lab}'s report check anyway`}>
+                      {verify.valid ? (
+                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                          <path d="m5 13 4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      ) : (
+                        <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                          <path d="M12 9v4m0 4h.01M10.3 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.7 3.86a2 2 0 0 0-3.42 0Z" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                      {verify.valid ? `Verify on ${verify.lab}` : `Check ${verify.lab} #`}
+                      <ExternalLink className="h-3 w-3 opacity-80" />
+                    </a>
+                  )}
+                  {!verify && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-400"
+                      title="Enter a GIA/IGI report number to verify it on the lab's official report check">
+                      Verify
+                      <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+                        <circle cx="11" cy="11" r="7" />
+                        <path d="m21 21-4.3-4.3" strokeLinecap="round" />
+                      </svg>
+                    </span>
+                  )}
+                </div>
+                <input type="text" value={stone.labReport} placeholder="e.g. GIA 1234567890"
+                  onChange={e => patchStone(stone.uid, { labReport: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                {verify && (
+                  <p className={`text-[10px] ${verify.valid ? 'text-slate-400' : 'text-rose-500'}`}>
+                    {verify.valid
+                      ? `Looks like a valid ${verify.lab} number — click "Verify on ${verify.lab}" to confirm it on the official report check.`
+                      : `This doesn't look like a complete ${verify.lab} report number yet.`}
+                  </p>
+                )}
+              </div>
+            )
+          })()}
+
+          <div className="space-y-1 md:col-span-2">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Additional comments <span className="font-normal normal-case text-slate-400">(optional)</span>
+            </label>
+            <textarea rows={3} value={stone.comments}
+              placeholder="Any notes about clarity, fluorescence, special instructions, etc."
+              onChange={e => patchStone(stone.uid, { comments: e.target.value })}
+              className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 pl-2 pt-3 border-t border-white/60">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+            <span className="rounded-xl bg-white/70 px-3 py-1.5">
+              Stone <strong className="ml-1 text-slate-900">${stoneCostVal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+              {hasManualPrice && <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">custom</span>}
+            </span>
+            <span className="rounded-xl bg-white/70 px-3 py-1.5">
+              Setting <strong className="ml-1 text-slate-900">${stoneLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+            </span>
+          </div>
+          <button type="button" onClick={() => collapseStone(stone.uid)}
+            className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition ${theme.btn}`}>
+            <Check className="h-3.5 w-3.5" /> Done
+          </button>
+        </div>
+
+        <StoneTypeCompareDialog
+          open={compareUid === stone.uid}
+          comparison={compareData}
+          current={stone.stoneType}
+          carats={caratsNum}
+          title={`${theme.label} stone #${index + 1}`}
+          sizeKey={stone.sizeKey}
+          onCreatedLabSize={() => config.refresh()}
+          onPick={t => patchStone(stone.uid, { stoneType: t })}
+          onClose={() => setCompareUid(null)}
+        />
+      </div>
+    )
+  }
+
+  const renderStoneSection = (role: StoneRoleKey, hint: string, items: StoneRowState[]) => {
+    const theme = STONE_ROLE_THEME[role]
+    const Icon = theme.icon
+    return (
+      <div key={role} className="group/section relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:shadow-md">
+        <span className={`absolute inset-y-0 left-0 w-1 ${theme.bar} opacity-80`} aria-hidden />
+        <div className="flex items-center justify-between gap-3 pl-2">
+          <div className="flex items-center gap-3">
+            <span className={`flex h-9 w-9 items-center justify-center rounded-xl shadow-sm ${theme.header}`}>
+              <Icon className="h-4 w-4" />
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">
+                {theme.label} stones
+                <span className={`ml-2 inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${theme.chip}`}>
+                  {items.length}
+                </span>
+              </h3>
+              <p className="text-xs text-slate-500">{hint}</p>
+            </div>
+          </div>
+          <button type="button" onClick={() => addStoneRow(role)}
+            className={`inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition ${theme.btn}`}>
+            <Plus className="h-3 w-3" /> Add {theme.label.toLowerCase()}
+          </button>
+        </div>
+        <div className="mt-3 pl-2">
+          {items.length === 0
+            ? <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-3 text-xs text-slate-400">None yet.</p>
+            : <div className="space-y-3">{items.map((s, i) => renderStoneRow(s, i))}</div>}
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -477,11 +1309,8 @@ export function StockBuilderPage() {
                 </p>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setDismissedDuplicateBanner(true)}
-              className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-white hover:text-slate-700"
-            >
+            <button type="button" onClick={() => setDismissedDuplicateBanner(true)}
+              className="shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-white hover:text-slate-700">
               Dismiss
             </button>
           </CardContent>
@@ -502,7 +1331,7 @@ export function StockBuilderPage() {
                 Price and catalog a piece the store already has in stock.
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:mt-4">
-                Same pricing engine as the Quote builder — metal, stones and labor — plus a{' '}
+                Same pricing engine as the Quote builder — metal, stones, RN rings and labor — plus a{' '}
                 <strong>SKU</strong> and <strong>quantity</strong> so it lives in your own inventory, not a customer order.
               </p>
 
@@ -565,7 +1394,232 @@ export function StockBuilderPage() {
             </CardContent>
           </Card>
 
-          {/* Metal rows */}
+          {/* RN ring section — shown when "RN ring" is the type of piece */}
+          {rnMode && (
+            <Card className={cardClass}>
+              <CardHeader className="border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Gem className="h-4 w-4 text-slate-500" />
+                  <CardTitle className="text-base font-semibold text-slate-900">RN ring</CardTitle>
+                </div>
+                <p className="text-sm text-slate-500">
+                  Pick a model, metal and ring size — stone count, CTW, gold and labor are filled from the RN tables.
+                </p>
+              </CardHeader>
+              <CardContent className="grid gap-5 pt-6 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className={labelClass}>Metal</label>
+                  <select className={inputClass} value={selectedMetal}
+                    onChange={e => updateMetalRow(metalRows[0].uid, { metalKey: e.target.value as JewelryMetalOption })}>
+                    {Object.entries(JEWELRY_METAL_OPTIONS).filter(([k]) => !['gold-14k', 'gold-18k', 'silver'].includes(k)).map(([key, opt]) => (
+                      <option key={key} value={key}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className={labelClass}>RN model</label>
+                  <select className={inputClass} value={rnModelKey}
+                    onChange={e => { setRnModelKey(e.target.value); setRnFingerSize(0) }}>
+                    <option value="">— Select a model</option>
+                    {config.rnRings.map(m => (
+                      <option key={m.modelKey} value={m.modelKey}>{m.label || m.modelKey}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <label className={labelClass}>Ring size</label>
+                  <select className={`${inputClass} disabled:opacity-50`} value={rnFingerSize} disabled={!rn?.model}
+                    onChange={e => setRnFingerSize(Number(e.target.value))}>
+                    <option value={0}>{rn?.model ? '— Select a size' : '— Pick a model first'}</option>
+                    {(rn?.model?.sizes ?? []).map(s => (
+                      <option key={s.fingerSize} value={s.fingerSize}>
+                        SZ {s.fingerSize} — {s.numStones ?? 0} stones · {(s.ctw ?? 0).toFixed(2)}ct
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-2 md:col-span-2">
+                  <label className={labelClass}>Band type</label>
+                  <div className="inline-flex w-full rounded-2xl bg-slate-100 p-1">
+                    {([['eternity', 'Eternity'], ['other', 'Other']] as const).map(([val, label]) => (
+                      <button key={val} type="button"
+                        onClick={() => { setRnBandMode(val); if (val === 'eternity') setRnCustomStones('') }}
+                        className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${rnBandMode === val ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {rnBandMode === 'other' && (
+                  <div className="space-y-2 md:col-span-2">
+                    <label className={labelClass}>Number of stones</label>
+                    <input type="number" min={1} step={1} className={inputClass} value={rnCustomStones}
+                      onChange={e => setRnCustomStones(e.target.value)}
+                      placeholder={`Default eternity: ${rn?.sizeRow?.numStones ?? '—'} stones`} />
+                  </div>
+                )}
+
+                <div className="space-y-2 md:col-span-2">
+                  <label className={labelClass}>Diamond type</label>
+                  <div className="inline-flex w-full rounded-2xl bg-slate-100 p-1">
+                    {([['natural', 'Natural'], ['lab-grown', 'Lab']] as const).map(([val, label]) => (
+                      <button key={val} type="button" onClick={() => setRnStoneType(val)}
+                        className={`flex-1 rounded-xl px-4 py-2 text-sm font-semibold transition ${rnStoneType === val ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {rnMode && rn && !rn.metalCat && (
+                  <p className="md:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                    RN rings are only priced in 14K / 18K gold or platinum. Pick one of those metals above.
+                  </p>
+                )}
+
+                {rn?.model && rn?.sizeRow && rn.metalCat && (
+                  <div className="md:col-span-2 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+                    <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">RN breakdown</p>
+                    <dl className="space-y-1.5 text-sm">
+                      <RnRow label="Number of stones" value={`${rn.numStones}`} />
+                      <RnRow label="CTW (from sheet)" value={`${rn.ctw.toFixed(2)} ct`} />
+                      <RnRow label={`Gold (${rn.avgGrams}g × $${rn.goldPerGram}/g)`} value={`$${rn.goldCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                      <RnRow label="Labor" value={`$${rn.casting.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                      <RnRow label={`Setting (${rn.numStones} × $${rn.settingPerStone})`} value={`$${rn.settingLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                    </dl>
+
+                    {rn.naturalOther && (
+                      <>
+                        <p className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Band type · compare</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {([
+                            ['eternity', 'Eternity', rnStoneType === 'lab-grown' ? rn.labEternity : rn.naturalEternity, rn.naturalEternity.numStones] as const,
+                            ['other', 'Other', rnStoneType === 'lab-grown' ? rn.labOther! : rn.naturalOther, rn.naturalOther.numStones] as const,
+                          ]).map(([val, label, d, numStones]) => {
+                            const isSel = rnBandMode === val
+                            const etTotal = (rnStoneType === 'lab-grown' ? rn.labEternity : rn.naturalEternity).total
+                            const otTotal = (rnStoneType === 'lab-grown' ? rn.labOther! : rn.naturalOther).total
+                            const isCheaper = d.total === Math.min(etTotal, otTotal) && etTotal !== otTotal
+                            return (
+                              <button key={val} type="button" onClick={() => setRnBandMode(val)}
+                                className={`rounded-xl border p-3 text-left transition ${isSel ? 'border-slate-900 bg-white ring-1 ring-slate-900' : 'border-slate-200 bg-white/60 hover:border-slate-300'}`}>
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="text-xs font-semibold text-slate-900">{label}</span>
+                                  {isSel
+                                    ? <span className="rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">USING</span>
+                                    : isCheaper && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">CHEAPER</span>}
+                                </div>
+                                <p className="mt-1 text-[11px] text-slate-500">{numStones} stones · {d.ctw.toFixed(2)}ct</p>
+                                <p className="mt-1 text-sm font-semibold text-slate-900">${d.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </>
+                    )}
+
+                    <p className="mb-1.5 mt-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Diamonds · pick type</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {([['natural', 'Natural', rn.natural], ['lab-grown', 'Lab', rn.lab]] as const).map(([val, label, d]) => {
+                        const isSel = rnStoneType === val
+                        const isCheaper = d.hasDiamondRow && rn.natural.hasDiamondRow && rn.lab.hasDiamondRow &&
+                          rn.natural.total !== rn.lab.total && d.total === Math.min(rn.natural.total, rn.lab.total)
+                        const cardCls = `rounded-xl border p-3 text-left transition ${isSel ? 'border-slate-900 bg-white ring-1 ring-slate-900' : 'border-slate-200 bg-white/60 hover:border-slate-300'}`
+                        const header = (
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold text-slate-900">{label}</span>
+                            {isSel
+                              ? <span className="rounded-full bg-slate-900 px-1.5 py-0.5 text-[9px] font-bold text-white">USING</span>
+                              : isCheaper && <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">CHEAPER</span>}
+                          </div>
+                        )
+                        if (val === 'lab-grown' && !d.hasDiamondRow) {
+                          const labExistsForNaturalKey = !!config.diamondSizeFor('lab-grown', rn.natural.sizeKey)
+                          return (
+                            <div key={val} className={cardCls}>
+                              {header}
+                              {labExistsForNaturalKey ? (
+                                <>
+                                  <p className="mt-1 text-[11px] text-amber-700">
+                                    Lab entry for <span className="font-mono font-semibold">"{rn.natural.sizeKey}"</span> exists but this model points to the wrong key{d.sizeKey ? <> (<span className="font-mono">"{d.sizeKey}"</span>)</> : ''}.
+                                  </p>
+                                  <button type="button" disabled={linkingLabRn}
+                                    onClick={async () => {
+                                      if (!rn.model) return
+                                      setLinkingLabRn(true)
+                                      try {
+                                        await configService.updateRnRing(rn.model.id, { diamondSizeKeyLab: rn.natural.sizeKey })
+                                        config.refresh()
+                                      } finally { setLinkingLabRn(false) }
+                                    }}
+                                    className="mt-1.5 rounded-lg px-2 py-0.5 text-[11px] font-semibold transition disabled:opacity-50"
+                                    style={{ backgroundColor: 'rgba(60,46,96,0.08)', color: '#3C2E60' }}>
+                                    {linkingLabRn ? 'Linking...' : `Link to Lab "${rn.natural.sizeKey}"`}
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="mt-1 text-[11px] text-amber-700">
+                                    No Lab price for size <span className="font-mono font-semibold">"{rn.natural.sizeKey}"</span>.
+                                  </p>
+                                  <button type="button" onClick={() => setShowCreateLabRn(true)}
+                                    className="mt-1.5 rounded-lg px-2 py-0.5 text-[11px] font-semibold transition"
+                                    style={{ backgroundColor: 'rgba(60,46,96,0.08)', color: '#3C2E60' }}>
+                                    + Add Lab price
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )
+                        }
+                        return (
+                          <button key={val} type="button" onClick={() => setRnStoneType(val)} className={cardCls}>
+                            {header}
+                            {d.hasDiamondRow ? (
+                              <>
+                                <p className="mt-1 text-[11px] text-slate-500">{rn.ctw.toFixed(2)}ct × ${d.pricePerCarat.toLocaleString('en-US')}/ct</p>
+                                <p className="text-[11px] text-slate-500">Diamonds ${d.diamondCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                                <p className="mt-1 text-sm font-semibold text-slate-900">${d.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+                                {val === 'lab-grown' && (
+                                  <p className="mt-1.5 border-t border-amber-200 pt-1.5 text-[10px] font-medium text-amber-700">
+                                    Make sure you double check the mark up for the Lab Version since it could be below what we usually charge.
+                                  </p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="mt-1 text-[11px] text-amber-700">No price for key "{d.sizeKey || '—'}"</p>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <CreateLabSizeDialog
+                      open={showCreateLabRn}
+                      sizeKey={rn.natural.sizeKey}
+                      initialLabel={config.diamondSizeFor('natural', rn.natural.sizeKey)?.label ?? ''}
+                      onCreated={(createdKey) => {
+                        if (rn.model) {
+                          configService.updateRnRing(rn.model.id, { diamondSizeKeyLab: createdKey })
+                            .then(() => config.refresh())
+                            .catch(console.error)
+                        } else {
+                          config.refresh()
+                        }
+                      }}
+                      onClose={() => setShowCreateLabRn(false)}
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Metal rows — hidden in RN mode, the model drives gold weight */}
+          {!rnMode && (
           <Card className={cardClass}>
             <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100">
               <div>
@@ -604,9 +1658,147 @@ export function StockBuilderPage() {
               </p>
             </CardContent>
           </Card>
+          )}
+
+          {/* Labor / extras — engraving slider + markup/discount presets, always visible */}
+          <Card className={cardClass}>
+            <CardHeader className="border-b border-slate-100">
+              <CardTitle className="text-base font-semibold text-slate-900">
+                {rnMode ? 'Pricing & options' : 'Labor & extras'}
+              </CardTitle>
+              <p className="text-sm text-slate-500">
+                {rnMode ? 'Engraving, extra costs, markup and discount.' : "Ring labor tier, dimensions, engraving, markup and discount."}
+              </p>
+            </CardHeader>
+            <CardContent className="grid gap-5 pt-6 md:grid-cols-2">
+              {!rnMode && (<>
+                <div className="space-y-2">
+                  <label className={labelClass}>Ring labor tier</label>
+                  <select className={inputClass} value={ringLabor} onChange={e => setRingLabor(e.target.value)}>
+                    <option value="none">None</option>
+                    {Object.entries(config.ringLaborMap).map(([key, tier]) => (
+                      <option key={key} value={key}>{tier.label} — ${tier.fee}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClass}>Ring width (mm)</label>
+                  <input type="number" min={0} step="0.1" className={inputClass} value={ringWidth} onChange={e => setRingWidth(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClass}>Finger size</label>
+                  <input type="number" min={0} step="0.25" className={inputClass} value={fingerSize} onChange={e => setFingerSize(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClass}>Extra costs ($)</label>
+                  <input type="number" min={0} className={inputClass} value={extraCosts} onChange={e => setExtraCosts(e.target.value)} />
+                </div>
+              </>)}
+              {rnMode && (
+                <div className="space-y-2 md:col-span-2">
+                  <label className={labelClass}>Extra costs ($)</label>
+                  <input type="number" min={0} className={inputClass} value={extraCosts} onChange={e => setExtraCosts(e.target.value)} />
+                </div>
+              )}
+
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <label className={labelClass}>Hand Engraving (milgrain)</label>
+                  <span className="text-sm font-bold tabular-nums text-slate-900">
+                    {engravingFee > 0 ? `$${engravingFee.toLocaleString('en-US')}` : 'None'}
+                  </span>
+                </div>
+                <input type="range" min={engravingBounds.min} max={engravingBounds.max} step={engravingBounds.step}
+                  value={Math.min(engravingBounds.max, Math.max(engravingBounds.min, engravingFee))}
+                  onChange={e => setEngravingFee(Number(e.target.value))}
+                  className="w-full accent-slate-900" aria-label="Hand engraving fee" />
+                <div className="flex justify-between text-[11px] font-medium text-slate-400">
+                  <span>${engravingBounds.min.toLocaleString('en-US')}</span>
+                  <span>Drag to set the engraving fee · $0 = none</span>
+                  <span>${engravingBounds.max.toLocaleString('en-US')}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <label className={labelClass}>
+                    Retail markup
+                    <span className="ml-2 text-xs font-normal text-slate-500">applied on top of the full cost (engraving included)</span>
+                  </label>
+                  <span className="text-xs font-medium text-slate-500">
+                    Cost <strong className="text-slate-700">${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                    {' '}→ Retail <strong className="text-slate-900">${retailPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative flex-1 min-w-[140px]">
+                    <input type="text" inputMode="decimal" value={markupText} placeholder={String(DEFAULT_MARKUP)}
+                      onChange={e => setMarkupText(e.target.value)}
+                      className={`${inputClass} pr-9`} />
+                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">×</span>
+                  </div>
+                  {MARKUP_PRESETS.map(p => {
+                    const active = parsedMarkup === p
+                    return (
+                      <button key={p} type="button" onClick={() => setMarkupText(String(p))}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${active ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                        {p}×
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-slate-400">
+                  For a discount, type a number below {DEFAULT_MARKUP} (e.g. 2.2× ≈ 12% off the standard {DEFAULT_MARKUP}× price).
+                </p>
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <label className={labelClass}>
+                    Discount
+                    <span className="ml-2 text-xs font-normal text-slate-500">optional — applied on top of the markup</span>
+                  </label>
+                  <span className="text-xs font-medium text-slate-500">
+                    {parsedDiscount > 0 ? (
+                      <>
+                        Save <strong className="text-emerald-600">${discountAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                        {' '}→ Final <strong className="text-slate-900">${retailPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                      </>
+                    ) : (
+                      <span className="text-slate-400">No discount applied</span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative flex-1 min-w-[140px]">
+                    <input type="text" inputMode="decimal" value={discountText} placeholder="0"
+                      onChange={e => setDiscountText(e.target.value)}
+                      className={`${inputClass} pr-9`} />
+                    <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">%</span>
+                  </div>
+                  <button type="button" onClick={() => setDiscountText('')}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${parsedDiscount === 0 ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                    None
+                  </button>
+                  {DISCOUNT_PRESETS.map(p => {
+                    const active = parsedDiscount === p
+                    return (
+                      <button key={p} type="button" onClick={() => setDiscountText(String(p))}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${active ? 'bg-emerald-600 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+                        {p}%
+                      </button>
+                    )
+                  })}
+                </div>
+                <p className="text-xs text-slate-400">Pick a preset or type any value. Leave empty (or pick None) to charge the full markup price.</p>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Stones — same MAIN/SIDE/MELEE grouping + gold/sapphire/emerald
-              palette as the Quote builder's Stone Setting section. */}
+              palette as the Quote builder's Stone Setting section. Hidden in
+              RN mode — stones come from the resolved RN model instead. */}
+          {!rnMode && (
           <Card id="stock-stones" className={`relative overflow-hidden ${cardClass}`}>
             <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top_left,rgba(251,191,36,0.10),transparent_45%),radial-gradient(circle_at_top_right,rgba(244,63,94,0.08),transparent_50%)]" aria-hidden />
             <CardHeader className="relative border-b border-slate-100">
@@ -616,110 +1808,14 @@ export function StockBuilderPage() {
                 </span>
                 <div>
                   <CardTitle className="text-base font-semibold text-slate-900">Stone Setting</CardTitle>
-                  <p className="text-xs text-slate-500">Main, side and melee — same pricing lookups as the Quote builder.</p>
+                  <p className="text-xs text-slate-500">Main, side and melee — each can have its own markup, grading and lab report.</p>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4 pt-6">
-              {STONE_ROLES.map(role => {
-                const theme = STONE_ROLE_THEME[role]
-                const Icon = theme.icon
-                const items = stones.filter(s => s.role === role)
-                const hint = role === 'MAIN' ? 'Center stones. Add one or several.'
-                  : role === 'SIDE' ? 'Accent stones. Add as many as you need.'
-                  : 'Pavé / melee. Add as many as you need.'
-                return (
-                  <div key={role} className="group/section relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition hover:shadow-md">
-                    <span className={`absolute inset-y-0 left-0 w-1 ${theme.bar} opacity-80`} aria-hidden />
-                    <div className="flex items-center justify-between gap-3 pl-2">
-                      <div className="flex items-center gap-3">
-                        <span className={`flex h-9 w-9 items-center justify-center rounded-xl shadow-sm ${theme.header}`}>
-                          <Icon className="h-4 w-4" />
-                        </span>
-                        <div>
-                          <h3 className="text-sm font-semibold text-slate-900">
-                            {theme.label} stones
-                            <span className={`ml-2 inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${theme.chip}`}>
-                              {items.length}
-                            </span>
-                          </h3>
-                          <p className="text-xs text-slate-500">{hint}</p>
-                        </div>
-                      </div>
-                      <button type="button" onClick={() => addStoneRow(role)}
-                        className={`inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition ${theme.btn}`}>
-                        <Plus className="h-3 w-3" /> Add {theme.label.toLowerCase()}
-                      </button>
-                    </div>
-                    <div className="mt-3 pl-2">
-                      {items.length === 0 ? (
-                        <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-3 text-xs text-slate-400">None yet.</p>
-                      ) : (
-                        <div className="space-y-3">
-                          {items.map(s => {
-                            const b = stoneBreakdown.find(x => x.uid === s.uid)
-                            return (
-                              <div key={s.uid} className={`relative overflow-hidden rounded-2xl border ${theme.ring} ${theme.tint} p-4 shadow-sm transition hover:shadow-md`}>
-                                <span className={`absolute inset-y-0 left-0 w-1.5 ${theme.bar}`} aria-hidden />
-                                <div className="flex items-center justify-between gap-2 pl-2">
-                                  <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${theme.chip}`}>
-                                    <Icon className="h-3 w-3" /> {theme.label} stone
-                                  </span>
-                                  <button type="button" onClick={() => removeStoneRow(s.uid)} aria-label="Remove stone"
-                                    className="flex h-7 w-7 items-center justify-center rounded-full bg-white/70 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600">
-                                    <X className="h-4 w-4" />
-                                  </button>
-                                </div>
-                                <div className="mt-3 grid grid-cols-2 gap-3 pl-2 sm:grid-cols-4">
-                                  <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type</label>
-                                    <select className={inputClass} value={s.stoneType} onChange={e => updateStoneRow(s.uid, { stoneType: e.target.value as StoneRowState['stoneType'] })}>
-                                      <option value="natural">Natural</option>
-                                      <option value="lab-grown">Lab</option>
-                                    </select>
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Size key</label>
-                                    <input className={inputClass} value={s.sizeKey} onChange={e => updateStoneRow(s.uid, { sizeKey: e.target.value })} placeholder="e.g. 1" />
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Carats</label>
-                                    <input type="number" min={0} step="0.01" className={inputClass} value={s.carats} onChange={e => updateStoneRow(s.uid, { carats: e.target.value })} />
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Qty</label>
-                                    <input type="number" min={1} className={inputClass} value={s.quantity} onChange={e => updateStoneRow(s.uid, { quantity: e.target.value })} />
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Setter</label>
-                                    <select className={inputClass} value={s.setterType} onChange={e => updateStoneRow(s.uid, { setterType: e.target.value })}>
-                                      <option value="">—</option>
-                                      {config.setters.map(st => <option key={st.typeKey} value={st.typeKey}>{st.label}</option>)}
-                                    </select>
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Setter fee override</label>
-                                    <input type="number" min={0} className={inputClass} value={s.setterFeeOverride} onChange={e => updateStoneRow(s.uid, { setterFeeOverride: e.target.value })} placeholder={`$${config.setterMap[s.setterType]?.fee ?? 0}`} />
-                                  </div>
-                                  <div className="space-y-1.5">
-                                    <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Manual price override</label>
-                                    <input type="number" min={0} className={inputClass} value={s.manualPrice} onChange={e => updateStoneRow(s.uid, { manualPrice: e.target.value })} placeholder="Optional" />
-                                  </div>
-                                  <div className="flex items-end pb-3">
-                                    <p className="text-xs text-slate-500">
-                                      Cost ${b ? b.cost.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'} + labor ${b ? b.labor.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'}
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
+              {renderStoneSection('MAIN', 'Center stones. Add one or several — each can have its own markup.', mainStones)}
+              {renderStoneSection('SIDE', 'Accent stones. Add as many as you need.', sideStones)}
+              {renderStoneSection('MELEE', 'Pavé / melee. Add as many as you need.', meleeStones)}
 
               {/* ── EMKAY Gemstones Catalog ─────────────────────────────── */}
               <div className="group/section relative overflow-hidden rounded-2xl border border-amber-100 bg-white p-4 shadow-sm transition hover:shadow-md">
@@ -887,50 +1983,74 @@ export function StockBuilderPage() {
               </div>
             </CardContent>
           </Card>
+          )}
 
-          {/* Labor / extras */}
+          {/* Internal notes & attachments — never shown outside the workspace */}
           <Card className={cardClass}>
             <CardHeader className="border-b border-slate-100">
-              <CardTitle className="text-base font-semibold text-slate-900">Labor & extras</CardTitle>
-              <p className="text-sm text-slate-500">Ring labor tier, dimensions and one-off fees.</p>
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+                  <ImagePlus className="h-4 w-4" />
+                </span>
+                <div>
+                  <CardTitle className="text-base font-semibold text-slate-900">
+                    Internal notes &amp; attachments
+                    <span className="ml-2 inline-flex items-center justify-center rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      {attachments.length}
+                    </span>
+                  </CardTitle>
+                  <p className="text-xs text-slate-500">Sourcing, condition, reminders — never shown outside the workspace.</p>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="grid gap-5 pt-6 sm:grid-cols-3">
+            <CardContent className="space-y-3 pt-6">
               <div className="space-y-2">
-                <label className={labelClass}>Ring labor tier</label>
-                <select className={inputClass} value={ringLabor} onChange={e => setRingLabor(e.target.value)}>
-                  <option value="none">None</option>
-                  {Object.entries(config.ringLaborMap).map(([key, tier]) => (
-                    <option key={key} value={key}>{tier.label} — ${tier.fee}</option>
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Internal notes <span className="font-normal normal-case text-slate-400">(optional)</span>
+                </label>
+                <textarea rows={3} className={inputClass} value={internalNotes} onChange={e => setInternalNotes(e.target.value)}
+                  placeholder="Sourcing, condition, reminders…" />
+              </div>
+
+              <input ref={attachmentInputRef} id="stock-attachment-files" type="file" accept="image/*" multiple
+                onChange={handleAttachmentsChange} className="hidden" />
+              <input ref={attachmentCameraRef} id="stock-attachment-camera" type="file" accept="image/*" capture="environment"
+                onChange={handleAttachmentsChange} className="hidden" />
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label htmlFor="stock-attachment-camera"
+                  className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white sm:hidden">
+                  <Camera className="h-4 w-4 shrink-0 text-slate-400" />
+                  <span>Take photo</span>
+                </label>
+                <label htmlFor="stock-attachment-files"
+                  className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white sm:col-span-2">
+                  <ImagePlus className="h-4 w-4 shrink-0 text-slate-400" />
+                  <span>Add photos (multiple allowed)</span>
+                </label>
+              </div>
+
+              {attachments.length === 0 ? (
+                <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-3 text-xs text-slate-400">No attachments yet.</p>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {attachments.map((a, idx) => (
+                    <div key={a.uid} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                      <img src={a.photo} alt={`Attachment ${idx + 1}`} className="w-full object-cover max-h-48" />
+                      <button type="button" onClick={() => removeAttachment(a.uid)} aria-label="Remove attachment"
+                        className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition hover:bg-black/80">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                      <div className="space-y-1.5 p-3">
+                        <input type="text" value={a.caption} onChange={e => patchAttachment(a.uid, { caption: e.target.value })}
+                          placeholder="Optional caption"
+                          className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 outline-none focus:border-slate-400 focus:bg-white" />
+                        <p className="text-[10px] text-slate-400">Added {new Date(a.createdAt).toLocaleString()}</p>
+                      </div>
+                    </div>
                   ))}
-                </select>
-              </div>
-              <div className="space-y-2">
-                <label className={labelClass}>Ring width (mm)</label>
-                <input type="number" min={0} step="0.1" className={inputClass} value={ringWidth} onChange={e => setRingWidth(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <label className={labelClass}>Finger size</label>
-                <input type="number" min={0} step="0.25" className={inputClass} value={fingerSize} onChange={e => setFingerSize(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <label className={labelClass}>Extra costs ($)</label>
-                <input type="number" min={0} className={inputClass} value={extraCosts} onChange={e => setExtraCosts(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <label className={labelClass}>Engraving fee ($)</label>
-                <input type="number" min={0} className={inputClass} value={engravingFee} onChange={e => setEngravingFee(e.target.value)} />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Notes */}
-          <Card className={cardClass}>
-            <CardHeader className="border-b border-slate-100">
-              <CardTitle className="text-base font-semibold text-slate-900">Internal notes</CardTitle>
-              <p className="text-sm text-slate-500">Sourcing, condition, reminders — never shown outside the workspace.</p>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <textarea rows={3} className={inputClass} value={internalNotes} onChange={e => setInternalNotes(e.target.value)} placeholder="Sourcing, condition, reminders…" />
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -973,52 +2093,34 @@ export function StockBuilderPage() {
               <CardTitle className="text-base font-semibold text-slate-900">Pricing</CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <label className={labelClass}>Markup ×</label>
-                  <input type="number" min={1} step="0.1" className={inputClass} value={markupMultiplier} onChange={e => setMarkupMultiplier(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <label className={labelClass}>Discount %</label>
-                  <input type="number" min={0} max={100} className={inputClass} value={discountPercent} onChange={e => setDiscountPercent(e.target.value)} />
-                </div>
-              </div>
-              <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-4 text-sm">
+              <div className="space-y-1.5 text-sm">
                 <div className="flex justify-between text-slate-500"><span>Internal cost</span><span>${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
-                {discount > 0 && (
-                  <div className="flex justify-between text-emerald-600"><span>Discount</span><span>−{discount}%</span></div>
+                <div className="flex justify-between text-slate-500"><span>Markup</span><span>{parsedMarkup}×</span></div>
+                {parsedDiscount > 0 && (
+                  <div className="flex justify-between text-emerald-600"><span>Discount</span><span>−{parsedDiscount}%</span></div>
                 )}
-                <div className="flex justify-between text-base font-bold text-slate-900"><span>Retail price</span><span>${retailPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
+                <div className="flex justify-between border-t border-slate-100 pt-1.5 text-base font-bold text-slate-900"><span>Retail price</span><span>${retailPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
               </div>
             </CardContent>
           </Card>
 
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={!canSave}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3.5 text-sm font-semibold text-white shadow-[0_20px_40px_rgba(15,23,42,0.18)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            {saving ? 'Saving…' : 'Save stock piece'}
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/stock-list')}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-slate-400"
-          >
+          <div className="space-y-2">
+            <button type="button" onClick={handleSave} disabled={!canSave}
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-900 py-3.5 text-sm font-semibold text-white shadow-[0_20px_40px_rgba(15,23,42,0.18)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40">
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {saving ? 'Saving…' : 'Save stock piece'}
+            </button>
+            {saveError && <p className="text-xs font-medium text-rose-600">{saveError}</p>}
+          </div>
+          <button type="button" onClick={() => navigate('/stock-list')}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 transition hover:border-slate-400">
             <Package className="h-4 w-4" /> View all stock
           </button>
         </div>
       </div>
 
       {toast && (
-        <Toast
-          title={toast.title}
-          description={toast.description}
-          variant={toast.variant}
-          onClose={() => setToast(null)}
-        />
+        <Toast title={toast.title} description={toast.description} variant={toast.variant} onClose={() => setToast(null)} />
       )}
     </div>
   )

@@ -1,5 +1,13 @@
 import { api } from '@/api/apiClient'
-import type { QuoteEmkayStone, QuoteMetal, StockItem, StockStatus, StockStone } from '../types'
+import type { QuoteAttachment, QuoteEmkayStone, QuoteMetal, StockItem, StockStatus, StockStone } from '../types'
+
+interface ApiAttachment {
+  id?: number | null
+  photo: string
+  caption?: string | null
+  sortOrder?: number | null
+  createdAt?: string | null
+}
 
 interface ApiEmkayStone {
   id?: number | null
@@ -35,6 +43,8 @@ interface ApiStockStone {
   role: 'MAIN' | 'SIDE' | 'MELEE'
   stoneType: string
   stoneCategory?: string | null
+  gemstoneId?: number | null
+  gemstoneName?: string | null
   sizeKey: string
   carats: number
   setterType: string
@@ -77,6 +87,7 @@ interface ApiStockItem {
   metalRows?: ApiMetalRow[]
   stones?: ApiStockStone[]
   emkayStones?: ApiEmkayStone[]
+  attachments?: ApiAttachment[]
   retailPrice?: number | null
 }
 
@@ -107,6 +118,8 @@ function mapStone(s: ApiStockStone): StockStone {
     role: s.role,
     stoneType: s.stoneType as StockStone['stoneType'],
     stoneCategory: (s.stoneCategory as StockStone['stoneCategory']) ?? 'DIAMOND',
+    gemstoneId: s.gemstoneId ?? null,
+    gemstoneName: s.gemstoneName ?? null,
     sizeKey: s.sizeKey,
     carats: s.carats,
     setterType: s.setterType,
@@ -148,6 +161,16 @@ function mapEmkayStone(s: ApiEmkayStone): QuoteEmkayStone {
   }
 }
 
+function mapAttachment(a: ApiAttachment): QuoteAttachment {
+  return {
+    id: a.id ?? null,
+    photo: a.photo,
+    caption: a.caption ?? null,
+    sortOrder: a.sortOrder ?? null,
+    createdAt: a.createdAt ?? null,
+  }
+}
+
 function mapStockItem(s: ApiStockItem): StockItem {
   return {
     id: String(s.id),
@@ -174,6 +197,7 @@ function mapStockItem(s: ApiStockItem): StockItem {
     setterType: s.setterType ?? null,
     stones: (s.stones ?? []).map(mapStone),
     emkayStones: (s.emkayStones ?? []).map(mapEmkayStone),
+    attachments: (s.attachments ?? []).map(mapAttachment),
     archived: s.archived ?? false,
     retailPrice: s.retailPrice ?? null,
   }
