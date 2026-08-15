@@ -2073,53 +2073,6 @@ export function StockBuilderPage() {
                   </div>
                 )}
               </div>
-
-              {/* ── Stone total breakdown — every stone's own contribution,
-                  so it's obvious what makes up the aggregate total. ────── */}
-              {(mainStones.length + sideStones.length + meleeStones.length + emkayStones.length) > 0 && (
-                <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">Stone total — breakdown</p>
-                  <div className="space-y-1.5 text-sm">
-                    {([['MAIN', mainStones], ['SIDE', sideStones], ['MELEE', meleeStones]] as const).flatMap(([role, items]) =>
-                      items.map((s, i) => {
-                        const b = stoneBreakdownByUid[s.uid]
-                        const contribution = b ? b.cost + b.labor : 0
-                        const theme = STONE_ROLE_THEME[role]
-                        const typeLabel = s.stoneTypeChosen ? DIAMOND_TYPE_OPTIONS[s.stoneType].label : 'Not chosen yet'
-                        const desc = [typeLabel, parseNum(s.carats) > 0 ? `${s.carats} ct` : null, s.shape || null].filter(Boolean).join(' · ')
-                        return (
-                          <div key={s.uid} className="flex items-center justify-between gap-3">
-                            <span className="flex min-w-0 items-center gap-2 text-slate-600">
-                              <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${theme.dot}`} aria-hidden />
-                              <span className="shrink-0 font-semibold text-slate-700">{theme.label} #{i + 1}</span>
-                              <span className="truncate text-slate-400">{desc || '—'}</span>
-                            </span>
-                            <strong className="shrink-0 tabular-nums text-slate-900">${contribution.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
-                          </div>
-                        )
-                      })
-                    )}
-                    {emkayStones.map((es, i) => {
-                      const b = emkayBreakdown.find(x => x.uid === es.uid)
-                      const contribution = b ? b.cost + b.labor : 0
-                      return (
-                        <div key={es.uid} className="flex items-center justify-between gap-3">
-                          <span className="flex min-w-0 items-center gap-2 text-slate-600">
-                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden />
-                            <span className="shrink-0 font-semibold text-slate-700">EMKAY #{i + 1}</span>
-                            <span className="truncate text-slate-400">{es.name}</span>
-                          </span>
-                          <strong className="shrink-0 tabular-nums text-slate-900">${contribution.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
-                        </div>
-                      )
-                    })}
-                    <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-base font-bold text-slate-900">
-                      <span>Total</span>
-                      <span>${(stoneCost + settingFee + emkayCost + emkaySettingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
           )}
@@ -2240,6 +2193,51 @@ export function StockBuilderPage() {
                 )}
                 <div className="flex justify-between border-t border-slate-100 pt-1.5 text-base font-bold text-slate-900"><span>Retail price</span><span>${retailPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
               </div>
+
+              {/* ── Every stone's own contribution, so it's obvious what
+                  makes up the "Stone + setting" total in the hero above. ── */}
+              {(mainStones.length + sideStones.length + meleeStones.length + emkayStones.length) > 0 && (
+                <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-4 text-sm">
+                  <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Stone total — breakdown</p>
+                  {([['MAIN', mainStones], ['SIDE', sideStones], ['MELEE', meleeStones]] as const).flatMap(([role, items]) =>
+                    items.map((s, i) => {
+                      const b = stoneBreakdownByUid[s.uid]
+                      const contribution = b ? b.cost + b.labor : 0
+                      const theme = STONE_ROLE_THEME[role]
+                      const typeLabel = s.stoneTypeChosen ? DIAMOND_TYPE_OPTIONS[s.stoneType].label : 'Not chosen yet'
+                      const desc = [typeLabel, parseNum(s.carats) > 0 ? `${s.carats} ct` : null, s.shape || null].filter(Boolean).join(' · ')
+                      return (
+                        <div key={s.uid} className="flex items-center justify-between gap-3">
+                          <span className="flex min-w-0 items-center gap-2 text-slate-600">
+                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${theme.dot}`} aria-hidden />
+                            <span className="shrink-0 font-semibold text-slate-700">{theme.label} #{i + 1}</span>
+                            <span className="truncate text-slate-400">{desc || '—'}</span>
+                          </span>
+                          <strong className="shrink-0 tabular-nums text-slate-900">${contribution.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                        </div>
+                      )
+                    })
+                  )}
+                  {emkayStones.map((es, i) => {
+                    const b = emkayBreakdown.find(x => x.uid === es.uid)
+                    const contribution = b ? b.cost + b.labor : 0
+                    return (
+                      <div key={es.uid} className="flex items-center justify-between gap-3">
+                        <span className="flex min-w-0 items-center gap-2 text-slate-600">
+                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden />
+                          <span className="shrink-0 font-semibold text-slate-700">EMKAY #{i + 1}</span>
+                          <span className="truncate text-slate-400">{es.name}</span>
+                        </span>
+                        <strong className="shrink-0 tabular-nums text-slate-900">${contribution.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                      </div>
+                    )
+                  })}
+                  <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-sm font-bold text-slate-900">
+                    <span>Total</span>
+                    <span>${(stoneCost + settingFee + emkayCost + emkaySettingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
