@@ -824,18 +824,18 @@ export function QuoteBuilderPage() {
     setStones(prev => prev.map(s => {
       if (s.uid !== uid) return s
       const ct = sizePricingFor(s).ctPerStone
-      // Custom (no-preset) size: the total is derived from $/ct × carats, so
-      // it has to be recalculated whenever carats changes too.
-      const isCustom = s.sizeKey === ''
+      // When a $/ct override is set (custom size or not), the total is
+      // derived from $/ct × carats, so it has to be recalculated whenever
+      // carats changes too.
       if (caratsText === '') {
         return {
           ...s, carats: '', amount: '',
-          manualPrice: isCustom ? '' : s.manualPrice,
+          manualPrice: s.manualPricePerCarat.trim() !== '' ? '' : s.manualPrice,
         }
       }
       const carats = parseNum(caratsText)
       const amount = ct > 0 ? String(Math.round(carats / ct)) : s.amount
-      const manualPrice = isCustom && s.manualPricePerCarat.trim() !== ''
+      const manualPrice = s.manualPricePerCarat.trim() !== ''
         ? String(Math.round(carats * parseNum(s.manualPricePerCarat) * 100) / 100)
         : s.manualPrice
       return { ...s, carats: caratsText, amount, manualPrice }
@@ -854,22 +854,10 @@ export function QuoteBuilderPage() {
     }))
   }
 
-  // When the user types a manual price they're overriding the per-carat
-  // calculation, but the SETTING labor (amount × setter fee) must still
-  // apply. Default amount to "1" the first time a manual price is entered
-  // so the labor isn't silently zero — the user can still bump amount up
-  // for multi-stone settings.
-  const onStoneManualPriceChange = (uid: string, priceText: string) => {
-    setStones(prev => prev.map(s => {
-      if (s.uid !== uid) return s
-      const shouldSeedAmount = priceText.trim() !== '' && s.amount.trim() === ''
-      return { ...s, manualPrice: priceText, amount: shouldSeedAmount ? '1' : s.amount }
-    }))
-  }
-
-  // Custom (no-preset) size: the jeweler types $/ct by hand instead of a flat
-  // total — the system multiplies by carats and keeps manualPrice (the value
-  // every cost formula and the save payload actually read) in sync.
+  // Cost-per-carat override, available for both custom and preset sizes — the
+  // jeweler types $/ct by hand instead of a flat total; the system multiplies
+  // by carats and keeps manualPrice (the value every cost formula and the
+  // save payload actually read) in sync.
   const onStoneManualPricePerCaratChange = (uid: string, perCaratText: string) => {
     setStones(prev => prev.map(s => {
       if (s.uid !== uid) return s
@@ -1278,47 +1266,39 @@ export function QuoteBuilderPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Cost per carat{' '}
                   {customSize ? (
-                    <>Cost per carat{' '}
-                      <span className="font-normal normal-case text-rose-500">
-                        (required — size/cut not in the system; the total is calculated automatically)
-                      </span>
-                    </>
+                    <span className="font-normal normal-case text-rose-500">
+                      (required — size/cut not in the system; the total is calculated automatically)
+                    </span>
                   ) : (
-                    <>{stone.role === 'MAIN' ? 'Wholesale cost' : 'Gross cost for this batch of stones'}{' '}
-                      <span className="font-normal normal-case text-slate-400">
-                        (optional — overrides ${pricePerCarat.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct × total carats)
-                      </span>
-                    </>
+                    <span className="font-normal normal-case text-slate-400">
+                      (optional — overrides the ${pricePerCarat.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct looked up for this size)
+                    </span>
                   )}
                 </label>
-                {customSize ? (
-                  <>
-                    <input type="number" min={0} step="0.01" value={stone.manualPricePerCarat}
-                      placeholder="e.g. 1500 per carat"
-                      onChange={e => onStoneManualPricePerCaratChange(stone.uid, e.target.value)}
-                      className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 ${
-                        stone.manualPricePerCarat.trim() === '' ? 'border-rose-300' : 'border-slate-200'
-                      }`} />
-                    <p className="text-[11px] text-slate-500">
-                      {caratsNum > 0 && stone.manualPricePerCarat.trim() !== ''
-                        ? `= $${stoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} total (${caratsNum} ct × $${parseNum(stone.manualPricePerCarat).toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct)`
-                        : 'Enter carats and cost per carat — the total is calculated for you.'}
-                    </p>
-                  </>
-                ) : (
-                  <input type="number" min={0} step="0.01" value={stone.manualPrice}
-                    placeholder="Leave empty to use calculated price"
-                    onChange={e => onStoneManualPriceChange(stone.uid, e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                <input type="number" min={0} step="0.01" value={stone.manualPricePerCarat}
+                  placeholder={customSize ? 'e.g. 1500 per carat' : `Default — $${pricePerCarat.toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct`}
+                  onChange={e => onStoneManualPricePerCaratChange(stone.uid, e.target.value)}
+                  className={`w-full rounded-xl border bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 ${
+                    customSize && stone.manualPricePerCarat.trim() === '' ? 'border-rose-300' : 'border-slate-200'
+                  }`} />
+                {caratsNum > 0 && (
+                  <p className="text-[11px] text-slate-500">
+                    = ${stoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })} total ({caratsNum} ct × $
+                    {(stone.manualPricePerCarat.trim() !== '' ? parseNum(stone.manualPricePerCarat) : pricePerCarat).toLocaleString('en-US', { minimumFractionDigits: 2 })}/ct)
+                  </p>
                 )}
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Custom setting fee (optional)</label>
-                <input type="text" inputMode="decimal" value={stone.setterFeeOverride}
-                  placeholder={`Default — $${config.setterMap[stone.setterType]?.fee ?? 0}`}
-                  onChange={e => patchStone(stone.uid, { setterFeeOverride: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                <div className="relative">
+                  <input type="text" inputMode="decimal" value={stone.setterFeeOverride}
+                    placeholder={`Default — $${config.setterMap[stone.setterType]?.fee ?? 0}`}
+                    onChange={e => patchStone(stone.uid, { setterFeeOverride: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 pr-16 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400">/ stone</span>
+                </div>
               </div>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-xl bg-white px-3 py-2 text-[11px] text-slate-500">
