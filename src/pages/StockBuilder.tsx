@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { DIAMOND_TYPE_OPTIONS, JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import { useAuth } from '@/context/AuthContext'
 import { useQuoteConfig, normalizeSizeKey } from '@/hooks/useQuoteConfig'
+import { METAL_GROUPS } from '@/hooks/useQuoteBuilder'
 import { computeRnBreakdown, type RnStoneType } from '@/lib/rnPricing'
 import { compareStoneTypes } from '@/lib/stoneTypeCompare'
 import { StoneTypeCompareDialog } from '@/components/StoneTypeCompareDialog'
@@ -1536,8 +1537,12 @@ export function StockBuilderPage() {
                   <label className={labelClass}>Metal</label>
                   <select className={inputClass} value={selectedMetal}
                     onChange={e => updateMetalRow(metalRows[0].uid, { metalKey: e.target.value as JewelryMetalOption })}>
-                    {Object.entries(JEWELRY_METAL_OPTIONS).filter(([k]) => !['gold-14k', 'gold-18k', 'silver'].includes(k)).map(([key, opt]) => (
-                      <option key={key} value={key}>{opt.label}</option>
+                    {METAL_GROUPS.map(g => (
+                      <optgroup key={g.group} label={g.group}>
+                        {g.keys.map(key => (
+                          <option key={key} value={key}>{JEWELRY_METAL_OPTIONS[key].label}</option>
+                        ))}
+                      </optgroup>
                     ))}
                   </select>
                 </div>
@@ -1763,8 +1768,12 @@ export function StockBuilderPage() {
                   <div className="space-y-2">
                     <label className={labelClass}>Metal</label>
                     <select className={inputClass} value={row.metalKey} onChange={e => updateMetalRow(row.uid, { metalKey: e.target.value as JewelryMetalOption })}>
-                      {Object.entries(JEWELRY_METAL_OPTIONS).filter(([k]) => !['gold-14k', 'gold-18k'].includes(k)).map(([key, opt]) => (
-                        <option key={key} value={key}>{opt.label} — ${(config.metalPriceMap[key as JewelryMetalOption] ?? 0).toFixed(2)}/g</option>
+                      {METAL_GROUPS.map(g => (
+                        <optgroup key={g.group} label={g.group}>
+                          {g.keys.map(key => (
+                            <option key={key} value={key}>{JEWELRY_METAL_OPTIONS[key].label} — ${(config.metalPriceMap[key] ?? 0).toFixed(2)}/g</option>
+                          ))}
+                        </optgroup>
                       ))}
                     </select>
                   </div>
