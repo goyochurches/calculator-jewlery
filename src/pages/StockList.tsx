@@ -187,14 +187,14 @@ export function StockListPage() {
             <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/70">
-                  {['Photo', 'Piece', 'SKU', 'Qty', 'Status', 'Date', 'Price', 'Actions'].map(h => (
+                  {['Photo', 'Piece', 'SKU', 'Qty', 'Status', 'Created by', 'Date', 'Price', 'Actions'].map(h => (
                     <th key={h} className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 last:text-right">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {!loading && items.length === 0 && (
-                  <tr><td colSpan={8} className="px-6 py-12 text-center text-sm text-slate-400">No stock pieces match the current filters.</td></tr>
+                  <tr><td colSpan={9} className="px-6 py-12 text-center text-sm text-slate-400">No stock pieces match the current filters.</td></tr>
                 )}
                 {items.map(item => (
                   <StockRow
@@ -367,6 +367,7 @@ function StockRow({
       <td className="px-6 py-4">
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[item.status]}`}>{STATUS_LABELS[item.status]}</span>
       </td>
+      <td className="px-6 py-4 text-slate-600">{item.createdBy || <span className="text-slate-300">—</span>}</td>
       <td className="px-6 py-4 text-slate-400">{item.createdAt}</td>
       <td className="px-6 py-4 text-right">
         <div className="flex flex-col items-end gap-1">

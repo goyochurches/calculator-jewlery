@@ -97,6 +97,7 @@ interface ApiStockItemSummary {
   title: string
   sku?: string | null
   quantity: number
+  createdBy?: { id: number; name: string; email: string; avatar: string } | null
   createdAt: string
   status: StockStatus
   photo?: string | null
@@ -214,6 +215,7 @@ function mapSummary(s: ApiStockItemSummary): StockItem {
     title: s.title,
     sku: s.sku ?? null,
     quantity: s.quantity ?? 1,
+    createdBy: s.createdBy?.name ?? null,
     createdAt: s.createdAt,
     status: s.status,
     photo: s.photo ?? null,
