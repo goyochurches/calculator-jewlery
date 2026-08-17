@@ -459,6 +459,9 @@ export interface StockItem {
   photo?: string | null
   internalNotes?: string | null
   engravingFee?: number | null
+  /** Actual weight of the completed piece, as measured on the scale — kept
+   *  as a record only. Never used in cost/price calculation. */
+  finishedWeightGrams?: number | null
   setterType?: string | null
   stones?: StockStone[]
   /** Real gemstones picked from the EMKAY Gemstones Catalog — same shape as

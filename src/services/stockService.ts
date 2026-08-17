@@ -82,6 +82,7 @@ interface ApiStockItem {
   photo?: string | null
   internalNotes?: string | null
   engravingFee?: number | null
+  finishedWeightGrams?: number | null
   setterType?: string | null
   archived?: boolean | null
   metalRows?: ApiMetalRow[]
@@ -194,6 +195,7 @@ function mapStockItem(s: ApiStockItem): StockItem {
     photo: s.photo ?? null,
     internalNotes: s.internalNotes ?? null,
     engravingFee: s.engravingFee ?? null,
+    finishedWeightGrams: s.finishedWeightGrams ?? null,
     setterType: s.setterType ?? null,
     stones: (s.stones ?? []).map(mapStone),
     emkayStones: (s.emkayStones ?? []).map(mapEmkayStone),

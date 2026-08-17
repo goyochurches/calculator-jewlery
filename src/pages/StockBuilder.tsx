@@ -254,6 +254,9 @@ export function StockBuilderPage() {
   const [markupText, setMarkupText] = useState(String(DEFAULT_MARKUP))
   const [discountText, setDiscountText] = useState('')
   const [internalNotes, setInternalNotes] = useState('')
+  // Actual scale weight of the finished piece — a record only, never fed
+  // into the cost calculation (that stays driven by the metal rows).
+  const [finishedWeight, setFinishedWeight] = useState('')
   const [photo, setPhoto] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
@@ -573,6 +576,7 @@ export function StockBuilderPage() {
     setMarkupText(String(duplicateFrom.markupMultiplier ?? DEFAULT_MARKUP))
     setDiscountText(duplicateFrom.discountPercent && duplicateFrom.discountPercent > 0 ? String(duplicateFrom.discountPercent) : '')
     setInternalNotes(duplicateFrom.internalNotes ?? '')
+    setFinishedWeight(duplicateFrom.finishedWeightGrams != null ? String(duplicateFrom.finishedWeightGrams) : '')
     setPhoto(duplicateFrom.photo ?? null)
     if (duplicateFrom.metalRows?.length) {
       setMetalRows(duplicateFrom.metalRows.map(r => ({
@@ -837,6 +841,7 @@ export function StockBuilderPage() {
         discountPercent: parsedDiscount,
         photo,
         internalNotes: mergedInternalNotes,
+        finishedWeightGrams: finishedWeight.trim() !== '' ? parseNum(finishedWeight) : null,
         engravingFee: Math.max(0, engravingFee),
         setterType: null,
         archived: false,
@@ -915,7 +920,7 @@ export function StockBuilderPage() {
       setMarkupText(String(DEFAULT_MARKUP)); setDiscountText('')
       setStones([]); setEmkayStones([]); setAttachments([])
       setRnModelKey(''); setRnFingerSize(0); setRnStoneType('natural'); setRnBandMode('eternity'); setRnCustomStones('')
-      setPhoto(null); setInternalNotes('')
+      setPhoto(null); setInternalNotes(''); setFinishedWeight('')
       setSaveError(null)
       if (photoInputRef.current) photoInputRef.current.value = ''
       if (cameraInputRef.current) cameraInputRef.current.value = ''
@@ -2132,6 +2137,14 @@ export function StockBuilderPage() {
                   placeholder="Sourcing, condition, reminders…" />
               </div>
 
+              <div className="space-y-2">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Finished weight (g) <span className="font-normal normal-case text-slate-400">(optional — a record only, not used in pricing)</span>
+                </label>
+                <input type="text" inputMode="decimal" className={inputClass} value={finishedWeight}
+                  onChange={e => setFinishedWeight(e.target.value)} placeholder="e.g. 2.1" />
+              </div>
+
               <input ref={attachmentInputRef} id="stock-attachment-files" type="file" accept="image/*" multiple
                 onChange={handleAttachmentsChange} className="hidden" />
               <input ref={attachmentCameraRef} id="stock-attachment-camera" type="file" accept="image/*" capture="environment"
@@ -2222,50 +2235,97 @@ export function StockBuilderPage() {
                 <div className="flex justify-between border-t border-slate-100 pt-1.5 text-base font-bold text-slate-900"><span>Retail price</span><span>${retailPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span></div>
               </div>
 
-              {/* ── Every stone's own contribution, so it's obvious what
-                  makes up the "Stone + setting" total in the hero above. ── */}
-              {(mainStones.length + sideStones.length + meleeStones.length + emkayStones.length) > 0 && (
-                <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-4 text-sm">
-                  <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Stone total — breakdown</p>
-                  {([['MAIN', mainStones], ['SIDE', sideStones], ['MELEE', meleeStones]] as const).flatMap(([role, items]) =>
-                    items.map((s, i) => {
-                      const b = stoneBreakdownByUid[s.uid]
-                      const contribution = b ? b.cost + b.labor : 0
-                      const theme = STONE_ROLE_THEME[role]
-                      const typeLabel = s.stoneTypeChosen ? DIAMOND_TYPE_OPTIONS[s.stoneType].label : 'Not chosen yet'
-                      const desc = [typeLabel, parseNum(s.carats) > 0 ? `${s.carats} ct` : null, s.shape || null].filter(Boolean).join(' · ')
-                      return (
-                        <div key={s.uid} className="flex items-center justify-between gap-3">
-                          <span className="flex min-w-0 items-center gap-2 text-slate-600">
-                            <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${theme.dot}`} aria-hidden />
-                            <span className="shrink-0 font-semibold text-slate-700">{theme.label} #{i + 1}</span>
-                            <span className="truncate text-slate-400">{desc || '—'}</span>
-                          </span>
-                          <strong className="shrink-0 tabular-nums text-slate-900">${contribution.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
-                        </div>
-                      )
-                    })
-                  )}
-                  {emkayStones.map((es, i) => {
-                    const b = emkayBreakdown.find(x => x.uid === es.uid)
-                    const contribution = b ? b.cost + b.labor : 0
+              {/* ── Every costing factor as its own line — metal, ring labor,
+                  each stone (cost only), setting labor as one line, engraving,
+                  extras — so it's obvious what the internal cost is made of. ── */}
+              <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-4 text-sm">
+                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Cost breakdown</p>
+
+                {rnMode && rn?.model ? (
+                  rn.avgGrams > 0 && (
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="truncate text-slate-600">{rn.avgGrams}g {JEWELRY_METAL_OPTIONS[selectedMetal]?.label ?? selectedMetal}</span>
+                      <strong className="shrink-0 tabular-nums text-slate-900">${rn.goldCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                    </div>
+                  )
+                ) : (
+                  metalRows.filter(r => parseNum(r.grams) > 0).map(r => (
+                    <div key={r.uid} className="flex items-center justify-between gap-3">
+                      <span className="truncate text-slate-600">{r.grams}g {JEWELRY_METAL_OPTIONS[r.metalKey]?.label ?? r.metalKey}</span>
+                      <strong className="shrink-0 tabular-nums text-slate-900">${((config.metalPriceMap[r.metalKey] ?? 0) * parseNum(r.grams)).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                    </div>
+                  ))
+                )}
+
+                {ringLaborFee > 0 && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-slate-600">{rnMode ? 'Casting labor' : (config.ringLaborMap[ringLabor]?.label ?? 'Ring labor')}</span>
+                    <strong className="shrink-0 tabular-nums text-slate-900">${ringLaborFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                  </div>
+                )}
+
+                {([['MAIN', mainStones], ['SIDE', sideStones], ['MELEE', meleeStones]] as const).flatMap(([, items]) =>
+                  items.map(s => {
+                    const b = stoneBreakdownByUid[s.uid]
+                    const cost = b ? b.cost : 0
+                    if (cost <= 0) return null
+                    const count = Math.round(parseNum(s.amount))
+                    const typeLabel = s.stoneTypeChosen ? (s.stoneType === 'lab-grown' ? 'lab' : 'natural') : ''
+                    const carats = parseNum(s.carats)
+                    const label = [
+                      count > 1 ? count : null,
+                      s.shape || null,
+                      typeLabel || null,
+                      s.sizeKey || null,
+                      carats > 0 ? `${carats}ct` : null,
+                    ].filter(Boolean).join(' ')
                     return (
-                      <div key={es.uid} className="flex items-center justify-between gap-3">
-                        <span className="flex min-w-0 items-center gap-2 text-slate-600">
-                          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden />
-                          <span className="shrink-0 font-semibold text-slate-700">EMKAY #{i + 1}</span>
-                          <span className="truncate text-slate-400">{es.name}</span>
-                        </span>
-                        <strong className="shrink-0 tabular-nums text-slate-900">${contribution.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                      <div key={s.uid} className="flex items-center justify-between gap-3">
+                        <span className="truncate text-slate-600">{label || 'Stone'}</span>
+                        <strong className="shrink-0 tabular-nums text-slate-900">${cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
                       </div>
                     )
-                  })}
-                  <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-sm font-bold text-slate-900">
-                    <span>Total</span>
-                    <span>${(stoneCost + settingFee + emkayCost + emkaySettingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                  })
+                )}
+
+                {emkayStones.map(es => {
+                  const b = emkayBreakdown.find(x => x.uid === es.uid)
+                  const cost = b ? b.cost : 0
+                  if (cost <= 0) return null
+                  return (
+                    <div key={es.uid} className="flex items-center justify-between gap-3">
+                      <span className="truncate text-slate-600">{es.name}</span>
+                      <strong className="shrink-0 tabular-nums text-slate-900">${cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                    </div>
+                  )
+                })}
+
+                {(settingFee + emkaySettingFee) > 0 && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-slate-600">Labor to set</span>
+                    <strong className="shrink-0 tabular-nums text-slate-900">${(settingFee + emkaySettingFee).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
                   </div>
+                )}
+
+                {engravingFee > 0 && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-slate-600">Engraving</span>
+                    <strong className="shrink-0 tabular-nums text-slate-900">${engravingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                  </div>
+                )}
+
+                {parseNum(extraCosts) !== 0 && (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="truncate text-slate-600">Extra costs</span>
+                    <strong className="shrink-0 tabular-nums text-slate-900">${parseNum(extraCosts).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2 text-sm font-bold text-slate-900">
+                  <span>Total cost</span>
+                  <span>${totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
                 </div>
-              )}
+              </div>
             </CardContent>
           </Card>
 
