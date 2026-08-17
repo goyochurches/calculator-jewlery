@@ -774,6 +774,11 @@ export function StockBuilderPage() {
       setSaveError('Enter the carats and cost per carat for any stone whose size/cut isn\'t in the system before saving.')
       return
     }
+    const mainMissingMarkup = !rnMode && stones.some(s => s.role === 'MAIN' && (s.markup.trim() === '' || !(Number(s.markup) > 0)))
+    if (mainMissingMarkup) {
+      setSaveError('Every main stone needs a markup before saving.')
+      return
+    }
     if (rnMode) {
       if (!rn?.model || !rn?.sizeRow) {
         setSaveError('Pick an RN model and a ring size before saving.')
@@ -1270,12 +1275,12 @@ export function StockBuilderPage() {
           {stone.role === 'MAIN' && (
             <div className="space-y-1 md:col-span-2">
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Markup for this stone <span className="font-normal normal-case text-slate-400">(optional — overrides the piece-level {parsedMarkup}× markup for this stone's cost + setting labor; internal pricing only, so it's fine to leave blank)</span>
+                Markup for this stone <span className={`font-normal normal-case ${Number(stone.markup) > 0 ? 'text-slate-400' : 'text-rose-500'}`}>(required — overrides the piece-level {parsedMarkup}× markup for this stone's cost + setting labor)</span>
               </label>
               <div className="relative">
                 <input type="text" inputMode="decimal" value={stone.markup} placeholder={String(parsedMarkup)}
                   onChange={e => patchStone(stone.uid, { markup: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 pr-9 text-sm text-slate-900 outline-none focus:border-slate-400" />
+                  className={`w-full rounded-xl border bg-white px-3 py-2 pr-9 text-sm text-slate-900 outline-none focus:border-slate-400 ${Number(stone.markup) > 0 ? 'border-slate-200' : 'border-rose-300'}`} />
                 <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">×</span>
               </div>
               <p className="text-[10px] text-slate-400">Useful when the center stone has a different margin than the rest of the piece.</p>
