@@ -35,9 +35,15 @@ import {
   ExternalLink,
   Eye,
   FileDown,
+  Gem,
+  Layers,
   MessageCircle,
+  Percent,
   RefreshCw,
+  Scale,
+  Sparkles,
   Trash2,
+  Wrench,
   XCircle,
 } from 'lucide-react'
 import { MarketComparisonPanel } from '@/components/MarketComparisonPanel'
@@ -62,6 +68,24 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
   return (
     <div className={`rounded-2xl border border-slate-100 bg-white p-5 shadow-sm ${className}`}>
       {children}
+    </div>
+  )
+}
+
+// Same icon-badge row as the Stock detail page's cost breakdown, so the two
+// "what did this cost" cards read as one system across Quotes and Stock.
+// `sub` is an optional second line for extra context (tier, $/g, …).
+function CostRow({ icon: Icon, label, sub, value, tint }: { icon: React.ElementType; label: React.ReactNode; sub?: string; value: string; tint: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl px-2.5 py-2 transition hover:bg-slate-50">
+      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${tint}`}>
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm text-slate-600">{label}</span>
+        {sub && <span className="block truncate text-[11px] text-slate-400">{sub}</span>}
+      </span>
+      <span className="shrink-0 tabular-nums text-sm font-semibold text-slate-900">{value}</span>
     </div>
   )
 }
@@ -447,26 +471,28 @@ export default function QuoteDetailPage() {
           {/* Spec */}
           <Card>
             <SectionLabel>Spec</SectionLabel>
-            <div className="space-y-2">
-              <LineItem label="Metal" value={metalCfg.label} />
-              <LineItem label="Weight" value={`${quote.weightGrams ?? 0} g`} />
+            <div className="-mx-2.5">
+              <CostRow icon={Scale} tint="bg-amber-50 text-amber-600"
+                label={`${quote.weightGrams ?? 0}g ${metalCfg.label}`}
+                sub={`$${(config.metalPriceMap[quote.metal] ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}/g`}
+                value={`$${((config.metalPriceMap[quote.metal] ?? 0) * (quote.weightGrams ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
               {(quote.ringWidth ?? 0) > 0 && <LineItem label="Ring width" value={`${quote.ringWidth} mm`} />}
               {(quote.fingerSize ?? 0) > 0 && <LineItem label="Finger size" value={`${quote.fingerSize}`} />}
               {!isRn && (
-                <LineItem
-                  label="CAD & Jeweler's time"
-                  value={ringLaborCfg ? `${ringLaborCfg.label} — $${ringLaborCfg.fee}` : (quote.ringLabor ?? '—')}
-                />
+                <CostRow icon={Wrench} tint="bg-slate-100 text-slate-500" label="CAD & jeweler's time"
+                  sub={ringLaborCfg ? `${ringLaborCfg.label} tier` : (quote.ringLabor ?? undefined)}
+                  value={ringLaborCfg ? `$${ringLaborCfg.fee}` : '—'} />
               )}
               {(quote.laborHours ?? 0) > 0 && (
-                <LineItem
-                  label="Bench labor"
-                  value={`${quote.laborHours} h × $${quote.hourlyRate}/h = $${((quote.laborHours ?? 0) * (quote.hourlyRate ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-                />
+                <CostRow icon={Wrench} tint="bg-slate-100 text-slate-500" label="Bench labor"
+                  sub={`${quote.laborHours}h × $${quote.hourlyRate}/h`}
+                  value={`$${((quote.laborHours ?? 0) * (quote.hourlyRate ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
               )}
-              <LineItem label="Engraving" value={quote.engraving ? `Yes — ${engravingFeeLabel}` : 'No'} />
+              <CostRow icon={Sparkles} tint="bg-violet-50 text-violet-600" label="Engraving"
+                value={quote.engraving ? engravingFeeLabel : 'No'} />
               {(quote.extraCosts ?? 0) > 0 && (
-                <LineItem label="Extra costs" value={`$${quote.extraCosts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                <CostRow icon={Layers} tint="bg-slate-100 text-slate-500" label="Extra costs"
+                  value={`$${quote.extraCosts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
               )}
             </div>
           </Card>
@@ -906,25 +932,29 @@ export default function QuoteDetailPage() {
           {/* Cost breakdown */}
           <Card>
             <SectionLabel>Cost breakdown</SectionLabel>
-            <div className="space-y-2">
-              <LineItem
-                label={`Setting supplied diamonds (${stoneTotals.amount} stone${stoneTotals.amount === 1 ? '' : 's'} · ${Math.round(stoneTotals.carats * 10000) / 10000} ct)`}
-                value={`$${(stoneTotals.cost + stoneTotals.labor).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-              />
+            <div className="-mx-2.5">
+              <CostRow icon={Gem} tint="bg-sky-50 text-sky-600"
+                label="Setting supplied diamonds"
+                sub={`${stoneTotals.amount} stone${stoneTotals.amount === 1 ? '' : 's'} · ${Math.round(stoneTotals.carats * 10000) / 10000} ct`}
+                value={`$${(stoneTotals.cost + stoneTotals.labor).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
               {(quote.customerStones?.length ?? 0) > 0 && (
-                <LineItem label={`Setting customer diamonds (${customerStoneQty} stone${customerStoneQty === 1 ? '' : 's'})`}
+                <CostRow icon={Gem} tint="bg-sky-50 text-sky-600" label="Setting customer diamonds"
+                  sub={`${customerStoneQty} stone${customerStoneQty === 1 ? '' : 's'}`}
                   value={`$${customerStoneFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
               )}
               {(quote.emkayStones?.length ?? 0) > 0 && (
-                <LineItem label={`EMKAY stones (${emkayStoneQty} stone${emkayStoneQty === 1 ? '' : 's'})`}
+                <CostRow icon={Gem} tint="bg-sky-50 text-sky-600" label="EMKAY stones"
+                  sub={`${emkayStoneQty} stone${emkayStoneQty === 1 ? '' : 's'}`}
                   value={`$${emkayStoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
               )}
-              <LineItem label="Hand engraving (milgrain)" value={engravingFeeLabel} />
+              <CostRow icon={Sparkles} tint="bg-violet-50 text-violet-600" label="Hand engraving (milgrain)" value={engravingFeeLabel} />
               {(quote.extraCosts ?? 0) > 0 && (
-                <LineItem label="Extra costs" value={`$${quote.extraCosts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                <CostRow icon={Layers} tint="bg-slate-100 text-slate-500" label="Extra costs"
+                  value={`$${quote.extraCosts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
               )}
               {applyTaxes && (
-                <LineItem label="Sales tax (7.75%) · added to customer total"
+                <CostRow icon={Percent} tint="bg-emerald-50 text-emerald-600" label="Sales tax (7.75%)"
+                  sub="Added to customer total"
                   value={`$${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
               )}
             </div>
