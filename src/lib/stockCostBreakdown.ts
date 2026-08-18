@@ -73,6 +73,20 @@ function money(n: number): string {
   return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 }
 
+/** RN ready-made rings don't use a ring-labor tier (their `ringLabor` field
+ *  is saved empty) — the casting fee only survives as a "Labor: $X" line
+ *  inside the structured RN note StockBuilder writes into internalNotes
+ *  (see its rnNote builder). Recovers that dollar figure so the detail view
+ *  and clipboard export can show it as its own "Casting labor" line instead
+ *  of it silently vanishing from the itemized breakdown. */
+export function rnCastingFeeFromNotes(internalNotes?: string | null): number | null {
+  if (!internalNotes) return null
+  const match = internalNotes.match(/^Labor:\s*\$([\d,.]+)/m)
+  if (!match) return null
+  const n = Number(match[1].replace(/,/g, ''))
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
 /** Every costing factor of a saved stock piece as one plain-text block,
  *  ready to paste into a listing description or an internal message — same
  *  line-by-line shape (and same spec detail) as the on-screen breakdown, so
@@ -96,6 +110,9 @@ export function formatStockItemText(item: StockItem, config: QuoteConfig): strin
   const ringLaborFee = item.ringLabor ? config.ringLaborMap[item.ringLabor]?.fee ?? 0 : 0
   if (ringLaborFee > 0) {
     lines.push(`${config.ringLaborMap[item.ringLabor ?? '']?.label ?? 'Ring labor'} — ${money(ringLaborFee)}`)
+  } else if (item.jewelryType === 'rn') {
+    const castingFee = rnCastingFeeFromNotes(item.internalNotes)
+    if (castingFee != null) lines.push(`Casting labor — ${money(castingFee)}`)
   }
 
   for (const s of item.stones ?? []) {

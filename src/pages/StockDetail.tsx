@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/context/AuthContext'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { copyToClipboard } from '@/lib/share'
-import { emkaySpecLine, formatStockItemText, stoneCostSplit, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
+import { emkaySpecLine, formatStockItemText, rnCastingFeeFromNotes, stoneCostSplit, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
 import { stockService } from '@/services/stockService'
 import type { StockItem, StockStatus } from '@/types'
 import { ArrowLeft, Check, ClipboardCopy, Copy, Gem, ImageOff, Layers, Scale, Sparkles, Trash2, Wrench } from 'lucide-react'
@@ -164,6 +164,10 @@ export default function StockDetailPage() {
   const stones = item.stones ?? []
   const emkayStones = item.emkayStones ?? []
   const ringLaborFee = item.ringLabor ? config.ringLaborMap[item.ringLabor]?.fee ?? 0 : 0
+  // RN ready-made rings save ringLabor as '' (no tier) — their casting fee
+  // only survives as a "Labor: $X" line in the RN note, so recover it here
+  // instead of letting it silently vanish from the breakdown.
+  const rnCastingFee = ringLaborFee === 0 && item.jewelryType === 'rn' ? rnCastingFeeFromNotes(item.internalNotes) : null
   const stoneLines = stones.map(s => ({ stone: s, ...stoneCostSplit(s, config) }))
   const emkayLines = emkayStones.map(es => {
     const qty = es.quantity ?? 1
