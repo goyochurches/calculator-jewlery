@@ -53,6 +53,24 @@ function CostGroupLabel({ children }: { children: React.ReactNode }) {
   return <p className="mb-1 mt-4 px-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 first:mt-0">{children}</p>
 }
 
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+// Same treatment as QuotesList/StockList's "Created by" avatar.
+function Avatar({ name, photo }: { name: string; photo?: string | null }) {
+  if (photo) {
+    return <img src={photo} alt={name} className="h-6 w-6 shrink-0 rounded-full object-cover ring-1 ring-slate-200" />
+  }
+  return (
+    <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[10px] font-bold text-violet-700">
+      {initials(name)}
+    </span>
+  )
+}
+
 export default function StockDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -282,7 +300,12 @@ export default function StockDetailPage() {
             <LineItem label="Quantity" value={item.quantity} />
             <LineItem label="Jewelry type" value={item.jewelryType || '—'} />
             <LineItem label="Created" value={item.createdAt} />
-            <LineItem label="Created by" value={item.createdBy || '—'} />
+            <LineItem label="Created by" value={item.createdBy ? (
+              <span className="flex items-center gap-1.5">
+                <Avatar name={item.createdBy} photo={item.createdByPhoto} />
+                {item.createdBy}
+              </span>
+            ) : '—'} />
             {item.finishedWeightGrams != null && (
               <LineItem label="Finished weight" value={`${item.finishedWeightGrams}g (note only)`} />
             )}

@@ -20,6 +20,25 @@ const STATUS_LABELS: Record<StockStatus, string> = {
   SOLD: 'Sold',
 }
 
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+// Same treatment as QuotesList's "Created by" avatar — real photo when the
+// user has one, initials bubble otherwise.
+function Avatar({ name, photo }: { name: string; photo?: string | null }) {
+  if (photo) {
+    return <img src={photo} alt={name} className="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-slate-200" />
+  }
+  return (
+    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">
+      {initials(name)}
+    </span>
+  )
+}
+
 type StatusFilter = StockStatus | 'all'
 
 const STATUS_FILTER_OPTIONS: { value: StatusFilter; label: string }[] = [
@@ -367,7 +386,16 @@ function StockRow({
       <td className="px-6 py-4">
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[item.status]}`}>{STATUS_LABELS[item.status]}</span>
       </td>
-      <td className="px-6 py-4 text-slate-600">{item.createdBy || <span className="text-slate-300">—</span>}</td>
+      <td className="px-6 py-4 text-slate-600">
+        {item.createdBy ? (
+          <div className="flex items-center gap-2">
+            <Avatar name={item.createdBy} photo={item.createdByPhoto} />
+            <span>{item.createdBy}</span>
+          </div>
+        ) : (
+          <span className="text-slate-300">—</span>
+        )}
+      </td>
       <td className="px-6 py-4 text-slate-400">{item.createdAt}</td>
       <td className="px-6 py-4 text-right">
         <div className="flex flex-col items-end gap-1">

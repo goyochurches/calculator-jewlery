@@ -443,6 +443,8 @@ export interface StockItem {
   sku?: string | null
   quantity: number
   createdBy?: string | null
+  createdByAvatar?: string | null
+  createdByPhoto?: string | null
   createdAt: string
   status: StockStatus
   jewelryType?: string | null

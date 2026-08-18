@@ -66,7 +66,7 @@ interface ApiStockItem {
   title: string
   sku?: string | null
   quantity: number
-  createdBy?: { id: number; name: string; email: string; avatar: string } | null
+  createdBy?: { id: number; name: string; email: string; avatar: string; photo?: string | null } | null
   createdAt: string
   status: StockStatus
   jewelryType?: string | null
@@ -97,7 +97,7 @@ interface ApiStockItemSummary {
   title: string
   sku?: string | null
   quantity: number
-  createdBy?: { id: number; name: string; email: string; avatar: string } | null
+  createdBy?: { id: number; name: string; email: string; avatar: string; photo?: string | null } | null
   createdAt: string
   status: StockStatus
   photo?: string | null
@@ -180,6 +180,8 @@ function mapStockItem(s: ApiStockItem): StockItem {
     sku: s.sku ?? null,
     quantity: s.quantity ?? 1,
     createdBy: s.createdBy?.name ?? null,
+    createdByAvatar: s.createdBy?.avatar ?? null,
+    createdByPhoto: s.createdBy?.photo ?? null,
     createdAt: s.createdAt,
     status: s.status,
     jewelryType: s.jewelryType ?? null,
@@ -216,6 +218,8 @@ function mapSummary(s: ApiStockItemSummary): StockItem {
     sku: s.sku ?? null,
     quantity: s.quantity ?? 1,
     createdBy: s.createdBy?.name ?? null,
+    createdByAvatar: s.createdBy?.avatar ?? null,
+    createdByPhoto: s.createdBy?.photo ?? null,
     createdAt: s.createdAt,
     status: s.status,
     photo: s.photo ?? null,
