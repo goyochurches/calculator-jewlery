@@ -275,6 +275,17 @@ export const stockService = {
     return mapStockItem(data)
   },
 
+  // Exact match across every piece, archived included — used by the
+  // "Suggest" SKU button and by manual-entry validation so a SKU is never
+  // saved twice. excludeId lets an edit keep its own SKU.
+  async isSkuAvailable(sku: string, excludeId?: string): Promise<boolean> {
+    if (!sku.trim()) return true
+    let url = `/api/stock/sku-available?sku=${encodeURIComponent(sku.trim())}`
+    if (excludeId) url += `&excludeId=${excludeId}`
+    const data = await api.get<{ available: boolean }>(url)
+    return data.available
+  },
+
   async create(
     payload: Omit<ApiStockItem, 'id' | 'createdBy' | 'createdAt' | 'retailPrice'>,
     userId: number,

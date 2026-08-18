@@ -264,6 +264,9 @@ export function StockBuilderPage() {
 
   const [title, setTitle] = useState('')
   const [sku, setSku] = useState('')
+  const [skuSuggesting, setSkuSuggesting] = useState(false)
+  const [skuTaken, setSkuTaken] = useState(false)
+  const [skuChecking, setSkuChecking] = useState(false)
   const [quantity, setQuantity] = useState('1')
   const [status, setStatus] = useState<StockItem['status']>('AVAILABLE')
   const [jewelryType, setJewelryType] = useState('ring')
@@ -350,6 +353,40 @@ export function StockBuilderPage() {
     const t = setTimeout(() => setEmkayDebouncedSearch(emkaySearchText.trim()), 400)
     return () => clearTimeout(t)
   }, [emkaySearchText])
+
+  // Live "is this SKU free?" check as the user types by hand — the Suggest
+  // button already checks its own candidates, this covers manual entry too.
+  useEffect(() => {
+    if (!sku.trim()) { setSkuTaken(false); setSkuChecking(false); return }
+    setSkuChecking(true)
+    let cancelled = false
+    const t = setTimeout(() => {
+      stockService.isSkuAvailable(sku).then(available => {
+        if (!cancelled) { setSkuTaken(!available); setSkuChecking(false) }
+      }).catch(() => { if (!cancelled) setSkuChecking(false) })
+    }, 500)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [sku])
+
+  // Generates candidates and checks each against the database, so the
+  // suggestion that lands in the field is guaranteed free at that moment
+  // (a handful of tries is enough — collisions on a random 3-digit suffix
+  // are rare, and the live check above still catches the odd race).
+  const handleSuggestSku = async () => {
+    setSkuSuggesting(true)
+    try {
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const candidate = suggestSku(jewelryType, selectedMetal)
+        const available = await stockService.isSkuAvailable(candidate)
+        if (available) { setSku(candidate); setSkuTaken(false); return }
+      }
+      // Extremely unlikely fallback — still not guaranteed unique, but the
+      // live check will flag it if so and the user can hit Suggest again.
+      setSku(suggestSku(jewelryType, selectedMetal))
+    } finally {
+      setSkuSuggesting(false)
+    }
+  }
 
   useEffect(() => { setEmkayPage(0) }, [emkayDebouncedSearch, emkayCategoryId])
 
@@ -787,6 +824,14 @@ export function StockBuilderPage() {
     if (!title.trim()) {
       setSaveError('Please enter a title.')
       return
+    }
+    if (sku.trim()) {
+      const available = await stockService.isSkuAvailable(sku)
+      if (!available) {
+        setSkuTaken(true)
+        setSaveError('That SKU is already used by another piece.')
+        return
+      }
     }
     const missingStoneType = !rnMode && stones.some(s => !s.stoneTypeChosen)
     if (missingStoneType) {
@@ -1529,13 +1574,20 @@ export function StockBuilderPage() {
               <div className="space-y-2">
                 <label className={labelClass}>SKU</label>
                 <div className="flex gap-2">
-                  <input className={inputClass} value={sku} onChange={e => setSku(e.target.value)} placeholder="Optional" />
-                  <button type="button" onClick={() => setSku(suggestSku(jewelryType, selectedMetal))}
-                    title="Suggest a SKU from the type and metal"
-                    className="flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-slate-400">
-                    <Sparkles className="h-3.5 w-3.5" /> Suggest
+                  <input className={`${inputClass} ${skuTaken ? 'border-rose-300 focus:border-rose-400' : ''}`}
+                    value={sku} onChange={e => setSku(e.target.value)} placeholder="Optional" />
+                  <button type="button" onClick={handleSuggestSku} disabled={skuSuggesting}
+                    title="Suggest a free SKU from the type and metal"
+                    className="flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-slate-400 disabled:opacity-50">
+                    {skuSuggesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    Suggest
                   </button>
                 </div>
+                {skuTaken ? (
+                  <p className="text-xs font-medium text-rose-600">Already used by another piece — pick a different one.</p>
+                ) : skuChecking ? (
+                  <p className="text-xs text-slate-400">Checking availability…</p>
+                ) : null}
               </div>
               <div className="space-y-2">
                 <label className={labelClass}>Quantity in stock</label>
