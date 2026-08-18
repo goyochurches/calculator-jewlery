@@ -99,6 +99,11 @@ export function formatStockItemText(item: StockItem, config: QuoteConfig): strin
   const jewelryTypeLabel = JEWELRY_TYPE_OPTIONS.find(j => j.key === item.jewelryType)?.label ?? item.jewelryType ?? null
   const meta = [item.sku ? `SKU ${item.sku}` : null, statusLabel, jewelryTypeLabel].filter(Boolean).join(' · ')
   if (meta) lines.push(meta)
+  const spec = [
+    item.ringWidth ? `Ring width ${item.ringWidth}mm` : null,
+    item.fingerSize ? `Finger size ${item.fingerSize}` : null,
+  ].filter(Boolean).join(' · ')
+  if (spec) lines.push(spec)
   lines.push('')
 
   let settingLabor = 0
@@ -119,14 +124,20 @@ export function formatStockItemText(item: StockItem, config: QuoteConfig): strin
     if (castingFee != null) lines.push(`Casting labor — ${money(castingFee)}`)
   }
 
+  if (item.laborHours) {
+    const benchCost = item.laborHours * (item.hourlyRate ?? 0)
+    lines.push(`Bench labor (${item.laborHours}h × ${money(item.hourlyRate ?? 0)}/h) — ${money(benchCost)}`)
+  }
+
+  const stoneComments: string[] = []
   for (const s of item.stones ?? []) {
     const { cost, labor, count } = stoneCostSplit(s, config)
     settingLabor += labor
-    if (cost <= 0) continue
-    const spec = stoneSpecLine(s)
+    const specForLabel = stoneSpecLine(s)
     const roleLabel = s.role.charAt(0) + s.role.slice(1).toLowerCase()
-    const label = `${roleLabel}: ${stoneLineLabel(s, count) || 'Stone'}${spec ? ` (${spec})` : ''}`
-    lines.push(`${label} — ${money(cost)}`)
+    const stoneLabel = `${roleLabel}: ${stoneLineLabel(s, count) || 'Stone'}`
+    if (cost > 0) lines.push(`${stoneLabel}${specForLabel ? ` (${specForLabel})` : ''} — ${money(cost)}`)
+    if (s.comments) stoneComments.push(`${stoneLabel} — ${s.comments}`)
   }
 
   for (const es of item.emkayStones ?? []) {
@@ -145,6 +156,7 @@ export function formatStockItemText(item: StockItem, config: QuoteConfig): strin
   lines.push('')
   lines.push(`Total cost: ${money(item.total)}`)
   if (item.finishedWeightGrams != null) lines.push(`Finished weight: ${item.finishedWeightGrams}g (note only)`)
+  if (stoneComments.length > 0) { lines.push(''); lines.push(...stoneComments) }
   if (item.internalNotes) { lines.push(''); lines.push(item.internalNotes) }
 
   return lines.join('\n')

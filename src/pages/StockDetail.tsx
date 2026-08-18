@@ -222,7 +222,7 @@ export default function StockDetailPage() {
               <p className="text-sm text-slate-400">No cost factors yet.</p>
             )}
 
-            {(metalRows.length > 0 || ringLaborFee > 0 || rnCastingFee != null) && (
+            {(metalRows.length > 0 || ringLaborFee > 0 || rnCastingFee != null || !!item.laborHours) && (
               <>
                 <CostGroupLabel>Materials</CostGroupLabel>
                 <div className="-mx-2.5">
@@ -244,6 +244,11 @@ export default function StockDetailPage() {
                   {rnCastingFee != null && (
                     <CostRow icon={Wrench} tint="bg-slate-100 text-slate-500" label="Casting labor"
                       value={`$${rnCastingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                  )}
+                  {!!item.laborHours && (
+                    <CostRow icon={Wrench} tint="bg-slate-100 text-slate-500" label="Bench labor"
+                      sub={`${item.laborHours}h × $${item.hourlyRate ?? 0}/h`}
+                      value={`$${((item.laborHours ?? 0) * (item.hourlyRate ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                   )}
                 </div>
               </>
@@ -300,12 +305,18 @@ export default function StockDetailPage() {
           {stones.some(s => s.comments) && (
             <Card>
               <SectionLabel>Stone comments</SectionLabel>
-              {stones.filter(s => s.comments).map((s, i) => (
-                <div key={i} className="border-b border-slate-50 py-2 last:border-0">
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">{s.role}</span>
-                  <p className="mt-1 text-xs text-slate-500">{s.comments}</p>
-                </div>
-              ))}
+              {stones.filter(s => s.comments).map((s, i) => {
+                const l = stoneLines.find(x => x.stone === s)
+                const roleLabel = s.role.charAt(0) + s.role.slice(1).toLowerCase()
+                return (
+                  <div key={i} className="border-b border-slate-50 py-2 last:border-0">
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                      {roleLabel}: {stoneLineLabel(s, l?.count ?? 1) || 'Stone'}
+                    </span>
+                    <p className="mt-1 text-xs text-slate-500">{s.comments}</p>
+                  </div>
+                )
+              })}
             </Card>
           )}
 
@@ -323,6 +334,8 @@ export default function StockDetailPage() {
             <LineItem label="SKU" value={item.sku || '—'} />
             <LineItem label="Quantity" value={item.quantity} />
             <LineItem label="Jewelry type" value={JEWELRY_TYPE_OPTIONS.find(j => j.key === item.jewelryType)?.label ?? item.jewelryType ?? '—'} />
+            {!!item.ringWidth && <LineItem label="Ring width" value={`${item.ringWidth}mm`} />}
+            {!!item.fingerSize && <LineItem label="Finger size" value={`${item.fingerSize}`} />}
             <LineItem label="Created" value={item.createdAt} />
             <LineItem label="Created by" value={item.createdBy ? (
               <span className="flex items-center gap-1.5">
