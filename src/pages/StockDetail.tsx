@@ -4,6 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/context/AuthContext'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { copyToClipboard } from '@/lib/share'
+import { JEWELRY_TYPE_OPTIONS } from '@/hooks/useQuoteBuilder'
 import { emkaySpecLine, formatStockItemText, rnCastingFeeFromNotes, stoneCostSplit, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
 import { stockService } from '@/services/stockService'
 import type { StockItem, StockStatus } from '@/types'
@@ -236,7 +237,8 @@ export default function StockDetailPage() {
                   })}
                   {ringLaborFee > 0 && (
                     <CostRow icon={Wrench} tint="bg-slate-100 text-slate-500"
-                      label={config.ringLaborMap[item.ringLabor ?? '']?.label ?? 'Ring labor'}
+                      label="CAD & jeweler's time"
+                      sub={`${config.ringLaborMap[item.ringLabor ?? '']?.label ?? item.ringLabor} tier`}
                       value={`$${ringLaborFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                   )}
                   {rnCastingFee != null && (
@@ -320,7 +322,7 @@ export default function StockDetailPage() {
             <SectionLabel>Details</SectionLabel>
             <LineItem label="SKU" value={item.sku || '—'} />
             <LineItem label="Quantity" value={item.quantity} />
-            <LineItem label="Jewelry type" value={item.jewelryType || '—'} />
+            <LineItem label="Jewelry type" value={JEWELRY_TYPE_OPTIONS.find(j => j.key === item.jewelryType)?.label ?? item.jewelryType ?? '—'} />
             <LineItem label="Created" value={item.createdAt} />
             <LineItem label="Created by" value={item.createdBy ? (
               <span className="flex items-center gap-1.5">

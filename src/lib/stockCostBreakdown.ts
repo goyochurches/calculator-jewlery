@@ -1,5 +1,6 @@
 import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import type { QuoteConfig } from '@/hooks/useQuoteConfig'
+import { JEWELRY_TYPE_OPTIONS } from '@/hooks/useQuoteBuilder'
 import type { QuoteEmkayStone, StockItem, StockStone } from '@/types'
 
 // Splits a saved StockStone's single `contribution` ($ = stone cost +
@@ -94,7 +95,9 @@ export function rnCastingFeeFromNotes(internalNotes?: string | null): number | n
 export function formatStockItemText(item: StockItem, config: QuoteConfig): string {
   const lines: string[] = []
   lines.push(item.title || 'Untitled piece')
-  const meta = [item.sku ? `SKU ${item.sku}` : null, item.status, item.jewelryType || null].filter(Boolean).join(' · ')
+  const statusLabel = item.status ? item.status.charAt(0) + item.status.slice(1).toLowerCase() : null
+  const jewelryTypeLabel = JEWELRY_TYPE_OPTIONS.find(j => j.key === item.jewelryType)?.label ?? item.jewelryType ?? null
+  const meta = [item.sku ? `SKU ${item.sku}` : null, statusLabel, jewelryTypeLabel].filter(Boolean).join(' · ')
   if (meta) lines.push(meta)
   lines.push('')
 
@@ -109,7 +112,8 @@ export function formatStockItemText(item: StockItem, config: QuoteConfig): strin
 
   const ringLaborFee = item.ringLabor ? config.ringLaborMap[item.ringLabor]?.fee ?? 0 : 0
   if (ringLaborFee > 0) {
-    lines.push(`${config.ringLaborMap[item.ringLabor ?? '']?.label ?? 'Ring labor'} — ${money(ringLaborFee)}`)
+    const tier = config.ringLaborMap[item.ringLabor ?? '']?.label ?? item.ringLabor
+    lines.push(`CAD & jeweler's time (${tier} tier) — ${money(ringLaborFee)}`)
   } else if (item.jewelryType === 'rn') {
     const castingFee = rnCastingFeeFromNotes(item.internalNotes)
     if (castingFee != null) lines.push(`Casting labor — ${money(castingFee)}`)
