@@ -39,6 +39,30 @@ const JEWELRY_TYPE_OPTIONS: Array<{ key: string; label: string }> = [
   { key: 'other', label: 'Other' },
 ]
 
+const JEWELRY_TYPE_SKU_PREFIX: Record<string, string> = {
+  ring: 'RG', rn: 'RN', pendant: 'PN', necklace: 'NK', bracelet: 'BR',
+  earrings: 'ER', cufflinks: 'CL', brooch: 'BC', anklet: 'AK', other: 'OT',
+}
+
+// "gold-14k-yellow" -> "14KY", "platinum" -> "PLT", "silver" -> "SLV"
+function metalSkuAbbrev(metalKey: string): string {
+  if (metalKey === 'platinum') return 'PLT'
+  if (metalKey === 'silver') return 'SLV'
+  const m = metalKey.match(/gold-(\d+)k(?:-(white|yellow|rose))?/)
+  if (!m) return ''
+  return `${m[1]}K${m[2] ? m[2][0].toUpperCase() : ''}`
+}
+
+// Short, human-scannable starting point — type + metal + a random 3-digit
+// suffix — so a piece reads as "RG-14KY-482" instead of a blank field.
+// Not checked against existing SKUs; the user can still edit it by hand.
+function suggestSku(jewelryType: string, metalKey: string): string {
+  const prefix = JEWELRY_TYPE_SKU_PREFIX[jewelryType] ?? 'JW'
+  const metal = metalSkuAbbrev(metalKey)
+  const rand = Math.floor(100 + Math.random() * 900)
+  return [prefix, metal, rand].filter(Boolean).join('-')
+}
+
 const STATUS_OPTIONS: Array<{ key: StockItem['status']; label: string }> = [
   { key: 'AVAILABLE', label: 'Available' },
   { key: 'RESERVED', label: 'Reserved' },
@@ -1504,7 +1528,14 @@ export function StockBuilderPage() {
               </div>
               <div className="space-y-2">
                 <label className={labelClass}>SKU</label>
-                <input className={inputClass} value={sku} onChange={e => setSku(e.target.value)} placeholder="Optional" />
+                <div className="flex gap-2">
+                  <input className={inputClass} value={sku} onChange={e => setSku(e.target.value)} placeholder="Optional" />
+                  <button type="button" onClick={() => setSku(suggestSku(jewelryType, selectedMetal))}
+                    title="Suggest a SKU from the type and metal"
+                    className="flex shrink-0 items-center gap-1.5 rounded-xl border border-slate-200 px-3 text-xs font-semibold text-slate-600 transition hover:border-slate-400">
+                    <Sparkles className="h-3.5 w-3.5" /> Suggest
+                  </button>
+                </div>
               </div>
               <div className="space-y-2">
                 <label className={labelClass}>Quantity in stock</label>
