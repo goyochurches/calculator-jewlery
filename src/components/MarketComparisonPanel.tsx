@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ExternalLink, TrendingUp, Clock, Store, Sparkles, AlertCircle } from 'lucide-react'
+import { ExternalLink, TrendingUp, Clock, Store, Sparkles, AlertCircle, RefreshCw } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   fetchMarketComparison,
@@ -18,6 +18,11 @@ interface Props {
   stoneType?: string | null
   quoteContext?: QuoteContext | null
   layout?: 'table' | 'cards'
+  /** When set, the backend caches the result on this saved quote — the
+   *  analysis runs once and every later view of the same quote reuses it
+   *  instead of re-hitting the AI/competitor pipeline. Leave unset while
+   *  actively building/editing a quote, where prices are still moving. */
+  quoteId?: number | null
 }
 
 const money = (n: number) =>
@@ -30,25 +35,30 @@ const STORE_COLORS: Record<string, string> = {
   'Blue Nile':               'bg-blue-50 text-blue-700 border-blue-200',
 }
 
-export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId, clientName, stoneType, quoteContext, layout = 'table' }: Props) {
+export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId, clientName, stoneType, quoteContext, layout = 'table', quoteId }: Props) {
   const [data, setData]       = useState<MarketComparisonResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
 
   // Stable cache key so we don't refetch on every render — only when relevant
   // quote details actually change.
   const ctxKey = quoteContext ? JSON.stringify(quoteContext) : ''
 
-  useEffect(() => {
+  const load = (forceRefresh = false) => {
     if (!myPrice || myPrice <= 0) { setLoading(false); return }
-    setLoading(true)
+    (forceRefresh ? setRefreshing : setLoading)(true)
     setError(null)
-    fetchMarketComparison(jewelryType, metalKey, myPrice, clientId, stoneType, quoteContext ?? null)
+    fetchMarketComparison(jewelryType, metalKey, myPrice, clientId, stoneType, quoteContext ?? null, quoteId, forceRefresh)
       .then(setData)
       .catch(() => setError('Could not load market data.'))
-      .finally(() => setLoading(false))
+      .finally(() => (forceRefresh ? setRefreshing : setLoading)(false))
+  }
+
+  useEffect(() => {
+    load()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jewelryType, metalKey, myPrice, clientId, stoneType, ctxKey])
+  }, [jewelryType, metalKey, myPrice, clientId, stoneType, ctxKey, quoteId])
 
   if (!myPrice || myPrice <= 0) return null
 
@@ -75,6 +85,14 @@ export function MarketComparisonPanel({ jewelryType, metalKey, myPrice, clientId
               : 'Similar pieces in the market vs. your price'}
           </p>
         </div>
+        {quoteId != null && (
+          <button type="button" onClick={() => load(true)} disabled={loading || refreshing}
+            title="Recompute this analysis instead of reusing the saved one"
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-[11px] font-semibold text-slate-500 transition hover:border-slate-400 disabled:opacity-50">
+            <RefreshCw className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </button>
+        )}
       </div>
 
       {/* Price score */}

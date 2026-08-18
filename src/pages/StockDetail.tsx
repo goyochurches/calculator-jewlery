@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/context/AuthContext'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { copyToClipboard } from '@/lib/share'
-import { formatStockItemText, stoneCostSplit, stoneLineLabel } from '@/lib/stockCostBreakdown'
+import { emkaySpecLine, formatStockItemText, stoneCostSplit, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
 import { stockService } from '@/services/stockService'
 import type { StockItem, StockStatus } from '@/types'
 import { ArrowLeft, Check, ClipboardCopy, Copy, Gem, ImageOff, Layers, Scale, Sparkles, Trash2, Wrench } from 'lucide-react'
@@ -36,14 +36,19 @@ function LineItem({ label, value }: { label: string; value: React.ReactNode }) {
 }
 
 // A single "what it cost" row inside the breakdown, with a category icon so
-// materials/stones/labor read apart from each other at a glance.
-function CostRow({ icon: Icon, label, value, tint }: { icon: React.ElementType; label: React.ReactNode; value: string; tint: string }) {
+// materials/stones/labor read apart from each other at a glance. `sub` is an
+// optional second line for the grading/catalog specifics (color, clarity,
+// cut, lab report, $/g, …) — same detail that goes into the clipboard copy.
+function CostRow({ icon: Icon, label, sub, value, tint }: { icon: React.ElementType; label: React.ReactNode; sub?: string; value: string; tint: string }) {
   return (
     <div className="flex items-center gap-3 rounded-xl px-2.5 py-2 transition hover:bg-slate-50">
       <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${tint}`}>
         <Icon className="h-3.5 w-3.5" />
       </span>
-      <span className="min-w-0 flex-1 truncate text-sm text-slate-600">{label}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm text-slate-600">{label}</span>
+        {sub && <span className="block truncate text-[11px] text-slate-400">{sub}</span>}
+      </span>
       <span className="shrink-0 tabular-nums text-sm font-semibold text-slate-900">{value}</span>
     </div>
   )
@@ -216,11 +221,15 @@ export default function StockDetailPage() {
               <>
                 <CostGroupLabel>Materials</CostGroupLabel>
                 <div className="-mx-2.5">
-                  {metalRows.map((r, i) => (
-                    <CostRow key={`m${i}`} icon={Scale} tint="bg-amber-50 text-amber-600"
-                      label={`${r.weightGrams}g ${JEWELRY_METAL_OPTIONS[r.metalKey]?.label ?? r.metalKey}`}
-                      value={`$${((config.metalPriceMap[r.metalKey] ?? 0) * r.weightGrams).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
-                  ))}
+                  {metalRows.map((r, i) => {
+                    const pricePerGram = config.metalPriceMap[r.metalKey] ?? 0
+                    return (
+                      <CostRow key={`m${i}`} icon={Scale} tint="bg-amber-50 text-amber-600"
+                        label={`${r.weightGrams}g ${JEWELRY_METAL_OPTIONS[r.metalKey]?.label ?? r.metalKey}`}
+                        sub={`$${pricePerGram.toLocaleString('en-US', { minimumFractionDigits: 2 })}/g`}
+                        value={`$${(pricePerGram * r.weightGrams).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                    )
+                  })}
                   {ringLaborFee > 0 && (
                     <CostRow icon={Wrench} tint="bg-slate-100 text-slate-500"
                       label={config.ringLaborMap[item.ringLabor ?? '']?.label ?? 'Ring labor'}
@@ -234,14 +243,19 @@ export default function StockDetailPage() {
               <>
                 <CostGroupLabel>Stones</CostGroupLabel>
                 <div className="-mx-2.5">
-                  {stoneLines.filter(l => l.cost > 0).map((l, i) => (
-                    <CostRow key={`s${i}`} icon={Gem} tint="bg-sky-50 text-sky-600"
-                      label={stoneLineLabel(l.stone, l.count) || `${l.stone.role} stone`}
-                      value={`$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
-                  ))}
+                  {stoneLines.filter(l => l.cost > 0).map((l, i) => {
+                    const roleLabel = l.stone.role.charAt(0) + l.stone.role.slice(1).toLowerCase()
+                    return (
+                      <CostRow key={`s${i}`} icon={Gem} tint="bg-sky-50 text-sky-600"
+                        label={`${roleLabel}: ${stoneLineLabel(l.stone, l.count) || 'Stone'}`}
+                        sub={stoneSpecLine(l.stone)}
+                        value={`$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                    )
+                  })}
                   {emkayLines.filter(l => l.cost > 0).map((l, i) => (
                     <CostRow key={`e${i}`} icon={Gem} tint="bg-sky-50 text-sky-600"
-                      label={l.stone.name} value={`$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                      label={l.stone.name} sub={emkaySpecLine(l.stone)}
+                      value={`$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                   ))}
                 </div>
               </>

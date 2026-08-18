@@ -1,6 +1,6 @@
 import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import type { QuoteConfig } from '@/hooks/useQuoteConfig'
-import type { StockItem, StockStone } from '@/types'
+import type { QuoteEmkayStone, StockItem, StockStone } from '@/types'
 
 // Splits a saved StockStone's single `contribution` ($ = stone cost +
 // setting labor, same convention as the Quote builder) back into its two
@@ -45,13 +45,38 @@ export function stoneLineLabel(stone: StockStone, count: number): string {
   ].filter(Boolean).join(' ')
 }
 
+/** Secondary spec line for a stone row — whatever grading/catalog detail is
+ *  actually set (gemstone name, color, clarity, cut, lab report). Empty
+ *  string when the stone has nothing beyond its main line. */
+export function stoneSpecLine(stone: StockStone): string {
+  const parts: string[] = []
+  if (stone.stoneCategory === 'GEMSTONE' && stone.gemstoneName) parts.push(stone.gemstoneName)
+  if (stone.color) parts.push(`Color ${stone.color}`)
+  if (stone.clarity) parts.push(`Clarity ${stone.clarity}`)
+  if (stone.cut) parts.push(`Cut ${stone.cut}`)
+  if (stone.labReport) parts.push(stone.labReport)
+  return parts.join(' · ')
+}
+
+/** Secondary spec line for an EMKAY catalog stone: "Round · 0.50ct ·
+ *  Heated · Sri Lanka". Empty string when nothing beyond the name is set. */
+export function emkaySpecLine(es: QuoteEmkayStone): string {
+  return [
+    es.shape || null,
+    es.caratWeight ? `${es.caratWeight}ct` : null,
+    es.treatment || null,
+    es.countryOfOrigin || null,
+  ].filter(Boolean).join(' · ')
+}
+
 function money(n: number): string {
   return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
 }
 
 /** Every costing factor of a saved stock piece as one plain-text block,
- *  ready to paste into a listing description or an internal message —
- *  same line-by-line shape as the on-screen breakdown. */
+ *  ready to paste into a listing description or an internal message — same
+ *  line-by-line shape (and same spec detail) as the on-screen breakdown, so
+ *  what you copy always matches what you see. */
 export function formatStockItemText(item: StockItem, config: QuoteConfig): string {
   const lines: string[] = []
   lines.push(item.title || 'Untitled piece')
@@ -63,8 +88,9 @@ export function formatStockItemText(item: StockItem, config: QuoteConfig): strin
 
   for (const r of item.metalRows ?? []) {
     if (!r.weightGrams) continue
-    const cost = (config.metalPriceMap[r.metalKey] ?? 0) * r.weightGrams
-    lines.push(`${r.weightGrams}g ${JEWELRY_METAL_OPTIONS[r.metalKey]?.label ?? r.metalKey} — ${money(cost)}`)
+    const pricePerGram = config.metalPriceMap[r.metalKey] ?? 0
+    const cost = pricePerGram * r.weightGrams
+    lines.push(`${r.weightGrams}g ${JEWELRY_METAL_OPTIONS[r.metalKey]?.label ?? r.metalKey} (${money(pricePerGram)}/g) — ${money(cost)}`)
   }
 
   const ringLaborFee = item.ringLabor ? config.ringLaborMap[item.ringLabor]?.fee ?? 0 : 0
@@ -76,7 +102,10 @@ export function formatStockItemText(item: StockItem, config: QuoteConfig): strin
     const { cost, labor, count } = stoneCostSplit(s, config)
     settingLabor += labor
     if (cost <= 0) continue
-    lines.push(`${stoneLineLabel(s, count) || 'Stone'} — ${money(cost)}`)
+    const spec = stoneSpecLine(s)
+    const roleLabel = s.role.charAt(0) + s.role.slice(1).toLowerCase()
+    const label = `${roleLabel}: ${stoneLineLabel(s, count) || 'Stone'}${spec ? ` (${spec})` : ''}`
+    lines.push(`${label} — ${money(cost)}`)
   }
 
   for (const es of item.emkayStones ?? []) {
@@ -84,7 +113,8 @@ export function formatStockItemText(item: StockItem, config: QuoteConfig): strin
     const cost = qty * es.priceUsd
     const setterFee = es.setterFeeOverride ?? config.setterMap[es.setterType ?? '']?.fee ?? 0
     settingLabor += qty * setterFee
-    lines.push(`${es.name} — ${money(cost)}`)
+    const spec = emkaySpecLine(es)
+    lines.push(`${es.name}${spec ? ` (${spec})` : ''} — ${money(cost)}`)
   }
 
   if (settingLabor > 0) lines.push(`Labor to set — ${money(settingLabor)}`)

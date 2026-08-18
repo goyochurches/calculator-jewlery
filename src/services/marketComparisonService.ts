@@ -145,6 +145,12 @@ export async function fetchMarketComparison(
   clientId?: number | null,
   stoneType?: string | null,
   ctx?: QuoteContext | null,
+  // When quoteId names an already-saved quote, the backend caches the
+  // result on it after the first computation and reuses that on later
+  // calls instead of re-running the AI/competitor pipeline. forceRefresh
+  // bypasses the cache for an explicit "Refresh analysis" action.
+  quoteId?: number | null,
+  forceRefresh?: boolean,
 ): Promise<MarketComparisonResult> {
   const { metalType, karat, metalColor } = parseMetalKey(metalKey)
   const params = new URLSearchParams({
@@ -156,6 +162,8 @@ export async function fetchMarketComparison(
   if (metalColor) params.set('metalColor', metalColor)
   if (clientId)   params.set('clientId',   String(clientId))
   if (stoneType)  params.set('stoneType',  stoneType)
+  if (quoteId)    params.set('quoteId',    String(quoteId))
+  if (forceRefresh) params.set('forceRefresh', 'true')
 
   // Rich context for AI analysis — backend uses these to produce piece-specific insights.
   if (ctx) {
