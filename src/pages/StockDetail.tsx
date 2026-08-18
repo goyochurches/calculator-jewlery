@@ -221,7 +221,7 @@ export default function StockDetailPage() {
               <p className="text-sm text-slate-400">No cost factors yet.</p>
             )}
 
-            {(metalRows.length > 0 || ringLaborFee > 0) && (
+            {(metalRows.length > 0 || ringLaborFee > 0 || rnCastingFee != null) && (
               <>
                 <CostGroupLabel>Materials</CostGroupLabel>
                 <div className="-mx-2.5">
@@ -238,6 +238,10 @@ export default function StockDetailPage() {
                     <CostRow icon={Wrench} tint="bg-slate-100 text-slate-500"
                       label={config.ringLaborMap[item.ringLabor ?? '']?.label ?? 'Ring labor'}
                       value={`$${ringLaborFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                  )}
+                  {rnCastingFee != null && (
+                    <CostRow icon={Wrench} tint="bg-slate-100 text-slate-500" label="Casting labor"
+                      value={`$${rnCastingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                   )}
                 </div>
               </>
