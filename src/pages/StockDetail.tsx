@@ -7,7 +7,7 @@ import { copyToClipboard } from '@/lib/share'
 import { formatStockItemText, stoneCostSplit, stoneLineLabel } from '@/lib/stockCostBreakdown'
 import { stockService } from '@/services/stockService'
 import type { StockItem, StockStatus } from '@/types'
-import { ArrowLeft, Check, ClipboardCopy, Copy, ImageOff, Trash2 } from 'lucide-react'
+import { ArrowLeft, Check, ClipboardCopy, Copy, Gem, ImageOff, Layers, Scale, Sparkles, Trash2, Wrench } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
@@ -33,6 +33,24 @@ function LineItem({ label, value }: { label: string; value: React.ReactNode }) {
       <span className="font-medium text-slate-800">{value}</span>
     </div>
   )
+}
+
+// A single "what it cost" row inside the breakdown, with a category icon so
+// materials/stones/labor read apart from each other at a glance.
+function CostRow({ icon: Icon, label, value, tint }: { icon: React.ElementType; label: React.ReactNode; value: string; tint: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl px-2.5 py-2 transition hover:bg-slate-50">
+      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${tint}`}>
+        <Icon className="h-3.5 w-3.5" />
+      </span>
+      <span className="min-w-0 flex-1 truncate text-sm text-slate-600">{label}</span>
+      <span className="shrink-0 tabular-nums text-sm font-semibold text-slate-900">{value}</span>
+    </div>
+  )
+}
+
+function CostGroupLabel({ children }: { children: React.ReactNode }) {
+  return <p className="mb-1 mt-4 px-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 first:mt-0">{children}</p>
 }
 
 export default function StockDetailPage() {
@@ -175,33 +193,65 @@ export default function StockDetailPage() {
             {metalRows.length === 0 && stones.length === 0 && emkayStones.length === 0 && (
               <p className="text-sm text-slate-400">No cost factors yet.</p>
             )}
-            {metalRows.map((r, i) => (
-              <LineItem key={`m${i}`} label={`${r.weightGrams}g ${JEWELRY_METAL_OPTIONS[r.metalKey]?.label ?? r.metalKey}`}
-                value={`$${((config.metalPriceMap[r.metalKey] ?? 0) * r.weightGrams).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
-            ))}
-            {ringLaborFee > 0 && (
-              <LineItem label={config.ringLaborMap[item.ringLabor ?? '']?.label ?? 'Ring labor'}
-                value={`$${ringLaborFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+
+            {(metalRows.length > 0 || ringLaborFee > 0) && (
+              <>
+                <CostGroupLabel>Materials</CostGroupLabel>
+                <div className="-mx-2.5">
+                  {metalRows.map((r, i) => (
+                    <CostRow key={`m${i}`} icon={Scale} tint="bg-amber-50 text-amber-600"
+                      label={`${r.weightGrams}g ${JEWELRY_METAL_OPTIONS[r.metalKey]?.label ?? r.metalKey}`}
+                      value={`$${((config.metalPriceMap[r.metalKey] ?? 0) * r.weightGrams).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                  ))}
+                  {ringLaborFee > 0 && (
+                    <CostRow icon={Wrench} tint="bg-slate-100 text-slate-500"
+                      label={config.ringLaborMap[item.ringLabor ?? '']?.label ?? 'Ring labor'}
+                      value={`$${ringLaborFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                  )}
+                </div>
+              </>
             )}
-            {stoneLines.filter(l => l.cost > 0).map((l, i) => (
-              <LineItem key={`s${i}`} label={stoneLineLabel(l.stone, l.count) || `${l.stone.role} stone`}
-                value={`$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
-            ))}
-            {emkayLines.filter(l => l.cost > 0).map((l, i) => (
-              <LineItem key={`e${i}`} label={l.stone.name} value={`$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
-            ))}
-            {laborToSet > 0 && (
-              <LineItem label="Labor to set" value={`$${laborToSet.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+
+            {(stoneLines.some(l => l.cost > 0) || emkayLines.some(l => l.cost > 0)) && (
+              <>
+                <CostGroupLabel>Stones</CostGroupLabel>
+                <div className="-mx-2.5">
+                  {stoneLines.filter(l => l.cost > 0).map((l, i) => (
+                    <CostRow key={`s${i}`} icon={Gem} tint="bg-sky-50 text-sky-600"
+                      label={stoneLineLabel(l.stone, l.count) || `${l.stone.role} stone`}
+                      value={`$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                  ))}
+                  {emkayLines.filter(l => l.cost > 0).map((l, i) => (
+                    <CostRow key={`e${i}`} icon={Gem} tint="bg-sky-50 text-sky-600"
+                      label={l.stone.name} value={`$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                  ))}
+                </div>
+              </>
             )}
-            {!!item.engravingFee && (
-              <LineItem label="Engraving" value={`$${item.engravingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+
+            {(laborToSet > 0 || !!item.engravingFee || !!item.extraCosts) && (
+              <>
+                <CostGroupLabel>Labor & fees</CostGroupLabel>
+                <div className="-mx-2.5">
+                  {laborToSet > 0 && (
+                    <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600" label="Labor to set"
+                      value={`$${laborToSet.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                  )}
+                  {!!item.engravingFee && (
+                    <CostRow icon={Sparkles} tint="bg-violet-50 text-violet-600" label="Engraving"
+                      value={`$${item.engravingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                  )}
+                  {!!item.extraCosts && (
+                    <CostRow icon={Layers} tint="bg-slate-100 text-slate-500" label="Extra costs"
+                      value={`$${item.extraCosts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                  )}
+                </div>
+              </>
             )}
-            {!!item.extraCosts && (
-              <LineItem label="Extra costs" value={`$${item.extraCosts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
-            )}
-            <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-2 text-sm font-bold text-slate-900">
-              <span>Total cost</span>
-              <span>${item.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+
+            <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-900 px-4 py-3 text-white">
+              <span className="text-sm font-semibold">Total cost</span>
+              <span className="text-lg font-bold tabular-nums">${item.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
             </div>
           </Card>
 
