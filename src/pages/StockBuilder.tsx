@@ -1221,14 +1221,20 @@ export function StockBuilderPage() {
               onChange={e => patchStone(stone.uid, { shape: e.target.value })}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
               <option value="">—</option>
-              <option value="Round">Round</option>
-              <optgroup label="Fancy shapes (Lab melee sheet)">
-                {fancyShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
-              </optgroup>
-              {otherShapeOptions.length > 0 && (
-                <optgroup label="Other">
-                  {otherShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
-                </optgroup>
+              {stone.stoneType === 'lab-grown' ? (
+                <>
+                  <option value="Round">Round</option>
+                  <optgroup label="Fancy shapes (Lab melee sheet)">
+                    {fancyShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
+                  </optgroup>
+                  {otherShapeOptions.length > 0 && (
+                    <optgroup label="Other">
+                      {otherShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
+                    </optgroup>
+                  )}
+                </>
+              ) : (
+                STONE_SHAPES.map(sh => <option key={sh} value={sh}>{sh}</option>)
               )}
             </select>
           </div>
