@@ -486,8 +486,11 @@ export function StockBuilderPage() {
     }
   }
 
-  const shapeOptions = useMemo(
-    () => Array.from(new Set<string>([...STONE_SHAPES, ...config.fancyShapes])),
+  // Shape picker options, grouped so Round (its own melee sheet) is never
+  // shown as if it were one more fancy shape — see QuoteBuilder.tsx.
+  const fancyShapeOptions = config.fancyShapes
+  const otherShapeOptions = useMemo(
+    () => STONE_SHAPES.filter(sh => sh !== 'Round' && !config.fancyShapes.includes(sh)),
     [config.fancyShapes],
   )
 
@@ -1218,7 +1221,15 @@ export function StockBuilderPage() {
               onChange={e => patchStone(stone.uid, { shape: e.target.value })}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
               <option value="">—</option>
-              {shapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
+              <option value="Round">Round</option>
+              <optgroup label="Fancy shapes (Lab melee sheet)">
+                {fancyShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
+              </optgroup>
+              {otherShapeOptions.length > 0 && (
+                <optgroup label="Other">
+                  {otherShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
+                </optgroup>
+              )}
             </select>
           </div>
 
