@@ -832,8 +832,11 @@ export function QuoteBuilderPage() {
       // sheet, so clear it outright instead of silently falling back to a
       // coincidentally-matching generic row (e.g. both the old LAB sheet and
       // the round sheet happen to start at "0.8"). Otherwise, jump to a
-      // matching (or first) row in the right generic list.
-      if ((patch.stoneType || patch.shape !== undefined) && !patch.sizeKey && s.role !== 'MAIN') {
+      // matching (or first) row in the right generic list. Skip entirely
+      // when the stone was already on "Custom" (sizeKey === '') — that's
+      // always valid regardless of type/shape, so a cosmetic Shape pick on a
+      // Natural custom-priced stone must NOT force it onto a preset size.
+      if ((patch.stoneType || patch.shape !== undefined) && !patch.sizeKey && s.role !== 'MAIN' && s.sizeKey !== '') {
         const usesSpecialSheet = next.stoneType === 'lab-grown' && (next.shape === 'Round' || config.fancyShapes.includes(next.shape))
         if (usesSpecialSheet) {
           next.sizeKey = ''

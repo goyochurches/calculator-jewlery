@@ -537,8 +537,12 @@ export function StockBuilderPage() {
       // Round/fancy shape means the size has to be re-picked from that
       // sheet, so clear it outright instead of silently falling back to a
       // coincidentally-matching generic row. Otherwise, jump to a matching
-      // (or first) row in the right generic list. Mirrors QuoteBuilder.tsx.
-      if ((patch.stoneType || patch.shape !== undefined) && !patch.sizeKey && s.role !== 'MAIN') {
+      // (or first) row in the right generic list. Skip entirely when the
+      // stone was already on "Custom" (sizeKey === '') — that's always
+      // valid regardless of type/shape, so a cosmetic Shape pick on a
+      // Natural custom-priced stone must NOT force it onto a preset size.
+      // Mirrors QuoteBuilder.tsx.
+      if ((patch.stoneType || patch.shape !== undefined) && !patch.sizeKey && s.role !== 'MAIN' && s.sizeKey !== '') {
         const usesSpecialSheet = next.stoneType === 'lab-grown' && (next.shape === 'Round' || config.fancyShapes.includes(next.shape))
         if (usesSpecialSheet) {
           next.sizeKey = ''
