@@ -823,14 +823,24 @@ export function QuoteBuilderPage() {
       } else if (patch.stoneCategory === 'gemstone' && !s.gemstoneId) {
         next.gemstoneId = gemstones[0]?.id ?? ''
       }
-      // If the size or type changed, jump to a valid size for that stoneType.
-      if (patch.stoneType && !patch.sizeKey && s.role !== 'MAIN') {
-        const list = patch.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
-        const match = list.find(d => normalizeSizeKey(d.sizeKey) === normalizeSizeKey(next.sizeKey))
-        if (match) {
-          next.sizeKey = match.sizeKey
+      // If the type or shape changed (and the size wasn't explicitly part of
+      // this same patch), the current sizeKey may no longer belong to the
+      // right price table — generic diamond_size_config, fancy_melee_prices
+      // and round_melee_prices each have their own key space, and a raw
+      // key/packed round key from one means nothing in another. Lab-grown +
+      // a Round/fancy shape means the size has to be re-picked from that
+      // sheet, so clear it outright instead of silently falling back to a
+      // coincidentally-matching generic row (e.g. both the old LAB sheet and
+      // the round sheet happen to start at "0.8"). Otherwise, jump to a
+      // matching (or first) row in the right generic list.
+      if ((patch.stoneType || patch.shape !== undefined) && !patch.sizeKey && s.role !== 'MAIN') {
+        const usesSpecialSheet = next.stoneType === 'lab-grown' && (next.shape === 'Round' || config.fancyShapes.includes(next.shape))
+        if (usesSpecialSheet) {
+          next.sizeKey = ''
         } else {
-          next.sizeKey = list[0]?.sizeKey ?? ''
+          const list = next.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
+          const match = list.find(d => normalizeSizeKey(d.sizeKey) === normalizeSizeKey(next.sizeKey))
+          next.sizeKey = match ? match.sizeKey : (list[0]?.sizeKey ?? '')
         }
       }
       return next
