@@ -758,11 +758,15 @@ export function QuoteBuilderPage() {
     }
   }
 
-  // Fancy shapes the picker offers — the original cosmetic list, unioned with
-  // every shape the fancy melee price sheet actually has data for (Baguette,
-  // Trilliant, Square Cushion, ... aren't in the original list).
-  const shapeOptions = useMemo(
-    () => Array.from(new Set<string>([...STONE_SHAPES, ...config.fancyShapes])),
+  // Shape picker options, grouped so Round (its own melee sheet) is never
+  // shown as if it were one more fancy shape: "Round" standalone, every
+  // shape the fancy melee sheet has data for (Baguette, Trilliant, Square
+  // Cushion, ... aren't in the original cosmetic list, so union them in),
+  // then whatever's left of the original cosmetic list with no sheet at all
+  // (e.g. plain "Cushion" — priced generically, same as always).
+  const fancyShapeOptions = config.fancyShapes
+  const otherShapeOptions = useMemo(
+    () => STONE_SHAPES.filter(sh => sh !== 'Round' && !config.fancyShapes.includes(sh)),
     [config.fancyShapes],
   )
 
@@ -1170,9 +1174,19 @@ export function QuoteBuilderPage() {
               onChange={e => patchStone(stone.uid, { shape: e.target.value })}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
               <option value="">—</option>
-              {shapeOptions.map(sh => (
-                <option key={sh} value={sh}>{sh}</option>
-              ))}
+              <option value="Round">Round</option>
+              <optgroup label="Fancy shapes (Lab melee sheet)">
+                {fancyShapeOptions.map(sh => (
+                  <option key={sh} value={sh}>{sh}</option>
+                ))}
+              </optgroup>
+              {otherShapeOptions.length > 0 && (
+                <optgroup label="Other">
+                  {otherShapeOptions.map(sh => (
+                    <option key={sh} value={sh}>{sh}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
 
