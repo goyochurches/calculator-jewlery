@@ -9,6 +9,7 @@ import {
   type FingerSizeConfig,
   type PricingTier,
   type RnRingModelConfig,
+  type RoundMeleePrice,
   type SetterConfig,
   type StoneType,
 } from '@/services/configService'
@@ -59,6 +60,10 @@ const BLANK_GEM: Omit<GemstonePrice, 'id'> = {
 
 const BLANK_DS: Omit<DiamondSizeConfig, 'id'> = { stoneType: 'NATURAL', sizeKey: '', label: '', basePrice: 0, ctPerStone: null }
 const BLANK_FMP: Omit<FancyMeleePrice, 'id'> = { shape: '', sizeKey: '', pointerLabel: '', ctPerStone: 0, pricePerCarat: 0, sortOrder: 0 }
+const BLANK_RMP: Omit<RoundMeleePrice, 'id'> = {
+  sizeKey: '', pointerLabel: '', sieve: '', ctPerStone: 0,
+  hphtVvsPrice: 0, hphtVsPrice: 0, cvdVvsPrice: 0, cvdVsPrice: 0, sortOrder: 0,
+}
 const BLANK_SETTER: Omit<SetterConfig, 'id' | 'sortOrder'> = { typeKey: '', label: '', fee: 0 }
 
 const STONE_TYPE_STYLES: Record<StoneType, string> = {
@@ -231,6 +236,50 @@ export function MasterTablesPage() {
     if (!confirm('Delete this fancy shape price?')) return
     await configService.deleteFancyMeleePrice(id)
     setFancyMeleePrices(prev => prev.filter(p => p.id !== id))
+  }
+
+  // ── Round lab-grown melee prices ────────────────────────────────────────────
+  // Size -> 4 prices/ct (HPHT x VVS/VS, CVD x VVS/VS) — round-only tiering
+  // the fancy sheet doesn't have.
+  const [roundMeleePrices, setRoundMeleePrices] = useState<RoundMeleePrice[]>([])
+  const [rmpFilter, setRmpFilter] = useState('')
+  const [rmpEditId, setRmpEditId] = useState<number | null>(null)
+  const [rmpDraft, setRmpDraft] = useState<RoundMeleePrice | null>(null)
+  const [showNewRmp, setShowNewRmp] = useState(false)
+  const [newRmpDraft, setNewRmpDraft] = useState<Omit<RoundMeleePrice, 'id'>>({ ...BLANK_RMP })
+
+  useEffect(() => {
+    configService.getRoundMeleePrices().then(setRoundMeleePrices).catch(console.error)
+  }, [])
+
+  const saveRmpEdit = async () => {
+    if (!rmpDraft) return
+    const updated = await configService.updateRoundMeleePrice(rmpDraft.id, {
+      sizeKey: rmpDraft.sizeKey,
+      pointerLabel: rmpDraft.pointerLabel,
+      sieve: rmpDraft.sieve,
+      ctPerStone: rmpDraft.ctPerStone,
+      hphtVvsPrice: rmpDraft.hphtVvsPrice,
+      hphtVsPrice: rmpDraft.hphtVsPrice,
+      cvdVvsPrice: rmpDraft.cvdVvsPrice,
+      cvdVsPrice: rmpDraft.cvdVsPrice,
+    })
+    setRoundMeleePrices(prev => prev.map(p => p.id === updated.id ? updated : p))
+    setRmpEditId(null); setRmpDraft(null)
+  }
+
+  const saveNewRmp = async () => {
+    if (!newRmpDraft.sizeKey.trim()) return
+    const created = await configService.createRoundMeleePrice(newRmpDraft)
+    setRoundMeleePrices(prev => [...prev, created])
+    setShowNewRmp(false)
+    setNewRmpDraft({ ...BLANK_RMP })
+  }
+
+  const deleteRmp = async (id: number) => {
+    if (!confirm('Delete this round melee price?')) return
+    await configService.deleteRoundMeleePrice(id)
+    setRoundMeleePrices(prev => prev.filter(p => p.id !== id))
   }
 
   // ── Finger Sizes ───────────────────────────────────────────────────────────
@@ -748,6 +797,166 @@ export function MasterTablesPage() {
                               onClick={() => { setFmpEditId(p.id); setFmpDraft({ ...p }) }}><Pencil className="h-3.5 w-3.5" /></Button>
                             <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
                               onClick={() => deleteFmp(p.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Round melee prices ── */}
+      <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+        <CardHeader className="border-b border-slate-100">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <CardTitle className="text-base font-semibold text-slate-900">Round Melee Prices</CardTitle>
+              <p className="text-sm text-slate-500">
+                Lab-grown round melee, split by growth method (HPHT/CVD) and clarity tier (VVS/VS) —
+                4 prices per size, per carat. {roundMeleePrices.length} rows.
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <div className="w-48">
+                <TInput placeholder="Filter by size…" value={rmpFilter}
+                  onChange={e => setRmpFilter(e.target.value)} />
+              </div>
+              <Button size="sm" className="shrink-0 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}
+                onClick={() => { setShowNewRmp(true); setRmpEditId(null); setRmpDraft(null) }}>
+                <Plus className="mr-1.5 h-3.5 w-3.5" /> Add
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="max-h-[560px] overflow-y-auto overflow-x-auto">
+            <table className="w-full min-w-[920px] text-sm">
+              <thead className="sticky top-0 z-10 bg-white">
+                <tr className="border-b border-slate-100 bg-slate-50/70">
+                  <TH>Size (mm)</TH>
+                  <TH>Pointer</TH>
+                  <TH>Sieve</TH>
+                  <TH>CT / stone</TH>
+                  <TH>HPHT VVS</TH>
+                  <TH>HPHT VS</TH>
+                  <TH>CVD VVS</TH>
+                  <TH>CVD VS</TH>
+                  <TH></TH>
+                </tr>
+              </thead>
+              <tbody>
+                {showNewRmp && (
+                  <tr className="border-b border-emerald-100 bg-emerald-50/30">
+                    <td className="px-3 py-2 w-24">
+                      <TInput placeholder="1.3" value={newRmpDraft.sizeKey}
+                        onChange={e => setNewRmpDraft(d => ({ ...d, sizeKey: e.target.value }))} />
+                    </td>
+                    <td className="px-3 py-2 w-28">
+                      <TInput placeholder="1-PT" value={newRmpDraft.pointerLabel ?? ''}
+                        onChange={e => setNewRmpDraft(d => ({ ...d, pointerLabel: e.target.value }))} />
+                    </td>
+                    <td className="px-3 py-2 w-20">
+                      <TInput placeholder="-1.5" value={newRmpDraft.sieve ?? ''}
+                        onChange={e => setNewRmpDraft(d => ({ ...d, sieve: e.target.value }))} />
+                    </td>
+                    <td className="px-3 py-2 w-24">
+                      <TInput type="number" step="0.00001" placeholder="0.01" value={newRmpDraft.ctPerStone}
+                        onChange={e => setNewRmpDraft(d => ({ ...d, ctPerStone: +e.target.value }))} />
+                    </td>
+                    <td className="px-3 py-2 w-24">
+                      <TInput type="number" step="0.01" value={newRmpDraft.hphtVvsPrice}
+                        onChange={e => setNewRmpDraft(d => ({ ...d, hphtVvsPrice: +e.target.value }))} />
+                    </td>
+                    <td className="px-3 py-2 w-24">
+                      <TInput type="number" step="0.01" value={newRmpDraft.hphtVsPrice}
+                        onChange={e => setNewRmpDraft(d => ({ ...d, hphtVsPrice: +e.target.value }))} />
+                    </td>
+                    <td className="px-3 py-2 w-24">
+                      <TInput type="number" step="0.01" value={newRmpDraft.cvdVvsPrice}
+                        onChange={e => setNewRmpDraft(d => ({ ...d, cvdVvsPrice: +e.target.value }))} />
+                    </td>
+                    <td className="px-3 py-2 w-24">
+                      <TInput type="number" step="0.01" value={newRmpDraft.cvdVsPrice}
+                        onChange={e => setNewRmpDraft(d => ({ ...d, cvdVsPrice: +e.target.value }))} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50" onClick={saveNewRmp}><Check className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:bg-slate-100"
+                          onClick={() => { setShowNewRmp(false); setNewRmpDraft({ ...BLANK_RMP }) }}><X className="h-4 w-4" /></Button>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+                {[...roundMeleePrices]
+                  .filter(p => {
+                    const q = rmpFilter.trim().toLowerCase()
+                    if (!q) return true
+                    return p.sizeKey.toLowerCase().includes(q) || (p.pointerLabel ?? '').toLowerCase().includes(q)
+                  })
+                  .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+                  .map(p => {
+                    if (rmpEditId === p.id && rmpDraft) {
+                      return (
+                        <tr key={p.id} className="border-b border-violet-100 bg-violet-50/30">
+                          <td className="px-3 py-2 w-24">
+                            <TInput value={rmpDraft.sizeKey} onChange={e => setRmpDraft(d => d && { ...d, sizeKey: e.target.value })} />
+                          </td>
+                          <td className="px-3 py-2 w-28">
+                            <TInput value={rmpDraft.pointerLabel ?? ''} onChange={e => setRmpDraft(d => d && { ...d, pointerLabel: e.target.value })} />
+                          </td>
+                          <td className="px-3 py-2 w-20">
+                            <TInput value={rmpDraft.sieve ?? ''} onChange={e => setRmpDraft(d => d && { ...d, sieve: e.target.value })} />
+                          </td>
+                          <td className="px-3 py-2 w-24">
+                            <TInput type="number" step="0.00001" value={rmpDraft.ctPerStone}
+                              onChange={e => setRmpDraft(d => d && { ...d, ctPerStone: +e.target.value })} />
+                          </td>
+                          <td className="px-3 py-2 w-24">
+                            <TInput type="number" step="0.01" value={rmpDraft.hphtVvsPrice}
+                              onChange={e => setRmpDraft(d => d && { ...d, hphtVvsPrice: +e.target.value })} />
+                          </td>
+                          <td className="px-3 py-2 w-24">
+                            <TInput type="number" step="0.01" value={rmpDraft.hphtVsPrice}
+                              onChange={e => setRmpDraft(d => d && { ...d, hphtVsPrice: +e.target.value })} />
+                          </td>
+                          <td className="px-3 py-2 w-24">
+                            <TInput type="number" step="0.01" value={rmpDraft.cvdVvsPrice}
+                              onChange={e => setRmpDraft(d => d && { ...d, cvdVvsPrice: +e.target.value })} />
+                          </td>
+                          <td className="px-3 py-2 w-24">
+                            <TInput type="number" step="0.01" value={rmpDraft.cvdVsPrice}
+                              onChange={e => setRmpDraft(d => d && { ...d, cvdVsPrice: +e.target.value })} />
+                          </td>
+                          <td className="px-3 py-2">
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-emerald-600 hover:bg-emerald-50" onClick={saveRmpEdit}><Check className="h-4 w-4" /></Button>
+                              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:bg-slate-100"
+                                onClick={() => { setRmpEditId(null); setRmpDraft(null) }}><X className="h-4 w-4" /></Button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    }
+                    return (
+                      <tr key={p.id} className="border-b border-slate-100 transition-colors last:border-0 hover:bg-slate-50/80">
+                        <td className="px-6 py-4 font-semibold text-slate-900 text-xs font-mono">{p.sizeKey}</td>
+                        <td className="px-6 py-4 text-slate-500 text-xs">{p.pointerLabel || <span className="text-slate-300">—</span>}</td>
+                        <td className="px-6 py-4 text-slate-500 text-xs">{p.sieve || <span className="text-slate-300">—</span>}</td>
+                        <td className="px-6 py-4 text-slate-700">{p.ctPerStone} ct</td>
+                        <td className="px-6 py-4 text-slate-900">{pf(p.hphtVvsPrice)}</td>
+                        <td className="px-6 py-4 text-slate-900">{pf(p.hphtVsPrice)}</td>
+                        <td className="px-6 py-4 text-slate-900">{pf(p.cvdVvsPrice)}</td>
+                        <td className="px-6 py-4 text-slate-900">{pf(p.cvdVsPrice)}</td>
+                        <td className="px-6 py-4">
+                          <div className="flex gap-1">
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-violet-600 hover:bg-violet-50"
+                              onClick={() => { setRmpEditId(p.id); setRmpDraft({ ...p }) }}><Pencil className="h-3.5 w-3.5" /></Button>
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                              onClick={() => deleteRmp(p.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
                           </div>
                         </td>
                       </tr>

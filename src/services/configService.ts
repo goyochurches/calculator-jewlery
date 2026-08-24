@@ -25,6 +25,22 @@ export interface FancyMeleePrice {
   sortOrder?: number | null
 }
 
+/** One size -> 4 prices/ct (HPHT x VVS/VS, CVD x VVS/VS) row for ROUND
+ *  lab-grown melee. Unlike fancy shapes, round splits by growth method and
+ *  clarity tier - no single "the" price for a size. */
+export interface RoundMeleePrice {
+  id: number
+  sizeKey: string
+  pointerLabel?: string | null
+  sieve?: string | null
+  ctPerStone: number
+  hphtVvsPrice: number
+  hphtVsPrice: number
+  cvdVvsPrice: number
+  cvdVsPrice: number
+  sortOrder?: number | null
+}
+
 export interface FingerSizeConfig {
   id: number
   size: number
@@ -104,6 +120,18 @@ export const configService = {
 
   deleteFancyMeleePrice: (id: number): Promise<void> =>
     api.delete(`/api/config/fancy-melee-prices/${id}`),
+
+  getRoundMeleePrices: (): Promise<RoundMeleePrice[]> =>
+    api.get('/api/config/round-melee-prices'),
+
+  updateRoundMeleePrice: (id: number, update: Partial<Omit<RoundMeleePrice, 'id'>>): Promise<RoundMeleePrice> =>
+    api.put(`/api/config/round-melee-prices/${id}`, update),
+
+  createRoundMeleePrice: (input: Omit<RoundMeleePrice, 'id'>): Promise<RoundMeleePrice> =>
+    api.post('/api/config/round-melee-prices', input),
+
+  deleteRoundMeleePrice: (id: number): Promise<void> =>
+    api.delete(`/api/config/round-melee-prices/${id}`),
 
   getFingerSizes: (): Promise<FingerSizeConfig[]> =>
     api.get('/api/config/finger-sizes'),

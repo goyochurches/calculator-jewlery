@@ -5,6 +5,7 @@ import {
   type FingerSizeConfig,
   type PricingTier,
   type RnRingModelConfig,
+  type RoundMeleePrice,
   type SetterConfig,
   type StoneType,
 } from '@/services/configService'
@@ -31,9 +32,37 @@ export function normalizeSizeKey(k: string): string {
   return Number.isFinite(n) && trimmed !== '' ? String(n) : trimmed
 }
 
+export type RoundGrowthMethod = 'HPHT' | 'CVD'
+export type RoundClarityTier = 'VVS' | 'VS'
+
+/** A stone's Round-melee Size dropdown value packs the price-sheet size key
+ *  together with the grower/clarity choice that picks which of the sheet's
+ *  4 prices applies - e.g. "1.3::HPHT::VVS". Kept out of the stone schema
+ *  entirely (no new saved-quote/stock-item columns) by round-tripping
+ *  through the existing sizeKey string field, same "don't add columns"
+ *  approach the RN ring mode used. */
+export function packRoundSizeKey(sizeKey: string, growth: RoundGrowthMethod, clarity: RoundClarityTier): string {
+  return `${sizeKey}::${growth}::${clarity}`
+}
+
+export function unpackRoundSizeKey(packed: string): { sizeKey: string; growth: RoundGrowthMethod | ''; clarity: RoundClarityTier | '' } {
+  const parts = packed.split('::')
+  if (parts.length === 3 && (parts[1] === 'HPHT' || parts[1] === 'CVD') && (parts[2] === 'VVS' || parts[2] === 'VS')) {
+    return { sizeKey: parts[0], growth: parts[1], clarity: parts[2] }
+  }
+  return { sizeKey: packed, growth: '', clarity: '' }
+}
+
+/** Picks the one of a round-melee row's 4 prices matching a growth/clarity pair. */
+export function roundMeleePriceValue(row: RoundMeleePrice, growth: RoundGrowthMethod, clarity: RoundClarityTier): number {
+  if (growth === 'HPHT') return clarity === 'VVS' ? row.hphtVvsPrice : row.hphtVsPrice
+  return clarity === 'VVS' ? row.cvdVvsPrice : row.cvdVsPrice
+}
+
 export interface QuoteConfig {
   diamondSizes: DiamondSizeConfig[]
   fancyMeleePrices: FancyMeleePrice[]
+  roundMeleePrices: RoundMeleePrice[]
   fingerSizes: FingerSizeConfig[]
   cadTiers: PricingTier[]
   ringLaborTiers: PricingTier[]
@@ -51,6 +80,9 @@ export interface QuoteConfig {
   fancyShapes: string[]
   /** Look up a fancy-shape price row for a (shape, sizeKey) pair. */
   fancyMeleePriceFor: (shape: string | undefined | null, sizeKey: string | undefined | null) => FancyMeleePrice | undefined
+  /** Look up a round-melee price-sheet row by its plain size key (e.g. "1.3",
+   *  "3.3-3.6") - not the packed "size::growth::clarity" stone sizeKey. */
+  roundMeleePriceFor: (sizeKey: string | undefined | null) => RoundMeleePrice | undefined
   fingerSizeMap: Record<number, FingerSizeConfig>
   cadMap: Record<string, PricingTier>
   ringLaborMap: Record<string, PricingTier>
@@ -70,10 +102,11 @@ const STATIC_METAL_PRICES = Object.fromEntries(
 ) as Record<JewelryMetalOption, number>
 
 const EMPTY: QuoteConfig = {
-  diamondSizes: [], fancyMeleePrices: [], fingerSizes: [], cadTiers: [], ringLaborTiers: [], setters: [], rnRings: [],
+  diamondSizes: [], fancyMeleePrices: [], roundMeleePrices: [], fingerSizes: [], cadTiers: [], ringLaborTiers: [], setters: [], rnRings: [],
   diamondSizeFor: () => undefined,
   fancyShapes: [],
   fancyMeleePriceFor: () => undefined,
+  roundMeleePriceFor: () => undefined,
   fingerSizeMap: {}, cadMap: {}, ringLaborMap: {}, setterMap: {},
   metalPriceMap: STATIC_METAL_PRICES,
   loading: true,
@@ -92,6 +125,7 @@ export function useQuoteConfig(): QuoteConfig {
       // Fancy-shape melee prices live behind a newer endpoint; degrade to an
       // empty list instead of breaking the whole builder if it's not there yet.
       configService.getFancyMeleePrices().catch(() => [] as Awaited<ReturnType<typeof configService.getFancyMeleePrices>>),
+      configService.getRoundMeleePrices().catch(() => [] as Awaited<ReturnType<typeof configService.getRoundMeleePrices>>),
       configService.getFingerSizes(),
       configService.getCadTiers(),
       configService.getRingLaborTiers(),
@@ -105,12 +139,15 @@ export function useQuoteConfig(): QuoteConfig {
       metalsService.getPrices().catch(() => [] as Awaited<ReturnType<typeof metalsService.getPrices>>),
       companyService.get().catch(() => null),
     ])
-      .then(([diamondSizes, fancyMeleePrices, fingerSizes, cadTiers, ringLaborTiers, setters, rnRings, metals, settings]) => {
+      .then(([diamondSizes, fancyMeleePrices, roundMeleePrices, fingerSizes, cadTiers, ringLaborTiers, setters, rnRings, metals, settings]) => {
         const byTypeAndKey: Record<string, DiamondSizeConfig> = Object.fromEntries(
           diamondSizes.map(d => [`${d.stoneType}|${normalizeSizeKey(d.sizeKey)}`, d])
         )
         const byShapeAndSize: Record<string, FancyMeleePrice> = Object.fromEntries(
           fancyMeleePrices.map(p => [`${p.shape.toLowerCase()}|${p.sizeKey.toLowerCase()}`, p])
+        )
+        const byRoundSize: Record<string, RoundMeleePrice> = Object.fromEntries(
+          roundMeleePrices.map(p => [p.sizeKey.toLowerCase(), p])
         )
         // Order shapes by how many sizes they have (most first) — matches the
         // order the price sheet listed them, and surfaces the common shapes
@@ -143,6 +180,7 @@ export function useQuoteConfig(): QuoteConfig {
         setConfig({
           diamondSizes,
           fancyMeleePrices,
+          roundMeleePrices,
           fingerSizes,
           cadTiers,
           ringLaborTiers,
@@ -153,6 +191,8 @@ export function useQuoteConfig(): QuoteConfig {
           fancyShapes,
           fancyMeleePriceFor: (shape, sizeKey) =>
             shape && sizeKey ? byShapeAndSize[`${shape.toLowerCase()}|${sizeKey.toLowerCase()}`] : undefined,
+          roundMeleePriceFor: (sizeKey) =>
+            sizeKey ? byRoundSize[sizeKey.toLowerCase()] : undefined,
           fingerSizeMap: Object.fromEntries(fingerSizes.map(f => [f.size, f])),
           cadMap: Object.fromEntries(cadTiers.map(t => [t.tierKey, t])),
           ringLaborMap: Object.fromEntries(ringLaborTiers.map(t => [t.tierKey, t])),

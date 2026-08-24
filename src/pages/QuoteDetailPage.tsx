@@ -476,8 +476,8 @@ export default function QuoteDetailPage() {
                 label={`${quote.weightGrams ?? 0}g ${metalCfg.label}`}
                 sub={`$${(config.metalPriceMap[quote.metal] ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}/g`}
                 value={`$${((config.metalPriceMap[quote.metal] ?? 0) * (quote.weightGrams ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
-              {(quote.ringWidth ?? 0) > 0 && <LineItem label="Ring width" value={`${quote.ringWidth} mm`} />}
-              {(quote.fingerSize ?? 0) > 0 && <LineItem label="Finger size" value={`${quote.fingerSize}`} />}
+              {(quote.ringWidth ?? 0) > 0 && <div className="mx-2.5 my-1"><LineItem label="Ring width" value={`${quote.ringWidth} mm`} /></div>}
+              {(quote.fingerSize ?? 0) > 0 && <div className="mx-2.5 my-1"><LineItem label="Finger size" value={`${quote.fingerSize}`} /></div>}
               {!isRn && (
                 <CostRow icon={Wrench} tint="bg-slate-100 text-slate-500" label="CAD & jeweler's time"
                   sub={ringLaborCfg ? `${ringLaborCfg.label} tier` : (quote.ringLabor ?? undefined)}
