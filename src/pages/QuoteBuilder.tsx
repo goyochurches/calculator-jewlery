@@ -1272,7 +1272,11 @@ export function QuoteBuilderPage() {
                     ))
                   : sizes.map(d => (
                       <option key={d.id} value={d.sizeKey}>
-                        {d.label} — ${d.basePrice}{d.ctPerStone != null ? '/ct' : ''}
+                        {/* Natural sizes hide the price here — the jeweler always
+                            sets it in the "Cost per carat" override below, so
+                            showing a number in this dropdown too just invites
+                            confusion about which one is the real price. */}
+                        {d.label}{stone.stoneType === 'natural' ? '' : ` — $${d.basePrice}${d.ctPerStone != null ? '/ct' : ''}`}
                       </option>
                     ))}
               </select>
