@@ -370,6 +370,16 @@ export interface ColdClient {
   daysSinceLastQuote: number
 }
 
+/** A PENDING quote that's been sitting a while, for the Dashboard's "Stale quotes" card. */
+export interface StaleQuote {
+  id: number
+  title: string
+  clientName: string | null
+  createdAt: string
+  daysPending: number
+  total: number
+}
+
 /** ── Shared inbox (WhatsApp + SMS) ───────────────────────────────────── */
 
 export type InboxChannel = 'WHATSAPP' | 'SMS'

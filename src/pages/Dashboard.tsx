@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useInternalPreview } from '@/lib/internalPreview'
 import { clientService } from '@/services/clientService'
 import { quotesService, type UserQuoteStats } from '@/services/quotesService'
-import type { ColdClient, UpcomingClientDate } from '@/types'
-import { Cake, CalendarHeart, DollarSign, FileText, Heart, Snowflake, TrendingUp, Users } from 'lucide-react'
+import type { ColdClient, StaleQuote, UpcomingClientDate } from '@/types'
+import { Cake, CalendarHeart, DollarSign, FileText, Heart, Snowflake, Timer, TrendingUp, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { Link } from 'react-router-dom'
@@ -657,6 +657,64 @@ function ColdClientsWidget() {
   )
 }
 
+function StaleQuotesWidget() {
+  const [quotes, setQuotes] = useState<StaleQuote[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    quotesService.staleQuotes(14)
+      .then(setQuotes)
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
+
+  return (
+    <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+      <CardHeader className="border-b border-slate-100">
+        <div className="flex items-center gap-2">
+          <Timer className="h-4 w-4 text-amber-500" />
+          <CardTitle className="text-base font-semibold text-slate-900">Stale quotes</CardTitle>
+        </div>
+        <p className="text-sm text-slate-500">Pending 14+ days without a decision — a nudge might close them.</p>
+      </CardHeader>
+      <CardContent className="p-0">
+        {loading ? (
+          <div className="px-6 py-10 text-center text-sm text-slate-400">Loading…</div>
+        ) : quotes.length === 0 ? (
+          <div className="px-6 py-10 text-center text-sm text-slate-400">
+            No pending quote has been sitting 14+ days.
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-50">
+            {quotes.slice(0, 8).map(q => (
+              <Link
+                key={q.id}
+                to={`/quotes-list?quoteId=${q.id}`}
+                className="flex items-center justify-between gap-3 px-6 py-3.5 transition hover:bg-slate-50/80"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                    <Timer className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">{q.title}</p>
+                    <p className="truncate text-xs text-slate-400">
+                      {q.clientName ?? 'No client'} · ${q.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+                <span className="shrink-0 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">
+                  {q.daysPending}d pending
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export function Dashboard() {
   const internalPreview = useInternalPreview()
   return (
@@ -678,6 +736,7 @@ export function Dashboard() {
         <section className="grid gap-4 xl:grid-cols-2">
           <UpcomingDatesWidget />
           <ColdClientsWidget />
+          <StaleQuotesWidget />
         </section>
       )}
 

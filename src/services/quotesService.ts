@@ -1,5 +1,5 @@
 import { api } from '@/api/apiClient'
-import type { Client, QuoteAttachment, QuoteCustomerStone, QuoteEmkayStone, QuoteMetal, QuoteStone, SavedQuote } from '../types'
+import type { Client, QuoteAttachment, QuoteCustomerStone, QuoteEmkayStone, QuoteMetal, QuoteStone, SavedQuote, StaleQuote } from '../types'
 
 interface ApiMetalRow {
   id?: number | null
@@ -517,6 +517,12 @@ export const quotesService = {
   async revenueYear(year?: number): Promise<{ year: number; total: number }> {
     const qs = year ? `?year=${year}` : ''
     return api.get<{ year: number; total: number }>(`/api/quotes/stats/revenue-year${qs}`)
+  },
+
+  /** PENDING quotes sitting since before `days` days ago, most overdue
+   *  first — backs the Dashboard's "Stale quotes" card. */
+  async staleQuotes(days = 14): Promise<StaleQuote[]> {
+    return api.get<StaleQuote[]>(`/api/quotes/stats/stale?days=${days}`)
   },
 
   /** Deterministic stats-based greeting for the chat widget — instant, no AI call. */
