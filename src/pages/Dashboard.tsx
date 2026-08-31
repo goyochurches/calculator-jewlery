@@ -1,6 +1,7 @@
 import { DashboardAnalytics } from '@/components/DashboardAnalytics'
 import { MarketDashboardWidget } from '@/components/MarketDashboardWidget'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useInternalPreview } from '@/lib/internalPreview'
 import { clientService } from '@/services/clientService'
 import { quotesService, type UserQuoteStats } from '@/services/quotesService'
 import type { UpcomingClientDate } from '@/types'
@@ -601,6 +602,7 @@ function UpcomingDatesWidget() {
 }
 
 export function Dashboard() {
+  const internalPreview = useInternalPreview()
   return (
     <div className="space-y-6">
       {/* Business analytics — money, funnel, calls, clients, reviews. */}
@@ -616,7 +618,7 @@ export function Dashboard() {
         <ClientsMonthlyWidget />
       </section>
 
-      <UpcomingDatesWidget />
+      {internalPreview && <UpcomingDatesWidget />}
 
       <QuoteStatusWidget />
 

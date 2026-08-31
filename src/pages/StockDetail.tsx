@@ -3,6 +3,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/context/AuthContext'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
+import { useInternalPreview } from '@/lib/internalPreview'
 import { copyToClipboard } from '@/lib/share'
 import { JEWELRY_TYPE_OPTIONS } from '@/hooks/useQuoteBuilder'
 import { emkaySpecLine, formatStockItemText, rnCastingFeeFromNotes, stoneCostSplit, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
@@ -94,6 +95,7 @@ export default function StockDetailPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
+  const internalPreview = useInternalPreview()
   const config = useQuoteConfig()
 
   const [item, setItem] = useState<StockItem | null>(null)
@@ -199,7 +201,7 @@ export default function StockDetailPage() {
           </button>
           <h1 className="text-xl font-semibold text-slate-900">{item.title}</h1>
           <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[item.status]}`}>{STATUS_LABELS[item.status]}</span>
-          {(() => {
+          {internalPreview && (() => {
             const days = daysInStock(item.createdAt)
             const isAged = item.status === 'AVAILABLE' && days >= AGED_THRESHOLD_DAYS
             return (
@@ -395,7 +397,7 @@ export default function StockDetailPage() {
               <span className="text-sm font-semibold text-slate-500">Retail price</span>
               <span className="text-lg font-bold text-slate-900">${(item.retailPrice ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
             </div>
-            {(() => {
+            {internalPreview && (() => {
               const retail = item.retailPrice ?? 0
               const margin = retail - item.total
               const marginPct = retail > 0 ? Math.round((margin / retail) * 100) : 0

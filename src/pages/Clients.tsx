@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { clientService, type ClientSummary } from '@/services/clientService'
 import { NoticeDialog } from '@/components/NoticeDialog'
+import { useInternalPreview } from '@/lib/internalPreview'
 import type { Client } from '@/types'
 import {
   Check, ChevronLeft, ChevronRight, FileText, Loader2, Mail, Pencil, Phone,
@@ -19,6 +20,7 @@ const DEFAULT_PAGE_SIZE = 25
 
 export function ClientsPage() {
   const navigate = useNavigate()
+  const internalPreview = useInternalPreview()
 
   // ── Server-side pagination state — same pattern as QuotesList/StockList,
   // so the page stays fast as the client list keeps growing. ──────────────
@@ -218,8 +220,12 @@ export function ClientsPage() {
                   <option value="WHATSAPP">WhatsApp</option>
                 </select>
               </label>
-              <Field label="Birthday" value={createDraft.birthday ?? ''} onChange={v => setCreateDraft(d => ({ ...d, birthday: v }))} type="date" />
-              <Field label="Anniversary" value={createDraft.anniversary ?? ''} onChange={v => setCreateDraft(d => ({ ...d, anniversary: v }))} type="date" />
+              {internalPreview && (
+                <>
+                  <Field label="Birthday" value={createDraft.birthday ?? ''} onChange={v => setCreateDraft(d => ({ ...d, birthday: v }))} type="date" />
+                  <Field label="Anniversary" value={createDraft.anniversary ?? ''} onChange={v => setCreateDraft(d => ({ ...d, anniversary: v }))} type="date" />
+                </>
+              )}
             </div>
             <div className="flex gap-2">
               <Button size="sm" className="rounded-xl text-white" style={{ backgroundColor: 'var(--theme-primary)' }} onClick={submitNew} disabled={saving}>

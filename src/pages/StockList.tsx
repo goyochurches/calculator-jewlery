@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/context/AuthContext'
+import { useInternalPreview } from '@/lib/internalPreview'
 import { stockService } from '@/services/stockService'
 import type { StockItem, StockStatus } from '@/types'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
@@ -71,6 +72,7 @@ export function StockListPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const isAdmin = user?.role === 'ADMIN'
+  const internalPreview = useInternalPreview()
 
   const [deleteTarget, setDeleteTarget] = useState<StockItem | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -160,7 +162,7 @@ export function StockListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className={`grid grid-cols-2 gap-4 ${internalPreview ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}`}>
         {(['AVAILABLE', 'RESERVED', 'SOLD'] as StockStatus[]).map(s => (
           <Card key={s} className="rounded-[24px] border border-white/80 bg-white/92 shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
             <CardContent className="p-5">
@@ -174,21 +176,23 @@ export function StockListPage() {
             </CardContent>
           </Card>
         ))}
-        <button
-          type="button"
-          onClick={() => setAgedOnly(v => !v)}
-          className={`rounded-[24px] border p-5 text-left shadow-[0_8px_30px_rgba(15,23,42,0.06)] transition ${
-            agedOnly ? 'border-amber-300 bg-amber-50/80' : 'border-white/80 bg-white/92 hover:border-amber-200'
-          }`}
-        >
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Aged ({AGED_THRESHOLD_DAYS}+ days)</p>
-          <p className="mt-2 text-3xl font-semibold text-slate-950">
-            {Object.keys(counts).length === 0 ? '—' : (counts.agedAvailable ?? 0)}
-          </p>
-          <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
-            <Hourglass className="h-3 w-3" /> {agedOnly ? 'Showing aged only' : 'Unsold, not moving'}
-          </span>
-        </button>
+        {internalPreview && (
+          <button
+            type="button"
+            onClick={() => setAgedOnly(v => !v)}
+            className={`rounded-[24px] border p-5 text-left shadow-[0_8px_30px_rgba(15,23,42,0.06)] transition ${
+              agedOnly ? 'border-amber-300 bg-amber-50/80' : 'border-white/80 bg-white/92 hover:border-amber-200'
+            }`}
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Aged ({AGED_THRESHOLD_DAYS}+ days)</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-950">
+              {Object.keys(counts).length === 0 ? '—' : (counts.agedAvailable ?? 0)}
+            </p>
+            <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+              <Hourglass className="h-3 w-3" /> {agedOnly ? 'Showing aged only' : 'Unsold, not moving'}
+            </span>
+          </button>
+        )}
       </div>
 
       <Card className="rounded-[24px] border border-white/80 bg-white/92 shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
@@ -223,7 +227,7 @@ export function StockListPage() {
                 </button>
               )
             })}
-            {agedOnly && (
+            {internalPreview && agedOnly && (
               <button onClick={() => setAgedOnly(false)}
                 className="flex shrink-0 items-center gap-1.5 rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
                 <Hourglass className="h-3 w-3" /> Aged only
@@ -246,19 +250,23 @@ export function StockListPage() {
             <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/70">
-                  {['Photo', 'Piece', 'SKU', 'Qty', 'Status', 'Created by', 'Date', 'Age', 'Price', 'Actions'].map(h => (
+                  {(internalPreview
+                    ? ['Photo', 'Piece', 'SKU', 'Qty', 'Status', 'Created by', 'Date', 'Age', 'Price', 'Actions']
+                    : ['Photo', 'Piece', 'SKU', 'Qty', 'Status', 'Created by', 'Date', 'Price', 'Actions']
+                  ).map(h => (
                     <th key={h} className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 last:text-right">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {!loading && items.length === 0 && (
-                  <tr><td colSpan={10} className="px-6 py-12 text-center text-sm text-slate-400">No stock pieces match the current filters.</td></tr>
+                  <tr><td colSpan={internalPreview ? 10 : 9} className="px-6 py-12 text-center text-sm text-slate-400">No stock pieces match the current filters.</td></tr>
                 )}
                 {items.map(item => (
                   <StockRow
                     key={item.id}
                     item={item}
+                    showAge={internalPreview}
                     onSelect={() => navigate(`/stock-list/${item.id}`)}
                     onDuplicate={() => handleDuplicate(item)}
                     duplicating={duplicatingId === item.id}
@@ -377,9 +385,10 @@ function StockListSkeleton() {
 }
 
 function StockRow({
-  item, onSelect, onDuplicate, duplicating, onDelete,
+  item, showAge, onSelect, onDuplicate, duplicating, onDelete,
 }: {
   item: StockItem
+  showAge: boolean
   onSelect: () => void
   onDuplicate: () => void
   duplicating?: boolean
@@ -437,20 +446,22 @@ function StockRow({
         )}
       </td>
       <td className="px-6 py-4 text-slate-400">{item.createdAt}</td>
-      <td className="px-6 py-4">
-        {(() => {
-          const days = daysInStock(item.createdAt)
-          const isAged = item.status === 'AVAILABLE' && days >= AGED_THRESHOLD_DAYS
-          return (
-            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
-              isAged ? 'bg-amber-100 text-amber-700' : 'text-slate-500'
-            }`}>
-              {isAged && <Hourglass className="h-3 w-3" />}
-              {days}d
-            </span>
-          )
-        })()}
-      </td>
+      {showAge && (
+        <td className="px-6 py-4">
+          {(() => {
+            const days = daysInStock(item.createdAt)
+            const isAged = item.status === 'AVAILABLE' && days >= AGED_THRESHOLD_DAYS
+            return (
+              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                isAged ? 'bg-amber-100 text-amber-700' : 'text-slate-500'
+              }`}>
+                {isAged && <Hourglass className="h-3 w-3" />}
+                {days}d
+              </span>
+            )
+          })()}
+        </td>
+      )}
       <td className="px-6 py-4 text-right">
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-baseline gap-1.5">

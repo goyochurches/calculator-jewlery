@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/context/AuthContext'
 import { useFeatures } from '@/hooks/useFeatures'
+import { useInternalPreview } from '@/lib/internalPreview'
 import { canSeePayments } from '@/lib/paymentsAccess'
 import { displayStatusFor } from '@/lib/quoteStatusDisplay'
 import { clientService } from '@/services/clientService'
@@ -36,6 +37,7 @@ export function ClientDetailPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
   const { isEnabled } = useFeatures()
+  const internalPreview = useInternalPreview()
   const isAdmin = user?.role === 'ADMIN'
   const [client, setClient] = useState<Client | null>(null)
   const [quotes, setQuotes] = useState<SavedQuote[]>([])
@@ -167,7 +169,7 @@ export function ClientDetailPage() {
         </CardContent>
       </Card>
 
-      <ClientDatesCard client={client} onSaved={setClient} />
+      {internalPreview && <ClientDatesCard client={client} onSaved={setClient} />}
 
       {/* Stats */}
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
