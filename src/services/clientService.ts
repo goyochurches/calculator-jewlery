@@ -1,5 +1,5 @@
 import { api } from '@/api/apiClient'
-import type { Client, UpcomingClientDate } from '@/types'
+import type { Client, ColdClient, UpcomingClientDate } from '@/types'
 
 interface SpringPage<T> {
   content: T[]
@@ -88,5 +88,11 @@ export const clientService = {
    *  backs the Dashboard's "Upcoming dates" card. */
   async getUpcomingDates(days = 30): Promise<UpcomingClientDate[]> {
     return api.get<UpcomingClientDate[]>(`/api/clients/upcoming-dates?days=${days}`)
+  },
+
+  /** Clients with no new quote in `days` days, most overdue first —
+   *  backs the Dashboard's "Cold clients" card. */
+  async getColdClients(days = 90): Promise<ColdClient[]> {
+    return api.get<ColdClient[]>(`/api/clients/cold?days=${days}`)
   },
 }

@@ -361,6 +361,15 @@ export interface UpcomingClientDate {
   daysUntil: number
 }
 
+/** A client with no new quote in a while, for the Dashboard's "Cold clients" card. */
+export interface ColdClient {
+  clientId: number
+  clientName: string
+  /** ISO date of their most recent quote. */
+  lastQuoteAt: string
+  daysSinceLastQuote: number
+}
+
 /** ── Shared inbox (WhatsApp + SMS) ───────────────────────────────────── */
 
 export type InboxChannel = 'WHATSAPP' | 'SMS'

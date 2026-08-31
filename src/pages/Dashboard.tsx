@@ -4,8 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useInternalPreview } from '@/lib/internalPreview'
 import { clientService } from '@/services/clientService'
 import { quotesService, type UserQuoteStats } from '@/services/quotesService'
-import type { UpcomingClientDate } from '@/types'
-import { Cake, CalendarHeart, DollarSign, FileText, Heart, TrendingUp, Users } from 'lucide-react'
+import type { ColdClient, UpcomingClientDate } from '@/types'
+import { Cake, CalendarHeart, DollarSign, FileText, Heart, Snowflake, TrendingUp, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
 import { Link } from 'react-router-dom'
@@ -601,6 +601,62 @@ function UpcomingDatesWidget() {
   )
 }
 
+function ColdClientsWidget() {
+  const [clients, setClients] = useState<ColdClient[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    clientService.getColdClients(90)
+      .then(setClients)
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
+
+  return (
+    <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+      <CardHeader className="border-b border-slate-100">
+        <div className="flex items-center gap-2">
+          <Snowflake className="h-4 w-4 text-sky-500" />
+          <CardTitle className="text-base font-semibold text-slate-900">Cold clients</CardTitle>
+        </div>
+        <p className="text-sm text-slate-500">No new quote in 90+ days — worth a check-in before they go elsewhere.</p>
+      </CardHeader>
+      <CardContent className="p-0">
+        {loading ? (
+          <div className="px-6 py-10 text-center text-sm text-slate-400">Loading…</div>
+        ) : clients.length === 0 ? (
+          <div className="px-6 py-10 text-center text-sm text-slate-400">
+            Every client with a quote history has ordered in the last 90 days.
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-50">
+            {clients.slice(0, 8).map(c => (
+              <Link
+                key={c.clientId}
+                to={`/clients/${c.clientId}`}
+                className="flex items-center justify-between gap-3 px-6 py-3.5 transition hover:bg-slate-50/80"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700">
+                    <Snowflake className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">{c.clientName}</p>
+                    <p className="text-xs text-slate-400">Last quote {new Date(c.lastQuoteAt).toLocaleDateString()}</p>
+                  </div>
+                </div>
+                <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">
+                  {c.daysSinceLastQuote}d silent
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export function Dashboard() {
   const internalPreview = useInternalPreview()
   return (
@@ -618,7 +674,12 @@ export function Dashboard() {
         <ClientsMonthlyWidget />
       </section>
 
-      {internalPreview && <UpcomingDatesWidget />}
+      {internalPreview && (
+        <section className="grid gap-4 xl:grid-cols-2">
+          <UpcomingDatesWidget />
+          <ColdClientsWidget />
+        </section>
+      )}
 
       <QuoteStatusWidget />
 
