@@ -41,7 +41,7 @@ export function compareStoneTypes(args: {
   amount: number
   setterFee: number
   manualPrice: number | null
-  diamondSizeFor: (stoneType: string | undefined | null, sizeKey: string) => DiamondSizeConfig | undefined
+  diamondSizeFor: (stoneType: string | undefined | null, sizeKey: string | undefined | null) => DiamondSizeConfig | undefined
 }): StoneTypeComparison {
   const { sizeKey, carats, amount, setterFee, manualPrice, diamondSizeFor } = args
   const settingLabor = amount * setterFee

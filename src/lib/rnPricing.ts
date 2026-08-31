@@ -45,7 +45,7 @@ export function computeRnBreakdown(args: {
   sizeRow: RnRingSizeConfig | null
   metal: JewelryMetalOption
   stoneType: RnStoneType
-  diamondSizeFor: (stoneType: string | undefined | null, sizeKey: string) => DiamondSizeConfig | undefined
+  diamondSizeFor: (stoneType: string | undefined | null, sizeKey: string | undefined | null) => DiamondSizeConfig | undefined
   /** When set, overrides sizeRow.numStones and recalculates CTW as customNumStones × ctPerStone. */
   customNumStones?: number
 }): RnBreakdown {

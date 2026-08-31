@@ -26,8 +26,11 @@ function normalizeStoneType(t: string | undefined | null): StoneType {
 }
 
 // Normalize numeric sizeKeys so "1.5" and "1.50" resolve to the same entry.
-export function normalizeSizeKey(k: string): string {
-  const trimmed = k.trim()
+// Guards null/undefined the same way normalizeStoneType above does — legacy
+// stones saved before the multi-stone refactor can be missing sizeKey
+// entirely, and this must resolve to "no match" rather than throw.
+export function normalizeSizeKey(k: string | undefined | null): string {
+  const trimmed = (k ?? '').trim()
   const n = Number(trimmed)
   return Number.isFinite(n) && trimmed !== '' ? String(n) : trimmed
 }
@@ -73,7 +76,7 @@ export interface QuoteConfig {
    *  the stone's type to get the right basePrice / ctPerStone — using
    *  sizeKey alone silently picked whichever row loaded last and made the
    *  carats↔amount sync wrong for LAB stones. */
-  diamondSizeFor: (stoneType: string | undefined | null, sizeKey: string) => DiamondSizeConfig | undefined
+  diamondSizeFor: (stoneType: string | undefined | null, sizeKey: string | undefined | null) => DiamondSizeConfig | undefined
   /** Distinct fancy shape names, in a stable order (most sizes first — the
    *  order the price sheet listed them). Round is deliberately not in this
    *  list; it isn't wired into fancyMeleePrices. */
