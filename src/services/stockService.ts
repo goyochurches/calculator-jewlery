@@ -251,10 +251,13 @@ export const stockService = {
     size?: number
     status?: string
     q?: string
+    /** Aged (unsold, sitting past the threshold) pieces only — overrides `status` server-side. */
+    aged?: boolean
   }): Promise<StockPage> {
-    const { page = 0, size = 20, status, q } = params
+    const { page = 0, size = 20, status, q, aged } = params
     let url = `/api/stock?page=${page}&size=${size}&sort=createdAt,desc&sort=id,desc`
-    if (status && status !== 'all') url += `&status=${status.toUpperCase()}`
+    if (aged) url += `&aged=true`
+    else if (status && status !== 'all') url += `&status=${status.toUpperCase()}`
     if (q && q.trim()) url += `&q=${encodeURIComponent(q.trim())}`
     const data = await api.get<SpringPage<ApiStockItemSummary>>(url)
     const meta = data.page

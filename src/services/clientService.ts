@@ -1,5 +1,5 @@
 import { api } from '@/api/apiClient'
-import type { Client } from '@/types'
+import type { Client, UpcomingClientDate } from '@/types'
 
 interface SpringPage<T> {
   content: T[]
@@ -82,5 +82,11 @@ export const clientService = {
   async countPerMonth(year?: number): Promise<Record<string, number>> {
     const qs = year ? `?year=${year}` : ''
     return api.get<Record<string, number>>(`/api/clients/stats/per-month${qs}`)
+  },
+
+  /** Birthdays/anniversaries in the next `days` days, nearest first —
+   *  backs the Dashboard's "Upcoming dates" card. */
+  async getUpcomingDates(days = 30): Promise<UpcomingClientDate[]> {
+    return api.get<UpcomingClientDate[]>(`/api/clients/upcoming-dates?days=${days}`)
   },
 }

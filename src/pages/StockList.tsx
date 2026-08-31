@@ -4,9 +4,25 @@ import { useAuth } from '@/context/AuthContext'
 import { stockService } from '@/services/stockService'
 import type { StockItem, StockStatus } from '@/types'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { ChevronLeft, ChevronRight, Copy, ImageOff, MoreHorizontal, Search, Trash2, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Copy, Hourglass, ImageOff, MoreHorizontal, Search, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+
+// Unsold pieces sitting this long or longer are flagged "aged" — mirrors
+// the backend's StockItemService.AGED_THRESHOLD_DAYS.
+const AGED_THRESHOLD_DAYS = 90
+
+/** Whole days between `createdAt` (a "YYYY-MM-DD" date, no time component)
+ *  and today. Parsed manually so it isn't shifted by timezone parsing of
+ *  a bare date string. */
+function daysInStock(createdAt: string): number {
+  const [y, m, d] = createdAt.split('-').map(Number)
+  if (!y || !m || !d) return 0
+  const created = new Date(y, m - 1, d)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return Math.max(0, Math.round((today.getTime() - created.getTime()) / 86_400_000))
+}
 
 const STATUS_STYLES: Record<StockStatus, string> = {
   AVAILABLE: 'bg-emerald-50 text-emerald-700',
@@ -67,6 +83,7 @@ export function StockListPage() {
   const [loading, setLoading] = useState(true)
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [agedOnly, setAgedOnly] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [page, setPage] = useState(0)
@@ -77,7 +94,7 @@ export function StockListPage() {
     return () => clearTimeout(t)
   }, [searchQuery])
 
-  useEffect(() => { setPage(0) }, [statusFilter, debouncedSearch, pageSize])
+  useEffect(() => { setPage(0) }, [statusFilter, agedOnly, debouncedSearch, pageSize])
 
   useEffect(() => {
     let cancelled = false
@@ -86,12 +103,13 @@ export function StockListPage() {
       page, size: pageSize,
       status: statusFilter !== 'all' ? statusFilter : undefined,
       q: debouncedSearch || undefined,
+      aged: agedOnly || undefined,
     }).then(({ items, totalPages: tp, totalElements: te }) => {
       if (cancelled) return
       setItems(items); setTotalPages(tp); setTotalElements(te); setLoading(false)
     }).catch(err => { if (!cancelled) { console.error(err); setLoading(false) } })
     return () => { cancelled = true }
-  }, [page, pageSize, statusFilter, debouncedSearch])
+  }, [page, pageSize, statusFilter, agedOnly, debouncedSearch])
 
   const loadCounts = useCallback(() => {
     stockService.getCounts().then(setCounts).catch(console.error)
@@ -142,7 +160,7 @@ export function StockListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {(['AVAILABLE', 'RESERVED', 'SOLD'] as StockStatus[]).map(s => (
           <Card key={s} className="rounded-[24px] border border-white/80 bg-white/92 shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
             <CardContent className="p-5">
@@ -156,6 +174,21 @@ export function StockListPage() {
             </CardContent>
           </Card>
         ))}
+        <button
+          type="button"
+          onClick={() => setAgedOnly(v => !v)}
+          className={`rounded-[24px] border p-5 text-left shadow-[0_8px_30px_rgba(15,23,42,0.06)] transition ${
+            agedOnly ? 'border-amber-300 bg-amber-50/80' : 'border-white/80 bg-white/92 hover:border-amber-200'
+          }`}
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Aged ({AGED_THRESHOLD_DAYS}+ days)</p>
+          <p className="mt-2 text-3xl font-semibold text-slate-950">
+            {Object.keys(counts).length === 0 ? '—' : (counts.agedAvailable ?? 0)}
+          </p>
+          <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+            <Hourglass className="h-3 w-3" /> {agedOnly ? 'Showing aged only' : 'Unsold, not moving'}
+          </span>
+        </button>
       </div>
 
       <Card className="rounded-[24px] border border-white/80 bg-white/92 shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
@@ -178,10 +211,10 @@ export function StockListPage() {
           </div>
           <div className="-mx-1 flex flex-wrap items-center gap-1.5 overflow-x-auto px-1">
             {STATUS_FILTER_OPTIONS.map(opt => {
-              const isActive = statusFilter === opt.value
+              const isActive = !agedOnly && statusFilter === opt.value
               const count = opt.value === 'all' ? (counts.all ?? totalElements) : statusCounts[opt.value]
               return (
-                <button key={opt.value} onClick={() => setStatusFilter(opt.value)}
+                <button key={opt.value} onClick={() => { setAgedOnly(false); setStatusFilter(opt.value) }}
                   className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                     isActive ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}>
@@ -190,6 +223,13 @@ export function StockListPage() {
                 </button>
               )
             })}
+            {agedOnly && (
+              <button onClick={() => setAgedOnly(false)}
+                className="flex shrink-0 items-center gap-1.5 rounded-full bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm">
+                <Hourglass className="h-3 w-3" /> Aged only
+                <X className="h-3 w-3" />
+              </button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -206,14 +246,14 @@ export function StockListPage() {
             <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/70">
-                  {['Photo', 'Piece', 'SKU', 'Qty', 'Status', 'Created by', 'Date', 'Price', 'Actions'].map(h => (
+                  {['Photo', 'Piece', 'SKU', 'Qty', 'Status', 'Created by', 'Date', 'Age', 'Price', 'Actions'].map(h => (
                     <th key={h} className="px-6 py-4 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400 last:text-right">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {!loading && items.length === 0 && (
-                  <tr><td colSpan={9} className="px-6 py-12 text-center text-sm text-slate-400">No stock pieces match the current filters.</td></tr>
+                  <tr><td colSpan={10} className="px-6 py-12 text-center text-sm text-slate-400">No stock pieces match the current filters.</td></tr>
                 )}
                 {items.map(item => (
                   <StockRow
@@ -397,6 +437,20 @@ function StockRow({
         )}
       </td>
       <td className="px-6 py-4 text-slate-400">{item.createdAt}</td>
+      <td className="px-6 py-4">
+        {(() => {
+          const days = daysInStock(item.createdAt)
+          const isAged = item.status === 'AVAILABLE' && days >= AGED_THRESHOLD_DAYS
+          return (
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+              isAged ? 'bg-amber-100 text-amber-700' : 'text-slate-500'
+            }`}>
+              {isAged && <Hourglass className="h-3 w-3" />}
+              {days}d
+            </span>
+          )
+        })()}
+      </td>
       <td className="px-6 py-4 text-right">
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-baseline gap-1.5">

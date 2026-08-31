@@ -12,7 +12,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 type Draft = Omit<Client, 'id' | 'createdAt'>
-const BLANK: Draft = { name: '', surname: '', phone: '', email: '', preferredChannel: 'SMS' }
+const BLANK: Draft = { name: '', surname: '', phone: '', email: '', preferredChannel: 'SMS', birthday: '', anniversary: '', notes: '' }
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50]
 const DEFAULT_PAGE_SIZE = 25
@@ -88,6 +88,9 @@ export function ClientsPage() {
         phone: createDraft.phone?.trim() || null,
         email: createDraft.email?.trim() || null,
         preferredChannel: createDraft.preferredChannel || 'SMS',
+        birthday: createDraft.birthday?.trim() || null,
+        anniversary: createDraft.anniversary?.trim() || null,
+        notes: createDraft.notes?.trim() || null,
       })
       setCreateDraft({ ...BLANK })
       setShowCreate(false)
@@ -110,6 +113,12 @@ export function ClientsPage() {
         phone: editDraft.phone?.trim() || null,
         email: editDraft.email?.trim() || null,
         preferredChannel: editDraft.preferredChannel || 'SMS',
+        // Not editable from this compact row — carry the existing values
+        // through unchanged so a quick contact-info edit here doesn't wipe
+        // dates/notes set from the client detail page.
+        birthday: editDraft.birthday ?? null,
+        anniversary: editDraft.anniversary ?? null,
+        notes: editDraft.notes ?? null,
       })
       setClients(prev => prev.map(c => c.id === updated.id ? updated : c))
       setEditId(null); setEditDraft(null)
@@ -209,6 +218,8 @@ export function ClientsPage() {
                   <option value="WHATSAPP">WhatsApp</option>
                 </select>
               </label>
+              <Field label="Birthday" value={createDraft.birthday ?? ''} onChange={v => setCreateDraft(d => ({ ...d, birthday: v }))} type="date" />
+              <Field label="Anniversary" value={createDraft.anniversary ?? ''} onChange={v => setCreateDraft(d => ({ ...d, anniversary: v }))} type="date" />
             </div>
             <div className="flex gap-2">
               <Button size="sm" className="rounded-xl text-white" style={{ backgroundColor: 'var(--theme-primary)' }} onClick={submitNew} disabled={saving}>

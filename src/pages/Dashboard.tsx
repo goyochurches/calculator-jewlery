@@ -3,9 +3,11 @@ import { MarketDashboardWidget } from '@/components/MarketDashboardWidget'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { clientService } from '@/services/clientService'
 import { quotesService, type UserQuoteStats } from '@/services/quotesService'
-import { DollarSign, FileText, TrendingUp, Users } from 'lucide-react'
+import type { UpcomingClientDate } from '@/types'
+import { Cake, CalendarHeart, DollarSign, FileText, Heart, TrendingUp, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
+import { Link } from 'react-router-dom'
 
 interface ChartDay { day: string; value: number; isToday: boolean }
 
@@ -536,6 +538,68 @@ function TeamQuotesWidget() {
   )
 }
 
+function daysLabel(n: number): string {
+  if (n === 0) return 'Today'
+  if (n === 1) return 'Tomorrow'
+  return `In ${n} days`
+}
+
+function UpcomingDatesWidget() {
+  const [dates, setDates] = useState<UpcomingClientDate[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    clientService.getUpcomingDates(30)
+      .then(setDates)
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
+
+  return (
+    <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+      <CardHeader className="border-b border-slate-100">
+        <div className="flex items-center gap-2">
+          <CalendarHeart className="h-4 w-4 text-rose-500" />
+          <CardTitle className="text-base font-semibold text-slate-900">Upcoming dates</CardTitle>
+        </div>
+        <p className="text-sm text-slate-500">Birthdays & anniversaries in the next 30 days — a good reason to reach out.</p>
+      </CardHeader>
+      <CardContent className="p-0">
+        {loading ? (
+          <div className="px-6 py-10 text-center text-sm text-slate-400">Loading…</div>
+        ) : dates.length === 0 ? (
+          <div className="px-6 py-10 text-center text-sm text-slate-400">
+            No birthdays or anniversaries on file for the next 30 days.
+          </div>
+        ) : (
+          <div className="divide-y divide-slate-50">
+            {dates.slice(0, 8).map((d, i) => (
+              <Link
+                key={`${d.clientId}-${d.type}-${i}`}
+                to={`/clients/${d.clientId}`}
+                className="flex items-center justify-between gap-3 px-6 py-3.5 transition hover:bg-slate-50/80"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${d.type === 'BIRTHDAY' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
+                    {d.type === 'BIRTHDAY' ? <Cake className="h-4 w-4" /> : <Heart className="h-4 w-4" />}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-900">{d.clientName}</p>
+                    <p className="text-xs text-slate-400">{d.type === 'BIRTHDAY' ? 'Birthday' : 'Anniversary'}</p>
+                  </div>
+                </div>
+                <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-semibold ${d.daysUntil <= 1 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                  {daysLabel(d.daysUntil)}
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export function Dashboard() {
   return (
     <div className="space-y-6">
@@ -551,6 +615,8 @@ export function Dashboard() {
         <RevenueWidget />
         <ClientsMonthlyWidget />
       </section>
+
+      <UpcomingDatesWidget />
 
       <QuoteStatusWidget />
 

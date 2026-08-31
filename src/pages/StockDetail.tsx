@@ -8,9 +8,21 @@ import { JEWELRY_TYPE_OPTIONS } from '@/hooks/useQuoteBuilder'
 import { emkaySpecLine, formatStockItemText, rnCastingFeeFromNotes, stoneCostSplit, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
 import { stockService } from '@/services/stockService'
 import type { StockItem, StockStatus } from '@/types'
-import { ArrowLeft, Check, ClipboardCopy, Copy, Gem, ImageOff, Layers, Scale, Sparkles, Trash2, Wrench } from 'lucide-react'
+import { ArrowLeft, Check, ClipboardCopy, Copy, Gem, Hourglass, ImageOff, Layers, Scale, Sparkles, Trash2, Wrench } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+
+// Mirrors StockList's aging badge (and the backend's AGED_THRESHOLD_DAYS).
+const AGED_THRESHOLD_DAYS = 90
+
+function daysInStock(createdAt: string): number {
+  const [y, m, d] = createdAt.split('-').map(Number)
+  if (!y || !m || !d) return 0
+  const created = new Date(y, m - 1, d)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return Math.max(0, Math.round((today.getTime() - created.getTime()) / 86_400_000))
+}
 
 const STATUS_STYLES: Record<StockStatus, string> = {
   AVAILABLE: 'bg-emerald-50 text-emerald-700',
@@ -187,6 +199,18 @@ export default function StockDetailPage() {
           </button>
           <h1 className="text-xl font-semibold text-slate-900">{item.title}</h1>
           <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLES[item.status]}`}>{STATUS_LABELS[item.status]}</span>
+          {(() => {
+            const days = daysInStock(item.createdAt)
+            const isAged = item.status === 'AVAILABLE' && days >= AGED_THRESHOLD_DAYS
+            return (
+              <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                isAged ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
+              }`}>
+                {isAged && <Hourglass className="h-3 w-3" />}
+                {days}d in stock
+              </span>
+            )
+          })()}
         </div>
         <div className="flex items-center gap-2">
           <button onClick={handleCopyDetails}
@@ -371,6 +395,19 @@ export default function StockDetailPage() {
               <span className="text-sm font-semibold text-slate-500">Retail price</span>
               <span className="text-lg font-bold text-slate-900">${(item.retailPrice ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
             </div>
+            {(() => {
+              const retail = item.retailPrice ?? 0
+              const margin = retail - item.total
+              const marginPct = retail > 0 ? Math.round((margin / retail) * 100) : 0
+              return (
+                <div className="mt-1 flex items-center justify-between">
+                  <span className="text-xs font-medium text-slate-400">Margin</span>
+                  <span className={`text-xs font-bold tabular-nums ${margin >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    ${margin.toLocaleString('en-US', { minimumFractionDigits: 2 })} ({marginPct}%)
+                  </span>
+                </div>
+              )
+            })()}
           </Card>
         </div>
       </div>

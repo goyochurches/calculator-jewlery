@@ -12,7 +12,10 @@ import { clientService } from '@/services/clientService'
 import { paymentsAdminService, type PaymentRow } from '@/services/paymentPlanService'
 import { quotesService } from '@/services/quotesService'
 import type { Client, QuoteStatus, SavedQuote } from '@/types'
-import { ArrowLeft, Check, Clock, CreditCard, FileText, Mail, Phone, RotateCcw, User, XCircle } from 'lucide-react'
+import {
+  ArrowLeft, Cake, Check, Clock, CreditCard, FileText, Heart, Loader2, Mail, Pencil, Phone,
+  RotateCcw, StickyNote, User, X, XCircle,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
@@ -163,6 +166,8 @@ export function ClientDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      <ClientDatesCard client={client} onSaved={setClient} />
 
       {/* Stats */}
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -410,6 +415,143 @@ function ClientPaymentsBlock({ clientId }: { clientId: string }) {
             </tbody>
           </table>
         </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** Editable birthday / anniversary / notes — the only client fields not
+ *  covered by the compact row edit on the Clients list, since they need
+ *  more room (date pickers + a notes box) than that table allows. */
+function ClientDatesCard({ client, onSaved }: { client: Client; onSaved: (c: Client) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(client)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => { setDraft(client) }, [client])
+
+  const save = async () => {
+    setSaving(true); setError(null)
+    try {
+      const updated = await clientService.update(client.id, {
+        name: client.name,
+        surname: client.surname,
+        phone: client.phone,
+        email: client.email,
+        preferredChannel: client.preferredChannel,
+        birthday: draft.birthday?.trim() || null,
+        anniversary: draft.anniversary?.trim() || null,
+        notes: draft.notes?.trim() || null,
+      })
+      onSaved(updated)
+      setEditing(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const fmt = (iso?: string | null) => {
+    if (!iso) return null
+    // Parse as a plain calendar date — avoids UTC/local timezone shifting
+    // the day when the ISO string has no time component.
+    const [y, m, d] = iso.split('-').map(Number)
+    if (!y || !m || !d) return null
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })
+  }
+
+  return (
+    <Card className="rounded-[24px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+      <CardHeader className="flex flex-row items-center justify-between gap-3 border-b border-slate-100">
+        <CardTitle className="text-base font-semibold text-slate-900">Important dates & notes</CardTitle>
+        {!editing && (
+          <Button size="sm" variant="ghost" className="gap-1.5 text-slate-500 hover:text-slate-900" onClick={() => { setDraft(client); setEditing(true) }}>
+            <Pencil className="h-3.5 w-3.5" /> Edit
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="p-6">
+        {error && (
+          <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{error}</div>
+        )}
+        {editing ? (
+          <div className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Birthday</span>
+                <input
+                  type="date"
+                  value={draft.birthday ?? ''}
+                  onChange={e => setDraft(d => ({ ...d, birthday: e.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400"
+                />
+              </label>
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Anniversary</span>
+                <input
+                  type="date"
+                  value={draft.anniversary ?? ''}
+                  onChange={e => setDraft(d => ({ ...d, anniversary: e.target.value }))}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400"
+                />
+              </label>
+            </div>
+            <label className="block">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Notes</span>
+              <textarea
+                value={draft.notes ?? ''}
+                onChange={e => setDraft(d => ({ ...d, notes: e.target.value }))}
+                placeholder="Preferences, wish list, past gifts…"
+                rows={3}
+                maxLength={1000}
+                className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400"
+              />
+            </label>
+            <div className="flex gap-2">
+              <Button size="sm" className="rounded-xl text-white" style={{ backgroundColor: 'var(--theme-primary)' }} onClick={save} disabled={saving}>
+                {saving ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Check className="mr-1.5 h-3.5 w-3.5" />}
+                {saving ? 'Saving…' : 'Save'}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => { setEditing(false); setDraft(client); setError(null) }}>
+                <X className="mr-1.5 h-3.5 w-3.5" /> Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                <Cake className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Birthday</p>
+                <p className="text-sm font-semibold text-slate-900">{fmt(client.birthday) ?? <span className="font-normal text-slate-300">Not set</span>}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-700">
+                <Heart className="h-4 w-4" />
+              </span>
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Anniversary</p>
+                <p className="text-sm font-semibold text-slate-900">{fmt(client.anniversary) ?? <span className="font-normal text-slate-300">Not set</span>}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 sm:col-span-1">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                <StickyNote className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Notes</p>
+                <p className="truncate text-sm font-semibold text-slate-900" title={client.notes ?? undefined}>
+                  {client.notes || <span className="font-normal text-slate-300">No notes</span>}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

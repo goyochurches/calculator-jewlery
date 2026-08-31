@@ -343,7 +343,22 @@ export interface Client {
   email: string | null
   /** Preferred channel for sending links: "WHATSAPP" | "SMS". */
   preferredChannel?: string | null
+  /** ISO date (YYYY-MM-DD). Only month/day matter — recurs every year. */
+  birthday?: string | null
+  /** ISO date (YYYY-MM-DD). Only month/day matter — recurs every year. */
+  anniversary?: string | null
+  notes?: string | null
   createdAt?: string | null
+}
+
+/** One upcoming birthday/anniversary for the Dashboard's "Upcoming dates" card. */
+export interface UpcomingClientDate {
+  clientId: number
+  clientName: string
+  type: 'BIRTHDAY' | 'ANNIVERSARY'
+  /** Next occurrence (ISO date), not the original date on file. */
+  date: string
+  daysUntil: number
 }
 
 /** ── Shared inbox (WhatsApp + SMS) ───────────────────────────────────── */
