@@ -380,6 +380,17 @@ export interface StaleQuote {
   total: number
 }
 
+/** Average cost/retail/margin for one jewelry-type category, for the
+ *  Dashboard's "Margin by category" chart. */
+export interface CategoryMargin {
+  /** Raw jewelryType key ("ring", "necklace", …) or "other" when unset. */
+  jewelryType: string
+  count: number
+  avgCost: number
+  avgRetail: number
+  avgMarginPct: number
+}
+
 /** ── Shared inbox (WhatsApp + SMS) ───────────────────────────────────── */
 
 export type InboxChannel = 'WHATSAPP' | 'SMS'

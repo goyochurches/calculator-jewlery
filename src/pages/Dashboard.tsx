@@ -1,14 +1,21 @@
 import { DashboardAnalytics } from '@/components/DashboardAnalytics'
 import { MarketDashboardWidget } from '@/components/MarketDashboardWidget'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { JEWELRY_TYPE_OPTIONS } from '@/hooks/useQuoteBuilder'
 import { useInternalPreview } from '@/lib/internalPreview'
 import { clientService } from '@/services/clientService'
 import { quotesService, type UserQuoteStats } from '@/services/quotesService'
-import type { ColdClient, StaleQuote, UpcomingClientDate } from '@/types'
-import { Cake, CalendarHeart, DollarSign, FileText, Heart, Snowflake, Timer, TrendingUp, Users } from 'lucide-react'
+import { stockService } from '@/services/stockService'
+import type { CategoryMargin, ColdClient, StaleQuote, UpcomingClientDate } from '@/types'
+import { Cake, CalendarHeart, DollarSign, FileText, Heart, PieChart as PieChartIcon, Snowflake, Timer, TrendingUp, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts'
+import { Bar, BarChart, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Link } from 'react-router-dom'
+
+function jewelryTypeLabel(key: string): string {
+  if (key === 'other') return 'Other'
+  return JEWELRY_TYPE_OPTIONS.find(j => j.key === key)?.label ?? key
+}
 
 interface ChartDay { day: string; value: number; isToday: boolean }
 
@@ -715,6 +722,66 @@ function StaleQuotesWidget() {
   )
 }
 
+const MARGIN_BAR_COLOR = '#8b5cf6'
+
+function MarginByCategoryWidget() {
+  const [categories, setCategories] = useState<CategoryMargin[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    stockService.getMarginByCategory()
+      .then(setCategories)
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [])
+
+  const data = categories.map(c => ({
+    name: jewelryTypeLabel(c.jewelryType),
+    margin: Math.round(c.avgMarginPct),
+    count: c.count,
+  }))
+  // Recharts needs some vertical room per bar to stay legible — grow with
+  // the category count instead of a fixed height that gets cramped.
+  const chartHeight = Math.max(160, data.length * 44)
+
+  return (
+    <Card className="rounded-[30px] border border-white/80 bg-white/92 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+      <CardHeader className="border-b border-slate-100">
+        <div className="flex items-center gap-2">
+          <PieChartIcon className="h-4 w-4 text-violet-500" />
+          <CardTitle className="text-base font-semibold text-slate-900">Margin by category</CardTitle>
+        </div>
+        <p className="text-sm text-slate-500">Average retail margin per jewelry type, across all non-archived stock.</p>
+      </CardHeader>
+      <CardContent className="p-6">
+        {loading ? (
+          <p className="py-10 text-center text-sm text-slate-400">Loading…</p>
+        ) : data.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-slate-200 px-4 py-10 text-center text-sm text-slate-400">
+            No stock pieces yet.
+          </p>
+        ) : (
+          <div style={{ height: chartHeight }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data} layout="vertical" margin={{ left: 8, right: 24 }}>
+                <XAxis type="number" hide domain={[0, (max: number) => Math.max(100, max)]} />
+                <YAxis type="category" dataKey="name" width={110} axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#475569' }} />
+                <Tooltip
+                  cursor={{ fill: 'rgba(15,23,42,0.04)' }}
+                  contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)', fontSize: 12 }}
+                  formatter={((v: number, _name: string, item: { payload: { count: number } }) =>
+                    [`${v}% margin · ${item.payload.count} piece${item.payload.count === 1 ? '' : 's'}`, '']) as never}
+                />
+                <Bar dataKey="margin" radius={[0, 6, 6, 0]} fill={MARGIN_BAR_COLOR} barSize={22} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export function Dashboard() {
   const internalPreview = useInternalPreview()
   return (
@@ -733,11 +800,14 @@ export function Dashboard() {
       </section>
 
       {internalPreview && (
-        <section className="grid gap-4 xl:grid-cols-2">
-          <UpcomingDatesWidget />
-          <ColdClientsWidget />
-          <StaleQuotesWidget />
-        </section>
+        <>
+          <section className="grid gap-4 xl:grid-cols-2">
+            <UpcomingDatesWidget />
+            <ColdClientsWidget />
+            <StaleQuotesWidget />
+          </section>
+          <MarginByCategoryWidget />
+        </>
       )}
 
       <QuoteStatusWidget />

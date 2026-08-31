@@ -1,5 +1,5 @@
 import { api } from '@/api/apiClient'
-import type { QuoteAttachment, QuoteEmkayStone, QuoteMetal, StockItem, StockStatus, StockStone } from '../types'
+import type { CategoryMargin, QuoteAttachment, QuoteEmkayStone, QuoteMetal, StockItem, StockStatus, StockStone } from '../types'
 
 interface ApiAttachment {
   id?: number | null
@@ -271,6 +271,12 @@ export const stockService = {
 
   async getCounts(): Promise<Record<string, number>> {
     return api.get<Record<string, number>>('/api/stock/counts')
+  },
+
+  /** Average cost/retail/margin% per jewelry type, highest margin first —
+   *  backs the Dashboard's "Margin by category" chart. */
+  async getMarginByCategory(): Promise<CategoryMargin[]> {
+    return api.get<CategoryMargin[]>('/api/stock/margin-by-category')
   },
 
   async getById(id: string): Promise<StockItem> {
