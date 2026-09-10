@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import {
-  useQuoteConfig, normalizeSizeKey,
-  unpackRoundSizeKey, roundMeleePriceValue,
-} from '@/hooks/useQuoteConfig'
+import { useQuoteConfig, normalizeSizeKey } from '@/hooks/useQuoteConfig'
 import { gemstoneService } from '@/services/gemstoneService'
 import { companyService, ENGRAVING_SLIDER_DEFAULTS } from '@/services/companyService'
 import { quotesService } from '@/services/quotesService'
@@ -521,10 +518,11 @@ export function useQuoteBuilder() {
   // Resolves the effective per-carat price + ct-per-stone for a stone, given
   // its Type and Shape. Lab-grown stones whose Shape matches a fancy melee
   // price-sheet entry (Oval, Princess, Baguette, ...) price from that table
-  // instead of the generic diamond_size_config lookup. Lab-grown Round
-  // stones price from the round melee sheet (split by growth method x
-  // clarity tier, packed into sizeKey — see packRoundSizeKey). Everything
-  // else falls back to the original per-mm behavior unchanged.
+  // instead of the generic diamond_size_config lookup. Round is NOT routed
+  // to a special sheet here — Wizard Round pricing intentionally stays on
+  // the plain per-mm lookup (matches current pricing; per explicit request,
+  // don't wire the round melee sheet into the Wizard). Everything else falls
+  // back to the original per-mm behavior unchanged.
   const sizePricingFor = (stone: Pick<StoneRow, 'stoneType' | 'shape' | 'sizeKey'>) => {
     if (stone.stoneType === 'lab-grown' && stone.shape && stone.sizeKey) {
       const fancyRow = config.fancyMeleePriceFor(stone.shape, stone.sizeKey)
@@ -535,22 +533,6 @@ export function useQuoteBuilder() {
           label: `${fancyRow.sizeKey}${fancyRow.pointerLabel ? ` · ${fancyRow.pointerLabel}` : ''}`,
           fancy: true as const,
         }
-      }
-      if (stone.shape === 'Round' && config.roundMeleePrices.length > 0) {
-        const { sizeKey: baseKey, growth, clarity } = unpackRoundSizeKey(stone.sizeKey)
-        const roundRow = baseKey ? config.roundMeleePriceFor(baseKey) : undefined
-        if (roundRow && growth && clarity) {
-          return {
-            pricePerCarat: roundMeleePriceValue(roundRow, growth, clarity),
-            ctPerStone: roundRow.ctPerStone,
-            label: `${roundRow.sizeKey}${roundRow.pointerLabel ? ` · ${roundRow.pointerLabel}` : ''} · ${growth}/${clarity}`,
-            fancy: true as const,
-          }
-        }
-        // Growth method / clarity tier not chosen yet (or no size picked) —
-        // no price to show, but keep the label human-readable instead of
-        // leaking the raw packed sizeKey.
-        return { pricePerCarat: 0, ctPerStone: 0, label: 'Choose growth & clarity', fancy: true as const }
       }
     }
     const sizeCfg = config.diamondSizeFor(stone.stoneType, stone.sizeKey)
@@ -563,15 +545,14 @@ export function useQuoteBuilder() {
     }
   }
 
-  // Shape picker options, grouped so Round (its own melee sheet) is never
-  // shown as if it were one more fancy shape: "Round" standalone, every
-  // shape the fancy melee sheet has data for (Baguette, Trilliant, Square
-  // Cushion, ... aren't in the original cosmetic list, so union them in),
-  // then whatever's left of the original cosmetic list with no sheet at all
-  // (e.g. plain "Cushion" — priced generically, same as always).
+  // Shape picker options: every shape the fancy melee sheet has data for
+  // (Baguette, Trilliant, Square Cushion, ... aren't in the original
+  // cosmetic list, so union them in), plus whatever's left of the original
+  // cosmetic list with no sheet — Round included, since Round has no special
+  // pricing in the Wizard and is priced generically like any other shape.
   const fancyShapeOptions = config.fancyShapes
   const otherShapeOptions = useMemo(
-    () => STONE_SHAPES.filter(sh => sh !== 'Round' && !config.fancyShapes.includes(sh)),
+    () => STONE_SHAPES.filter(sh => !config.fancyShapes.includes(sh)),
     [config.fancyShapes],
   )
 
@@ -645,7 +626,7 @@ export function useQuoteBuilder() {
       // regardless of type/shape, so a cosmetic Shape pick on a Natural
       // custom-priced stone must NOT force it onto a preset size.
       if ((patch.stoneType || patch.shape !== undefined) && !patch.sizeKey && s.role !== 'MAIN' && s.sizeKey !== '') {
-        const usesSpecialSheet = next.stoneType === 'lab-grown' && (next.shape === 'Round' || config.fancyShapes.includes(next.shape))
+        const usesSpecialSheet = next.stoneType === 'lab-grown' && config.fancyShapes.includes(next.shape)
         if (usesSpecialSheet) {
           next.sizeKey = ''
         } else {
