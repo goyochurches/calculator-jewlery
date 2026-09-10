@@ -17,6 +17,7 @@ import {
 } from '@/services/publicQuoteService'
 import { copyToClipboard } from '@/lib/share'
 import { parseFeatureFlags } from '@/lib/featureFlags'
+import { useInternalPreview } from '@/lib/internalPreview'
 import { AlertCircle, Check, Clock, Copy, Diamond, Gem, HelpCircle, MessageCircle, Phone, Quote as QuoteIcon, Ruler, Scissors, Sparkles, Wrench } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
@@ -272,6 +273,12 @@ const PUBLIC_RING_LABOR_LEVELS: Record<string, string> = {
 }
 
 function QuoteView({ quote }: { quote: PublicQuote }) {
+  // "About this piece" (the auto-generated prose description) is still
+  // being validated — only visible when the internal preview account
+  // happens to be logged into this browser (e.g. checking the link
+  // themselves), never to an actual client. UI-only gate, same caveat as
+  // every other useInternalPreview() usage in the app.
+  const showPieceDescription = useInternalPreview()
   const metal = JEWELRY_METAL_OPTIONS[quote.metal as keyof typeof JEWELRY_METAL_OPTIONS]?.label ?? quote.metal
   // Always show the numeric level to the customer regardless of the internal label —
   // applies both to the "Jeweler's time" and the "CAD design" rows, since both
@@ -649,16 +656,21 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
         </section>
       )}
 
-      {/* ── About this piece: auto-generated prose description (no price) ── */}
-      {pieceDescription.trim() !== '' && (
-        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-          <div className="border-b border-slate-100 px-6 py-5 text-center sm:px-8">
+      {/* ── About this piece: auto-generated prose description (no price) ──
+          Still being validated — internal-preview-only, never shown to an
+          actual client (see showPieceDescription above). */}
+      {showPieceDescription && pieceDescription.trim() !== '' && (
+        <section className="overflow-hidden rounded-[28px] border border-amber-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+          <div className="border-b border-amber-100 px-6 py-5 text-center sm:px-8">
             <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-amber-700">
               <GoldDot /> About this piece <GoldDot />
             </p>
             <h2 className="mt-1.5 font-serif text-xl font-medium tracking-tight text-slate-900 sm:text-2xl">
               The design
             </h2>
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-800">
+              Admin preview only — only the admin sees this part
+            </p>
           </div>
           <div className="px-6 py-6 sm:px-8 sm:py-8">
             <p className="text-[15px] leading-relaxed text-slate-700">{pieceDescription}</p>
