@@ -537,6 +537,7 @@ function toneFor(e: QuoteEvent): { border: string; bg: string; icon: string } {
       return { border: 'border-emerald-200', bg: 'bg-emerald-50/50', icon: 'text-emerald-600' }
     case 'REMINDER_CREATOR':
     case 'REMINDER_CLIENT':
+    case 'REMINDER_APPROVAL':
     case 'OVERDUE':
       return { border: 'border-amber-200', bg: 'bg-amber-50/50', icon: 'text-amber-600' }
     case 'PLAN_CANCELED':
@@ -553,7 +554,8 @@ function iconFor(e: QuoteEvent) {
     case 'INSTALLMENT_PAID':
     case 'PLAN_FULLY_PAID':   return Check
     case 'REMINDER_CREATOR':
-    case 'REMINDER_CLIENT':   return Clock
+    case 'REMINDER_CLIENT':
+    case 'REMINDER_APPROVAL': return Clock
     case 'OVERDUE':           return AlertTriangle
     case 'PLAN_CANCELED':     return XCircle
     default:                  return Bell

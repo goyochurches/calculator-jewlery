@@ -156,6 +156,7 @@ export type QuoteEventType =
   | 'INSTALLMENT_PAID'
   | 'PLAN_FULLY_PAID'
   | 'OVERDUE'
+  | 'REMINDER_APPROVAL'
 
 export type QuoteEventChannel = 'WHATSAPP' | 'IN_APP' | 'SYSTEM'
 
