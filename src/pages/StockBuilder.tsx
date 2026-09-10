@@ -444,15 +444,17 @@ export function StockBuilderPage() {
   }), [config.diamondSizes])
 
   // Resolves the effective per-carat price + ct-per-stone for a stone, given
-  // its Type and Shape. Lab-grown stones whose Shape matches a fancy melee
-  // price-sheet entry (Oval, Princess, Baguette, ...) price from that table
-  // instead of the generic diamond_size_config lookup. Lab-grown Round
-  // stones price from the round melee sheet (split by growth method x
-  // clarity tier, packed into sizeKey — see packRoundSizeKey). Everything
-  // else falls back to the original per-mm behavior unchanged. Mirrors
-  // QuoteBuilder.tsx's sizePricingFor.
+  // its Type and Shape. A stone (Natural or Lab) whose Shape matches a fancy
+  // melee price-sheet entry (Oval, Princess, Baguette, ...) prices from that
+  // table instead of the generic diamond_size_config lookup — the fancy
+  // sheet has no Natural/Lab split, so it applies regardless of stoneType.
+  // Lab-grown Round stones price from the round melee sheet (split by
+  // growth method x clarity tier, packed into sizeKey — see
+  // packRoundSizeKey); Round stays lab-grown-only. Everything else falls
+  // back to the original per-mm behavior unchanged. Mirrors QuoteBuilder.tsx's
+  // sizePricingFor.
   const sizePricingFor = (stone: Pick<StoneRowState, 'stoneType' | 'shape' | 'sizeKey'>) => {
-    if (stone.stoneType === 'lab-grown' && stone.shape && stone.sizeKey) {
+    if (stone.shape && stone.sizeKey) {
       const fancyRow = config.fancyMeleePriceFor(stone.shape, stone.sizeKey)
       if (fancyRow) {
         return {
@@ -462,7 +464,7 @@ export function StockBuilderPage() {
           fancy: true as const,
         }
       }
-      if (stone.shape === 'Round' && config.roundMeleePrices.length > 0) {
+      if (stone.stoneType === 'lab-grown' && stone.shape === 'Round' && config.roundMeleePrices.length > 0) {
         const { sizeKey: baseKey, growth, clarity } = unpackRoundSizeKey(stone.sizeKey)
         const roundRow = baseKey ? config.roundMeleePriceFor(baseKey) : undefined
         if (roundRow && growth && clarity) {
@@ -546,7 +548,7 @@ export function StockBuilderPage() {
       // Natural custom-priced stone must NOT force it onto a preset size.
       // Mirrors QuoteBuilder.tsx.
       if ((patch.stoneType || patch.shape !== undefined) && !patch.sizeKey && s.role !== 'MAIN' && s.sizeKey !== '') {
-        const usesSpecialSheet = next.stoneType === 'lab-grown' && (next.shape === 'Round' || config.fancyShapes.includes(next.shape))
+        const usesSpecialSheet = (next.stoneType === 'lab-grown' && next.shape === 'Round') || config.fancyShapes.includes(next.shape)
         if (usesSpecialSheet) {
           next.sizeKey = ''
         } else {
@@ -1051,7 +1053,7 @@ export function StockBuilderPage() {
   // ── Renders a single stone row: collapsed summary card or the full form,
   // full parity with the Quote builder's renderStoneRow. ─────────────────
   const renderStoneRow = (stone: StoneRowState, index: number) => {
-    const isFancyShape = stone.stoneType === 'lab-grown' && config.fancyShapes.includes(stone.shape)
+    const isFancyShape = config.fancyShapes.includes(stone.shape)
     const fancySizes = isFancyShape ? config.fancyMeleePrices.filter(p => p.shape === stone.shape) : []
     const isRoundMelee = stone.stoneType === 'lab-grown' && stone.shape === 'Round' && config.roundMeleePrices.length > 0
     const roundSelection = isRoundMelee ? unpackRoundSizeKey(stone.sizeKey) : null
@@ -1210,9 +1212,11 @@ export function StockBuilderPage() {
             </div>
           )}
 
-          {/* Shape comes right before Size — for a Lab stone, picking a
-              fancy shape (Oval, Princess, ...) changes which sizes/prices
-              the Size dropdown below offers. */}
+          {/* Shape comes right before Size — picking a fancy shape (Oval,
+              Princess, ...) changes which sizes/prices the Size dropdown
+              below offers. The fancy melee sheet has no Natural/Lab split,
+              so it's offered for both — Round stays a Lab-only standalone
+              option since round melee pricing is Lab-grown only. */}
           <div className="space-y-1">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Shape <span className="font-normal normal-case text-slate-400">(optional)</span>
@@ -1221,20 +1225,20 @@ export function StockBuilderPage() {
               onChange={e => patchStone(stone.uid, { shape: e.target.value })}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
               <option value="">—</option>
+              {stone.stoneType === 'lab-grown' && <option value="Round">Round</option>}
+              <optgroup label="Fancy shapes (melee sheet)">
+                {fancyShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
+              </optgroup>
               {stone.stoneType === 'lab-grown' ? (
-                <>
-                  <option value="Round">Round</option>
-                  <optgroup label="Fancy shapes (Lab melee sheet)">
-                    {fancyShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
+                otherShapeOptions.length > 0 && (
+                  <optgroup label="Other">
+                    {otherShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
                   </optgroup>
-                  {otherShapeOptions.length > 0 && (
-                    <optgroup label="Other">
-                      {otherShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
-                    </optgroup>
-                  )}
-                </>
+                )
               ) : (
-                STONE_SHAPES.map(sh => <option key={sh} value={sh}>{sh}</option>)
+                <optgroup label="Other">
+                  {STONE_SHAPES.filter(sh => !fancyShapeOptions.includes(sh)).map(sh => <option key={sh} value={sh}>{sh}</option>)}
+                </optgroup>
               )}
             </select>
           </div>

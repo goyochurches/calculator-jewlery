@@ -19,7 +19,6 @@ import {
   diamondTypeKeys,
   METAL_GROUPS,
   FINGER_SIZE_OPTIONS,
-  STONE_SHAPES,
   STONE_COLORS,
   STONE_CUTS,
   STONE_CLARITIES,
@@ -761,7 +760,7 @@ function StepStones({ qb }: { qb: QuoteBuilderState }) {
 function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: StoneRow; index: number }) {
   const [compareOpen, setCompareOpen] = useState(false)
   const m = roleMeta[stone.role]
-  const isFancyShape = stone.stoneType === 'lab-grown' && qb.config.fancyShapes.includes(stone.shape)
+  const isFancyShape = qb.config.fancyShapes.includes(stone.shape)
   const fancySizes = isFancyShape ? qb.config.fancyMeleePrices.filter(p => p.shape === stone.shape) : []
   const sizes = stone.stoneType === 'natural' ? qb.sizesByStoneType.NATURAL : qb.sizesByStoneType.LAB
   const customSize = stone.sizeKey === ''
@@ -868,23 +867,19 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
             shape (Oval, Princess, ...) changes which sizes/prices the Size
             dropdown below offers. Round has no special sheet here — it's
             priced generically like any other non-fancy shape, same as
-            current pricing, so it stays in "Other" rather than pulled out. */}
+            current pricing, so it stays in "Other" rather than pulled out.
+            The fancy melee sheet has no Natural/Lab split, so the grouping
+            (and the pricing it drives) is the same for both stone types. */}
         <Field label="Shape (optional)">
           <select value={stone.shape} onChange={e => qb.patchStone(stone.uid, { shape: e.target.value })} className={miniCls}>
             <option value="">—</option>
-            {stone.stoneType === 'lab-grown' ? (
-              <>
-                <optgroup label="Fancy shapes (Lab melee sheet)">
-                  {qb.fancyShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
-                </optgroup>
-                {qb.otherShapeOptions.length > 0 && (
-                  <optgroup label="Other">
-                    {qb.otherShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
-                  </optgroup>
-                )}
-              </>
-            ) : (
-              STONE_SHAPES.map(sh => <option key={sh} value={sh}>{sh}</option>)
+            <optgroup label="Fancy shapes (melee sheet)">
+              {qb.fancyShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
+            </optgroup>
+            {qb.otherShapeOptions.length > 0 && (
+              <optgroup label="Other">
+                {qb.otherShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
+              </optgroup>
             )}
           </select>
         </Field>

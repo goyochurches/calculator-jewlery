@@ -711,13 +711,15 @@ export function QuoteBuilderPage() {
   }), [config.diamondSizes])
 
   // Resolves the effective per-carat price + ct-per-stone for a stone, given
-  // its Type and Shape. Lab-grown stones whose Shape matches a fancy melee
-  // price-sheet entry (Oval, Princess, Baguette, ...) price from that table
-  // instead of the generic diamond_size_config lookup. Round is NOT routed
-  // to a special sheet — Round pricing always comes from the Diamond Sizes
-  // master table (generic per-mm lookup), same as any other non-fancy shape.
+  // its Type and Shape. A stone (Natural or Lab) whose Shape matches a fancy
+  // melee price-sheet entry (Oval, Princess, Baguette, ...) prices from that
+  // table instead of the generic diamond_size_config lookup — the fancy
+  // sheet has no Natural/Lab split, so it applies regardless of stoneType.
+  // Round is NOT routed to a special sheet — Round pricing always comes from
+  // the Diamond Sizes master table (generic per-mm lookup), same as any
+  // other non-fancy shape.
   const sizePricingFor = (stone: Pick<StoneRow, 'stoneType' | 'shape' | 'sizeKey'>) => {
-    if (stone.stoneType === 'lab-grown' && stone.shape && stone.sizeKey) {
+    if (stone.shape && stone.sizeKey) {
       const fancyRow = config.fancyMeleePriceFor(stone.shape, stone.sizeKey)
       if (fancyRow) {
         return {
@@ -820,7 +822,7 @@ export function QuoteBuilderPage() {
       // always valid regardless of type/shape, so a cosmetic Shape pick on a
       // Natural custom-priced stone must NOT force it onto a preset size.
       if ((patch.stoneType || patch.shape !== undefined) && !patch.sizeKey && s.role !== 'MAIN' && s.sizeKey !== '') {
-        const usesSpecialSheet = next.stoneType === 'lab-grown' && config.fancyShapes.includes(next.shape)
+        const usesSpecialSheet = config.fancyShapes.includes(next.shape)
         if (usesSpecialSheet) {
           next.sizeKey = ''
         } else {
@@ -962,7 +964,7 @@ export function QuoteBuilderPage() {
   }
 
   const renderStoneRow = (stone: StoneRow, index: number) => {
-    const isFancyShape = stone.stoneType === 'lab-grown' && config.fancyShapes.includes(stone.shape)
+    const isFancyShape = config.fancyShapes.includes(stone.shape)
     const fancySizes = isFancyShape ? config.fancyMeleePrices.filter(p => p.shape === stone.shape) : []
     const sizes = stone.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
     // Custom = no preset mm size: carats are free-typed and the cost comes
@@ -1140,11 +1142,13 @@ export function QuoteBuilderPage() {
             </div>
           )}
 
-          {/* Shape comes right before Size — for a Lab stone, picking a
-              fancy shape (Oval, Princess, ...) changes which sizes/prices
-              the Size dropdown below offers. Round has no special sheet —
-              it's priced generically (Diamond Sizes master table) like any
-              other non-fancy shape, so it stays in "Other". */}
+          {/* Shape comes right before Size — picking a fancy shape (Oval,
+              Princess, ...) changes which sizes/prices the Size dropdown
+              below offers. The fancy melee sheet has no Natural/Lab split
+              (one price per shape+size), so this applies to both stone
+              types. Round has no special sheet — it's priced generically
+              (Diamond Sizes master table) like any other non-fancy shape,
+              so it stays in "Other". */}
           <div className="space-y-1">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Shape <span className="font-normal normal-case text-slate-400">(optional)</span>
@@ -1153,28 +1157,17 @@ export function QuoteBuilderPage() {
               onChange={e => patchStone(stone.uid, { shape: e.target.value })}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
               <option value="">—</option>
-              {stone.stoneType === 'lab-grown' ? (
-                <>
-                  <optgroup label="Fancy shapes (Lab melee sheet)">
-                    {fancyShapeOptions.map(sh => (
-                      <option key={sh} value={sh}>{sh}</option>
-                    ))}
-                  </optgroup>
-                  {otherShapeOptions.length > 0 && (
-                    <optgroup label="Other">
-                      {otherShapeOptions.map(sh => (
-                        <option key={sh} value={sh}>{sh}</option>
-                      ))}
-                    </optgroup>
-                  )}
-                </>
-              ) : (
-                // Natural: no melee sheet applies to any shape — it's a
-                // cosmetic label only, so just the plain shape list, no
-                // grouping.
-                STONE_SHAPES.map(sh => (
+              <optgroup label="Fancy shapes (melee sheet)">
+                {fancyShapeOptions.map(sh => (
                   <option key={sh} value={sh}>{sh}</option>
-                ))
+                ))}
+              </optgroup>
+              {otherShapeOptions.length > 0 && (
+                <optgroup label="Other">
+                  {otherShapeOptions.map(sh => (
+                    <option key={sh} value={sh}>{sh}</option>
+                  ))}
+                </optgroup>
               )}
             </select>
           </div>

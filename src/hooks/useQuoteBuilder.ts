@@ -518,13 +518,15 @@ export function useQuoteBuilder() {
   // Resolves the effective per-carat price + ct-per-stone for a stone, given
   // its Type and Shape. Lab-grown stones whose Shape matches a fancy melee
   // price-sheet entry (Oval, Princess, Baguette, ...) price from that table
-  // instead of the generic diamond_size_config lookup. Round is NOT routed
-  // to a special sheet here — Wizard Round pricing intentionally stays on
-  // the plain per-mm lookup (matches current pricing; per explicit request,
-  // don't wire the round melee sheet into the Wizard). Everything else falls
-  // back to the original per-mm behavior unchanged.
+  // instead of the generic diamond_size_config lookup — the fancy sheet has
+  // no Natural/Lab split (one price per shape+size), so it applies to a
+  // matching shape regardless of stoneType. Round is NOT routed to a special
+  // sheet here — Wizard Round pricing intentionally stays on the plain
+  // per-mm lookup (matches current pricing; per explicit request, don't wire
+  // the round melee sheet into the Wizard). Everything else falls back to
+  // the original per-mm behavior unchanged.
   const sizePricingFor = (stone: Pick<StoneRow, 'stoneType' | 'shape' | 'sizeKey'>) => {
-    if (stone.stoneType === 'lab-grown' && stone.shape && stone.sizeKey) {
+    if (stone.shape && stone.sizeKey) {
       const fancyRow = config.fancyMeleePriceFor(stone.shape, stone.sizeKey)
       if (fancyRow) {
         return {
@@ -626,7 +628,7 @@ export function useQuoteBuilder() {
       // regardless of type/shape, so a cosmetic Shape pick on a Natural
       // custom-priced stone must NOT force it onto a preset size.
       if ((patch.stoneType || patch.shape !== undefined) && !patch.sizeKey && s.role !== 'MAIN' && s.sizeKey !== '') {
-        const usesSpecialSheet = next.stoneType === 'lab-grown' && config.fancyShapes.includes(next.shape)
+        const usesSpecialSheet = config.fancyShapes.includes(next.shape)
         if (usesSpecialSheet) {
           next.sizeKey = ''
         } else {
