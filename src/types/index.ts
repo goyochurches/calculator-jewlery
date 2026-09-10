@@ -239,6 +239,11 @@ export interface SavedQuote {
   /** Optional customer-facing description / notes — rendered on the public
    *  share link as a short personal message from the jeweler. */
   customerNotes?: string | null
+  /** Auto-generated prose description of the piece (metal, stones,
+   *  engraving, sizing — never price), built by useQuoteBuilder from the
+   *  saved payload and sent at creation time. Rendered as the "About this
+   *  piece" paragraph on the public share link. */
+  pieceDescription?: string | null
   photo?: string | null
   engraving?: boolean | null
   /** Per-quote hand-engraving surcharge chosen via the builder slider (USD).

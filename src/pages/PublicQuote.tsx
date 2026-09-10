@@ -370,9 +370,101 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
 
   // RN ready-made rings only carry the fields the RN flow fills in (metal,
   // diamond type, stones, carats, finger size). The bench-labor / CAD-design /
-  // ring-width rows are never set in that flow, so we omit them entirely rather
-  // than print empty or "0 mm" noise.
+  // ring-width rows are never set in that flow, so we omit them entirely
+  // rather than print empty or "0 mm" noise. Declared here (rather than
+  // below, next to `specs`) because the narrative description needs it too.
   const isRn = quote.jewelryType === 'rn'
+
+  // ── Narrative piece description ─────────────────────────────────────────
+  // Auto-generated prose paragraph summarizing exactly what's being made —
+  // metal, stones, engraving, sizing — built from the very same
+  // customer-facing fields as the Specifications list above (never price),
+  // so the client gets one readable description instead of having to piece
+  // the spec rows together themselves.
+  const JEWELRY_PIECE_NOUNS: Record<string, string> = {
+    ring: 'ring', rn: 'ring', pendant: 'pendant', necklace: 'necklace',
+    bracelet: 'bracelet', earrings: 'earrings', cufflinks: 'cufflinks',
+    brooch: 'brooch', anklet: 'anklet',
+  }
+  const pieceNoun = JEWELRY_PIECE_NOUNS[quote.jewelryType ?? 'ring'] ?? 'piece'
+  // "An 18K..." / "An Platinum..." — the 18K/14K labels read as "an
+  // eighteen-karat", so a leading digit also takes "An".
+  const metalTakesAn = /^[0-9aeiouAEIOU]/.test(metal)
+
+  // One prose fragment per stone — same fields as describeStone(), reworded
+  // as a sentence clause instead of a "·"-joined bullet.
+  const stoneClause = (s: PublicQuoteStone, withCount: boolean): string => {
+    const ct = Number(s.carats ?? 0)
+    const isGem = s.stoneCategory === 'GEMSTONE' && !!s.gemstoneName
+    const stoneNoun = isGem ? s.gemstoneName!.toLowerCase() : 'diamond'
+    const plural2 = withCount && (s.amount ?? 0) > 1
+    const typeWord = s.stoneType && s.stoneType !== quote.diamondType
+      ? `${(STONE_TYPE_LABELS[s.stoneType] ?? s.stoneType).toLowerCase()} `
+      : ''
+    const shapeWord = s.shape ? `${s.shape.toLowerCase()} ` : ''
+    const countWord = plural2 ? `${s.amount} ` : ''
+    const ctWord = ct > 0 ? `${formatCt(ct)} ct ` : ''
+    const head = `${countWord}${ctWord}${shapeWord}${typeWord}${stoneNoun}${plural2 ? 's' : ''}`.trim()
+    const details = [
+      s.color ? `color ${s.color}` : null,
+      s.cut ? `${s.cut} cut` : null,
+      s.clarity ? `${s.clarity} clarity` : null,
+      s.labReport ? `${s.labReport} certified` : null,
+    ].filter(Boolean).join(', ')
+    return details ? `${head} (${details})` : head
+  }
+  // "a, b and c" / "a and b" / "a" — natural list joining for 1-3+ clauses.
+  const joinList = (items: string[]): string =>
+    items.length === 0 ? '' :
+    items.length === 1 ? items[0] :
+    items.length === 2 ? `${items[0]} and ${items[1]}` :
+    `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`
+
+  const mainClauses  = stoneList.filter(s => s.role === 'MAIN').map(s => stoneClause(s, false))
+  const sideClauses  = stoneList.filter(s => s.role === 'SIDE').map(s => stoneClause(s, true))
+  const meleeClauses = stoneList.filter(s => s.role === 'MELEE').map(s => stoneClause(s, true))
+
+  const descSentences: string[] = []
+  if (stoneList.length > 0) {
+    descSentences.push(
+      `${metalTakesAn ? 'An' : 'A'} ${metal} ${pieceNoun}` +
+      (mainClauses.length > 0 ? ` centered by ${joinList(mainClauses)}` : '') + '.'
+    )
+    if (sideClauses.length > 0) descSentences.push(`Flanked by ${joinList(sideClauses)}.`)
+    if (meleeClauses.length > 0) descSentences.push(`Accented with ${joinList(meleeClauses)} set as melee.`)
+  } else {
+    // Legacy quotes with no stones[] array — fall back to the single
+    // headline diamond type/size, same source the spec fallback row uses.
+    descSentences.push(
+      `${metalTakesAn ? 'An' : 'A'} ${metal} ${pieceNoun}` +
+      (diamondSizeLabel ? ` featuring a ${diamondSizeLabel} mm ${diamondTypeLabel.toLowerCase()} diamond` : '') + '.'
+    )
+  }
+  if (customerCount > 0) {
+    descSentences.push(`${customerCount} additional ${plural(customerCount)} supplied by the client will be set into the piece.`)
+  }
+  if (totalCt > 0 && totalStones > 1) {
+    descSentences.push(`In total, the piece carries ${formatCt(totalCt)} ct across ${totalStones} ${plural(totalStones)}.`)
+  }
+  if (quote.engraving) {
+    descSentences.push('Finished with fine hand engraving.')
+  }
+  if (!isRn && (quote.fingerSize || quote.ringWidth)) {
+    const sizingBits = [
+      quote.fingerSize ? `size ${quote.fingerSize}` : null,
+      quote.ringWidth ? `a ${quote.ringWidth}mm band width` : null,
+    ].filter(Boolean).join(' and ')
+    if (sizingBits) descSentences.push(`Made to ${sizingBits}.`)
+  } else if (isRn && quote.fingerSize) {
+    descSentences.push(`Made to size ${quote.fingerSize}.`)
+  }
+  const derivedPieceDescription = descSentences.join(' ')
+  // Prefer the description sent at creation time (built by the same logic
+  // in useQuoteBuilder from the exact fields the jeweler entered); fall
+  // back to deriving it here for quotes saved before this field existed.
+  const pieceDescription = quote.pieceDescription && quote.pieceDescription.trim() !== ''
+    ? quote.pieceDescription
+    : derivedPieceDescription
 
   const specs: { icon: React.ElementType; label: string; value: string }[] = [
     { icon: Gem,      label: 'Metal',          value: metal },
@@ -553,6 +645,23 @@ function QuoteView({ quote }: { quote: PublicQuote }) {
                 </>
               )}
             </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── About this piece: auto-generated prose description (no price) ── */}
+      {pieceDescription.trim() !== '' && (
+        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+          <div className="border-b border-slate-100 px-6 py-5 text-center sm:px-8">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.32em] text-amber-700">
+              <GoldDot /> About this piece <GoldDot />
+            </p>
+            <h2 className="mt-1.5 font-serif text-xl font-medium tracking-tight text-slate-900 sm:text-2xl">
+              The design
+            </h2>
+          </div>
+          <div className="px-6 py-6 sm:px-8 sm:py-8">
+            <p className="text-[15px] leading-relaxed text-slate-700">{pieceDescription}</p>
           </div>
         </section>
       )}

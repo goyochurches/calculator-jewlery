@@ -875,6 +875,91 @@ export function useQuoteBuilder() {
   })()
   const customerPrice = parsedOverride != null ? parsedOverride : computedCustomerPrice
 
+  // Auto-generated prose description of the piece — metal, stones,
+  // engraving, sizing, deliberately never price — built from the same
+  // fields the builder already collects. Sent as part of the create
+  // payload and rendered as the "About this piece" paragraph on the public
+  // share link, alongside the structured Specifications list.
+  const formatCtForDescription = (n: number) => n.toFixed(4).replace(/\.?0+$/, '')
+  const buildPieceDescription = (): string => {
+    const pieceNouns: Record<string, string> = {
+      ring: 'ring', rn: 'ring', pendant: 'pendant', necklace: 'necklace',
+      bracelet: 'bracelet', earrings: 'earrings', cufflinks: 'cufflinks',
+      brooch: 'brooch', anklet: 'anklet',
+    }
+    const pieceNoun = pieceNouns[jewelryType] ?? 'piece'
+    const metalLabel = selectedMetalConfig.label
+    // "An 18K..." / "A Platinum..." — the 18K/14K labels read as "an
+    // eighteen-karat", so a leading digit also takes "An".
+    const article = /^[0-9aeiouAEIOU]/.test(metalLabel) ? 'An' : 'A'
+
+    if (rnMode && rn?.model) {
+      const typeLabel = rn.stoneType === 'lab-grown' ? 'lab-grown' : 'natural'
+      const stoneBit = rn.numStones > 0
+        ? ` featuring ${rn.numStones} ${typeLabel} diamond${rn.numStones === 1 ? '' : 's'} (${formatCtForDescription(rn.ctw)} ct total)`
+        : ''
+      const sizeBit = rnFingerSize ? ` Made to size ${rnFingerSize}.` : ''
+      return `${article} ${metalLabel} ${rn.model.label || rn.model.modelKey} ${pieceNoun}${stoneBit}.${sizeBit}`
+    }
+
+    const headlineType = stones[0]?.stoneType ?? 'natural'
+    // One prose fragment per stone — mirrors the per-stone detail the
+    // public share link shows (shape, type, color, cut, clarity, cert),
+    // reworded as a sentence clause instead of a "·"-joined bullet.
+    const stoneClause = (s: StoneRow, withCount: boolean): string => {
+      const ct = parseNum(s.carats)
+      const isGem = s.role === 'MAIN' && s.stoneCategory === 'gemstone'
+      const gem = isGem ? gemstones.find(g => g.id === s.gemstoneId) : undefined
+      const stoneNoun = isGem ? (gem?.name ?? 'gemstone').toLowerCase() : 'diamond'
+      const amount = parseNum(s.amount)
+      const isPlural = withCount && amount > 1
+      const typeWord = s.stoneType !== headlineType ? `${s.stoneType} ` : ''
+      const shapeWord = s.shape ? `${s.shape.toLowerCase()} ` : ''
+      const countWord = isPlural ? `${Math.round(amount)} ` : ''
+      const ctWord = ct > 0 ? `${formatCtForDescription(ct)} ct ` : ''
+      const head = `${countWord}${ctWord}${shapeWord}${typeWord}${stoneNoun}${isPlural ? 's' : ''}`.trim()
+      const details = [
+        s.color ? `color ${s.color}` : null,
+        s.role === 'MAIN' && s.cut ? `${s.cut} cut` : null,
+        s.role === 'MAIN' && s.clarity ? `${s.clarity} clarity` : null,
+        s.role !== 'MELEE' && s.labReport ? `${s.labReport} certified` : null,
+      ].filter(Boolean).join(', ')
+      return details ? `${head} (${details})` : head
+    }
+    // "a, b and c" / "a and b" / "a" — natural list joining.
+    const joinList = (items: string[]): string =>
+      items.length === 0 ? '' :
+      items.length === 1 ? items[0] :
+      items.length === 2 ? `${items[0]} and ${items[1]}` :
+      `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`
+
+    const mainClauses  = mainStones.map(s => stoneClause(s, false))
+    const sideClauses  = sideStones.map(s => stoneClause(s, true))
+    const meleeClauses = meleeStones.map(s => stoneClause(s, true))
+
+    const sentences: string[] = []
+    sentences.push(
+      `${article} ${metalLabel} ${pieceNoun}` +
+      (mainClauses.length > 0 ? ` centered by ${joinList(mainClauses)}` : '') + '.'
+    )
+    if (sideClauses.length > 0)  sentences.push(`Flanked by ${joinList(sideClauses)}.`)
+    if (meleeClauses.length > 0) sentences.push(`Accented with ${joinList(meleeClauses)} set as melee.`)
+    if (customerStones.length > 0) {
+      const n = customerStones.reduce((sum, cs) => sum + (parseNum(cs.quantity) || 1), 0)
+      sentences.push(`${n} additional stone${n === 1 ? '' : 's'} supplied by the client will be set into the piece.`)
+    }
+    if (pricing.totalCarats > 0 && pricing.totalAmount > 1) {
+      sentences.push(`In total, the piece carries ${formatCtForDescription(pricing.totalCarats)} ct across ${pricing.totalAmount} stones.`)
+    }
+    if (engravingFee > 0) sentences.push('Finished with fine hand engraving.')
+    const sizingBits = [
+      fingerSize > 0 ? `size ${fingerSize}` : null,
+      ringWidth > 0 ? `a ${ringWidth}mm band width` : null,
+    ].filter(Boolean).join(' and ')
+    if (sizingBits) sentences.push(`Made to ${sizingBits}.`)
+    return sentences.join(' ')
+  }
+
   const handleQuoteReady = async () => {
     if (!user) return
     const errors: { title?: string; client?: string; jewelryType?: string } = {}
@@ -1002,6 +1087,7 @@ export function useQuoteBuilder() {
         discountPercent: parsedDiscount,
         internalNotes: mergedInternalNotes,
         customerNotes: customerNotes.trim() === '' ? null : customerNotes.trim(),
+        pieceDescription: buildPieceDescription(),
         parentQuote: parentQuoteRef,
         photo: photo ?? undefined,
         engraving: engravingFee > 0,

@@ -81,6 +81,11 @@ export interface PublicQuote {
   setterType: string | null
   /** Optional customer-facing description / notes written by the jeweler. */
   customerNotes: string | null
+  /** Auto-generated prose description of the piece (metal, stones,
+   *  engraving, sizing — never price), sent by the frontend at creation
+   *  time. Null on quotes saved before this field existed — the public
+   *  page falls back to deriving it from `stones`. */
+  pieceDescription?: string | null
   photo: string | null
   companyName: string | null
   companyLogo: string | null
