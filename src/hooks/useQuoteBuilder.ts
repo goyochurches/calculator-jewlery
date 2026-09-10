@@ -834,6 +834,14 @@ export function useQuoteBuilder() {
   pricing.stoneBreakdown.forEach(b => { stoneBreakdownByUid[b.uid] = { cost: b.cost, labor: b.labor } })
   let customMainRaw = 0
   let customMainMarkedUp = 0
+  // Same carve-out as above, but split into stone-cost-only and
+  // setting-labor-only running totals — lets the summary show "cost per
+  // carat" and "custom setting fee" as two separate lines while still
+  // respecting each MAIN stone's own markup.
+  let customMainCostRaw = 0
+  let customMainCostMarkedUp = 0
+  let customMainLaborRaw = 0
+  let customMainLaborMarkedUp = 0
   stones.forEach(s => {
     if (s.role !== 'MAIN') return
     const txt = s.markup.trim()
@@ -845,6 +853,10 @@ export function useQuoteBuilder() {
     const contrib = b.cost + b.labor
     customMainRaw += contrib
     customMainMarkedUp += contrib * n
+    customMainCostRaw += b.cost
+    customMainCostMarkedUp += b.cost * n
+    customMainLaborRaw += b.labor
+    customMainLaborMarkedUp += b.labor * n
   })
   // Engraving is part of the cost and IS marked up like everything else; only
   // MAIN stones with their own markup are carved out (priced at their rate).
@@ -1177,6 +1189,10 @@ export function useQuoteBuilder() {
     pricing,
     customMainRaw,
     customMainMarkedUp,
+    customMainCostRaw,
+    customMainCostMarkedUp,
+    customMainLaborRaw,
+    customMainLaborMarkedUp,
     discountAmount,
     customerPriceBeforeDiscount,
     customerPriceAfterDiscount,

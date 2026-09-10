@@ -1490,9 +1490,10 @@ function ReviewItem({ label, value }: { label: string; value: string }) {
 function PriceSummary({ qb }: { qb: QuoteBuilderState }) {
   const p = qb.pricing
   const mk = qb.parsedMarkup
-  // MAIN stones with their own markup are priced at that rate, so the supplied
-  // diamonds line's retail isn't a flat cost × mk; every other line is.
-  const diamondRetail = (p.diamondCost - qb.customMainRaw) * mk + qb.customMainMarkedUp
+  // MAIN stones with their own markup are priced at that rate, so these
+  // lines' retail isn't a flat cost × mk; every other line is.
+  const diamondRetail = (p.diamondCost - qb.customMainCostRaw) * mk + qb.customMainCostMarkedUp
+  const settingRetail = (p.settingFee - qb.customMainLaborRaw) * mk + qb.customMainLaborMarkedUp
   // [label, cost, retail] — retail shows the selected markup applied per line.
   // RN rings use a dedicated wording (per Fabiola): MATERIAL/Labor, with setting
   // labor and the supplied diamonds split out and the diamond type spelled out.
@@ -1510,7 +1511,12 @@ function PriceSummary({ qb }: { qb: QuoteBuilderState }) {
     : [
         ['Material reference', p.materialCost, p.materialCost * mk],
         ["CAD design & Jeweler's time", p.ringLaborFee, p.ringLaborFee * mk],
-        [`Supplied diamonds (${p.totalAmount} · ${p.totalCarats} ct)`, p.diamondCost + p.settingFee, diamondRetail + p.settingFee * mk],
+        // Cost per carat total = stone cost for the in-house MAIN/SIDE/MELEE
+        // stones (we buy them), no setting labor.
+        [`Cost per carat total (${p.totalAmount} stones · ${p.totalCarats} ct)`, p.diamondCost, diamondRetail],
+        // Custom setting fee total = the setting labor for those same
+        // stones, separate from the stone cost above.
+        [`Custom setting fee total (${p.totalAmount} stones)`, p.settingFee, settingRetail],
         ...(qb.customerStones.length > 0 ? [[`Customer diamonds (${p.customerStoneCount})`, p.customerSettingFee, p.customerSettingFee * mk] as [string, number, number]] : []),
         ...(qb.emkayStones.length > 0 ? [[`EMKAY stones (${p.emkayStoneCount})`, p.emkayCost + p.emkaySettingFee, (p.emkayCost + p.emkaySettingFee) * mk] as [string, number, number]] : []),
         ['Hand engraving', p.engravingFee, p.engravingFee * mk],

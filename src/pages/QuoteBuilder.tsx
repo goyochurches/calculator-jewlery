@@ -1687,6 +1687,15 @@ export function QuoteBuilderPage() {
   pricing.stoneBreakdown.forEach(b => { stoneBreakdownByUid[b.uid] = { cost: b.cost, labor: b.labor } })
   let customMainRaw = 0
   let customMainMarkedUp = 0
+  // Same carve-out as above, but split into stone-cost-only and
+  // setting-labor-only running totals — lets the "Estimated total" list show
+  // "cost per carat" and "custom setting fee" as two separate lines while
+  // still respecting each MAIN stone's own markup (see the diamondRetail /
+  // settingRetail split below).
+  let customMainCostRaw = 0
+  let customMainCostMarkedUp = 0
+  let customMainLaborRaw = 0
+  let customMainLaborMarkedUp = 0
   stones.forEach(s => {
     if (s.role !== 'MAIN') return
     const txt = s.markup.trim()
@@ -1698,6 +1707,10 @@ export function QuoteBuilderPage() {
     const contrib = b.cost + b.labor
     customMainRaw += contrib
     customMainMarkedUp += contrib * n
+    customMainCostRaw += b.cost
+    customMainCostMarkedUp += b.cost * n
+    customMainLaborRaw += b.labor
+    customMainLaborMarkedUp += b.labor * n
   })
   // Price shown to the customer: the markup applies to the WHOLE cost,
   // engraving included. Main stones with their own markup are pulled out of
@@ -3526,17 +3539,26 @@ export function QuoteBuilderPage() {
                 </div>
                 {(() => {
                   const mk = parsedMarkup
-                  const suppliedCost = pricing.diamondCost + pricing.settingFee
                   // MAIN stones with their own markup are priced at that rate,
-                  // so this line's retail isn't a flat cost × mk; the rest are.
-                  const suppliedRetail = (suppliedCost - customMainRaw) * mk + customMainMarkedUp
+                  // so these lines' retail isn't a flat cost × mk; the rest are.
+                  // Split out of the old combined "Setting supplied diamonds"
+                  // line so the stone cost (cost per carat total) and the
+                  // setting labor (custom setting fee total) show separately
+                  // — the two retail halves still sum to the same total as
+                  // the old single-line figure.
+                  const diamondRetail = (pricing.diamondCost - customMainCostRaw) * mk + customMainCostMarkedUp
+                  const settingRetail = (pricing.settingFee - customMainLaborRaw) * mk + customMainLaborMarkedUp
                   const rows: Array<[string, number, number]> = [
                     ['Material reference', pricing.materialCost, pricing.materialCost * mk],
                     ['CAD design & Jeweler\'s time', pricing.ringLaborFee, pricing.ringLaborFee * mk],
-                    // "Setting supplied diamonds" = stone cost + labor for the
-                    // in-house MAIN/SIDE/MELEE stones (we buy them and set them).
-                    [`Setting supplied diamonds (${pricing.totalAmount} stones · ${pricing.totalCarats} ct)`,
-                      suppliedCost, suppliedRetail],
+                    // Cost per carat total = stone cost for the in-house
+                    // MAIN/SIDE/MELEE stones (we buy them), no setting labor.
+                    [`Cost per carat total (${pricing.totalAmount} stones · ${pricing.totalCarats} ct)`,
+                      pricing.diamondCost, diamondRetail],
+                    // Custom setting fee total = the setting labor for those
+                    // same stones, separate from the stone cost above.
+                    [`Custom setting fee total (${pricing.totalAmount} stones)`,
+                      pricing.settingFee, settingRetail],
                     // Only render the customer line when there's at least one —
                     // an empty "Setting customer diamonds (0 stones)" line is noise.
                     ...(customerStones.length > 0
