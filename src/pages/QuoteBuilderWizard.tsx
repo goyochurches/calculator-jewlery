@@ -32,9 +32,12 @@ import {
   type StoneRow,
   type StoneRole,
 } from '@/hooks/useQuoteBuilder'
+import { packRoundSizeKey, unpackRoundSizeKey, roundMeleePriceValue } from '@/hooks/useQuoteConfig'
+import { compareStoneTypes } from '@/lib/stoneTypeCompare'
+import { StoneTypeCompareDialog } from '@/components/StoneTypeCompareDialog'
 import {
   ArrowLeft, ArrowRight, Camera, Check, ChevronDown, ChevronUp, CircleDollarSign, Compass,
-  Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Plus, Sparkles, User, X,
+  Crown, Diamond, ExternalLink, Gem, ImagePlus, Layers3, Plus, Scale, Sparkles, User, X,
 } from 'lucide-react'
 import { CreateLabSizeDialog } from '@/components/CreateLabSizeDialog'
 import { configService } from '@/services/configService'
@@ -150,6 +153,7 @@ export function QuoteBuilderWizardPage() {
           {step === 2 && <StepStones qb={qb} />}
           {step === 3 && <StepPricing qb={qb} />}
           {step === 4 && <StepReview qb={qb} />}
+          {step === 4 && <InternalAttachments qb={qb} />}
 
           {/* Footer nav */}
           <div className="flex items-center justify-between gap-3 pt-2">
@@ -756,11 +760,15 @@ function StepStones({ qb }: { qb: QuoteBuilderState }) {
 }
 
 function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: StoneRow; index: number }) {
+  const [compareOpen, setCompareOpen] = useState(false)
   const m = roleMeta[stone.role]
+  const isFancyShape = stone.stoneType === 'lab-grown' && qb.config.fancyShapes.includes(stone.shape)
+  const fancySizes = isFancyShape ? qb.config.fancyMeleePrices.filter(p => p.shape === stone.shape) : []
+  const isRoundMelee = stone.stoneType === 'lab-grown' && stone.shape === 'Round' && qb.config.roundMeleePrices.length > 0
+  const roundSelection = isRoundMelee ? unpackRoundSizeKey(stone.sizeKey) : null
   const sizes = stone.stoneType === 'natural' ? qb.sizesByStoneType.NATURAL : qb.sizesByStoneType.LAB
   const customSize = stone.sizeKey === ''
-  const sizeCfg = qb.config.diamondSizeFor(stone.stoneType, stone.sizeKey)
-  const pricePerCarat = (sizeCfg?.basePrice ?? 0) * DIAMOND_TYPE_OPTIONS[stone.stoneType].multiplier
+  const { pricePerCarat, label: sizeLabel } = qb.sizePricingFor(stone)
   const verify = labReportVerifyUrl(stone.labReport)
 
   const caratsNum = qb.parseNum(stone.carats)
@@ -771,6 +779,17 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
   const stoneSetterFee = stoneFeeOverride !== '' ? qb.parseNum(stoneFeeOverride) : (qb.config.setterMap[stone.setterType]?.fee ?? 0)
   const stoneLabor = amountNum * stoneSetterFee
   const stoneTotal = stoneCost + stoneLabor
+  const setterLabel = qb.config.setterMap[stone.setterType]?.label ?? stone.setterType
+
+  // Same physical stone priced as natural vs lab for the compare popup.
+  const compareData = compareStoneTypes({
+    sizeKey: stone.sizeKey,
+    carats: caratsNum,
+    amount: amountNum,
+    setterFee: stoneSetterFee,
+    manualPrice: hasManualPrice ? qb.parseNum(stone.manualPrice) : null,
+    diamondSizeFor: qb.config.diamondSizeFor,
+  })
 
   if (stone.collapsed) {
     const isGemstone = stone.role === 'MAIN' && stone.stoneCategory === 'gemstone'
@@ -783,7 +802,10 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
       <div className="flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3">
         <button type="button" onClick={() => qb.toggleCollapsed(stone.uid)} className="flex min-w-0 flex-1 items-center gap-2 text-left">
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${m.chip}`}>{m.label} #{index + 1}</span>
-          <span className="truncate text-sm text-slate-600">{parts.length ? parts.join(' · ') : 'Not configured'}</span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm text-slate-600">{parts.length ? parts.join(' · ') : 'Not configured'}</p>
+            <p className="truncate text-[11px] text-slate-400">{sizeLabel} · {setterLabel || 'no setter'}</p>
+          </div>
           <ChevronDown className="ml-auto h-4 w-4 shrink-0 text-slate-400" />
         </button>
         <button type="button" onClick={() => qb.removeStone(stone.uid)} className="text-slate-400 hover:text-rose-600"><X className="h-4 w-4" /></button>
@@ -797,7 +819,9 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
       <div className="mb-3 flex items-center justify-between pl-2">
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${m.chip}`}>{m.label} stone #{index + 1}</span>
         <div className="flex gap-1.5">
-          <button type="button" onClick={() => qb.collapseStone(stone.uid)} className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"><ChevronUp className="h-4 w-4" /></button>
+          <button type="button" onClick={() => stone.stoneTypeChosen && qb.collapseStone(stone.uid)}
+            disabled={!stone.stoneTypeChosen} title={stone.stoneTypeChosen ? undefined : 'Choose Natural or Lab first'}
+            className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40"><ChevronUp className="h-4 w-4" /></button>
           <button type="button" onClick={() => qb.removeStone(stone.uid)} className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-rose-50 hover:text-rose-600"><X className="h-4 w-4" /></button>
         </div>
       </div>
@@ -811,11 +835,30 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
             </select>
           </Field>
         )}
-        <Field label={stone.role === 'MAIN' && stone.stoneCategory === 'gemstone' ? 'Origin' : 'Type'}>
-          <select value={stone.stoneType} onChange={e => qb.patchStone(stone.uid, { stoneType: e.target.value as StoneRow['stoneType'] })} className={miniCls}>
-            {diamondTypeKeys.map(k => <option key={k} value={k}>{DIAMOND_TYPE_OPTIONS[k].label}</option>)}
-          </select>
-        </Field>
+        {/* Type/Origin — forced choice, no silent default. Two buttons instead
+            of a pre-selected <select> so a stone can never be saved with a
+            type nobody actually picked. */}
+        <div className="col-span-2 space-y-1">
+          <Field label={stone.role === 'MAIN' && stone.stoneCategory === 'gemstone' ? 'Origin' : 'Type'} hint="(required — pick one)" hintError>
+            <div className="grid grid-cols-2 gap-2">
+              {diamondTypeKeys.map(key => {
+                const active = stone.stoneTypeChosen && stone.stoneType === key
+                return (
+                  <button key={key} type="button"
+                    onClick={() => qb.patchStone(stone.uid, { stoneType: key, stoneTypeChosen: true })}
+                    className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${active ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                    {DIAMOND_TYPE_OPTIONS[key].label}
+                  </button>
+                )
+              })}
+            </div>
+          </Field>
+          {!stone.stoneTypeChosen && (
+            <p className="rounded-xl bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-600">
+              You must choose Natural or Lab before this stone can be saved.
+            </p>
+          )}
+        </div>
         {stone.role === 'MAIN' && stone.stoneCategory === 'gemstone' && (
           <Field label="Gemstone" wide>
             <select value={stone.gemstoneId} onChange={e => qb.patchStone(stone.uid, { gemstoneId: e.target.value })} className={miniCls}>
@@ -824,12 +867,85 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
             </select>
           </Field>
         )}
+        {/* Shape comes right before Size — for a Lab stone, picking a fancy
+            shape (Oval, Princess, ...) changes which sizes/prices the Size
+            dropdown below offers. */}
+        <Field label="Shape (optional)">
+          <select value={stone.shape} onChange={e => qb.patchStone(stone.uid, { shape: e.target.value })} className={miniCls}>
+            <option value="">—</option>
+            {stone.stoneType === 'lab-grown' ? (
+              <>
+                <option value="Round">Round</option>
+                <optgroup label="Fancy shapes (Lab melee sheet)">
+                  {qb.fancyShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
+                </optgroup>
+                {qb.otherShapeOptions.length > 0 && (
+                  <optgroup label="Other">
+                    {qb.otherShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
+                  </optgroup>
+                )}
+              </>
+            ) : (
+              STONE_SHAPES.map(sh => <option key={sh} value={sh}>{sh}</option>)
+            )}
+          </select>
+        </Field>
+        {stone.role !== 'MAIN' && isRoundMelee && (
+          <div className="col-span-2 space-y-2">
+            <Field label="Growth method">
+              <div className="grid grid-cols-2 gap-2">
+                {(['HPHT', 'CVD'] as const).map(g => (
+                  <button key={g} type="button"
+                    onClick={() => qb.patchStone(stone.uid, { sizeKey: packRoundSizeKey(roundSelection?.sizeKey ?? '', g, roundSelection?.clarity || 'VVS') })}
+                    className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${roundSelection?.growth === g ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </Field>
+            <Field label="Clarity">
+              <div className="grid grid-cols-2 gap-2">
+                {(['VVS', 'VS'] as const).map(c => (
+                  <button key={c} type="button"
+                    onClick={() => qb.patchStone(stone.uid, { sizeKey: packRoundSizeKey(roundSelection?.sizeKey ?? '', roundSelection?.growth || 'HPHT', c) })}
+                    className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${roundSelection?.clarity === c ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                    {c}
+                  </button>
+                ))}
+              </div>
+            </Field>
+          </div>
+        )}
         {stone.role !== 'MAIN' && (
           <Field label="Size">
-            <select value={stone.sizeKey} onChange={e => qb.patchStone(stone.uid, { sizeKey: e.target.value })} className={miniCls}>
+            <select value={isRoundMelee ? (roundSelection?.sizeKey ?? '') : stone.sizeKey}
+              onChange={e => {
+                const v = e.target.value
+                if (isRoundMelee) {
+                  qb.patchStone(stone.uid, { sizeKey: v === '' ? '' : packRoundSizeKey(v, roundSelection?.growth || 'HPHT', roundSelection?.clarity || 'VVS') })
+                } else {
+                  qb.patchStone(stone.uid, { sizeKey: v })
+                }
+              }}
+              className={miniCls}>
               <option value="">Custom — enter carats &amp; price</option>
-              {sizes.map(d => <option key={d.id} value={d.sizeKey}>{d.label} — ${d.basePrice}{d.ctPerStone != null ? '/ct' : ''}</option>)}
+              {isFancyShape
+                ? fancySizes.map(p => <option key={p.id} value={p.sizeKey}>{p.sizeKey}{p.pointerLabel ? ` — ${p.pointerLabel}` : ''} · ${p.pricePerCarat}/ct</option>)
+                : isRoundMelee
+                ? qb.config.roundMeleePrices.map(p => (
+                    <option key={p.id} value={p.sizeKey}>
+                      {p.sizeKey}{p.pointerLabel ? ` — ${p.pointerLabel}` : ''} · ${roundMeleePriceValue(p, roundSelection?.growth || 'HPHT', roundSelection?.clarity || 'VVS')}/ct
+                    </option>
+                  ))
+                : sizes.map(d => (
+                    // Natural sizes hide the price here — it's always set in
+                    // the "Cost per carat" override below, so showing a
+                    // number in this dropdown too just invites confusion.
+                    <option key={d.id} value={d.sizeKey}>{d.label}{stone.stoneType === 'natural' ? '' : ` — $${d.basePrice}${d.ctPerStone != null ? '/ct' : ''}`}</option>
+                  ))}
             </select>
+            {isFancyShape && <p className="mt-1 text-[10px] text-slate-400">Priced from the {stone.shape} melee sheet.</p>}
+            {isRoundMelee && <p className="mt-1 text-[10px] text-slate-400">Priced from the Round melee sheet ({roundSelection?.growth || 'HPHT'}/{roundSelection?.clarity || 'VVS'}).</p>}
           </Field>
         )}
         <Field label="Carats">
@@ -843,12 +959,23 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
             {qb.config.setters.map(s => <option key={s.typeKey} value={s.typeKey}>{s.label} — ${s.fee}</option>)}
           </select>
         </Field>
-        <Field label="Shape (optional)">
-          <select value={stone.shape} onChange={e => qb.patchStone(stone.uid, { shape: e.target.value })} className={miniCls}>
-            <option value="">—</option>
-            {STONE_SHAPES.map(sh => <option key={sh} value={sh}>{sh}</option>)}
-          </select>
-        </Field>
+        {/* Natural vs Lab — popup comparing the same stone priced both ways.
+            Hidden for fancy-shape and round-melee sizes: both sheets are
+            Lab-only, so there's no equivalent Natural price to compare against. */}
+        {!isFancyShape && !isRoundMelee && (
+          <div className="col-span-2">
+            <button type="button" onClick={() => setCompareOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">
+              <Scale className="h-3.5 w-3.5 text-slate-400" />
+              Natural vs Lab
+              {compareData.cheaper && (
+                <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-700">
+                  {compareData.cheaper === stone.stoneType ? 'best price' : `${compareData.cheaper === 'natural' ? 'Natural' : 'Lab'} cheaper`}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
         <Field label="Color (optional)">
           <select value={stone.color} onChange={e => qb.patchStone(stone.uid, { color: e.target.value })} className={miniCls}>
             <option value="">—</option>
@@ -873,15 +1000,21 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
         )}
         {/* Grouped so it's unmistakable these two overrides are related
             (price and setting fee) yet independent of each other — the
-            live total at the bottom proves it. */}
+            live total at the bottom proves it. Cost per carat is available
+            for both custom and preset sizes: it's always $/ct × carats. */}
         <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3 md:col-span-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">Pricing overrides</p>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label={stone.role === 'MAIN' ? 'Wholesale cost' : 'Gross cost for this batch of stones'} hint={customSize ? '(required — total for all stones in this batch)' : `(overrides ${money(pricePerCarat)}/ct × total carats)`} hintError={customSize}>
-              <input type="number" min={0} step="0.01" value={stone.manualPrice}
-                placeholder={customSize ? 'e.g. 4500 (required)' : 'Leave empty to use calculated price'}
-                onChange={e => qb.onStoneManualPriceChange(stone.uid, e.target.value)}
-                className={`${miniCls} ${customSize && stone.manualPrice.trim() === '' ? 'border-rose-300' : ''}`} />
+            <Field label="Cost per carat" hint={customSize ? '(required — size/cut not in the system; the total is calculated automatically)' : `(optional — overrides the ${money(pricePerCarat)}/ct looked up for this size)`} hintError={customSize}>
+              <input type="number" min={0} step="0.01" value={stone.manualPricePerCarat}
+                placeholder={customSize ? 'e.g. 1500 per carat' : `Default — ${money(pricePerCarat)}/ct`}
+                onChange={e => qb.onStoneManualPricePerCaratChange(stone.uid, e.target.value)}
+                className={`${miniCls} ${customSize && stone.manualPricePerCarat.trim() === '' ? 'border-rose-300' : ''}`} />
+              {caratsNum > 0 && (
+                <p className="text-[11px] text-slate-500">
+                  = {money(stoneCost)} total ({caratsNum} ct × {money(stone.manualPricePerCarat.trim() !== '' ? qb.parseNum(stone.manualPricePerCarat) : pricePerCarat)}/ct)
+                </p>
+              )}
             </Field>
             <Field label="Custom setting fee (optional)">
               <input type="text" inputMode="decimal" value={stone.setterFeeOverride}
@@ -925,6 +1058,26 @@ function StoneEditor({ qb, stone, index }: { qb: QuoteBuilderState; stone: Stone
           </div>
         )}
       </div>
+
+      <div className="mt-3 flex items-center justify-end pl-2">
+        <button type="button" onClick={() => stone.stoneTypeChosen && qb.collapseStone(stone.uid)}
+          disabled={!stone.stoneTypeChosen} title={stone.stoneTypeChosen ? undefined : 'Choose Natural or Lab first'}
+          className={`inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r ${m.bar} px-4 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40`}>
+          <Check className="h-3.5 w-3.5" /> Done
+        </button>
+      </div>
+
+      <StoneTypeCompareDialog
+        open={compareOpen}
+        comparison={compareData}
+        current={stone.stoneType}
+        carats={caratsNum}
+        title={`${m.label} stone #${index + 1}`}
+        sizeKey={stone.sizeKey}
+        onCreatedLabSize={() => qb.config.refresh()}
+        onPick={t => qb.patchStone(stone.uid, { stoneType: t })}
+        onClose={() => setCompareOpen(false)}
+      />
     </div>
   )
 }
@@ -1322,6 +1475,57 @@ function StepReview({ qb }: { qb: QuoteBuilderState }) {
   )
 }
 
+// Internal-only notes + a photo gallery for conversation screenshots and
+// references — never shown to the client (unlike the customer-facing notes
+// and reference photo collected in Step 1).
+function InternalAttachments({ qb }: { qb: QuoteBuilderState }) {
+  return (
+    <SectionCard title="Internal notes & attachments" subtitle="Conversation screenshots, references — never shown to the client." icon={ImagePlus}>
+      <div className="space-y-4">
+        <div>
+          <label className={labelCls}>Internal notes <span className="font-normal normal-case text-slate-400">(optional)</span></label>
+          <textarea rows={4} value={qb.internalNotes} onChange={e => qb.setInternalNotes(e.target.value)}
+            placeholder="Customer preferences, follow-up reminders, context for your records. Never shown to the client."
+            className={`${inputCls} resize-y`} />
+        </div>
+
+        <input ref={qb.attachmentInputRef} id="wz-attachment-files" type="file" accept="image/*" multiple onChange={qb.handleAttachmentsChange} className="hidden" />
+        <input ref={qb.attachmentCameraRef} id="wz-attachment-camera" type="file" accept="image/*" capture="environment" onChange={qb.handleAttachmentsChange} className="hidden" />
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label htmlFor="wz-attachment-camera" className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white sm:hidden">
+            <Camera className="h-4 w-4 shrink-0 text-slate-400" /> Take photo
+          </label>
+          <label htmlFor="wz-attachment-files" className="flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500 transition hover:border-slate-400 hover:bg-white sm:col-span-2">
+            <ImagePlus className="h-4 w-4 shrink-0 text-slate-400" /> Add photos (multiple allowed)
+          </label>
+        </div>
+
+        {qb.attachments.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-3 text-xs text-slate-400">No attachments yet.</p>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {qb.attachments.map((a, idx) => (
+              <div key={a.uid} className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <img src={a.photo} alt={`Attachment ${idx + 1}`} className="max-h-48 w-full object-cover" />
+                <button type="button" onClick={() => qb.removeAttachment(a.uid)} aria-label="Remove attachment"
+                  className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur-sm transition hover:bg-black/80">
+                  <X className="h-3.5 w-3.5" />
+                </button>
+                <div className="space-y-1.5 p-3">
+                  <input type="text" value={a.caption} onChange={e => qb.patchAttachment(a.uid, { caption: e.target.value })}
+                    placeholder="Optional caption (e.g. WhatsApp Apr 15 — switch to sapphires)"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 outline-none focus:border-slate-400 focus:bg-white" />
+                  <p className="text-[10px] text-slate-400">Added {new Date(a.createdAt).toLocaleString()}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </SectionCard>
+  )
+}
+
 function ReviewItem({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-slate-50 px-4 py-3">
@@ -1365,10 +1569,16 @@ function PriceSummary({ qb }: { qb: QuoteBuilderState }) {
     <Card className="rounded-[30px] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.18)] xl:sticky xl:top-24">
       <CardContent className="space-y-4 p-6">
         <div className="rounded-2xl p-5 text-white" style={{ backgroundColor: 'var(--theme-primary)' }}>
-          <p className="text-xs uppercase tracking-[0.18em] text-amber-300">Customer price</p>
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-xs uppercase tracking-[0.18em] text-amber-300">Customer price</p>
+            <button type="button" onClick={() => qb.setEditingOverride(!qb.editingOverride)}
+              className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider transition ${qb.editingOverride ? 'bg-white text-slate-900' : 'bg-white/10 text-amber-200 hover:bg-white/20'}`}>
+              {qb.editingOverride ? 'Close' : (qb.parsedOverride != null ? 'Edit override' : 'Edit total')}
+            </button>
+          </div>
           <p className="mt-2 text-4xl font-semibold tracking-tight">{money(qb.customerPrice)}</p>
           <p className="mt-1 text-[11px] font-medium uppercase tracking-wider text-amber-200/90">
-            {qb.parsedOverride != null ? 'Custom total' : `${qb.parsedMarkup}×${qb.parsedDiscount > 0 ? `, −${qb.parsedDiscount}%` : ''}${qb.applyTaxes ? ', +7.75% tax' : ''}`}
+            {qb.parsedOverride != null ? 'Custom total — markup/discount/tax bypassed' : `${qb.parsedMarkup}×${qb.parsedDiscount > 0 ? `, −${qb.parsedDiscount}%` : ''}${qb.applyTaxes ? ', +7.75% tax' : ''}`}
           </p>
           <div className="mt-3 flex items-baseline justify-between rounded-xl bg-black/20 px-3 py-2">
             <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">Our cost</span>
@@ -1376,6 +1586,58 @@ function PriceSummary({ qb }: { qb: QuoteBuilderState }) {
           </div>
           {qb.parsedDiscount > 0 && qb.parsedOverride == null && (
             <p className="mt-1 text-xs text-emerald-300/90">Discount −{money(qb.discountAmount)} ({qb.parsedDiscount}% off)</p>
+          )}
+          {qb.parsedOverride != null && qb.customerPriceOverrideReason.trim() !== '' && (
+            <p className="mt-1 text-[11px] text-amber-200/80">Reason: <span className="text-white">{qb.customerPriceOverrideReason}</span></p>
+          )}
+          {qb.editingOverride && (
+            <div className="mt-3 space-y-2 rounded-xl border border-white/15 bg-black/20 p-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-amber-200/90">
+                  Custom customer total <span className="font-normal normal-case text-slate-300">(empty = computed price)</span>
+                </label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-slate-400">$</span>
+                  <input type="text" inputMode="decimal" value={qb.customerPriceOverrideText}
+                    placeholder={qb.computedCustomerPrice.toFixed(2)}
+                    onChange={e => { qb.setCustomerPriceOverrideText(e.target.value); qb.setOverrideError(null) }}
+                    className="w-full rounded-lg border border-white/20 bg-white/10 px-3 py-2 pl-7 text-sm text-white placeholder:text-slate-400 outline-none focus:border-amber-300" />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-amber-200/90">
+                  Reason {qb.parsedOverride != null && <span className="text-rose-300">(required)</span>}
+                </label>
+                <textarea rows={2} value={qb.customerPriceOverrideReason}
+                  onChange={e => { qb.setCustomerPriceOverrideReason(e.target.value); qb.setOverrideError(null) }}
+                  placeholder="e.g. Matched competitor quote, goodwill discount, rounded for cash deal…"
+                  className="w-full resize-y rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-sm text-white placeholder:text-slate-400 outline-none focus:border-amber-300" />
+              </div>
+              {qb.overrideError && <p className="text-[11px] font-medium text-rose-300">{qb.overrideError}</p>}
+              <div className="flex items-center gap-2 pt-1">
+                <button type="button"
+                  onClick={() => { qb.setCustomerPriceOverrideText(''); qb.setCustomerPriceOverrideReason(''); qb.setOverrideError(null) }}
+                  className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-200 transition hover:bg-white/20">
+                  Clear override
+                </button>
+                <button type="button" onClick={() => qb.setCustomerPriceOverrideText(String(Math.round(qb.customerPrice)))}
+                  className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-slate-200 transition hover:bg-white/20">
+                  Round
+                </button>
+                <button type="button"
+                  onClick={() => {
+                    if (qb.customerPriceOverrideText.trim() !== '' && qb.customerPriceOverrideReason.trim() === '') {
+                      qb.setOverrideError('Please type a short reason for the override.')
+                      return
+                    }
+                    qb.setOverrideError(null)
+                    qb.setEditingOverride(false)
+                  }}
+                  className="ml-auto rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-slate-900 transition hover:bg-amber-100">
+                  Apply
+                </button>
+              </div>
+            </div>
           )}
         </div>
         <div className="space-y-2 text-sm">

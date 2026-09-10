@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { useAuth } from '@/context/AuthContext'
-import { useQuoteConfig, normalizeSizeKey } from '@/hooks/useQuoteConfig'
+import {
+  useQuoteConfig, normalizeSizeKey,
+  unpackRoundSizeKey, roundMeleePriceValue,
+} from '@/hooks/useQuoteConfig'
 import { gemstoneService } from '@/services/gemstoneService'
 import { companyService, ENGRAVING_SLIDER_DEFAULTS } from '@/services/companyService'
 import { quotesService } from '@/services/quotesService'
@@ -99,6 +102,11 @@ export interface StoneRow {
   uid: string
   role: StoneRole
   stoneType: 'natural' | 'lab-grown'
+  /** Explicit Natural-vs-Lab choice made by the user — starts false so a
+   *  stone never silently defaults to Natural. Gates collapsing the stone
+   *  and saving the quote; see `stoneTypeChosen` gating in the Wizard's
+   *  StoneEditor and in `handleQuoteReady`. */
+  stoneTypeChosen: boolean
   /** Only surfaced on MAIN stones — SIDE/MELEE are always 'diamond'. */
   stoneCategory: 'diamond' | 'gemstone'
   /** Gemstone catalog id (as a string, for the <select>) when stoneCategory
@@ -117,6 +125,10 @@ export interface StoneRow {
   cut: string
   clarity: string
   manualPrice: string
+  /** Cost-per-carat override, available for any size (preset or custom) —
+   *  the jeweler types $/ct by hand and `manualPrice` (the value every cost
+   *  formula and the save payload actually read) is kept in sync from it. */
+  manualPricePerCarat: string
   comments: string
   markup: string
   collapsed: boolean
@@ -319,13 +331,15 @@ export function useQuoteBuilder() {
     setCustomerNotes(dup.customerNotes ?? '')
 
     setStones((dup.stones ?? []).map(s => {
-      const ct = config.diamondSizeFor(s.stoneType, s.sizeKey)?.ctPerStone ?? 0
+      const ct = sizePricingFor({ stoneType: s.stoneType, shape: s.shape ?? '', sizeKey: s.sizeKey }).ctPerStone
       const carats = s.carats ?? 0
       const amount = ct > 0 && carats > 0 ? String(Math.round(carats / ct)) : ''
       return {
         uid: crypto.randomUUID(),
         role: s.role,
         stoneType: s.stoneType,
+        // A duplicated stone already had a type picked historically.
+        stoneTypeChosen: true,
         stoneCategory: s.stoneCategory === 'GEMSTONE' ? 'gemstone' : 'diamond',
         gemstoneId: s.gemstoneId != null ? String(s.gemstoneId) : '',
         sizeKey: s.sizeKey,
@@ -339,6 +353,12 @@ export function useQuoteBuilder() {
         cut: s.cut ?? '',
         clarity: s.clarity ?? '',
         manualPrice: s.manualPrice != null ? String(s.manualPrice) : '',
+        // Back-derive $/ct from the stored total so a duplicated custom-size
+        // stone's per-carat field isn't blank — the user just typed a total
+        // historically, so this is our best reconstruction of it.
+        manualPricePerCarat: s.sizeKey === '' && s.manualPrice != null && carats > 0
+          ? String(Math.round((s.manualPrice / carats) * 100) / 100)
+          : '',
         comments: s.comments ?? '',
         markup: s.markupMultiplier != null ? String(s.markupMultiplier) : (s.role === 'MAIN' ? String(DEFAULT_MARKUP) : ''),
         collapsed: true,
@@ -498,6 +518,63 @@ export function useQuoteBuilder() {
     LAB: config.diamondSizes.filter(d => d.stoneType === 'LAB'),
   }), [config.diamondSizes])
 
+  // Resolves the effective per-carat price + ct-per-stone for a stone, given
+  // its Type and Shape. Lab-grown stones whose Shape matches a fancy melee
+  // price-sheet entry (Oval, Princess, Baguette, ...) price from that table
+  // instead of the generic diamond_size_config lookup. Lab-grown Round
+  // stones price from the round melee sheet (split by growth method x
+  // clarity tier, packed into sizeKey — see packRoundSizeKey). Everything
+  // else falls back to the original per-mm behavior unchanged.
+  const sizePricingFor = (stone: Pick<StoneRow, 'stoneType' | 'shape' | 'sizeKey'>) => {
+    if (stone.stoneType === 'lab-grown' && stone.shape && stone.sizeKey) {
+      const fancyRow = config.fancyMeleePriceFor(stone.shape, stone.sizeKey)
+      if (fancyRow) {
+        return {
+          pricePerCarat: fancyRow.pricePerCarat,
+          ctPerStone: fancyRow.ctPerStone,
+          label: `${fancyRow.sizeKey}${fancyRow.pointerLabel ? ` · ${fancyRow.pointerLabel}` : ''}`,
+          fancy: true as const,
+        }
+      }
+      if (stone.shape === 'Round' && config.roundMeleePrices.length > 0) {
+        const { sizeKey: baseKey, growth, clarity } = unpackRoundSizeKey(stone.sizeKey)
+        const roundRow = baseKey ? config.roundMeleePriceFor(baseKey) : undefined
+        if (roundRow && growth && clarity) {
+          return {
+            pricePerCarat: roundMeleePriceValue(roundRow, growth, clarity),
+            ctPerStone: roundRow.ctPerStone,
+            label: `${roundRow.sizeKey}${roundRow.pointerLabel ? ` · ${roundRow.pointerLabel}` : ''} · ${growth}/${clarity}`,
+            fancy: true as const,
+          }
+        }
+        // Growth method / clarity tier not chosen yet (or no size picked) —
+        // no price to show, but keep the label human-readable instead of
+        // leaking the raw packed sizeKey.
+        return { pricePerCarat: 0, ctPerStone: 0, label: 'Choose growth & clarity', fancy: true as const }
+      }
+    }
+    const sizeCfg = config.diamondSizeFor(stone.stoneType, stone.sizeKey)
+    const mult = DIAMOND_TYPE_OPTIONS[stone.stoneType]?.multiplier ?? 1
+    return {
+      pricePerCarat: (sizeCfg?.basePrice ?? 0) * mult,
+      ctPerStone: sizeCfg?.ctPerStone ?? 0,
+      label: sizeCfg?.label ?? (stone.sizeKey || 'Custom'),
+      fancy: false as const,
+    }
+  }
+
+  // Shape picker options, grouped so Round (its own melee sheet) is never
+  // shown as if it were one more fancy shape: "Round" standalone, every
+  // shape the fancy melee sheet has data for (Baguette, Trilliant, Square
+  // Cushion, ... aren't in the original cosmetic list, so union them in),
+  // then whatever's left of the original cosmetic list with no sheet at all
+  // (e.g. plain "Cushion" — priced generically, same as always).
+  const fancyShapeOptions = config.fancyShapes
+  const otherShapeOptions = useMemo(
+    () => STONE_SHAPES.filter(sh => sh !== 'Round' && !config.fancyShapes.includes(sh)),
+    [config.fancyShapes],
+  )
+
   const defaultStoneFor = (role: StoneRole): StoneRow => {
     const sizes = sizesByStoneType.NATURAL
     const firstSetter = config.setters[0]?.typeKey ?? ''
@@ -505,6 +582,7 @@ export function useQuoteBuilder() {
       uid: crypto.randomUUID(),
       role,
       stoneType: 'natural',
+      stoneTypeChosen: false,
       stoneCategory: 'diamond',
       gemstoneId: '',
       // MAIN stones are always individually priced (Wholesale cost), never
@@ -520,6 +598,7 @@ export function useQuoteBuilder() {
       cut: '',
       clarity: '',
       manualPrice: '',
+      manualPricePerCarat: '',
       comments: '',
       // MAIN stones must always carry an explicit markup so it's never
       // ambiguous whether one applies — pre-fill with the quote's default.
@@ -553,33 +632,60 @@ export function useQuoteBuilder() {
       } else if (patch.stoneCategory === 'gemstone' && !s.gemstoneId) {
         next.gemstoneId = gemstones[0]?.id ?? ''
       }
-      if (patch.stoneType && !patch.sizeKey && s.role !== 'MAIN') {
-        const list = patch.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
-        const match = list.find(d => normalizeSizeKey(d.sizeKey) === normalizeSizeKey(next.sizeKey))
-        if (match) {
-          next.sizeKey = match.sizeKey
+      // If the type or shape changed (and the size wasn't explicitly part of
+      // this same patch), the current sizeKey may no longer belong to the
+      // right price table — generic diamond_size_config, fancy_melee_prices
+      // and round_melee_prices each have their own key space, and a raw
+      // key/packed round key from one means nothing in another. Lab-grown +
+      // a Round/fancy shape means the size has to be re-picked from that
+      // sheet, so clear it outright instead of silently falling back to a
+      // coincidentally-matching generic row. Otherwise, jump to a matching
+      // (or first) row in the right generic list. Skip entirely when the
+      // stone was already on "Custom" (sizeKey === '') — that's always valid
+      // regardless of type/shape, so a cosmetic Shape pick on a Natural
+      // custom-priced stone must NOT force it onto a preset size.
+      if ((patch.stoneType || patch.shape !== undefined) && !patch.sizeKey && s.role !== 'MAIN' && s.sizeKey !== '') {
+        const usesSpecialSheet = next.stoneType === 'lab-grown' && (next.shape === 'Round' || config.fancyShapes.includes(next.shape))
+        if (usesSpecialSheet) {
+          next.sizeKey = ''
         } else {
-          next.sizeKey = list[0]?.sizeKey ?? ''
+          const list = next.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
+          const match = list.find(d => normalizeSizeKey(d.sizeKey) === normalizeSizeKey(next.sizeKey))
+          next.sizeKey = match ? match.sizeKey : (list[0]?.sizeKey ?? '')
         }
       }
       return next
     }))
   }
 
+  // Two-way sync between carats and amount for a single stone via ctPerStone.
+  // The typed field keeps the raw string (so "0." stays "0."); the derived
+  // field is overwritten with a formatted number string.
   const onStoneCaratsChange = (uid: string, caratsText: string) => {
     setStones(prev => prev.map(s => {
       if (s.uid !== uid) return s
-      const ct = config.diamondSizeFor(s.stoneType, s.sizeKey)?.ctPerStone ?? 0
-      if (caratsText === '') return { ...s, carats: '', amount: '' }
+      const ct = sizePricingFor(s).ctPerStone
+      // When a $/ct override is set (custom size or not), the total is
+      // derived from $/ct × carats, so it has to be recalculated whenever
+      // carats changes too.
+      if (caratsText === '') {
+        return {
+          ...s, carats: '', amount: '',
+          manualPrice: s.manualPricePerCarat.trim() !== '' ? '' : s.manualPrice,
+        }
+      }
       const carats = parseNum(caratsText)
       const amount = ct > 0 ? String(Math.round(carats / ct)) : s.amount
-      return { ...s, carats: caratsText, amount }
+      const manualPrice = s.manualPricePerCarat.trim() !== ''
+        ? String(Math.round(carats * parseNum(s.manualPricePerCarat) * 100) / 100)
+        : s.manualPrice
+      return { ...s, carats: caratsText, amount, manualPrice }
     }))
   }
   const onStoneAmountChange = (uid: string, amountText: string) => {
     setStones(prev => prev.map(s => {
       if (s.uid !== uid) return s
-      const ct = config.diamondSizeFor(s.stoneType, s.sizeKey)?.ctPerStone ?? 0
+      const ct = sizePricingFor(s).ctPerStone
       if (amountText === '') return { ...s, amount: '', carats: '' }
       const amount = parseNum(amountText)
       const carats = ct > 0
@@ -589,11 +695,19 @@ export function useQuoteBuilder() {
     }))
   }
 
-  const onStoneManualPriceChange = (uid: string, priceText: string) => {
+  // Cost-per-carat override, available for both custom and preset sizes — the
+  // jeweler types $/ct by hand instead of a flat total; the system multiplies
+  // by carats and keeps manualPrice (the value every cost formula and the
+  // save payload actually read) in sync.
+  const onStoneManualPricePerCaratChange = (uid: string, perCaratText: string) => {
     setStones(prev => prev.map(s => {
       if (s.uid !== uid) return s
-      const shouldSeedAmount = priceText.trim() !== '' && s.amount.trim() === ''
-      return { ...s, manualPrice: priceText, amount: shouldSeedAmount ? '1' : s.amount }
+      const carats = parseNum(s.carats)
+      const shouldSeedAmount = perCaratText.trim() !== '' && s.amount.trim() === ''
+      const manualPrice = perCaratText.trim() === ''
+        ? ''
+        : String(Math.round(carats * parseNum(perCaratText) * 100) / 100)
+      return { ...s, manualPricePerCarat: perCaratText, manualPrice, amount: shouldSeedAmount ? '1' : s.amount }
     }))
   }
 
@@ -628,9 +742,7 @@ export function useQuoteBuilder() {
     let totalCarats = 0
     let totalAmount = 0
     const stoneBreakdown = stones.map(s => {
-      const sizeCfg = config.diamondSizeFor(s.stoneType, s.sizeKey)
-      const mult = DIAMOND_TYPE_OPTIONS[s.stoneType].multiplier
-      const pricePerCarat = (sizeCfg?.basePrice ?? 0) * mult
+      const { pricePerCarat } = sizePricingFor(s)
       const carats = parseNum(s.carats)
       const amount = parseNum(s.amount)
       const hasManualPrice = s.manualPrice.trim() !== ''
@@ -776,9 +888,19 @@ export function useQuoteBuilder() {
     if (!jewelryType) errors.jewelryType = 'Please select a type of piece.'
     setFieldErrors(errors)
     if (Object.keys(errors).length > 0) return
-    const customMissingPrice = stones.some(s => s.sizeKey === '' && s.manualPrice.trim() === '')
+    // Every main/side/melee stone must have an explicit Natural-vs-Lab choice
+    // — no silently defaulting to Natural.
+    const missingStoneType = !rnMode && stones.some(s => !s.stoneTypeChosen)
+    if (missingStoneType) {
+      setSaveError('Choose Natural or Lab for every stone (Main, Side, Melee) before creating the quote.')
+      return
+    }
+    // A "Custom" (no-preset) size has no per-carat base, so its price must be
+    // typed in — otherwise the stone would contribute $0. Only required for
+    // custom-size stones; preset sizes price themselves.
+    const customMissingPrice = stones.some(s => s.sizeKey === '' && (s.manualPricePerCarat.trim() === '' || parseNum(s.carats) <= 0))
     if (customMissingPrice) {
-      setSaveError('Enter the stone price for any “Custom” size stone before creating the quote.')
+      setSaveError('Enter the carats and cost per carat for any stone whose size/cut isn\'t in the system before creating the quote.')
       return
     }
     const mainMissingMarkup = stones.some(s => s.role === 'MAIN' && (s.markup.trim() === '' || !(Number(s.markup) > 0)))
@@ -1050,10 +1172,10 @@ export function useQuoteBuilder() {
     // stones
     stones, setStones, parseNum,
     mainStones, sideStones, meleeStones,
-    sizesByStoneType,
+    sizesByStoneType, sizePricingFor, fancyShapeOptions, otherShapeOptions,
     addStone, removeStone, patchStone,
     toggleCollapsed, collapseStone,
-    onStoneCaratsChange, onStoneAmountChange, onStoneManualPriceChange,
+    onStoneCaratsChange, onStoneAmountChange, onStoneManualPricePerCaratChange,
     // customer stones
     customerStones, customerSetters, gemstones,
     addCustomerStone, removeCustomerStone, patchCustomerStone,
