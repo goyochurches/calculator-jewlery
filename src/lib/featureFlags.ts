@@ -41,7 +41,6 @@ export type FeatureKey =
   | 'payments'
   | 'reviews'
   | 'master-tables'
-  | 'cad-design'
   // In-page features — finer-grained controls inside individual pages.
   | 'quote-delete'
   | 'quote-copy-text'
@@ -70,7 +69,6 @@ export const FEATURE_CATALOG: FeatureDef[] = [
   { key: 'payments',      group: 'modules', label: 'Payments',      description: 'Payments page + the payment plan block inside quotes.', defaultOn: false },
   { key: 'reviews',       group: 'modules', label: 'Reviews',       description: 'Google reviews page.' },
   { key: 'master-tables', group: 'modules', label: 'Master Tables', description: 'Pricing master tables.' },
-  { key: 'cad-design',    group: 'modules', label: 'CAD Design',    description: 'Parametric ring band generator with a live 3D preview and STL export. Early preview — no stone settings/prongs yet.', defaultOn: false },
   { key: 'quote-delete',    group: 'features', label: 'Delete quotes',   description: 'Show the Delete button in the quote detail (admin only).' },
   { key: 'quote-copy-text', group: 'features', label: 'Copy quote text', description: 'Show the "Copy details to share" button on the public quote page.' },
   { key: 'quote-pdf',       group: 'features', label: 'Quote PDF',       description: 'Show the "PDF" download button in the quote detail.', defaultOn: false },
