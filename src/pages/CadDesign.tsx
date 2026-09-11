@@ -9,7 +9,7 @@ import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import type { JewelryMetalOption } from '@/types'
 import {
   buildRingBandGeometry, usSizeToDiameterMm, type BandProfile,
-  buildStoneHeadGroup, buildBezelHeadGroup, attachHeadToBand, roundDiameterMmFromCarat,
+  buildStoneHeadGroup, buildBezelHeadGroup, buildHaloGroup, attachHeadToBand, roundDiameterMmFromCarat,
   buildFancyStoneHeadGroup, type FancyStoneShape,
   buildPaveRow, buildChannelSetting,
   unionMetalParts, extractStoneMeshes,
@@ -65,6 +65,9 @@ export function CadDesignPage() {
   const [fancyWidthMm, setFancyWidthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.widthMm)
   const [settingType, setSettingType] = useState<SettingType>('prong')
   const [prongCount, setProngCount] = useState<4 | 6>(4)
+  const [includeHalo, setIncludeHalo] = useState(false)
+  const [haloCount, setHaloCount] = useState(16)
+  const [haloStoneMm, setHaloStoneMm] = useState(1.2)
   const [includePave, setIncludePave] = useState(false)
   const [paveSettingType, setPaveSettingType] = useState<'pave' | 'channel'>('pave')
   const [paveCount, setPaveCount] = useState(12)
@@ -73,6 +76,8 @@ export function CadDesignPage() {
 
   const innerDiameterMm = usSizeToDiameterMm(fingerSize)
   const stoneDiameterMm = roundDiameterMmFromCarat(caratWeight)
+  // Round center stone only for now — see the roadmap memory.
+  const haloEligible = includeHalo && stoneShape === 'round'
 
   const selectStoneShape = (shape: StoneShape) => {
     setStoneShape(shape)
@@ -97,6 +102,12 @@ export function CadDesignPage() {
         : buildFancyStoneHeadGroup({ shape: stoneShape, lengthMm: fancyLengthMm, widthMm: fancyWidthMm })
       attachHeadToBand(head, { fingerSize, widthMm, thicknessMm, profile })
       group.add(head)
+
+      if (haloEligible) {
+        const halo = buildHaloGroup({ stoneDiameterMm, haloCount, haloStoneDiameterMm: haloStoneMm })
+        attachHeadToBand(halo, { fingerSize, widthMm, thicknessMm, profile })
+        group.add(halo)
+      }
     }
     if (includePave) {
       const sideStones = paveSettingType === 'channel'
@@ -106,7 +117,7 @@ export function CadDesignPage() {
     }
     return group
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneShape, settingType, stoneDiameterMm, prongCount, fancyLengthMm, fancyWidthMm, includePave, paveSettingType, paveCount, paveStoneMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneShape, settingType, stoneDiameterMm, prongCount, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -286,6 +297,33 @@ export function CadDesignPage() {
                   )}
                   {stoneShape !== 'round' && (
                     <p className="text-[11px] text-slate-400">Fancy shapes use 4 fixed prongs for now — adjustable count is a future refinement.</p>
+                  )}
+
+                  {stoneShape === 'round' && (
+                    <div className="space-y-3 border-t border-slate-200 pt-3">
+                      <label className="flex items-center justify-between gap-3">
+                        <span className="text-sm font-semibold text-slate-900">Halo</span>
+                        <input type="checkbox" checked={includeHalo} onChange={e => setIncludeHalo(e.target.checked)}
+                          className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+                      </label>
+                      {includeHalo && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className={labelCls}>Halo stone count</label>
+                            <input type="number" min={6} max={40} step={1} value={haloCount}
+                              onChange={e => setHaloCount(Math.max(6, Number(e.target.value) || 6))} className={inputCls} />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Halo stone size (mm)</label>
+                            <input type="number" min={0.5} max={3} step={0.1} value={haloStoneMm}
+                              onChange={e => setHaloStoneMm(Math.max(0.5, Number(e.target.value) || 0.5))} className={inputCls} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {stoneShape !== 'round' && includeHalo && (
+                    <p className="text-[11px] text-slate-400">Halo is round-center-stone only for now.</p>
                   )}
                 </>
               )}

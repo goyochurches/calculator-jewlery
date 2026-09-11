@@ -249,6 +249,46 @@ export function buildBezelHeadGroup(params: BezelHeadParams): THREE.Group {
   return group
 }
 
+// ── Halo — a ring of small stones circling the center stone ─────────────────
+// Round center stone only for now — a fancy-shape halo would need to follow
+// that shape's own outline (scaled outward) rather than a plain circle, a
+// separate future piece (tracked in the roadmap memory alongside pear and
+// adjustable fancy prong count).
+
+export interface HaloParams {
+  /** The CENTER stone's own diameter, in mm — the halo rings around it. */
+  stoneDiameterMm: number
+  haloCount: number
+  haloStoneDiameterMm?: number
+  /** Gap between the center stone's edge and the halo stones, in mm. */
+  gapMm?: number
+}
+
+/** Small stones evenly spaced in a full circle just outside the center
+ *  stone's girdle, built in the SAME local "+Y up" space as the head —
+ *  call `attachHeadToBand` on this group too (with the same band params)
+ *  so it lines up with the head it surrounds. */
+export function buildHaloGroup(params: HaloParams): THREE.Group {
+  const { stoneDiameterMm, haloCount } = params
+  const stoneRadius = stoneDiameterMm / 2
+  const haloStoneRadius = (params.haloStoneDiameterMm ?? Math.max(0.8, stoneDiameterMm * 0.18)) / 2
+  const gapMm = params.gapMm ?? haloStoneRadius * 0.6
+  const orbitRadius = stoneRadius + gapMm + haloStoneRadius
+
+  const group = new THREE.Group()
+  for (let i = 0; i < haloCount; i++) {
+    const angle = (i / haloCount) * Math.PI * 2
+    const stone = new THREE.Mesh(new THREE.SphereGeometry(haloStoneRadius, 14, 10))
+    stone.position.set(Math.cos(angle) * orbitRadius, 0, Math.sin(angle) * orbitRadius)
+    stone.userData.isStone = true
+    group.add(stone)
+  }
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}
+
 /** Reorients a head group (built "+Y up") and places it on the band's outer
  *  surface at angle 0 (the Lathe convention's +X direction — see
  *  buildBandProfile) so its "up" axis points radially outward, matching how
