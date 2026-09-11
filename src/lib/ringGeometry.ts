@@ -465,33 +465,50 @@ function buildStoneOutline(shape: FancyStoneShape, halfW: number, halfL: number,
  *  hanging off a sharp point; oval at the "shoulders"; marquise at the two
  *  side bulges plus just short of the two tips). 4 prongs for all four —
  *  a reasonable default; larger stones often want 6, a future refinement. */
-function fancyProngPoints(shape: FancyStoneShape, halfW: number, halfL: number, count: 4 | 6 = 4): THREE.Vector2[] {
+/** A prong seat point plus whether it sits AT a sharp outline point (a
+ *  marquise/pear tip) — those get a V-tip wedge prong instead of a plain
+ *  round taper, since a round prong tip doesn't protect a sharp corner as
+ *  well. Every other shape/point is `isTip: false`. */
+interface ProngSeat { point: THREE.Vector2; isTip: boolean }
+
+function fancyProngPoints(shape: FancyStoneShape, halfW: number, halfL: number, count: 4 | 6 = 4): ProngSeat[] {
   switch (shape) {
     case 'oval': {
       // Evenly spaced by angle works cleanly for either count — no
-      // shape-specific landmark points needed.
-      const pts: THREE.Vector2[] = []
+      // shape-specific landmark points needed, and oval has no sharp tips.
+      const seats: ProngSeat[] = []
       for (let i = 0; i < count; i++) {
         const a = ((2 * i + 1) / count) * Math.PI
-        pts.push(new THREE.Vector2(halfW * Math.cos(a), halfL * Math.sin(a)))
+        seats.push({ point: new THREE.Vector2(halfW * Math.cos(a), halfL * Math.sin(a)), isTip: false })
       }
-      return pts
+      return seats
     }
     case 'princess':
     case 'cushion': {
       const inset = 0.82
-      const corners = ([[1, 1], [-1, 1], [-1, -1], [1, -1]] as const)
-        .map(([sx, sy]) => new THREE.Vector2(sx * halfW * inset, sy * halfL * inset))
+      const corners: ProngSeat[] = ([[1, 1], [-1, 1], [-1, -1], [1, -1]] as const)
+        .map(([sx, sy]) => ({ point: new THREE.Vector2(sx * halfW * inset, sy * halfL * inset), isTip: shape === 'princess' }))
       if (count === 4) return corners
       // 6: the 4 corners plus the midpoints of the length-axis edges —
       // where a bigger stone's extra pair of prongs typically goes.
-      return [...corners, new THREE.Vector2(0, halfL * inset), new THREE.Vector2(0, -halfL * inset)]
+      return [
+        ...corners,
+        { point: new THREE.Vector2(0, halfL * inset), isTip: false },
+        { point: new THREE.Vector2(0, -halfL * inset), isTip: false },
+      ]
     }
     case 'marquise': {
       const tipInset = 0.85
-      const tips = [new THREE.Vector2(0, halfL * tipInset), new THREE.Vector2(0, -halfL * tipInset)]
+      const tips: ProngSeat[] = [
+        { point: new THREE.Vector2(0, halfL * tipInset), isTip: true },
+        { point: new THREE.Vector2(0, -halfL * tipInset), isTip: true },
+      ]
       if (count === 4) {
-        return [new THREE.Vector2(halfW, 0), new THREE.Vector2(-halfW, 0), ...tips]
+        return [
+          { point: new THREE.Vector2(halfW, 0), isTip: false },
+          { point: new THREE.Vector2(-halfW, 0), isTip: false },
+          ...tips,
+        ]
       }
       // 6: tips + two points per side, each halfway (by the vesica arc's
       // own angle) between a tip and the side bulge — same circle-through-
@@ -502,7 +519,7 @@ function fancyProngPoints(shape: FancyStoneShape, halfW: number, halfL: number, 
       const mid = thetaTop / 2
       const rightPts = [mid, -mid].map(t => new THREE.Vector2(-c + R * Math.cos(t), R * Math.sin(t)))
       const leftPts = [Math.PI - mid, Math.PI + mid].map(t => new THREE.Vector2(c + R * Math.cos(t), R * Math.sin(t)))
-      return [...tips, ...rightPts, ...leftPts]
+      return [...tips, ...[...rightPts, ...leftPts].map(point => ({ point, isTip: false }))]
     }
   }
 }
@@ -549,12 +566,17 @@ export function buildFancyStoneHeadGroup(params: FancyStoneHeadParams): THREE.Gr
   gallery.position.y = -galleryDepth / 2
   group.add(gallery)
 
-  const prongPoints = fancyProngPoints(shape, halfW, halfL, params.prongCount ?? 4)
-  for (const p of prongPoints) {
+  const prongSeats = fancyProngPoints(shape, halfW, halfL, params.prongCount ?? 4)
+  for (const seat of prongSeats) {
+    // V-tip: a 3-sided wedge (ConeGeometry with 3 radial segments) instead
+    // of a round taper — better protects a sharp outline point (a
+    // princess corner or a marquise tip) than a round prong tip would.
     const prong = new THREE.Mesh(
-      new THREE.CylinderGeometry(prongDiameterMm * 0.35, prongDiameterMm / 2, prongHeightMm, 12),
+      seat.isTip
+        ? new THREE.ConeGeometry(prongDiameterMm * 0.55, prongHeightMm, 3)
+        : new THREE.CylinderGeometry(prongDiameterMm * 0.35, prongDiameterMm / 2, prongHeightMm, 12),
     )
-    prong.position.set(p.x, prongHeightMm / 2, p.y)
+    prong.position.set(seat.point.x, prongHeightMm / 2, seat.point.y)
     group.add(prong)
   }
 
