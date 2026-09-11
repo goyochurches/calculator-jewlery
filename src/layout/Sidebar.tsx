@@ -5,7 +5,6 @@ import { canAccess, type NavKey } from '@/constants/permissions'
 import { FEATURES, isFeatureKey } from '@/lib/featureFlags'
 import { canSeePayments } from '@/lib/paymentsAccess'
 import { useFeatures } from '@/hooks/useFeatures'
-import { useInternalPreview } from '@/lib/internalPreview'
 import { useInboxUnread } from '@/hooks/useInboxUnread'
 import { useTourOnce } from '@/hooks/useTourOnce'
 import type { TourStep } from '@/lib/tour'
@@ -107,19 +106,17 @@ function SidebarContent({
   const { user, logout } = useAuth()
   const { companyName, logo } = useBrand()
   const { isEnabled } = useFeatures()
-  const isInternalPreview = useInternalPreview()
   const navigate = useNavigate()
   const visibleNavItems = navItems.filter((item) => {
     if (item.hidden) return false
     // Runtime feature flag — keys outside the catalog (e.g. configuration)
-    // are always allowed so the Configuration page can't be hidden.
+    // are always allowed so the Configuration page can't be hidden. CAD
+    // Design is in the catalog (defaultOn: false) so it starts hidden for
+    // everyone until toggled on from Configuration, same as Quote PDF.
     if (isFeatureKey(item.key) && !isEnabled(item.key)) return false
     // Payments is gated on the specific shop-owner email, not on role.
     // Hide the sidebar entry for anyone else, even other ADMIN accounts.
     if (item.key === 'payments' && !canSeePayments(user)) return false
-    // CAD Design is a brand-new, still-being-validated tool — internal
-    // preview only, same as the CRM/aging widgets.
-    if (item.key === 'cad-design' && !isInternalPreview) return false
     return canAccess(user?.role, item.key)
   })
   const goToProfile = () => { onNavigate?.(); navigate('/profile') }

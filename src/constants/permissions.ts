@@ -47,8 +47,8 @@ export const ROLE_PERMISSIONS: Record<Role, NavKey[]> = {
   ],
   MANAGER: ['quotes', 'quotes-wizard', 'quotes-list', 'stock', 'stock-list', 'gemstones', 'messages', 'market-prices', 'cad-design'],
   JEWELER: ['quotes', 'quotes-wizard', 'quotes-list', 'stock', 'stock-list', 'gemstones', 'messages', 'market-prices', 'cad-design'],
-  SALES:   ['quotes', 'quotes-wizard', 'quotes-list', 'stock', 'stock-list', 'gemstones', 'messages', 'market-prices'],
-  VIEWER:  ['quotes', 'quotes-wizard', 'quotes-list', 'stock', 'stock-list', 'gemstones', 'messages', 'market-prices'],
+  SALES:   ['quotes', 'quotes-wizard', 'quotes-list', 'stock', 'stock-list', 'gemstones', 'messages', 'market-prices', 'cad-design'],
+  VIEWER:  ['quotes', 'quotes-wizard', 'quotes-list', 'stock', 'stock-list', 'gemstones', 'messages', 'market-prices', 'cad-design'],
 }
 
 export function canAccess(role: Role | undefined, key: NavKey): boolean {
