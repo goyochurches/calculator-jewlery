@@ -10,8 +10,22 @@ import type { JewelryMetalOption } from '@/types'
 import {
   buildRingBandGeometry, usSizeToDiameterMm, type BandProfile,
   buildStoneHeadGroup, attachHeadToBand, roundDiameterMmFromCarat,
+  buildFancyStoneHeadGroup, type FancyStoneShape,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
+
+type StoneShape = 'round' | FancyStoneShape
+
+const STONE_SHAPE_LABELS: Record<StoneShape, string> = {
+  round: 'Round', oval: 'Oval', cushion: 'Cushion', princess: 'Princess', marquise: 'Marquise',
+}
+// Reasonable starting length×width (mm) per fancy shape, editable afterward.
+const FANCY_SHAPE_DEFAULTS: Record<FancyStoneShape, { lengthMm: number; widthMm: number }> = {
+  oval: { lengthMm: 8, widthMm: 6 },
+  cushion: { lengthMm: 7, widthMm: 7 },
+  princess: { lengthMm: 6.5, widthMm: 6.5 },
+  marquise: { lengthMm: 10, widthMm: 5 },
+}
 import { Download, RotateCw, Scale } from 'lucide-react'
 
 // Approximate render colors per metal — cosmetic only, doesn't drive
@@ -41,11 +55,22 @@ export function CadDesignPage() {
   const [profile, setProfile] = useState<BandProfile>('comfort')
   const [metal, setMetal] = useState<JewelryMetalOption>('gold-18k-yellow')
   const [includeStone, setIncludeStone] = useState(true)
+  const [stoneShape, setStoneShape] = useState<StoneShape>('round')
   const [caratWeight, setCaratWeight] = useState(1)
+  const [fancyLengthMm, setFancyLengthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.lengthMm)
+  const [fancyWidthMm, setFancyWidthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.widthMm)
   const [prongCount, setProngCount] = useState<4 | 6>(4)
 
   const innerDiameterMm = usSizeToDiameterMm(fingerSize)
   const stoneDiameterMm = roundDiameterMmFromCarat(caratWeight)
+
+  const selectStoneShape = (shape: StoneShape) => {
+    setStoneShape(shape)
+    if (shape !== 'round') {
+      setFancyLengthMm(FANCY_SHAPE_DEFAULTS[shape].lengthMm)
+      setFancyWidthMm(FANCY_SHAPE_DEFAULTS[shape].widthMm)
+    }
+  }
 
   // One combined group — band + (optionally) the center-stone head — so the
   // viewer and the STL export both see a single object. Rebuilt only when a
@@ -55,13 +80,15 @@ export function CadDesignPage() {
     const band = new THREE.Mesh(buildRingBandGeometry({ fingerSize, widthMm, thicknessMm, profile }))
     group.add(band)
     if (includeStone) {
-      const head = buildStoneHeadGroup({ stoneDiameterMm, prongCount })
+      const head = stoneShape === 'round'
+        ? buildStoneHeadGroup({ stoneDiameterMm, prongCount })
+        : buildFancyStoneHeadGroup({ shape: stoneShape, lengthMm: fancyLengthMm, widthMm: fancyWidthMm })
       attachHeadToBand(head, { fingerSize, widthMm, thicknessMm, profile })
       group.add(head)
     }
     return group
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneDiameterMm, prongCount])
+  }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneShape, stoneDiameterMm, prongCount, fancyLengthMm, fancyWidthMm])
 
   // Weight & cost estimate — volume comes straight off the displayed
   // geometry, so it always matches what's on screen (and in the STL).
@@ -77,7 +104,8 @@ export function CadDesignPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `ring-size${fingerSize}-w${widthMm}mm${includeStone ? `-${caratWeight}ct` : ''}.stl`
+    const stoneTag = includeStone ? (stoneShape === 'round' ? `-${caratWeight}ct-round` : `-${stoneShape}`) : ''
+    a.download = `ring-size${fingerSize}-w${widthMm}mm${stoneTag}.stl`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -94,10 +122,10 @@ export function CadDesignPage() {
           </div>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Parametric solitaire ring</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            Band (size/width/thickness/profile) plus an optional round-brilliant prong head, sized from carat weight.
+            Band (size/width/thickness/profile) plus an optional prong head — round, oval, cushion, princess or marquise.
             This is not a Matrix/RhinoGold replacement yet — the stone is a placeholder shape (not faceted gem geometry),
-            band and head aren't boolean-unioned into one solid, and only round center stones are supported so far.
-            Building toward full parity step by step.
+            band and head aren't boolean-unioned into one solid, and pear is still on the list. Building toward full
+            parity step by step.
           </p>
         </CardContent>
       </Card>
@@ -151,19 +179,47 @@ export function CadDesignPage() {
 
             <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
               <label className="flex items-center justify-between gap-3">
-                <span className="text-sm font-semibold text-slate-900">Center stone (round)</span>
+                <span className="text-sm font-semibold text-slate-900">Center stone</span>
                 <input type="checkbox" checked={includeStone} onChange={e => setIncludeStone(e.target.checked)}
                   className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
               </label>
               {includeStone && (
                 <>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Shape</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(Object.keys(STONE_SHAPE_LABELS) as StoneShape[]).map(shape => (
+                        <button key={shape} type="button" onClick={() => selectStoneShape(shape)}
+                          className={`rounded-xl border px-2.5 py-2 text-xs font-semibold transition ${stoneShape === shape ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                          {STONE_SHAPE_LABELS[shape]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {stoneShape === 'round' ? (
                     <div>
                       <label className={labelCls}>Carat weight</label>
                       <input type="number" min={0.1} max={10} step={0.05} value={caratWeight}
                         onChange={e => setCaratWeight(Math.max(0.1, Number(e.target.value) || 0.1))} className={inputCls} />
                       <p className="mt-1 text-[11px] text-slate-400">≈ {stoneDiameterMm.toFixed(2)} mm diameter</p>
                     </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>Length (mm)</label>
+                        <input type="number" min={2} max={20} step={0.1} value={fancyLengthMm}
+                          onChange={e => setFancyLengthMm(Math.max(2, Number(e.target.value) || 2))} className={inputCls} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Width (mm)</label>
+                        <input type="number" min={2} max={20} step={0.1} value={fancyWidthMm}
+                          onChange={e => setFancyWidthMm(Math.max(2, Number(e.target.value) || 2))} className={inputCls} />
+                      </div>
+                    </div>
+                  )}
+
+                  {stoneShape === 'round' && (
                     <div>
                       <label className={labelCls}>Prongs</label>
                       <div className="grid grid-cols-2 gap-2">
@@ -175,7 +231,10 @@ export function CadDesignPage() {
                         ))}
                       </div>
                     </div>
-                  </div>
+                  )}
+                  {stoneShape !== 'round' && (
+                    <p className="text-[11px] text-slate-400">Fancy shapes use 4 fixed prongs for now — adjustable count is a future refinement.</p>
+                  )}
                 </>
               )}
             </div>

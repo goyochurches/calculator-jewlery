@@ -274,3 +274,183 @@ export const METAL_DENSITY_G_PER_CM3: Record<JewelryMetalOption, number> = {
 export function estimateWeightGrams(volumeMm3: number, densityGPerCm3: number): number {
   return (volumeMm3 * densityGPerCm3) / 1000
 }
+
+// ── Fancy-shape heads ─────────────────────────────────────────────────────────
+// Round is handled by buildStoneHeadGroup above (kept as-is, unchanged).
+// These four cover the next most common center-stone shapes; pear is
+// deferred (its asymmetric outline needs more careful curve-fitting than
+// the exact constructions below) — see the CAD roadmap memory.
+
+export type FancyStoneShape = 'oval' | 'cushion' | 'princess' | 'marquise'
+
+/** Closed footprint outline (as seen from above) for one fancy shape, in
+ *  local (u, v) = (width-axis, length-axis) mm, centered on the origin.
+ *  Every shape here is symmetric about both axes, which is what lets
+ *  `buildFancyStoneHeadGroup` reuse one extrude→rotate step for all of
+ *  them without worrying about a mirrored result (asymmetric shapes like
+ *  pear would need the mapping tracked carefully — reason it's deferred). */
+function buildStoneOutline(shape: FancyStoneShape, halfW: number, halfL: number, segments = 64): THREE.Vector2[] {
+  switch (shape) {
+    case 'oval': {
+      const pts: THREE.Vector2[] = []
+      for (let i = 0; i < segments; i++) {
+        const a = (i / segments) * Math.PI * 2
+        pts.push(new THREE.Vector2(halfW * Math.cos(a), halfL * Math.sin(a)))
+      }
+      return pts
+    }
+    case 'princess':
+      return [
+        new THREE.Vector2(halfW, halfL), new THREE.Vector2(-halfW, halfL),
+        new THREE.Vector2(-halfW, -halfL), new THREE.Vector2(halfW, -halfL),
+      ]
+    case 'cushion': {
+      // Rounded rectangle: a quarter-circle fillet at each corner, radius
+      // scaled to the shorter side so a long/narrow cushion doesn't get an
+      // oversized fillet.
+      const r = Math.min(halfW, halfL) * 0.55
+      const segsPerCorner = 10
+      const corners = [
+        { cx: halfW - r, cy: halfL - r, start: 0 },
+        { cx: -halfW + r, cy: halfL - r, start: 90 },
+        { cx: -halfW + r, cy: -halfL + r, start: 180 },
+        { cx: halfW - r, cy: -halfL + r, start: 270 },
+      ]
+      const pts: THREE.Vector2[] = []
+      for (const corner of corners) {
+        for (let i = 0; i <= segsPerCorner; i++) {
+          const a = (corner.start + (i / segsPerCorner) * 90) * (Math.PI / 180)
+          pts.push(new THREE.Vector2(corner.cx + r * Math.cos(a), corner.cy + r * Math.sin(a)))
+        }
+      }
+      return pts
+    }
+    case 'marquise': {
+      // Exact "vesica" construction: two equal circles, centers offset
+      // along the width axis by ±c, radius R — their intersection is a
+      // lens with sharp points on the length axis at ±halfL and its widest
+      // extent on the width axis at ±halfW. Solve c, R from halfW/halfL:
+      //   halfW = R − c,  halfL = √(R² − c²)  ⇒  c = (halfL² − halfW²) / (2·halfW)
+      const c = (halfL * halfL - halfW * halfW) / (2 * halfW)
+      const R = halfW + c
+      const half = Math.max(1, Math.round(segments / 2))
+      const pts: THREE.Vector2[] = []
+      // Right boundary: arc of the circle centered at (−c, 0), bulging
+      // toward +u, from the top tip (0, halfL) to the bottom tip (0, −halfL).
+      // thetaTop is (0, halfL)'s angle around that center: cos = c/R, sin = halfL/R.
+      const thetaTop = Math.atan2(halfL, c)
+      for (let i = 0; i <= half; i++) {
+        const t = thetaTop - (2 * thetaTop) * (i / half)
+        pts.push(new THREE.Vector2(-c + R * Math.cos(t), R * Math.sin(t)))
+      }
+      // Left boundary: mirror arc, circle centered at (+c, 0), bottom tip
+      // back up to the top tip, closing the loop.
+      for (let i = 0; i <= half; i++) {
+        const t = Math.PI + thetaTop - (2 * thetaTop) * (i / half)
+        pts.push(new THREE.Vector2(c + R * Math.cos(t), R * Math.sin(t)))
+      }
+      return pts
+    }
+  }
+}
+
+/** Where to seat prongs for each fancy shape — hand-picked safe points
+ *  (corners inset slightly so a prong sits on solid material rather than
+ *  hanging off a sharp point; oval at the "shoulders"; marquise at the two
+ *  side bulges plus just short of the two tips). 4 prongs for all four —
+ *  a reasonable default; larger stones often want 6, a future refinement. */
+function fancyProngPoints(shape: FancyStoneShape, halfW: number, halfL: number): THREE.Vector2[] {
+  switch (shape) {
+    case 'oval':
+      return [Math.PI / 4, 3 * Math.PI / 4, 5 * Math.PI / 4, 7 * Math.PI / 4]
+        .map(a => new THREE.Vector2(halfW * Math.cos(a), halfL * Math.sin(a)))
+    case 'princess':
+    case 'cushion': {
+      const inset = 0.82
+      return [[1, 1], [-1, 1], [-1, -1], [1, -1]]
+        .map(([sx, sy]) => new THREE.Vector2(sx * halfW * inset, sy * halfL * inset))
+    }
+    case 'marquise': {
+      const tipInset = 0.85
+      return [
+        new THREE.Vector2(halfW, 0), new THREE.Vector2(-halfW, 0),
+        new THREE.Vector2(0, halfL * tipInset), new THREE.Vector2(0, -halfL * tipInset),
+      ]
+    }
+  }
+}
+
+export interface FancyStoneHeadParams {
+  shape: FancyStoneShape
+  /** Stone footprint, in mm — the two numbers you'd see quoted as e.g.
+   *  "8×6mm oval". */
+  lengthMm: number
+  widthMm: number
+  prongDiameterMm?: number
+  prongHeightMm?: number
+  standHeightMm?: number
+}
+
+/** Fancy-shape counterpart to buildStoneHeadGroup — same local convention
+ *  (+Y up, culet down) and the same visual-preview caveats: the stone is an
+ *  extruded/beveled proxy (not faceted gem geometry) and nothing here is
+ *  boolean-unioned with the band yet. `attachHeadToBand` works for this
+ *  group unchanged, since it only cares about the group's own local +Y. */
+export function buildFancyStoneHeadGroup(params: FancyStoneHeadParams): THREE.Group {
+  const { shape, lengthMm, widthMm } = params
+  const halfW = widthMm / 2
+  const halfL = lengthMm / 2
+  const maxHalf = Math.max(halfW, halfL)
+  const prongDiameterMm = params.prongDiameterMm ?? Math.max(0.8, Math.min(widthMm, lengthMm) * 0.12)
+  const prongHeightMm = params.prongHeightMm ?? maxHalf * 1.0
+  const standHeightMm = params.standHeightMm ?? maxHalf * 0.8
+
+  const group = new THREE.Group()
+  const outline = buildStoneOutline(shape, halfW, halfL)
+
+  // ExtrudeGeometry builds its shape in local XY and extrudes along local
+  // Z; rotating −90° about X maps that Z (depth) onto this group's +Y (up)
+  // — the same "footprint flat, height vertical" convention every other
+  // mesh in this file uses. Since every shape above is symmetric about
+  // both axes, the accompanying axis mirror from that rotation changes
+  // nothing visually.
+  const galleryDepth = Math.max(0.3, prongDiameterMm * 0.4)
+  const galleryShape = new THREE.Shape(outline.map(p => p.clone().multiplyScalar(1.08)))
+  const gallery = new THREE.Mesh(new THREE.ExtrudeGeometry(galleryShape, { depth: galleryDepth, bevelEnabled: false }))
+  gallery.rotation.x = -Math.PI / 2
+  gallery.position.y = -galleryDepth / 2
+  group.add(gallery)
+
+  const prongPoints = fancyProngPoints(shape, halfW, halfL)
+  for (const p of prongPoints) {
+    const prong = new THREE.Mesh(
+      new THREE.CylinderGeometry(prongDiameterMm * 0.35, prongDiameterMm / 2, prongHeightMm, 12),
+    )
+    prong.position.set(p.x, prongHeightMm / 2, p.y)
+    group.add(prong)
+  }
+
+  const stand = new THREE.Mesh(
+    new THREE.CylinderGeometry(maxHalf * 0.85, maxHalf * 0.6, standHeightMm, 24),
+  )
+  stand.position.y = -standHeightMm / 2
+  group.add(stand)
+
+  // Stone placeholder — the footprint outline extruded with a bevel to
+  // fake a crown/pavilion taper, standing in for real faceted geometry.
+  const stoneDepth = maxHalf * 0.9
+  const stoneShape2D = new THREE.Shape(outline)
+  const bevelSize = Math.min(halfW, halfL) * 0.35
+  const stoneProxy = new THREE.Mesh(new THREE.ExtrudeGeometry(stoneShape2D, {
+    depth: stoneDepth * 0.5, bevelEnabled: true,
+    bevelThickness: stoneDepth * 0.5, bevelSize, bevelSegments: 6,
+  }))
+  stoneProxy.rotation.x = -Math.PI / 2
+  stoneProxy.position.y = 0
+  group.add(stoneProxy)
+
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}
