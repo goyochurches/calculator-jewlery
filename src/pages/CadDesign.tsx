@@ -12,6 +12,7 @@ import {
   buildStoneHeadGroup, attachHeadToBand, roundDiameterMmFromCarat,
   buildFancyStoneHeadGroup, type FancyStoneShape,
   buildPaveRow,
+  unionMetalParts, extractStoneMeshes,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
 
@@ -64,6 +65,7 @@ export function CadDesignPage() {
   const [includePave, setIncludePave] = useState(false)
   const [paveCount, setPaveCount] = useState(12)
   const [paveStoneMm, setPaveStoneMm] = useState(1.2)
+  const [mergeSolid, setMergeSolid] = useState(false)
 
   const innerDiameterMm = usSizeToDiameterMm(fingerSize)
   const stoneDiameterMm = roundDiameterMmFromCarat(caratWeight)
@@ -97,16 +99,36 @@ export function CadDesignPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneShape, stoneDiameterMm, prongCount, fancyLengthMm, fancyWidthMm, includePave, paveCount, paveStoneMm])
 
+  // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
+  // tool. Folds every metal mesh into one real watertight solid; gems stay
+  // separate (see ringGeometry.ts). Beta: three-bvh-csg can throw on a
+  // genuinely degenerate input, so this is wrapped and falls back to the
+  // unmerged preview rather than breaking the page.
+  const { displayModel, mergeError } = useMemo(() => {
+    if (!mergeSolid) return { displayModel: model, mergeError: null }
+    try {
+      const unioned = unionMetalParts(model)
+      if (!unioned) return { displayModel: model, mergeError: null }
+      const merged = new THREE.Group()
+      merged.add(new THREE.Mesh(unioned))
+      for (const stone of extractStoneMeshes(model)) merged.add(stone)
+      return { displayModel: merged, mergeError: null }
+    } catch (err) {
+      return { displayModel: model, mergeError: err instanceof Error ? err.message : 'Boolean union failed on this geometry.' }
+    }
+  }, [model, mergeSolid])
+
   // Weight & cost estimate — volume comes straight off the displayed
-  // geometry, so it always matches what's on screen (and in the STL).
-  const volumeMm3 = useMemo(() => computeVolumeMm3(model), [model])
+  // geometry, so it always matches what's on screen (and in the STL). Once
+  // merged, this is exact (no more overlap double-counting).
+  const volumeMm3 = useMemo(() => computeVolumeMm3(displayModel), [displayModel])
   const weightGrams = estimateWeightGrams(volumeMm3, METAL_DENSITY_G_PER_CM3[metal])
   const pricePerGram = config.metalPriceMap[metal] ?? 0
   const estimatedMetalCost = weightGrams * pricePerGram
 
   const downloadStl = () => {
     const exporter = new STLExporter()
-    const stl = exporter.parse(model, { binary: false })
+    const stl = exporter.parse(displayModel, { binary: false })
     const blob = new Blob([stl], { type: 'model/stl' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -129,10 +151,10 @@ export function CadDesignPage() {
           </div>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Parametric solitaire ring</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            Band (size/width/thickness/profile) plus an optional prong head — round, oval, cushion, princess or marquise.
-            This is not a Matrix/RhinoGold replacement yet — the stone is a placeholder shape (not faceted gem geometry),
-            band and head aren't boolean-unioned into one solid, and pear is still on the list. Building toward full
-            parity step by step.
+            Band (size/width/thickness/profile) plus an optional prong head — round, oval, cushion, princess or marquise
+            — pavé side stones, and an optional boolean merge into one real solid. This is not a Matrix/RhinoGold
+            replacement yet — the stone is a placeholder shape (not faceted gem geometry) and pear is still on the
+            list. Building toward full parity step by step.
           </p>
         </CardContent>
       </Card>
@@ -268,6 +290,24 @@ export function CadDesignPage() {
               )}
             </div>
 
+            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-slate-900">Merge into one solid</span>
+                <input type="checkbox" checked={mergeSolid} onChange={e => setMergeSolid(e.target.checked)}
+                  className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+              </label>
+              <p className="text-[11px] text-slate-400">
+                MatrixGold's own "Parametric Boolean" tool — folds the metal parts (band, gallery, prongs, stand) into
+                one real watertight solid instead of separate overlapping meshes. Gems are never merged into the
+                metal — they're separate physical objects. Beta: can fail on some size combinations.
+              </p>
+              {mergeError && (
+                <p className="rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700">
+                  Couldn't merge this geometry ({mergeError}) — showing the unmerged preview instead.
+                </p>
+              )}
+            </div>
+
             <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
               <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-amber-700">
                 <Scale className="h-3.5 w-3.5" /> Estimated weight &amp; metal cost
@@ -281,8 +321,9 @@ export function CadDesignPage() {
               </div>
               <p className="mt-1.5 text-[11px] text-slate-500">
                 From the actual displayed volume × {METAL_DENSITY_G_PER_CM3[metal]} g/cm³ for {JEWELRY_METAL_OPTIONS[metal].label},
-                at the same $/g the rest of the app prices from. Metal cost only — no labor, stones or setting yet, and
-                band+head overlap slightly (not unioned), so this reads a little high rather than low.
+                at the same $/g the rest of the app prices from — metal only, gems excluded. {mergeSolid && !mergeError
+                  ? 'Merged into one solid, so this is exact (no more overlap double-counting).'
+                  : 'Band+head overlap slightly (not merged), so this reads a little high rather than low.'}
               </p>
             </div>
 
@@ -299,7 +340,7 @@ export function CadDesignPage() {
         </Card>
 
         <Card className="overflow-hidden rounded-[30px] border border-slate-200 shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
-          <ModelViewer3D object={model} color={METAL_COLORS[metal]} className="h-[420px] w-full sm:h-[520px]" />
+          <ModelViewer3D object={displayModel} color={METAL_COLORS[metal]} className="h-[420px] w-full sm:h-[520px]" />
         </Card>
       </section>
     </div>

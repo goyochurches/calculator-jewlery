@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { Brush, Evaluator, ADDITION } from 'three-bvh-csg'
 import type { JewelryMetalOption } from '@/types'
 
 // ── Ring-size ↔ millimeters ──────────────────────────────────────────────────
@@ -174,10 +175,14 @@ export function buildStoneHeadGroup(params: StoneHeadParams): THREE.Group {
   group.add(stand)
 
   // Stone placeholder — an octahedron proxy standing in for a round
-  // brilliant's silhouette until real faceted gem geometry exists.
+  // brilliant's silhouette until real faceted gem geometry exists. Tagged
+  // isStone so weight/volume and the boolean-union step (which should only
+  // ever touch metal) both know to skip it — the gem is a separate
+  // physical object sitting IN the setting, not fused with the metal.
   const stoneProxy = new THREE.Mesh(new THREE.OctahedronGeometry(stoneRadius * 0.92))
   stoneProxy.position.y = stoneRadius * 0.5
   stoneProxy.scale.y = 0.8
+  stoneProxy.userData.isStone = true
   group.add(stoneProxy)
 
   group.traverse(obj => {
@@ -239,11 +244,14 @@ function meshVolume(geometry: THREE.BufferGeometry): number {
  *  memory), their small overlap at the join gets counted twice — a minor,
  *  deliberately-safe-direction overestimate rather than a gap, until real
  *  booleans land. */
-export function computeVolumeMm3(object: THREE.Object3D): number {
+export function computeVolumeMm3(object: THREE.Object3D, opts: { includeStones?: boolean } = {}): number {
   let total = 0
   object.updateMatrixWorld(true)
   object.traverse(obj => {
     if (!(obj instanceof THREE.Mesh)) return
+    // Gems aren't metal — skip them by default so a metal-weight estimate
+    // doesn't apply metal density to the volume a stone occupies.
+    if (obj.userData.isStone && !opts.includeStones) return
     // Scale factored in via the world matrix's determinant, so a scaled
     // mesh (the stone proxy squashes Y by 0.8) still reports correctly.
     const scale = new THREE.Vector3()
@@ -447,6 +455,7 @@ export function buildFancyStoneHeadGroup(params: FancyStoneHeadParams): THREE.Gr
   }))
   stoneProxy.rotation.x = -Math.PI / 2
   stoneProxy.position.y = 0
+  stoneProxy.userData.isStone = true
   group.add(stoneProxy)
 
   group.traverse(obj => {
@@ -496,6 +505,7 @@ export function buildPaveRow(params: PaveRowParams, band: RingBandParams): THREE
       const angle = (angleDeg * Math.PI) / 180
       const stone = new THREE.Mesh(new THREE.SphereGeometry(stoneRadius, 16, 12))
       stone.position.set(Math.cos(angle) * seatRadius, 0, Math.sin(angle) * seatRadius)
+      stone.userData.isStone = true
       group.add(stone)
     }
   }
@@ -503,4 +513,62 @@ export function buildPaveRow(params: PaveRowParams, band: RingBandParams): THREE
     if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
   })
   return group
+}
+
+// ── Boolean union — MatrixGold's own "Parametric Boolean" tool ──────────────
+// Everything above builds separate, overlapping meshes (a real preview
+// limitation flagged throughout the CAD roadmap memory). This is the actual
+// fix: fold every METAL mesh (band + gallery + prongs + stand — never the
+// gem proxies, which are separate physical objects, not part of the metal)
+// into one true watertight solid via three-bvh-csg, the same operation
+// Matrix itself exposes as a named tool rather than something automatic.
+
+/** Clones `mesh.geometry` with its current world transform baked in, so the
+ *  result can be combined with other meshes regardless of how deep they
+ *  each sit in their own local group hierarchy (the head's local "+Y up"
+ *  space vs. the band's, for instance). */
+function worldBakedGeometry(mesh: THREE.Mesh): THREE.BufferGeometry {
+  const g = mesh.geometry.clone()
+  g.applyMatrix4(mesh.matrixWorld)
+  return g
+}
+
+/** Unions every non-stone mesh inside `object` into one manifold geometry.
+ *  Returns null if there's nothing to union. Can throw on a genuinely
+ *  degenerate input (e.g. a self-intersecting profile) — callers should
+ *  treat this as a beta operation and catch accordingly, per the roadmap. */
+export function unionMetalParts(object: THREE.Object3D): THREE.BufferGeometry | null {
+  object.updateMatrixWorld(true)
+  const metalMeshes: THREE.Mesh[] = []
+  object.traverse(obj => {
+    if (obj instanceof THREE.Mesh && !obj.userData.isStone) metalMeshes.push(obj)
+  })
+  if (metalMeshes.length === 0) return null
+
+  const evaluator = new Evaluator()
+  let acc = new Brush(worldBakedGeometry(metalMeshes[0]))
+  acc.updateMatrixWorld(true)
+  for (let i = 1; i < metalMeshes.length; i++) {
+    const next = new Brush(worldBakedGeometry(metalMeshes[i]))
+    next.updateMatrixWorld(true)
+    acc = evaluator.evaluate(acc, next, ADDITION)
+  }
+  return acc.geometry
+}
+
+/** Every gem (center stone + pavé), as standalone world-baked meshes at
+ *  identity transform — the boolean-union counterpart to
+ *  `unionMetalParts`, kept separate since gems are never unioned into the
+ *  metal. Pass both into one Group to redisplay/re-export the merged
+ *  result. */
+export function extractStoneMeshes(object: THREE.Object3D): THREE.Mesh[] {
+  object.updateMatrixWorld(true)
+  const stones: THREE.Mesh[] = []
+  object.traverse(obj => {
+    if (!(obj instanceof THREE.Mesh) || !obj.userData.isStone) return
+    const mesh = new THREE.Mesh(worldBakedGeometry(obj))
+    mesh.userData.isStone = true
+    stones.push(mesh)
+  })
+  return stones
 }

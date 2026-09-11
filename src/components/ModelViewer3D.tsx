@@ -6,9 +6,11 @@ interface ModelViewer3DProps {
   /** The object (a single Mesh, or a Group with several — band + head +
    *  prongs, etc.) to display, centered on the origin. Swapping this
    *  rebuilds just the displayed object, not the whole scene/renderer.
-   *  Every Mesh found inside gets the shared metal material — a future
-   *  refinement can give individual parts (e.g. a stone proxy) their own
-   *  material instead. */
+   *  Every Mesh gets the shared metal material, EXCEPT one tagged
+   *  `userData.isStone = true` (the center-stone/pavé proxies from
+   *  ringGeometry.ts), which gets a fixed gem-like material instead — so
+   *  metal and gem read as visibly different materials, not one gold
+   *  blob. */
   object: THREE.Object3D | null
   /** Base color of the material — e.g. the selected metal's tint. */
   color?: string
@@ -28,6 +30,7 @@ export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, rou
   const containerRef = useRef<HTMLDivElement>(null)
   const displayedRef = useRef<THREE.Object3D | null>(null)
   const materialRef = useRef<THREE.MeshStandardMaterial | null>(null)
+  const stoneMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
 
   // One-time scene/camera/renderer/controls setup, torn down on unmount.
@@ -67,6 +70,12 @@ export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, rou
 
     const material = new THREE.MeshStandardMaterial({ color, metalness, roughness })
     materialRef.current = material
+    // Fixed gem look — icy, glassy, low metalness — independent of the
+    // selected metal color.
+    const stoneMaterial = new THREE.MeshStandardMaterial({
+      color: '#eaf6ff', metalness: 0.05, roughness: 0.05, transparent: true, opacity: 0.85,
+    })
+    stoneMaterialRef.current = stoneMaterial
 
     const resize = () => {
       const { clientWidth, clientHeight } = container
@@ -93,6 +102,7 @@ export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, rou
       resizeObserver.disconnect()
       controls.dispose()
       material.dispose()
+      stoneMaterial.dispose()
       renderer.dispose()
       container.removeChild(renderer.domElement)
       sceneRef.current = null
@@ -108,7 +118,8 @@ export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, rou
   useEffect(() => {
     const scene = sceneRef.current
     const material = materialRef.current
-    if (!scene || !material) return
+    const stoneMaterial = stoneMaterialRef.current
+    if (!scene || !material || !stoneMaterial) return
 
     if (displayedRef.current) {
       const prev = displayedRef.current
@@ -117,7 +128,9 @@ export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, rou
       displayedRef.current = null
     }
     if (object) {
-      object.traverse(obj => { if (obj instanceof THREE.Mesh) obj.material = material })
+      object.traverse(obj => {
+        if (obj instanceof THREE.Mesh) obj.material = obj.userData.isStone ? stoneMaterial : material
+      })
       scene.add(object)
       displayedRef.current = object
     }
