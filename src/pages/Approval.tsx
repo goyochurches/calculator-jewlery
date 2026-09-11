@@ -11,6 +11,7 @@ import {
   type ApprovalStoneDetail,
 } from '@/services/publicApprovalService'
 import { AlertCircle, Check, Clock, FileText, Image as ImageIcon, ShieldCheck, X } from 'lucide-react'
+import { formatDateTime } from '@/lib/formatDate'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 
@@ -497,7 +498,7 @@ function AttachmentsBlock({ attachments }: { attachments: ApprovalDetails['attac
               <img src={a.photo} alt={a.caption ?? `Attachment ${idx + 1}`} className="max-h-48 w-full object-cover transition group-hover:scale-[1.02]" />
               <div className="space-y-0.5 px-3 py-2">
                 {a.caption && <p className="line-clamp-2 text-xs font-medium text-slate-700">{a.caption}</p>}
-                {a.createdAt && <p className="text-[10px] text-slate-400">{new Date(a.createdAt).toLocaleString()}</p>}
+                {a.createdAt && <p className="text-[10px] text-slate-400">{formatDateTime(a.createdAt)}</p>}
               </div>
             </a>
           ) : null

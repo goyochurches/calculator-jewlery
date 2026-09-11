@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useFeatures } from '@/hooks/useFeatures'
 import { useInternalPreview } from '@/lib/internalPreview'
 import { canSeePayments } from '@/lib/paymentsAccess'
+import { formatDate } from '@/lib/formatDate'
 import { displayStatusFor } from '@/lib/quoteStatusDisplay'
 import { clientService } from '@/services/clientService'
 import { paymentsAdminService, type PaymentRow } from '@/services/paymentPlanService'
@@ -161,7 +162,7 @@ export function ClientDetailPage() {
                   <span className="text-slate-400">No contact info on file</span>
                 )}
                 {client.createdAt && (
-                  <span className="text-slate-400">Added {new Date(client.createdAt).toLocaleDateString()}</span>
+                  <span className="text-slate-400">Added {formatDate(client.createdAt)}</span>
                 )}
               </div>
             </div>
@@ -387,8 +388,8 @@ function ClientPaymentsBlock({ clientId }: { clientId: string }) {
                     <p className="text-[11px] text-slate-400">#{r.quoteId}</p>
                   </td>
                   <td className="px-4 py-3 text-slate-600">#{r.sortOrder + 1}</td>
-                  <td className="px-4 py-3 text-slate-600">
-                    {r.dueDate ? new Date(r.dueDate).toLocaleDateString() : <span className="text-slate-300">—</span>}
+                  <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+                    {r.dueDate ? formatDate(r.dueDate) : <span className="text-slate-300">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right font-bold tabular-nums text-slate-900">
                     ${r.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}

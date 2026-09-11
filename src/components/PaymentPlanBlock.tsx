@@ -1,5 +1,6 @@
 import { RefundDialog } from '@/components/RefundDialog'
 import { paymentPlanService, quoteEventsService, type PaymentInstallment, type PaymentMethodChoice, type PlanRow, type QuoteEvent } from '@/services/paymentPlanService'
+import { formatDate, formatDateTime } from '@/lib/formatDate'
 import { AlertTriangle, Bell, Check, Clock, Copy, CreditCard, Landmark, Link as LinkIcon, Loader2, MessageCircle, Plus, RefreshCw, RotateCcw, Trash2, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
@@ -498,7 +499,7 @@ function PaymentEventsTimeline({ quoteId }: { quoteId: string }) {
 function EventRow({ event }: { event: QuoteEvent }) {
   const tone = toneFor(event)
   const Icon = iconFor(event)
-  const when = new Date(event.createdAt).toLocaleString()
+  const when = formatDateTime(event.createdAt)
 
   return (
     <div className={`rounded-xl border ${tone.border} ${tone.bg} px-3 py-2`}>
@@ -645,9 +646,9 @@ function InstallmentRow({
             Installment {index + 1} <span className="text-slate-400">of {total}</span>
           </p>
           <p className="text-[11px] text-slate-500">
-            {installment.dueDate ? <>Due {new Date(installment.dueDate).toLocaleDateString()}</> : 'No due date'}
+            {installment.dueDate ? <>Due {formatDate(installment.dueDate)}</> : 'No due date'}
             {isPaid && installment.paidAt && (
-              <> · <span className="text-emerald-700 font-semibold">Paid {new Date(installment.paidAt).toLocaleDateString()}</span></>
+              <> · <span className="text-emerald-700 font-semibold">Paid {formatDate(installment.paidAt)}</span></>
             )}
           </p>
         </div>
@@ -665,7 +666,7 @@ function InstallmentRow({
         <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
           <RotateCcw className="h-2.5 w-2.5" />
           Refunded ${installment.refundAmount!.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-          {installment.refundedAt && <> · {new Date(installment.refundedAt).toLocaleDateString()}</>}
+          {installment.refundedAt && <> · {formatDate(installment.refundedAt)}</>}
         </div>
       )}
 

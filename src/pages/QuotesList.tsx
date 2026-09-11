@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useFeatures } from '@/hooks/useFeatures'
 import { displayStatusFor } from '@/lib/quoteStatusDisplay'
 import { computeCustomerPrice } from '@/lib/quotePricing'
+import { formatDate } from '@/lib/formatDate'
 import { quotesService } from '@/services/quotesService'
 import type { QuoteStatus, SavedQuote } from '@/types'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
@@ -838,8 +839,8 @@ function QuoteRow({
           )
         })()}
       </td>
-      <td className={`px-6 py-4 ${isSelected ? 'text-slate-400' : 'text-slate-400'}`}>
-        {quote.createdAt}
+      <td className={`px-6 py-4 whitespace-nowrap ${isSelected ? 'text-slate-400' : 'text-slate-400'}`}>
+        {formatDate(quote.createdAt)}
       </td>
       <td className="px-6 py-4 text-right">
         {(() => {

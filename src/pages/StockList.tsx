@@ -3,6 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAuth } from '@/context/AuthContext'
 import { useInternalPreview } from '@/lib/internalPreview'
 import { stockService } from '@/services/stockService'
+import { formatDate } from '@/lib/formatDate'
 import type { StockItem, StockStatus } from '@/types'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { ChevronLeft, ChevronRight, Copy, Hourglass, ImageOff, MoreHorizontal, Search, Trash2, X } from 'lucide-react'
@@ -445,7 +446,7 @@ function StockRow({
           <span className="text-slate-300">—</span>
         )}
       </td>
-      <td className="px-6 py-4 text-slate-400">{item.createdAt}</td>
+      <td className="px-6 py-4 text-slate-400 whitespace-nowrap">{formatDate(item.createdAt)}</td>
       {showAge && (
         <td className="px-6 py-4">
           {(() => {

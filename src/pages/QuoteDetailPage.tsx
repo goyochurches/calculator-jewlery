@@ -23,6 +23,7 @@ import { useAuth } from '@/context/AuthContext'
 import { canSeePayments } from '@/lib/paymentsAccess'
 import { displayStatusFor } from '@/lib/quoteStatusDisplay'
 import { computeCustomerPrice } from '@/lib/quotePricing'
+import { formatDateTime } from '@/lib/formatDate'
 import { labReportVerifyUrl } from '@/hooks/useQuoteBuilder'
 import { quotesService } from '@/services/quotesService'
 import type { QuoteStone, SavedQuote } from '@/types'
@@ -921,7 +922,7 @@ export default function QuoteDetailPage() {
                       className="w-full object-cover max-h-48 transition group-hover:scale-[1.02]" />
                     <div className="space-y-0.5 px-3 py-2">
                       {a.caption && <p className="text-xs font-medium text-slate-700 line-clamp-2">{a.caption}</p>}
-                      <p className="text-[10px] text-slate-400">{a.createdAt ? new Date(a.createdAt).toLocaleString() : ''}</p>
+                      <p className="text-[10px] text-slate-400">{a.createdAt ? formatDateTime(a.createdAt) : ''}</p>
                     </div>
                   </a>
                 ))}

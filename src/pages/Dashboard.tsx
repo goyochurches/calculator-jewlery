@@ -3,6 +3,7 @@ import { MarketDashboardWidget } from '@/components/MarketDashboardWidget'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { JEWELRY_TYPE_OPTIONS } from '@/hooks/useQuoteBuilder'
 import { useInternalPreview } from '@/lib/internalPreview'
+import { formatDate } from '@/lib/formatDate'
 import { clientService } from '@/services/clientService'
 import { quotesService, type UserQuoteStats } from '@/services/quotesService'
 import { stockService } from '@/services/stockService'
@@ -649,7 +650,7 @@ function ColdClientsWidget() {
                   </span>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold text-slate-900">{c.clientName}</p>
-                    <p className="text-xs text-slate-400">Last quote {new Date(c.lastQuoteAt).toLocaleDateString()}</p>
+                    <p className="text-xs text-slate-400">Last quote {formatDate(c.lastQuoteAt)}</p>
                   </div>
                 </div>
                 <span className="shrink-0 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600">

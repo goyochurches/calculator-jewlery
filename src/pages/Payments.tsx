@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { RefundDialog } from '@/components/RefundDialog'
 import { paymentPlanService, paymentsAdminService, type PaymentRow, type StripePaymentRow } from '@/services/paymentPlanService'
+import { formatDate, formatDateTime } from '@/lib/formatDate'
 import { Check, Clock, CreditCard, ExternalLink, Filter, Loader2, RefreshCw, RotateCcw, XCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
@@ -281,8 +282,8 @@ function InstallmentRow({ row, refundPhase, onRefund }: {
         )}
       </td>
       <td className="px-4 py-3 text-slate-600">#{row.sortOrder + 1}</td>
-      <td className="px-4 py-3 text-slate-600">
-        {row.dueDate ? new Date(row.dueDate).toLocaleDateString() : <span className="text-slate-300">—</span>}
+      <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
+        {row.dueDate ? formatDate(row.dueDate) : <span className="text-slate-300">—</span>}
       </td>
       <td className="px-4 py-3 text-right font-bold tabular-nums text-slate-900">
         ${row.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
@@ -436,8 +437,8 @@ function StripeRow({ row }: { row: StripePaymentRow }) {
   const currency = (row.currency ?? 'usd').toUpperCase()
   return (
     <tr className="transition hover:bg-violet-50/20">
-      <td className="px-4 py-3 text-slate-700">
-        {new Date(row.createdEpoch * 1000).toLocaleString()}
+      <td className="px-4 py-3 text-slate-700 whitespace-nowrap">
+        {formatDateTime(row.createdEpoch * 1000)}
       </td>
       <td className="px-4 py-3">
         {row.quoteTitle ? (
@@ -543,7 +544,7 @@ function LocalStatusBadge({ status, paidAt }: { status: PaymentRow['status']; pa
       <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
         <Check className="h-2.5 w-2.5" /> Paid
       </span>
-      {paidAt && <p className="mt-1 text-[10px] text-slate-400">{new Date(paidAt).toLocaleDateString()}</p>}
+      {paidAt && <p className="mt-1 text-[10px] text-slate-400 whitespace-nowrap">{formatDate(paidAt)}</p>}
     </div>
   )
   if (status === 'REFUNDED') return (

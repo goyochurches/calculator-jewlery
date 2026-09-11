@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ExternalLink, TrendingUp, Clock, Store, Sparkles, AlertCircle, RefreshCw } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import { formatDate } from '@/lib/formatDate'
 import {
   fetchMarketComparison,
   type CompetitorProduct,
@@ -301,9 +302,7 @@ function CompetitorRow({ product: p, myPrice }: { product: CompetitorProduct; my
 function PastQuoteRow({ quote: q, myPrice }: { quote: SimilarQuote; myPrice: number }) {
   const diff = q.customerTotal - myPrice
   const pct  = myPrice > 0 ? (diff / myPrice) * 100 : 0
-  const date = q.createdAt
-    ? new Date(q.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-    : ''
+  const date = formatDate(q.createdAt, '')
 
   return (
     <div className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">

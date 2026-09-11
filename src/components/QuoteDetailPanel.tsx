@@ -10,6 +10,7 @@ import { PaymentPlanBlock } from '@/components/PaymentPlanBlock'
 import { useAuth } from '@/context/AuthContext'
 import { canSeePayments } from '@/lib/paymentsAccess'
 import { displayStatusFor } from '@/lib/quoteStatusDisplay'
+import { formatDate, formatDateTime } from '@/lib/formatDate'
 import { quotesService } from '@/services/quotesService'
 import { OpenQuoteButton } from '@/components/OpenQuoteButton'
 import { NoticeDialog } from '@/components/NoticeDialog'
@@ -140,8 +141,8 @@ export function formatLastOpened(iso: string | null | undefined): string | null 
     minutes < 60 ? `${minutes} min ago` :
     hours   < 24 ? `${hours} h ago` :
     days    <  7 ? `${days} d ago` :
-    date.toLocaleDateString()
-  return `${date.toLocaleString()} (${relative})`
+    formatDate(date)
+  return `${formatDateTime(date)} (${relative})`
 }
 
 export function formatExpiration(iso: string | null | undefined): { label: string; expired: boolean } {
@@ -150,10 +151,10 @@ export function formatExpiration(iso: string | null | undefined): { label: strin
   if (Number.isNaN(date.getTime())) return { label: 'No expiration', expired: false }
   const now = new Date()
   const expired = date.getTime() < now.getTime()
-  if (expired) return { label: `Expired ${date.toLocaleDateString()}`, expired: true }
+  if (expired) return { label: `Expired ${formatDate(date)}`, expired: true }
   const diffDays = Math.ceil((date.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
   if (diffDays <= 14) return { label: `Expires in ${diffDays} day${diffDays === 1 ? '' : 's'}`, expired: false }
-  return { label: `Expires ${date.toLocaleDateString()}`, expired: false }
+  return { label: `Expires ${formatDate(date)}`, expired: false }
 }
 
 /**
@@ -1295,7 +1296,7 @@ export function QuoteDetailPanel({ quote, onClose, onStatusChange, onRefreshToke
                       <p className="text-xs font-medium text-slate-700 line-clamp-2">{a.caption}</p>
                     )}
                     <p className="text-[10px] text-slate-400">
-                      {a.createdAt ? new Date(a.createdAt).toLocaleString() : ''}
+                      {a.createdAt ? formatDateTime(a.createdAt) : ''}
                     </p>
                   </div>
                 </a>
@@ -1525,7 +1526,7 @@ function AdminActionRow({ action, at, reason }: { action: 'APPROVED' | 'REJECTED
           )}
           <p className="text-xs text-slate-700">
             <span className="text-slate-400">When: </span>
-            <span className="font-mono">{new Date(at).toLocaleString()}</span>
+            <span className="font-mono">{formatDateTime(at)}</span>
           </p>
         </div>
       </div>
@@ -1615,7 +1616,7 @@ function WhatsAppRow({ title, subtitle, sentAt, to, toLabel, status, error }: {
           {sentAt && (
             <p className="text-xs text-slate-700">
               <span className="text-slate-400">Sent: </span>
-              <span className="font-mono">{new Date(sentAt).toLocaleString()}</span>
+              <span className="font-mono">{formatDateTime(sentAt)}</span>
             </p>
           )}
 

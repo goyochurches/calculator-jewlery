@@ -4,6 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { clientService, type ClientSummary } from '@/services/clientService'
 import { NoticeDialog } from '@/components/NoticeDialog'
 import { useInternalPreview } from '@/lib/internalPreview'
+import { formatDate } from '@/lib/formatDate'
 import type { Client } from '@/types'
 import {
   Check, ChevronLeft, ChevronRight, FileText, Loader2, Mail, Pencil, Phone,
@@ -308,8 +309,8 @@ export function ClientsPage() {
                               className="w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:border-slate-400"
                             />
                           </td>
-                          <td className="px-6 py-2 text-slate-400 text-xs">
-                            {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '—'}
+                          <td className="px-6 py-2 text-slate-400 text-xs whitespace-nowrap">
+                            {formatDate(c.createdAt)}
                           </td>
                           <td className="px-3 py-2 text-right">
                             <div className="flex justify-end gap-1">
@@ -363,8 +364,8 @@ export function ClientsPage() {
                             </a>
                           ) : <span className="text-slate-300">—</span>}
                         </td>
-                        <td className="px-6 py-3.5 text-slate-500 text-xs">
-                          {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '—'}
+                        <td className="px-6 py-3.5 text-slate-500 text-xs whitespace-nowrap">
+                          {formatDate(c.createdAt)}
                         </td>
                         <td className="px-3 py-3.5 text-right">
                           <div className="flex justify-end gap-1">
