@@ -191,6 +191,64 @@ export function buildStoneHeadGroup(params: StoneHeadParams): THREE.Group {
   return group
 }
 
+// ── Bezel setting (round) — Matrix's own "Bezel" tool ────────────────────────
+// A second setting TYPE for the same round center stone, alongside the
+// prong head above — a solid wall wrapping the girdle instead of individual
+// claws. Same local "+Y up" convention, same `attachHeadToBand` unchanged.
+
+export interface BezelHeadParams {
+  stoneDiameterMm: number
+  /** Radial thickness of the bezel wall, in mm. */
+  bezelWallMm?: number
+  /** How far the wall rises above the gallery plane, in mm — tall enough
+   *  to clear the crown and be burnished over the stone's edge. */
+  bezelHeightMm?: number
+  standHeightMm?: number
+}
+
+/** Round-stone bezel: a hollow tube (an extruded ring — a circular
+ *  THREE.Shape with a circular hole) instead of individual prongs, on the
+ *  same stand as the prong head. The inner radius sits a hair under the
+ *  stone's own radius so it reads as gripping it. */
+export function buildBezelHeadGroup(params: BezelHeadParams): THREE.Group {
+  const { stoneDiameterMm } = params
+  const stoneRadius = stoneDiameterMm / 2
+  const wallMm = params.bezelWallMm ?? Math.max(0.4, stoneDiameterMm * 0.1)
+  const heightMm = params.bezelHeightMm ?? stoneDiameterMm * 0.5
+  const standHeightMm = params.standHeightMm ?? stoneDiameterMm * 0.4
+
+  const group = new THREE.Group()
+
+  const outerR = stoneRadius + wallMm
+  const innerR = stoneRadius * 0.97
+  const ringShape = new THREE.Shape()
+  ringShape.absarc(0, 0, outerR, 0, Math.PI * 2, false)
+  const hole = new THREE.Path()
+  hole.absarc(0, 0, innerR, 0, Math.PI * 2, true)
+  ringShape.holes.push(hole)
+  const bezel = new THREE.Mesh(new THREE.ExtrudeGeometry(ringShape, { depth: heightMm, bevelEnabled: false, curveSegments: 48 }))
+  // Same extrude→rotate convention as the fancy-shape gallery/stone proxy:
+  // shape lies in local XY, extrudes along Z; rotating −90° about X maps
+  // that Z onto this group's +Y (up).
+  bezel.rotation.x = -Math.PI / 2
+  group.add(bezel)
+
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(stoneRadius * 0.85, stoneRadius * 0.6, standHeightMm, 32))
+  stand.position.y = -standHeightMm / 2
+  group.add(stand)
+
+  const stoneProxy = new THREE.Mesh(new THREE.OctahedronGeometry(stoneRadius * 0.92))
+  stoneProxy.position.y = stoneRadius * 0.5
+  stoneProxy.scale.y = 0.8
+  stoneProxy.userData.isStone = true
+  group.add(stoneProxy)
+
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}
+
 /** Reorients a head group (built "+Y up") and places it on the band's outer
  *  surface at angle 0 (the Lathe convention's +X direction — see
  *  buildBandProfile) so its "up" axis points radially outward, matching how

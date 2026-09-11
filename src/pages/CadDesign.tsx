@@ -9,12 +9,14 @@ import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import type { JewelryMetalOption } from '@/types'
 import {
   buildRingBandGeometry, usSizeToDiameterMm, type BandProfile,
-  buildStoneHeadGroup, attachHeadToBand, roundDiameterMmFromCarat,
+  buildStoneHeadGroup, buildBezelHeadGroup, attachHeadToBand, roundDiameterMmFromCarat,
   buildFancyStoneHeadGroup, type FancyStoneShape,
   buildPaveRow,
   unionMetalParts, extractStoneMeshes,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
+
+type SettingType = 'prong' | 'bezel'
 
 type StoneShape = 'round' | FancyStoneShape
 
@@ -61,6 +63,7 @@ export function CadDesignPage() {
   const [caratWeight, setCaratWeight] = useState(1)
   const [fancyLengthMm, setFancyLengthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.lengthMm)
   const [fancyWidthMm, setFancyWidthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.widthMm)
+  const [settingType, setSettingType] = useState<SettingType>('prong')
   const [prongCount, setProngCount] = useState<4 | 6>(4)
   const [includePave, setIncludePave] = useState(false)
   const [paveCount, setPaveCount] = useState(12)
@@ -87,7 +90,9 @@ export function CadDesignPage() {
     group.add(band)
     if (includeStone) {
       const head = stoneShape === 'round'
-        ? buildStoneHeadGroup({ stoneDiameterMm, prongCount })
+        ? (settingType === 'bezel'
+            ? buildBezelHeadGroup({ stoneDiameterMm })
+            : buildStoneHeadGroup({ stoneDiameterMm, prongCount }))
         : buildFancyStoneHeadGroup({ shape: stoneShape, lengthMm: fancyLengthMm, widthMm: fancyWidthMm })
       attachHeadToBand(head, { fingerSize, widthMm, thicknessMm, profile })
       group.add(head)
@@ -97,7 +102,7 @@ export function CadDesignPage() {
     }
     return group
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneShape, stoneDiameterMm, prongCount, fancyLengthMm, fancyWidthMm, includePave, paveCount, paveStoneMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneShape, settingType, stoneDiameterMm, prongCount, fancyLengthMm, fancyWidthMm, includePave, paveCount, paveStoneMm])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -133,7 +138,7 @@ export function CadDesignPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    const stoneTag = includeStone ? (stoneShape === 'round' ? `-${caratWeight}ct-round` : `-${stoneShape}`) : ''
+    const stoneTag = includeStone ? (stoneShape === 'round' ? `-${caratWeight}ct-round-${settingType}` : `-${stoneShape}`) : ''
     a.download = `ring-size${fingerSize}-w${widthMm}mm${stoneTag}.stl`
     document.body.appendChild(a)
     a.click()
@@ -233,7 +238,21 @@ export function CadDesignPage() {
                         onChange={e => setCaratWeight(Math.max(0.1, Number(e.target.value) || 0.1))} className={inputCls} />
                       <p className="mt-1 text-[11px] text-slate-400">≈ {stoneDiameterMm.toFixed(2)} mm diameter</p>
                     </div>
-                  ) : (
+                  ) : null}
+                  {stoneShape === 'round' && (
+                    <div>
+                      <label className={labelCls}>Setting type</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['prong', 'bezel'] as const).map(t => (
+                          <button key={t} type="button" onClick={() => setSettingType(t)}
+                            className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${settingType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {stoneShape !== 'round' && (
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className={labelCls}>Length (mm)</label>
@@ -248,7 +267,7 @@ export function CadDesignPage() {
                     </div>
                   )}
 
-                  {stoneShape === 'round' && (
+                  {stoneShape === 'round' && settingType === 'prong' && (
                     <div>
                       <label className={labelCls}>Prongs</label>
                       <div className="grid grid-cols-2 gap-2">
