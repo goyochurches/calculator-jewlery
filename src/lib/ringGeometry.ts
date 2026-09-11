@@ -96,3 +96,102 @@ export function buildRingBandGeometry(params: RingBandParams): THREE.BufferGeome
   geometry.computeVertexNormals()
   return geometry
 }
+
+// ── Center-stone head (prong basket) — round brilliant only for v1 ─────────
+// Fancy shapes (oval, princess, pear, marquise, cushion...) each need their
+// own prong-placement logic and are a separate future piece — see the CAD
+// roadmap memory. This is intentionally the simplest real case first.
+
+/** Round-brilliant diameter (mm) from carat weight — the standard jewelry
+ *  approximation `6.5 × ∛carat` (calibrated so 1.00ct ≈ 6.5mm, the commonly
+ *  cited reference point). Real stones vary a little by cut proportions
+ *  (depth/table ratio) — treat this as a solid estimate, not a spec. */
+export function roundDiameterMmFromCarat(carat: number): number {
+  return 6.5 * Math.cbrt(Math.max(0, carat))
+}
+
+export interface StoneHeadParams {
+  /** Round-brilliant diameter, in mm (see roundDiameterMmFromCarat). */
+  stoneDiameterMm: number
+  prongCount: 4 | 6
+  /** Diameter of each prong, in mm. */
+  prongDiameterMm?: number
+  /** How far the prong tips reach above the gallery ring, in mm — enough to
+   *  clear the stone's crown and grip it. */
+  prongHeightMm?: number
+  /** Height of the tapered stand connecting the gallery down to the band's
+   *  outer surface, in mm. */
+  standHeightMm?: number
+}
+
+/** A center-stone prong head, built in its own local space with +Y as "up"
+ *  (culet down, table up) — same convention as looking at a solitaire
+ *  sitting on a table. `attachHeadToBand` below reorients and positions it
+ *  onto an actual band. Visual/preview-grade: this is NOT yet boolean-
+ *  unioned with the band (see CAD roadmap memory) — the exported STL has
+ *  separate, overlapping meshes rather than one watertight manifold, and
+ *  the stone itself is a plain octahedron proxy, not faceted gem geometry. */
+export function buildStoneHeadGroup(params: StoneHeadParams): THREE.Group {
+  const {
+    stoneDiameterMm, prongCount,
+    prongDiameterMm = Math.max(0.8, stoneDiameterMm * 0.12),
+    prongHeightMm = stoneDiameterMm * 0.55,
+    standHeightMm = stoneDiameterMm * 0.45,
+  } = params
+  const stoneRadius = stoneDiameterMm / 2
+  const group = new THREE.Group()
+
+  // Gallery ring — a thin torus at the girdle line the prongs rise from and
+  // the stand descends from.
+  const galleryTube = Math.max(0.3, prongDiameterMm * 0.4)
+  const gallery = new THREE.Mesh(new THREE.TorusGeometry(stoneRadius, galleryTube, 12, 48))
+  gallery.rotation.x = Math.PI / 2 // lie flat (torus defaults to standing in XY)
+  group.add(gallery)
+
+  // Prongs — tapered cylinders standing on the gallery, circling the stone
+  // just outside its girdle, tips tapering in slightly to suggest a grip.
+  const prongOrbitRadius = stoneRadius + prongDiameterMm / 2
+  for (let i = 0; i < prongCount; i++) {
+    const angle = (i / prongCount) * Math.PI * 2
+    const prong = new THREE.Mesh(
+      new THREE.CylinderGeometry(prongDiameterMm * 0.35, prongDiameterMm / 2, prongHeightMm, 12),
+    )
+    prong.position.set(
+      Math.cos(angle) * prongOrbitRadius,
+      prongHeightMm / 2,
+      Math.sin(angle) * prongOrbitRadius,
+    )
+    group.add(prong)
+  }
+
+  // Stand — truncated cone descending from the gallery to where it meets
+  // the band.
+  const stand = new THREE.Mesh(
+    new THREE.CylinderGeometry(stoneRadius * 0.75, stoneRadius * 0.5, standHeightMm, 24),
+  )
+  stand.position.y = -standHeightMm / 2
+  group.add(stand)
+
+  // Stone placeholder — an octahedron proxy standing in for a round
+  // brilliant's silhouette until real faceted gem geometry exists.
+  const stoneProxy = new THREE.Mesh(new THREE.OctahedronGeometry(stoneRadius * 0.92))
+  stoneProxy.position.y = stoneRadius * 0.5
+  stoneProxy.scale.y = 0.8
+  group.add(stoneProxy)
+
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}
+
+/** Reorients a head group (built "+Y up") and places it on the band's outer
+ *  surface at angle 0 (the Lathe convention's +X direction — see
+ *  buildBandProfile) so its "up" axis points radially outward, matching how
+ *  a stone sits above the shank when worn. Mutates and returns `head`. */
+export function attachHeadToBand(head: THREE.Group, band: RingBandParams): THREE.Group {
+  const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
+  head.rotation.z = -Math.PI / 2
+  head.position.set(outerRadius, 0, 0)
+  return head
+}

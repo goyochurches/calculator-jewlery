@@ -3,10 +3,13 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { useEffect, useRef } from 'react'
 
 interface ModelViewer3DProps {
-  /** The geometry to display, centered on the origin. Swapping this (e.g.
-   *  after changing a size/width slider) rebuilds just the mesh, not the
-   *  whole scene/renderer. */
-  geometry: THREE.BufferGeometry | null
+  /** The object (a single Mesh, or a Group with several — band + head +
+   *  prongs, etc.) to display, centered on the origin. Swapping this
+   *  rebuilds just the displayed object, not the whole scene/renderer.
+   *  Every Mesh found inside gets the shared metal material — a future
+   *  refinement can give individual parts (e.g. a stone proxy) their own
+   *  material instead. */
+  object: THREE.Object3D | null
   /** Base color of the material — e.g. the selected metal's tint. */
   color?: string
   metalness?: number
@@ -16,14 +19,14 @@ interface ModelViewer3DProps {
 
 /**
  * Reusable three.js viewport: scene/camera/renderer/lights/orbit-controls
- * set up once per mount, with the displayed mesh swapped in and out as
- * `geometry` changes. Deliberately generic — any BufferGeometry works, so
- * this same component is the future home of an imported CAD file's mesh,
- * not just the parametric ring band.
+ * set up once per mount, with the displayed object swapped in and out as
+ * `object` changes. Deliberately generic — a single mesh or a whole group
+ * both work, so this same component is the future home of an imported CAD
+ * file's mesh, not just the parametric ring band.
  */
-export function ModelViewer3D({ geometry, color = '#d4af37', metalness = 0.85, roughness = 0.28, className }: ModelViewer3DProps) {
+export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className }: ModelViewer3DProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const meshRef = useRef<THREE.Mesh | null>(null)
+  const displayedRef = useRef<THREE.Object3D | null>(null)
   const materialRef = useRef<THREE.MeshStandardMaterial | null>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
 
@@ -100,24 +103,25 @@ export function ModelViewer3D({ geometry, color = '#d4af37', metalness = 0.85, r
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Swap the displayed mesh whenever the geometry changes, without
-  // rebuilding the scene/renderer/controls.
+  // Swap the displayed object whenever it changes, without rebuilding the
+  // scene/renderer/controls.
   useEffect(() => {
     const scene = sceneRef.current
     const material = materialRef.current
     if (!scene || !material) return
 
-    if (meshRef.current) {
-      scene.remove(meshRef.current)
-      meshRef.current.geometry.dispose()
-      meshRef.current = null
+    if (displayedRef.current) {
+      const prev = displayedRef.current
+      scene.remove(prev)
+      prev.traverse(obj => { if (obj instanceof THREE.Mesh) obj.geometry.dispose() })
+      displayedRef.current = null
     }
-    if (geometry) {
-      const mesh = new THREE.Mesh(geometry, material)
-      scene.add(mesh)
-      meshRef.current = mesh
+    if (object) {
+      object.traverse(obj => { if (obj instanceof THREE.Mesh) obj.material = material })
+      scene.add(object)
+      displayedRef.current = object
     }
-  }, [geometry])
+  }, [object])
 
   // Live-update material appearance without touching geometry.
   useEffect(() => {

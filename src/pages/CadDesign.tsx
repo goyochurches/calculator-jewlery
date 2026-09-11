@@ -6,7 +6,10 @@ import { ModelViewer3D } from '@/components/ModelViewer3D'
 import { FINGER_SIZE_OPTIONS, METAL_GROUPS } from '@/hooks/useQuoteBuilder'
 import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import type { JewelryMetalOption } from '@/types'
-import { buildRingBandGeometry, usSizeToDiameterMm, type BandProfile } from '@/lib/ringGeometry'
+import {
+  buildRingBandGeometry, usSizeToDiameterMm, type BandProfile,
+  buildStoneHeadGroup, attachHeadToBand, roundDiameterMmFromCarat,
+} from '@/lib/ringGeometry'
 import { Download, RotateCw } from 'lucide-react'
 
 // Approximate render colors per metal — cosmetic only, doesn't drive
@@ -34,22 +37,37 @@ export function CadDesignPage() {
   const [thicknessMm, setThicknessMm] = useState(1.8)
   const [profile, setProfile] = useState<BandProfile>('comfort')
   const [metal, setMetal] = useState<JewelryMetalOption>('gold-18k-yellow')
+  const [includeStone, setIncludeStone] = useState(true)
+  const [caratWeight, setCaratWeight] = useState(1)
+  const [prongCount, setProngCount] = useState<4 | 6>(4)
 
-  const geometry = useMemo(
-    () => buildRingBandGeometry({ fingerSize, widthMm, thicknessMm, profile }),
-    [fingerSize, widthMm, thicknessMm, profile],
-  )
   const innerDiameterMm = usSizeToDiameterMm(fingerSize)
+  const stoneDiameterMm = roundDiameterMmFromCarat(caratWeight)
+
+  // One combined group — band + (optionally) the center-stone head — so the
+  // viewer and the STL export both see a single object. Rebuilt only when a
+  // param actually changes, not every render.
+  const model = useMemo(() => {
+    const group = new THREE.Group()
+    const band = new THREE.Mesh(buildRingBandGeometry({ fingerSize, widthMm, thicknessMm, profile }))
+    group.add(band)
+    if (includeStone) {
+      const head = buildStoneHeadGroup({ stoneDiameterMm, prongCount })
+      attachHeadToBand(head, { fingerSize, widthMm, thicknessMm, profile })
+      group.add(head)
+    }
+    return group
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneDiameterMm, prongCount])
 
   const downloadStl = () => {
-    const mesh = new THREE.Mesh(geometry)
     const exporter = new STLExporter()
-    const stl = exporter.parse(mesh, { binary: false })
+    const stl = exporter.parse(model, { binary: false })
     const blob = new Blob([stl], { type: 'model/stl' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `ring-band-size${fingerSize}-w${widthMm}mm.stl`
+    a.download = `ring-size${fingerSize}-w${widthMm}mm${includeStone ? `-${caratWeight}ct` : ''}.stl`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -64,11 +82,12 @@ export function CadDesignPage() {
             <RotateCw className="h-4 w-4" /> CAD Design
             <span className="rounded-full bg-amber-400/90 px-2 py-0.5 text-[9px] font-bold text-slate-900">Early preview</span>
           </div>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Parametric ring band</h2>
+          <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Parametric solitaire ring</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            First step toward in-app CAD — a plain or comfort-fit band generated from size, width and thickness, with a
-            real 3D preview and an STL you can hand to a caster or printer. This is not a replacement for Matrix/RhinoGold
-            (no stone settings, prongs or manufacturability checks yet) — it's the starting point we're building on.
+            Band (size/width/thickness/profile) plus an optional round-brilliant prong head, sized from carat weight.
+            This is not a Matrix/RhinoGold replacement yet — the stone is a placeholder shape (not faceted gem geometry),
+            band and head aren't boolean-unioned into one solid, and only round center stones are supported so far.
+            Building toward full parity step by step.
           </p>
         </CardContent>
       </Card>
@@ -120,20 +139,51 @@ export function CadDesignPage() {
               </select>
             </div>
 
+            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-slate-900">Center stone (round)</span>
+                <input type="checkbox" checked={includeStone} onChange={e => setIncludeStone(e.target.checked)}
+                  className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+              </label>
+              {includeStone && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Carat weight</label>
+                      <input type="number" min={0.1} max={10} step={0.05} value={caratWeight}
+                        onChange={e => setCaratWeight(Math.max(0.1, Number(e.target.value) || 0.1))} className={inputCls} />
+                      <p className="mt-1 text-[11px] text-slate-400">≈ {stoneDiameterMm.toFixed(2)} mm diameter</p>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Prongs</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {([4, 6] as const).map(n => (
+                          <button key={n} type="button" onClick={() => setProngCount(n)}
+                            className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${prongCount === n ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
             <button type="button" onClick={downloadStl}
               className="inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
               style={{ backgroundColor: 'var(--theme-primary)' }}>
               <Download className="h-4 w-4" /> Download STL
             </button>
             <p className="text-[11px] text-slate-400">
-              Sizing uses a linear approximation of the standard US chart — cross-check against your sizing mandrel
-              before sending anything to production.
+              Sizing uses a linear approximation of the standard US chart, and carat→diameter the standard
+              6.5×∛carat estimate — cross-check both against your own charts before sending anything to production.
             </p>
           </CardContent>
         </Card>
 
         <Card className="overflow-hidden rounded-[30px] border border-slate-200 shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
-          <ModelViewer3D geometry={geometry} color={METAL_COLORS[metal]} className="h-[420px] w-full sm:h-[520px]" />
+          <ModelViewer3D object={model} color={METAL_COLORS[metal]} className="h-[420px] w-full sm:h-[520px]" />
         </Card>
       </section>
     </div>
