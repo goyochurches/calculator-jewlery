@@ -11,7 +11,7 @@ import {
   buildRingBandGeometry, usSizeToDiameterMm, type BandProfile,
   buildStoneHeadGroup, buildBezelHeadGroup, buildHaloGroup, attachHeadToBand, roundDiameterMmFromCarat,
   buildFancyStoneHeadGroup, type FancyStoneShape,
-  buildPaveRow, buildChannelSetting,
+  buildPaveRow, buildChannelSetting, buildFlushSetting,
   unionMetalParts, extractStoneMeshes,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
@@ -70,7 +70,7 @@ export function CadDesignPage() {
   const [haloCount, setHaloCount] = useState(16)
   const [haloStoneMm, setHaloStoneMm] = useState(1.2)
   const [includePave, setIncludePave] = useState(false)
-  const [paveSettingType, setPaveSettingType] = useState<'pave' | 'channel'>('pave')
+  const [paveSettingType, setPaveSettingType] = useState<'pave' | 'channel' | 'flush'>('pave')
   const [paveCount, setPaveCount] = useState(12)
   const [paveStoneMm, setPaveStoneMm] = useState(1.2)
   const [mergeSolid, setMergeSolid] = useState(false)
@@ -111,9 +111,12 @@ export function CadDesignPage() {
       }
     }
     if (includePave) {
+      const bandParams = { fingerSize, widthMm, thicknessMm, profile }
       const sideStones = paveSettingType === 'channel'
-        ? buildChannelSetting({ count: paveCount, stoneDiameterMm: paveStoneMm }, { fingerSize, widthMm, thicknessMm, profile })
-        : buildPaveRow({ count: paveCount, stoneDiameterMm: paveStoneMm }, { fingerSize, widthMm, thicknessMm, profile })
+        ? buildChannelSetting({ count: paveCount, stoneDiameterMm: paveStoneMm }, bandParams)
+        : paveSettingType === 'flush'
+          ? buildFlushSetting({ count: paveCount, stoneDiameterMm: paveStoneMm }, bandParams)
+          : buildPaveRow({ count: paveCount, stoneDiameterMm: paveStoneMm }, bandParams)
       group.add(sideStones)
     }
     return group
@@ -173,9 +176,9 @@ export function CadDesignPage() {
           <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Parametric solitaire ring</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
             Band (size/width/thickness/profile) plus an optional prong head — round, oval, cushion, princess, marquise
-            or pear — pavé side stones, and an optional boolean merge into one real solid. This is not a Matrix/RhinoGold
-            replacement yet — the stone is a placeholder shape (not faceted gem geometry). Building toward full parity
-            step by step.
+            or pear — pavé, channel or flush side stones, and an optional boolean merge into one real solid. This is
+            not a Matrix/RhinoGold replacement yet — the stone is a placeholder shape (not faceted gem geometry).
+            Building toward full parity step by step.
           </p>
         </CardContent>
       </Card>
@@ -337,8 +340,8 @@ export function CadDesignPage() {
                 <>
                   <div>
                     <label className={labelCls}>Setting</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {([['pave', 'Pavé'], ['channel', 'Channel']] as const).map(([t, label]) => (
+                    <div className="grid grid-cols-3 gap-2">
+                      {([['pave', 'Pavé'], ['channel', 'Channel'], ['flush', 'Flush']] as const).map(([t, label]) => (
                         <button key={t} type="button" onClick={() => setPaveSettingType(t)}
                           className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${paveSettingType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
                           {label}

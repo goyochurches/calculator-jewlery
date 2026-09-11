@@ -738,6 +738,65 @@ export function buildPaveRow(params: PaveRowParams, band: RingBandParams): THREE
   return group
 }
 
+// ── Flush (gypsy) setting ────────────────────────────────────────────────────
+// Matrix's "flush"/"gypsy" setting — a third alternative to pavé/channel for
+// side stones: each stone is set directly INTO the metal (sunk well below
+// the band's outer surface, not resting on top like pavé or sitting between
+// rails like channel), with a small burnished collar of metal folded over
+// its girdle to hold it in place. Same "split evenly on both sides of the
+// head, with a gap" layout convention as pavé/channel above, so it's a
+// drop-in third option in the UI.
+
+export interface FlushSettingParams {
+  count: number
+  stoneDiameterMm: number
+  spreadDeg?: number
+  gapDeg?: number
+}
+
+/** A row of stones sunk into the band's outer surface, each ringed by a
+ *  thin torus "collar" sitting flush at the band's own surface — the
+ *  defining visual signature of a flush/gypsy setting (no prongs, no
+ *  rails, just metal burnished over the stone's edge). */
+export function buildFlushSetting(params: FlushSettingParams, band: RingBandParams): THREE.Group {
+  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12 } = params
+  const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
+  const stoneRadius = stoneDiameterMm / 2
+  // Sunk much deeper than pavé's shallow sink (0.3×) or channel's near-flush
+  // seating (0.1×) — only the crown/table sits near the band's own surface.
+  const seatRadius = outerRadius - stoneRadius * 0.75
+  const rimTube = Math.max(0.25, stoneRadius * 0.18)
+  const perSide = Math.max(1, Math.round(count / 2))
+
+  const group = new THREE.Group()
+  for (const side of [1, -1]) {
+    for (let i = 0; i < perSide; i++) {
+      const t = perSide === 1 ? 0 : i / (perSide - 1)
+      const angleDeg = side * (gapDeg + t * Math.max(0, spreadDeg - gapDeg))
+      const angle = (angleDeg * Math.PI) / 180
+      const cos = Math.cos(angle), sin = Math.sin(angle)
+
+      const stone = new THREE.Mesh(new THREE.SphereGeometry(stoneRadius, 16, 12))
+      stone.position.set(cos * seatRadius, 0, sin * seatRadius)
+      stone.userData.isStone = true
+      group.add(stone)
+
+      // The burnished collar — a small torus lying flat against the band's
+      // outer surface (same angle, but at the band's actual outer radius
+      // rather than the sunk stone's), ringing where the metal is pushed
+      // over the stone's edge.
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(stoneRadius * 0.85, rimTube, 10, 24))
+      rim.position.set(cos * outerRadius, 0, sin * outerRadius)
+      rim.rotation.x = Math.PI / 2
+      group.add(rim)
+    }
+  }
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}
+
 // ── Boolean union — MatrixGold's own "Parametric Boolean" tool ──────────────
 // Everything above builds separate, overlapping meshes (a real preview
 // limitation flagged throughout the CAD roadmap memory). This is the actual
