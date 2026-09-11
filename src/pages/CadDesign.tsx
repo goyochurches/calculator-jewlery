@@ -21,7 +21,7 @@ type SettingType = 'prong' | 'bezel'
 type StoneShape = 'round' | FancyStoneShape
 
 const STONE_SHAPE_LABELS: Record<StoneShape, string> = {
-  round: 'Round', oval: 'Oval', cushion: 'Cushion', princess: 'Princess', marquise: 'Marquise',
+  round: 'Round', oval: 'Oval', cushion: 'Cushion', princess: 'Princess', marquise: 'Marquise', pear: 'Pear',
 }
 // Reasonable starting length×width (mm) per fancy shape, editable afterward.
 const FANCY_SHAPE_DEFAULTS: Record<FancyStoneShape, { lengthMm: number; widthMm: number }> = {
@@ -29,6 +29,7 @@ const FANCY_SHAPE_DEFAULTS: Record<FancyStoneShape, { lengthMm: number; widthMm:
   cushion: { lengthMm: 7, widthMm: 7 },
   princess: { lengthMm: 6.5, widthMm: 6.5 },
   marquise: { lengthMm: 10, widthMm: 5 },
+  pear: { lengthMm: 9, widthMm: 6 },
 }
 import { Download, RotateCw, Scale } from 'lucide-react'
 
@@ -171,10 +172,10 @@ export function CadDesignPage() {
           </div>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Parametric solitaire ring</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            Band (size/width/thickness/profile) plus an optional prong head — round, oval, cushion, princess or marquise
-            — pavé side stones, and an optional boolean merge into one real solid. This is not a Matrix/RhinoGold
-            replacement yet — the stone is a placeholder shape (not faceted gem geometry) and pear is still on the
-            list. Building toward full parity step by step.
+            Band (size/width/thickness/profile) plus an optional prong head — round, oval, cushion, princess, marquise
+            or pear — pavé side stones, and an optional boolean merge into one real solid. This is not a Matrix/RhinoGold
+            replacement yet — the stone is a placeholder shape (not faceted gem geometry). Building toward full parity
+            step by step.
           </p>
         </CardContent>
       </Card>

@@ -387,14 +387,17 @@ export function estimateWeightGrams(volumeMm3: number, densityGPerCm3: number): 
 // deferred (its asymmetric outline needs more careful curve-fitting than
 // the exact constructions below) — see the CAD roadmap memory.
 
-export type FancyStoneShape = 'oval' | 'cushion' | 'princess' | 'marquise'
+export type FancyStoneShape = 'oval' | 'cushion' | 'princess' | 'marquise' | 'pear'
 
 /** Closed footprint outline (as seen from above) for one fancy shape, in
  *  local (u, v) = (width-axis, length-axis) mm, centered on the origin.
- *  Every shape here is symmetric about both axes, which is what lets
- *  `buildFancyStoneHeadGroup` reuse one extrude→rotate step for all of
- *  them without worrying about a mirrored result (asymmetric shapes like
- *  pear would need the mapping tracked carefully — reason it's deferred). */
+ *  Oval/cushion/princess/marquise are symmetric about both axes, so the
+ *  extrude→rotate step in `buildFancyStoneHeadGroup` can't mirror them
+ *  into anything different. Pear is only symmetric about u (width) —
+ *  by convention its point sits at +v, which after that same
+ *  extrude→rotate step ends up facing a fixed direction relative to the
+ *  band; purely a cosmetic pick (which way the pear points), not a
+ *  correctness concern. */
 function buildStoneOutline(shape: FancyStoneShape, halfW: number, halfL: number, segments = 64): THREE.Vector2[] {
   switch (shape) {
     case 'oval': {
@@ -454,6 +457,51 @@ function buildStoneOutline(shape: FancyStoneShape, halfW: number, halfL: number,
       for (let i = 0; i <= half; i++) {
         const t = Math.PI + thetaTop - (2 * thetaTop) * (i / half)
         pts.push(new THREE.Vector2(c + R * Math.cos(t), R * Math.sin(t)))
+      }
+      return pts
+    }
+    case 'pear': {
+      // Rounded belly (a semicircle of radius halfW) smoothly blended
+      // (matching tangent, not just matching position — no kink) into two
+      // side arcs converging on a single sharp point at the top.
+      //
+      // Semicircle: center (0, v0), radius r = halfW, where v0 = −halfL + r
+      // so its bottom-most point lands exactly at −halfL. It spans from
+      // (r, v0) round through (0, −halfL) to (−r, v0) — tangent is VERTICAL
+      // at both those ends (radius is horizontal there).
+      //
+      // Side arc (right half): must pass through (r, v0) with that same
+      // vertical tangent (so it has to be centered on the line y = v0),
+      // and through the tip (0, halfL). Center (cx, v0), radius R2:
+      //   R2 = r − cx  (passes through (r, v0))
+      //   R2² = cx² + h²,  h = halfL − v0  (passes through the tip)
+      //   ⇒ cx = (r² − h²) / (2r)
+      const r = halfW
+      const v0 = -halfL + r
+      const h = halfL - v0
+      const cx = (r * r - h * h) / (2 * r)
+      const R2 = r - cx
+      const phiTip = Math.atan2(h, -cx) // tip's angle around (cx, v0)
+
+      const belly = Math.max(1, Math.round(segments * 0.4))
+      const side = Math.max(1, Math.round(segments * 0.3))
+      const pts: THREE.Vector2[] = []
+      // Belly: from (r, v0) [angle 0] down through the bottom to (−r, v0)
+      // [angle −π], relative to the semicircle's own center (0, v0).
+      for (let i = 0; i <= belly; i++) {
+        const t = -Math.PI * (i / belly)
+        pts.push(new THREE.Vector2(r * Math.cos(t), v0 + r * Math.sin(t)))
+      }
+      // Left side arc: mirror of the right one (negate u for the same t),
+      // from (−r, v0) up to the tip.
+      for (let i = 1; i <= side; i++) {
+        const t = phiTip * (i / side)
+        pts.push(new THREE.Vector2(-(cx + R2 * Math.cos(t)), v0 + R2 * Math.sin(t)))
+      }
+      // Right side arc: tip back down to (r, v0), closing the loop.
+      for (let i = 1; i < side; i++) {
+        const t = phiTip * (1 - i / side)
+        pts.push(new THREE.Vector2(cx + R2 * Math.cos(t), v0 + R2 * Math.sin(t)))
       }
       return pts
     }
@@ -520,6 +568,39 @@ function fancyProngPoints(shape: FancyStoneShape, halfW: number, halfL: number, 
       const rightPts = [mid, -mid].map(t => new THREE.Vector2(-c + R * Math.cos(t), R * Math.sin(t)))
       const leftPts = [Math.PI - mid, Math.PI + mid].map(t => new THREE.Vector2(c + R * Math.cos(t), R * Math.sin(t)))
       return [...tips, ...[...rightPts, ...leftPts].map(point => ({ point, isTip: false }))]
+    }
+    case 'pear': {
+      // Same landmark geometry as buildStoneOutline's pear case — the
+      // point (V-tip), the belly's bottom-most point, and shoulder points
+      // sampled along the same side-arc formula at a couple of heights.
+      const r = halfW
+      const v0 = -halfL + r
+      const h = halfL - v0
+      const cx = (r * r - h * h) / (2 * r)
+      const R2 = r - cx
+      const phiTip = Math.atan2(h, -cx)
+      const shoulder = (f: number, mirror: 1 | -1): THREE.Vector2 => {
+        const t = phiTip * f
+        return new THREE.Vector2(mirror * (cx + R2 * Math.cos(t)), v0 + R2 * Math.sin(t))
+      }
+      const tip: ProngSeat = { point: new THREE.Vector2(0, halfL), isTip: true }
+      const bottom: ProngSeat = { point: new THREE.Vector2(0, -halfL), isTip: false }
+      if (count === 4) {
+        return [
+          tip,
+          { point: shoulder(0.55, 1), isTip: false },
+          { point: shoulder(0.55, -1), isTip: false },
+          bottom,
+        ]
+      }
+      return [
+        tip,
+        { point: shoulder(0.75, 1), isTip: false },
+        { point: shoulder(0.75, -1), isTip: false },
+        { point: shoulder(0.35, 1), isTip: false },
+        { point: shoulder(0.35, -1), isTip: false },
+        bottom,
+      ]
     }
   }
 }
