@@ -630,3 +630,79 @@ export function extractStoneMeshes(object: THREE.Object3D): THREE.Mesh[] {
   })
   return stones
 }
+
+// ── Channel setting ───────────────────────────────────────────────────────────
+// Alternative to pavé for side stones — the stones sit flush between two
+// raised metal rails running along the shank, instead of resting on top
+// held by beads. Same "split evenly on both sides of the head, with a gap"
+// layout as buildPaveRow, reusing the same angular convention.
+
+export interface ChannelSettingParams {
+  count: number
+  stoneDiameterMm: number
+  spreadDeg?: number
+  gapDeg?: number
+  wallHeightMm?: number
+  wallThicknessMm?: number
+}
+
+/** Points along a circular arc (radius `r`, at axial height `y`) from
+ *  `fromDeg` to `toDeg`, in the same (angle 0 = +X, +angle → +Z)
+ *  convention every other angular placement in this file uses. */
+function arcPoints3(r: number, y: number, fromDeg: number, toDeg: number, segments = 24): THREE.Vector3[] {
+  const pts: THREE.Vector3[] = []
+  for (let i = 0; i <= segments; i++) {
+    const deg = fromDeg + (toDeg - fromDeg) * (i / segments)
+    const rad = (deg * Math.PI) / 180
+    pts.push(new THREE.Vector3(Math.cos(rad) * r, y, Math.sin(rad) * r))
+  }
+  return pts
+}
+
+/** A row of stones (spheres, same as pavé) sitting flush at the band's
+ *  outer radius, flanked on both sides (along the band's WIDTH axis, not
+ *  radially) by two raised rail walls — each wall a `THREE.TubeGeometry`
+ *  swept along the arc it covers, built from sampled points rather than
+ *  TorusGeometry's own arc/rotation parameters (easier to reason about
+ *  correctly against this file's existing angle convention). */
+export function buildChannelSetting(params: ChannelSettingParams, band: RingBandParams): THREE.Group {
+  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12 } = params
+  const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
+  const stoneRadius = stoneDiameterMm / 2
+  const wallHeightMm = params.wallHeightMm ?? stoneRadius * 0.8
+  const wallThicknessMm = params.wallThicknessMm ?? Math.max(0.4, stoneRadius * 0.3)
+  const seatRadius = outerRadius - stoneRadius * 0.1 // sit almost flush, minimal sinking
+  const perSide = Math.max(1, Math.round(count / 2))
+
+  const group = new THREE.Group()
+
+  for (const side of [1, -1]) {
+    for (let i = 0; i < perSide; i++) {
+      const t = perSide === 1 ? 0 : i / (perSide - 1)
+      const deg = side * (gapDeg + t * Math.max(0, spreadDeg - gapDeg))
+      const rad = (deg * Math.PI) / 180
+      const stone = new THREE.Mesh(new THREE.SphereGeometry(stoneRadius, 16, 12))
+      stone.position.set(Math.cos(rad) * seatRadius, wallHeightMm * 0.3, Math.sin(rad) * seatRadius)
+      stone.userData.isStone = true
+      group.add(stone)
+    }
+  }
+
+  // Two wall arcs (one per side of the head) × two rails each (flanking
+  // the stones along the width axis).
+  for (const side of [1, -1]) {
+    const fromDeg = side === 1 ? gapDeg : -spreadDeg
+    const toDeg = side === 1 ? spreadDeg : -gapDeg
+    for (const railSide of [1, -1]) {
+      const yOffset = railSide * (stoneRadius + wallThicknessMm / 2)
+      const curve = new THREE.CatmullRomCurve3(arcPoints3(seatRadius, yOffset, fromDeg, toDeg))
+      const wall = new THREE.Mesh(new THREE.TubeGeometry(curve, 32, wallThicknessMm / 2, 8, false))
+      group.add(wall)
+    }
+  }
+
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}

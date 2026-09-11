@@ -11,7 +11,7 @@ import {
   buildRingBandGeometry, usSizeToDiameterMm, type BandProfile,
   buildStoneHeadGroup, buildBezelHeadGroup, attachHeadToBand, roundDiameterMmFromCarat,
   buildFancyStoneHeadGroup, type FancyStoneShape,
-  buildPaveRow,
+  buildPaveRow, buildChannelSetting,
   unionMetalParts, extractStoneMeshes,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
@@ -66,6 +66,7 @@ export function CadDesignPage() {
   const [settingType, setSettingType] = useState<SettingType>('prong')
   const [prongCount, setProngCount] = useState<4 | 6>(4)
   const [includePave, setIncludePave] = useState(false)
+  const [paveSettingType, setPaveSettingType] = useState<'pave' | 'channel'>('pave')
   const [paveCount, setPaveCount] = useState(12)
   const [paveStoneMm, setPaveStoneMm] = useState(1.2)
   const [mergeSolid, setMergeSolid] = useState(false)
@@ -98,11 +99,14 @@ export function CadDesignPage() {
       group.add(head)
     }
     if (includePave) {
-      group.add(buildPaveRow({ count: paveCount, stoneDiameterMm: paveStoneMm }, { fingerSize, widthMm, thicknessMm, profile }))
+      const sideStones = paveSettingType === 'channel'
+        ? buildChannelSetting({ count: paveCount, stoneDiameterMm: paveStoneMm }, { fingerSize, widthMm, thicknessMm, profile })
+        : buildPaveRow({ count: paveCount, stoneDiameterMm: paveStoneMm }, { fingerSize, widthMm, thicknessMm, profile })
+      group.add(sideStones)
     }
     return group
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneShape, settingType, stoneDiameterMm, prongCount, fancyLengthMm, fancyWidthMm, includePave, paveCount, paveStoneMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneShape, settingType, stoneDiameterMm, prongCount, fancyLengthMm, fancyWidthMm, includePave, paveSettingType, paveCount, paveStoneMm])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -289,23 +293,36 @@ export function CadDesignPage() {
 
             <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
               <label className="flex items-center justify-between gap-3">
-                <span className="text-sm font-semibold text-slate-900">Pavé side stones</span>
+                <span className="text-sm font-semibold text-slate-900">Side stones</span>
                 <input type="checkbox" checked={includePave} onChange={e => setIncludePave(e.target.checked)}
                   className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
               </label>
               {includePave && (
-                <div className="grid grid-cols-2 gap-3">
+                <>
                   <div>
-                    <label className={labelCls}>Stone count</label>
-                    <input type="number" min={2} max={60} step={2} value={paveCount}
-                      onChange={e => setPaveCount(Math.max(2, Number(e.target.value) || 2))} className={inputCls} />
+                    <label className={labelCls}>Setting</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {([['pave', 'Pavé'], ['channel', 'Channel']] as const).map(([t, label]) => (
+                        <button key={t} type="button" onClick={() => setPaveSettingType(t)}
+                          className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${paveSettingType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div>
-                    <label className={labelCls}>Stone size (mm)</label>
-                    <input type="number" min={0.5} max={3} step={0.1} value={paveStoneMm}
-                      onChange={e => setPaveStoneMm(Math.max(0.5, Number(e.target.value) || 0.5))} className={inputCls} />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={labelCls}>Stone count</label>
+                      <input type="number" min={2} max={60} step={2} value={paveCount}
+                        onChange={e => setPaveCount(Math.max(2, Number(e.target.value) || 2))} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Stone size (mm)</label>
+                      <input type="number" min={0.5} max={3} step={0.1} value={paveStoneMm}
+                        onChange={e => setPaveStoneMm(Math.max(0.5, Number(e.target.value) || 0.5))} className={inputCls} />
+                    </div>
                   </div>
-                </div>
+                </>
               )}
             </div>
 
