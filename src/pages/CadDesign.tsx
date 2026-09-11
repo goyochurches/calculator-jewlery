@@ -4,13 +4,15 @@ import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js'
 import { Card, CardContent } from '@/components/ui/card'
 import { ModelViewer3D } from '@/components/ModelViewer3D'
 import { FINGER_SIZE_OPTIONS, METAL_GROUPS } from '@/hooks/useQuoteBuilder'
+import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import type { JewelryMetalOption } from '@/types'
 import {
   buildRingBandGeometry, usSizeToDiameterMm, type BandProfile,
   buildStoneHeadGroup, attachHeadToBand, roundDiameterMmFromCarat,
+  computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
-import { Download, RotateCw } from 'lucide-react'
+import { Download, RotateCw, Scale } from 'lucide-react'
 
 // Approximate render colors per metal — cosmetic only, doesn't drive
 // pricing (that still comes from Master Tables / config.metalPriceMap
@@ -32,6 +34,7 @@ const inputCls = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2 t
 const labelCls = 'mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500'
 
 export function CadDesignPage() {
+  const config = useQuoteConfig()
   const [fingerSize, setFingerSize] = useState(6)
   const [widthMm, setWidthMm] = useState(2.5)
   const [thicknessMm, setThicknessMm] = useState(1.8)
@@ -59,6 +62,13 @@ export function CadDesignPage() {
     return group
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneDiameterMm, prongCount])
+
+  // Weight & cost estimate — volume comes straight off the displayed
+  // geometry, so it always matches what's on screen (and in the STL).
+  const volumeMm3 = useMemo(() => computeVolumeMm3(model), [model])
+  const weightGrams = estimateWeightGrams(volumeMm3, METAL_DENSITY_G_PER_CM3[metal])
+  const pricePerGram = config.metalPriceMap[metal] ?? 0
+  const estimatedMetalCost = weightGrams * pricePerGram
 
   const downloadStl = () => {
     const exporter = new STLExporter()
@@ -168,6 +178,24 @@ export function CadDesignPage() {
                   </div>
                 </>
               )}
+            </div>
+
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+              <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-amber-700">
+                <Scale className="h-3.5 w-3.5" /> Estimated weight &amp; metal cost
+              </div>
+              <div className="mt-2 flex items-baseline justify-between">
+                <span className="text-2xl font-semibold text-slate-900">{weightGrams.toFixed(2)} g</span>
+                <span className="text-sm text-slate-500">
+                  {config.loading ? '…' : `$${pricePerGram.toFixed(2)}/g → `}
+                  <strong className="text-slate-900">${estimatedMetalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                </span>
+              </div>
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                From the actual displayed volume × {METAL_DENSITY_G_PER_CM3[metal]} g/cm³ for {JEWELRY_METAL_OPTIONS[metal].label},
+                at the same $/g the rest of the app prices from. Metal cost only — no labor, stones or setting yet, and
+                band+head overlap slightly (not unioned), so this reads a little high rather than low.
+              </p>
             </div>
 
             <button type="button" onClick={downloadStl}

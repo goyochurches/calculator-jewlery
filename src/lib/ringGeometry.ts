@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import type { JewelryMetalOption } from '@/types'
 
 // ── Ring-size ↔ millimeters ──────────────────────────────────────────────────
 // US ring size → inside diameter (mm). Linear approximation fit to the
@@ -194,4 +195,82 @@ export function attachHeadToBand(head: THREE.Group, band: RingBandParams): THREE
   head.rotation.z = -Math.PI / 2
   head.position.set(outerRadius, 0, 0)
   return head
+}
+
+// ── Weight & cost estimation ─────────────────────────────────────────────────
+// Volume → weight → cost, so the CAD page can show a live estimate using the
+// SAME $/gram the rest of the app already prices from (config.metalPriceMap)
+// — the one advantage a generic CAD tool doesn't have built in.
+
+/** Signed volume of one triangle (as three position vectors) about the
+ *  origin, via the divergence theorem — the standard way to get a closed
+ *  mesh's volume without a dedicated CSG/solid-modeling library. */
+function signedTetraVolume(a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3): number {
+  return a.dot(b.clone().cross(c)) / 6
+}
+
+/** Volume of ONE closed/manifold mesh, in the geometry's own units³ (mm³
+ *  here, since every dimension in this file is in mm). Every primitive this
+ *  file builds (Lathe band, Torus gallery, capped Cylinder prongs/stand,
+ *  Octahedron stone proxy) is individually closed, so this is exact per
+ *  part. */
+function meshVolume(geometry: THREE.BufferGeometry): number {
+  const pos = geometry.attributes.position
+  if (!pos) return 0
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3()
+  let volume = 0
+  const readTriangle = (ia: number, ib: number, ic: number) => {
+    a.fromBufferAttribute(pos, ia)
+    b.fromBufferAttribute(pos, ib)
+    c.fromBufferAttribute(pos, ic)
+    volume += signedTetraVolume(a, b, c)
+  }
+  if (geometry.index) {
+    const idx = geometry.index
+    for (let i = 0; i < idx.count; i += 3) readTriangle(idx.getX(i), idx.getX(i + 1), idx.getX(i + 2))
+  } else {
+    for (let i = 0; i < pos.count; i += 3) readTriangle(i, i + 1, i + 2)
+  }
+  return Math.abs(volume)
+}
+
+/** Total volume (mm³) of every mesh inside an object/group, summed. Since
+ *  the band and head aren't boolean-unioned yet (see the CAD roadmap
+ *  memory), their small overlap at the join gets counted twice — a minor,
+ *  deliberately-safe-direction overestimate rather than a gap, until real
+ *  booleans land. */
+export function computeVolumeMm3(object: THREE.Object3D): number {
+  let total = 0
+  object.updateMatrixWorld(true)
+  object.traverse(obj => {
+    if (!(obj instanceof THREE.Mesh)) return
+    // Scale factored in via the world matrix's determinant, so a scaled
+    // mesh (the stone proxy squashes Y by 0.8) still reports correctly.
+    const scale = new THREE.Vector3()
+    obj.getWorldScale(scale)
+    total += meshVolume(obj.geometry) * Math.abs(scale.x * scale.y * scale.z)
+  })
+  return total
+}
+
+/** Density (g/cm³) per metal — standard jewelry-industry reference values.
+ *  Real alloys vary a little by manufacturer; treat this as an estimate to
+ *  cross-check, not a certified figure. */
+export const METAL_DENSITY_G_PER_CM3: Record<JewelryMetalOption, number> = {
+  'gold-14k-white': 12.9,
+  'gold-14k-yellow': 13.1,
+  'gold-14k-rose': 13.4,
+  'gold-18k-white': 15.4,
+  'gold-18k-yellow': 15.6,
+  'gold-18k-rose': 15.2,
+  platinum: 21.45,
+  'gold-14k': 13.1,
+  'gold-18k': 15.6,
+  silver: 10.3,
+}
+
+/** Grams of metal for a given volume (mm³) and density (g/cm³) — 1 cm³ =
+ *  1000 mm³, so grams = volumeMm3 × density / 1000. */
+export function estimateWeightGrams(volumeMm3: number, densityGPerCm3: number): number {
+  return (volumeMm3 * densityGPerCm3) / 1000
 }
