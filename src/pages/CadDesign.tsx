@@ -11,6 +11,7 @@ import {
   buildRingBandGeometry, usSizeToDiameterMm, type BandProfile,
   buildStoneHeadGroup, attachHeadToBand, roundDiameterMmFromCarat,
   buildFancyStoneHeadGroup, type FancyStoneShape,
+  buildPaveRow,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
 
@@ -60,6 +61,9 @@ export function CadDesignPage() {
   const [fancyLengthMm, setFancyLengthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.lengthMm)
   const [fancyWidthMm, setFancyWidthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.widthMm)
   const [prongCount, setProngCount] = useState<4 | 6>(4)
+  const [includePave, setIncludePave] = useState(false)
+  const [paveCount, setPaveCount] = useState(12)
+  const [paveStoneMm, setPaveStoneMm] = useState(1.2)
 
   const innerDiameterMm = usSizeToDiameterMm(fingerSize)
   const stoneDiameterMm = roundDiameterMmFromCarat(caratWeight)
@@ -86,9 +90,12 @@ export function CadDesignPage() {
       attachHeadToBand(head, { fingerSize, widthMm, thicknessMm, profile })
       group.add(head)
     }
+    if (includePave) {
+      group.add(buildPaveRow({ count: paveCount, stoneDiameterMm: paveStoneMm }, { fingerSize, widthMm, thicknessMm, profile }))
+    }
     return group
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneShape, stoneDiameterMm, prongCount, fancyLengthMm, fancyWidthMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneShape, stoneDiameterMm, prongCount, fancyLengthMm, fancyWidthMm, includePave, paveCount, paveStoneMm])
 
   // Weight & cost estimate — volume comes straight off the displayed
   // geometry, so it always matches what's on screen (and in the STL).
@@ -236,6 +243,28 @@ export function CadDesignPage() {
                     <p className="text-[11px] text-slate-400">Fancy shapes use 4 fixed prongs for now — adjustable count is a future refinement.</p>
                   )}
                 </>
+              )}
+            </div>
+
+            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+              <label className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-slate-900">Pavé side stones</span>
+                <input type="checkbox" checked={includePave} onChange={e => setIncludePave(e.target.checked)}
+                  className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+              </label>
+              {includePave && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Stone count</label>
+                    <input type="number" min={2} max={60} step={2} value={paveCount}
+                      onChange={e => setPaveCount(Math.max(2, Number(e.target.value) || 2))} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Stone size (mm)</label>
+                    <input type="number" min={0.5} max={3} step={0.1} value={paveStoneMm}
+                      onChange={e => setPaveStoneMm(Math.max(0.5, Number(e.target.value) || 0.5))} className={inputCls} />
+                  </div>
+                </div>
               )}
             </div>
 

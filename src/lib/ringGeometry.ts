@@ -454,3 +454,53 @@ export function buildFancyStoneHeadGroup(params: FancyStoneHeadParams): THREE.Gr
   })
   return group
 }
+
+// ── Pavé side stones ──────────────────────────────────────────────────────────
+// Maps to MatrixGold's "Gems on Ring Rail" / "Gems on Curve" tools — a row
+// of small stones set along the shank, split evenly on both sides of the
+// head so it doesn't collide with the stand. Uses the SIDE/MELEE role data
+// already modeled in the quote/stock builders conceptually (a future step
+// can pull real melee sizes from useQuoteConfig instead of a flat input).
+
+export interface PaveRowParams {
+  /** Total stone count, split evenly across both sides of the head. */
+  count: number
+  stoneDiameterMm: number
+  /** How far the row reaches around the band from the head, in degrees
+   *  (0° = at the head, 180° = the far side / back of the ring). */
+  spreadDeg?: number
+  /** Angular gap left empty right next to the head's stand, in degrees,
+   *  so pavé stones don't overlap it. */
+  gapDeg?: number
+}
+
+/** A row of small placeholder stones (spheres — pavé doesn't need the
+ *  faceted-proxy treatment the center stone gets, they're too small to
+ *  read as anything but tiny round beads at this scale) set along the
+ *  band's outer surface, in WORLD/band coordinates directly — unlike the
+ *  center-stone heads, this doesn't need `attachHeadToBand`'s local→band
+ *  reorientation since it's built straight onto the band's own outer
+ *  surface at each angle. */
+export function buildPaveRow(params: PaveRowParams, band: RingBandParams): THREE.Group {
+  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12 } = params
+  const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
+  const stoneRadius = stoneDiameterMm / 2
+  const seatRadius = outerRadius - stoneRadius * 0.3 // sink each stone slightly into the band
+  const perSide = Math.max(1, Math.round(count / 2))
+
+  const group = new THREE.Group()
+  for (const side of [1, -1]) {
+    for (let i = 0; i < perSide; i++) {
+      const t = perSide === 1 ? 0 : i / (perSide - 1)
+      const angleDeg = side * (gapDeg + t * Math.max(0, spreadDeg - gapDeg))
+      const angle = (angleDeg * Math.PI) / 180
+      const stone = new THREE.Mesh(new THREE.SphereGeometry(stoneRadius, 16, 12))
+      stone.position.set(Math.cos(angle) * seatRadius, 0, Math.sin(angle) * seatRadius)
+      group.add(stone)
+    }
+  }
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}
