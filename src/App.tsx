@@ -13,6 +13,7 @@ import { UsersPage } from '@/pages/Users'
 import { Configuration } from '@/pages/Configuration'
 import { ReviewsPage } from '@/pages/Reviews'
 import MasterTables from '@/pages/MasterTables'
+import { CadDesignPage } from '@/pages/CadDesign'
 import QuotesList from '@/pages/QuotesList'
 import QuoteDetailPage from '@/pages/QuoteDetailPage'
 import { StockBuilderPage } from '@/pages/StockBuilder'
@@ -143,6 +144,9 @@ export default function App() {
                 </Route>
                 <Route element={<RequirePermission permission="master-tables" />}>
                   <Route path="/master-tables" element={<MasterTables />} />
+                </Route>
+                <Route element={<RequirePermission permission="cad-design" />}>
+                  <Route path="/cad-design" element={<CadDesignPage />} />
                 </Route>
 
               </Route>

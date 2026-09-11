@@ -80,6 +80,10 @@ const pageCopy: Record<string, { title: string; subtitle: string }> = {
     title: 'My profile',
     subtitle: 'Update your name, photo and account settings.',
   },
+  '/cad-design': {
+    title: 'CAD Design',
+    subtitle: 'Parametric ring band generator with a live 3D preview and STL export.',
+  },
 }
 
 const dynamicPageCopy: Array<{ pattern: RegExp; title: string; subtitle: string }> = [

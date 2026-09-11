@@ -5,11 +5,13 @@ import { canAccess, type NavKey } from '@/constants/permissions'
 import { FEATURES, isFeatureKey } from '@/lib/featureFlags'
 import { canSeePayments } from '@/lib/paymentsAccess'
 import { useFeatures } from '@/hooks/useFeatures'
+import { useInternalPreview } from '@/lib/internalPreview'
 import { useInboxUnread } from '@/hooks/useInboxUnread'
 import { useTourOnce } from '@/hooks/useTourOnce'
 import type { TourStep } from '@/lib/tour'
 import { useMemo } from 'react'
 import {
+  Box,
   Calculator,
   ClipboardList,
   CircleDollarSign,
@@ -50,6 +52,8 @@ const navItems: { to: string; label: string; icon: typeof LayoutDashboard; key: 
   { to: '/reviews', label: 'Reviews', icon: Star, key: 'reviews' },
   { to: '/configuration', label: 'Configuration', icon: Settings, key: 'configuration' },
   { to: '/master-tables', label: 'Master Tables', icon: ClipboardList, key: 'master-tables' },
+  // Early preview — see the internalPreview gate in visibleNavItems below.
+  { to: '/cad-design', label: 'CAD Design', icon: Box, key: 'cad-design' },
 ]
 
 // One line per section, shown as the tour walks the sidebar top to bottom.
@@ -103,6 +107,7 @@ function SidebarContent({
   const { user, logout } = useAuth()
   const { companyName, logo } = useBrand()
   const { isEnabled } = useFeatures()
+  const isInternalPreview = useInternalPreview()
   const navigate = useNavigate()
   const visibleNavItems = navItems.filter((item) => {
     if (item.hidden) return false
@@ -112,6 +117,9 @@ function SidebarContent({
     // Payments is gated on the specific shop-owner email, not on role.
     // Hide the sidebar entry for anyone else, even other ADMIN accounts.
     if (item.key === 'payments' && !canSeePayments(user)) return false
+    // CAD Design is a brand-new, still-being-validated tool — internal
+    // preview only, same as the CRM/aging widgets.
+    if (item.key === 'cad-design' && !isInternalPreview) return false
     return canAccess(user?.role, item.key)
   })
   const goToProfile = () => { onNavigate?.(); navigate('/profile') }
