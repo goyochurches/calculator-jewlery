@@ -9,14 +9,14 @@ import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import type { JewelryMetalOption } from '@/types'
 import {
   buildRingBandGeometry, usSizeToDiameterMm, type BandProfile,
-  buildStoneHeadGroup, buildBezelHeadGroup, buildHaloGroup, attachHeadToBand, roundDiameterMmFromCarat,
+  buildStoneHeadGroup, buildBezelHeadGroup, buildClusterHeadGroup, buildHaloGroup, attachHeadToBand, roundDiameterMmFromCarat,
   buildFancyStoneHeadGroup, type FancyStoneShape,
   buildPaveRow, buildChannelSetting, buildFlushSetting,
   unionMetalParts, extractStoneMeshes,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
 
-type SettingType = 'prong' | 'bezel'
+type SettingType = 'prong' | 'bezel' | 'cluster'
 
 type StoneShape = 'round' | FancyStoneShape
 
@@ -66,6 +66,8 @@ export function CadDesignPage() {
   const [fancyWidthMm, setFancyWidthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.widthMm)
   const [settingType, setSettingType] = useState<SettingType>('prong')
   const [prongCount, setProngCount] = useState<4 | 6>(4)
+  const [clusterPetalCount, setClusterPetalCount] = useState(6)
+  const [clusterPetalStoneMm, setClusterPetalStoneMm] = useState(2)
   const [includeHalo, setIncludeHalo] = useState(false)
   const [haloCount, setHaloCount] = useState(16)
   const [haloStoneMm, setHaloStoneMm] = useState(1.2)
@@ -99,7 +101,9 @@ export function CadDesignPage() {
       const head = stoneShape === 'round'
         ? (settingType === 'bezel'
             ? buildBezelHeadGroup({ stoneDiameterMm })
-            : buildStoneHeadGroup({ stoneDiameterMm, prongCount }))
+            : settingType === 'cluster'
+              ? buildClusterHeadGroup({ centerStoneDiameterMm: stoneDiameterMm, petalCount: clusterPetalCount, petalStoneDiameterMm: clusterPetalStoneMm })
+              : buildStoneHeadGroup({ stoneDiameterMm, prongCount }))
         : buildFancyStoneHeadGroup({ shape: stoneShape, lengthMm: fancyLengthMm, widthMm: fancyWidthMm, prongCount })
       attachHeadToBand(head, { fingerSize, widthMm, thicknessMm, profile })
       group.add(head)
@@ -121,7 +125,7 @@ export function CadDesignPage() {
     }
     return group
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneShape, settingType, stoneDiameterMm, prongCount, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneShape, settingType, stoneDiameterMm, prongCount, clusterPetalCount, clusterPetalStoneMm, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -175,10 +179,10 @@ export function CadDesignPage() {
           </div>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Parametric solitaire ring</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            Band (size/width/thickness/profile) plus an optional prong head — round, oval, cushion, princess, marquise
-            or pear — pavé, channel or flush side stones, and an optional boolean merge into one real solid. This is
-            not a Matrix/RhinoGold replacement yet — the stone is a placeholder shape (not faceted gem geometry).
-            Building toward full parity step by step.
+            Band (size/width/thickness/profile) plus an optional head — round (prong, bezel or cluster), oval, cushion,
+            princess, marquise or pear — pavé, channel or flush side stones, and an optional boolean merge into one
+            real solid. This is not a Matrix/RhinoGold replacement yet — the stone is a placeholder shape (not faceted
+            gem geometry). Building toward full parity step by step.
           </p>
         </CardContent>
       </Card>
@@ -261,13 +265,27 @@ export function CadDesignPage() {
                   {stoneShape === 'round' && (
                     <div>
                       <label className={labelCls}>Setting type</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {(['prong', 'bezel'] as const).map(t => (
+                      <div className="grid grid-cols-3 gap-2">
+                        {(['prong', 'bezel', 'cluster'] as const).map(t => (
                           <button key={t} type="button" onClick={() => setSettingType(t)}
                             className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${settingType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
                             {t}
                           </button>
                         ))}
+                      </div>
+                    </div>
+                  )}
+                  {stoneShape === 'round' && settingType === 'cluster' && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>Petal count</label>
+                        <input type="number" min={4} max={10} step={1} value={clusterPetalCount}
+                          onChange={e => setClusterPetalCount(Math.max(4, Number(e.target.value) || 4))} className={inputCls} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Petal stone size (mm)</label>
+                        <input type="number" min={0.8} max={5} step={0.1} value={clusterPetalStoneMm}
+                          onChange={e => setClusterPetalStoneMm(Math.max(0.8, Number(e.target.value) || 0.8))} className={inputCls} />
                       </div>
                     </div>
                   )}

@@ -249,6 +249,87 @@ export function buildBezelHeadGroup(params: BezelHeadParams): THREE.Group {
   return group
 }
 
+// ── Cluster setting — several smaller stones grouped as one "flower" ───────
+// A third CENTER-stone setting type alongside prong/bezel — Matrix's own
+// named "cluster" setting: instead of a single larger stone, a tight
+// rosette of a center stone plus a ring of smaller "petal" stones, all
+// standing on one shared plate/stand, reads as one bigger unit from a
+// distance. Round-only for now (a fancy-shape cluster would need the
+// petals to follow that shape's outline, like halo) — same scoping as halo.
+
+export interface ClusterHeadParams {
+  /** The rosette's own center stone, in mm. */
+  centerStoneDiameterMm: number
+  /** Stones ringing the center, e.g. 6 for a classic 7-stone cluster. */
+  petalCount: number
+  /** Each petal stone's diameter, in mm — defaults to just over half the
+   *  center stone's, a typical cluster proportion. */
+  petalStoneDiameterMm?: number
+  standHeightMm?: number
+}
+
+/** Cluster head: one shared flat plate underlies the whole rosette (instead
+ *  of each stone getting its own separate gallery+stand), with the center
+ *  stone's own small prong cage in the middle and each petal stone getting
+ *  its own smaller 3-prong cage — a reasonable, honestly-simplified stand-
+ *  in for how a real cluster often shares prongs between neighboring
+ *  stones. Same local "+Y up" convention as every other head in this file. */
+export function buildClusterHeadGroup(params: ClusterHeadParams): THREE.Group {
+  const { centerStoneDiameterMm, petalCount } = params
+  const centerRadius = centerStoneDiameterMm / 2
+  const petalRadius = (params.petalStoneDiameterMm ?? centerStoneDiameterMm * 0.55) / 2
+  const standHeightMm = params.standHeightMm ?? centerStoneDiameterMm * 0.4
+
+  // Petals sit just outside the center stone, touching-close (a small gap
+  // so their proxies don't z-fight the center one).
+  const orbitRadius = centerRadius + petalRadius * 1.05
+  const plateRadius = orbitRadius + petalRadius * 1.3
+  const plateThickness = Math.max(0.4, petalRadius * 0.5)
+
+  const group = new THREE.Group()
+
+  // Shared plate — a thin disc every stone in the rosette sits on, standing
+  // in for a cluster's shared gallery/undergallery.
+  const plate = new THREE.Mesh(new THREE.CylinderGeometry(plateRadius, plateRadius * 0.92, plateThickness, 48))
+  plate.position.y = plateThickness / 2
+  group.add(plate)
+
+  const addStoneWithProngs = (cx: number, cz: number, radius: number, prongCount: number) => {
+    const prongDiameterMm = Math.max(0.5, radius * 0.28)
+    const prongHeightMm = radius * 1.1
+    for (let i = 0; i < prongCount; i++) {
+      const angle = (i / prongCount) * Math.PI * 2
+      const prong = new THREE.Mesh(new THREE.CylinderGeometry(prongDiameterMm * 0.35, prongDiameterMm / 2, prongHeightMm, 10))
+      prong.position.set(
+        cx + Math.cos(angle) * (radius + prongDiameterMm / 2),
+        plateThickness + prongHeightMm / 2,
+        cz + Math.sin(angle) * (radius + prongDiameterMm / 2),
+      )
+      group.add(prong)
+    }
+    const stoneProxy = new THREE.Mesh(new THREE.OctahedronGeometry(radius * 0.92))
+    stoneProxy.position.set(cx, plateThickness + radius * 0.5, cz)
+    stoneProxy.scale.y = 0.8
+    stoneProxy.userData.isStone = true
+    group.add(stoneProxy)
+  }
+
+  addStoneWithProngs(0, 0, centerRadius, 4)
+  for (let i = 0; i < petalCount; i++) {
+    const angle = (i / petalCount) * Math.PI * 2
+    addStoneWithProngs(Math.cos(angle) * orbitRadius, Math.sin(angle) * orbitRadius, petalRadius, 3)
+  }
+
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(plateRadius * 0.85, plateRadius * 0.55, standHeightMm, 24))
+  stand.position.y = -standHeightMm / 2
+  group.add(stand)
+
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}
+
 // ── Halo — a ring of small stones circling the center stone ─────────────────
 // Round center stone only for now — a fancy-shape halo would need to follow
 // that shape's own outline (scaled outward) rather than a plain circle, a
