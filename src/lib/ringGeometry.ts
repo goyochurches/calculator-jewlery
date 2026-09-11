@@ -465,23 +465,44 @@ function buildStoneOutline(shape: FancyStoneShape, halfW: number, halfL: number,
  *  hanging off a sharp point; oval at the "shoulders"; marquise at the two
  *  side bulges plus just short of the two tips). 4 prongs for all four —
  *  a reasonable default; larger stones often want 6, a future refinement. */
-function fancyProngPoints(shape: FancyStoneShape, halfW: number, halfL: number): THREE.Vector2[] {
+function fancyProngPoints(shape: FancyStoneShape, halfW: number, halfL: number, count: 4 | 6 = 4): THREE.Vector2[] {
   switch (shape) {
-    case 'oval':
-      return [Math.PI / 4, 3 * Math.PI / 4, 5 * Math.PI / 4, 7 * Math.PI / 4]
-        .map(a => new THREE.Vector2(halfW * Math.cos(a), halfL * Math.sin(a)))
+    case 'oval': {
+      // Evenly spaced by angle works cleanly for either count — no
+      // shape-specific landmark points needed.
+      const pts: THREE.Vector2[] = []
+      for (let i = 0; i < count; i++) {
+        const a = ((2 * i + 1) / count) * Math.PI
+        pts.push(new THREE.Vector2(halfW * Math.cos(a), halfL * Math.sin(a)))
+      }
+      return pts
+    }
     case 'princess':
     case 'cushion': {
       const inset = 0.82
-      return [[1, 1], [-1, 1], [-1, -1], [1, -1]]
+      const corners = ([[1, 1], [-1, 1], [-1, -1], [1, -1]] as const)
         .map(([sx, sy]) => new THREE.Vector2(sx * halfW * inset, sy * halfL * inset))
+      if (count === 4) return corners
+      // 6: the 4 corners plus the midpoints of the length-axis edges —
+      // where a bigger stone's extra pair of prongs typically goes.
+      return [...corners, new THREE.Vector2(0, halfL * inset), new THREE.Vector2(0, -halfL * inset)]
     }
     case 'marquise': {
       const tipInset = 0.85
-      return [
-        new THREE.Vector2(halfW, 0), new THREE.Vector2(-halfW, 0),
-        new THREE.Vector2(0, halfL * tipInset), new THREE.Vector2(0, -halfL * tipInset),
-      ]
+      const tips = [new THREE.Vector2(0, halfL * tipInset), new THREE.Vector2(0, -halfL * tipInset)]
+      if (count === 4) {
+        return [new THREE.Vector2(halfW, 0), new THREE.Vector2(-halfW, 0), ...tips]
+      }
+      // 6: tips + two points per side, each halfway (by the vesica arc's
+      // own angle) between a tip and the side bulge — same circle-through-
+      // 3-points construction buildStoneOutline uses for the outline itself.
+      const c = (halfL * halfL - halfW * halfW) / (2 * halfW)
+      const R = halfW + c
+      const thetaTop = Math.atan2(halfL, c)
+      const mid = thetaTop / 2
+      const rightPts = [mid, -mid].map(t => new THREE.Vector2(-c + R * Math.cos(t), R * Math.sin(t)))
+      const leftPts = [Math.PI - mid, Math.PI + mid].map(t => new THREE.Vector2(c + R * Math.cos(t), R * Math.sin(t)))
+      return [...tips, ...rightPts, ...leftPts]
     }
   }
 }
@@ -492,6 +513,7 @@ export interface FancyStoneHeadParams {
    *  "8×6mm oval". */
   lengthMm: number
   widthMm: number
+  prongCount?: 4 | 6
   prongDiameterMm?: number
   prongHeightMm?: number
   standHeightMm?: number
@@ -527,7 +549,7 @@ export function buildFancyStoneHeadGroup(params: FancyStoneHeadParams): THREE.Gr
   gallery.position.y = -galleryDepth / 2
   group.add(gallery)
 
-  const prongPoints = fancyProngPoints(shape, halfW, halfL)
+  const prongPoints = fancyProngPoints(shape, halfW, halfL, params.prongCount ?? 4)
   for (const p of prongPoints) {
     const prong = new THREE.Mesh(
       new THREE.CylinderGeometry(prongDiameterMm * 0.35, prongDiameterMm / 2, prongHeightMm, 12),

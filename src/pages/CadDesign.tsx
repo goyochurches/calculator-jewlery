@@ -99,7 +99,7 @@ export function CadDesignPage() {
         ? (settingType === 'bezel'
             ? buildBezelHeadGroup({ stoneDiameterMm })
             : buildStoneHeadGroup({ stoneDiameterMm, prongCount }))
-        : buildFancyStoneHeadGroup({ shape: stoneShape, lengthMm: fancyLengthMm, widthMm: fancyWidthMm })
+        : buildFancyStoneHeadGroup({ shape: stoneShape, lengthMm: fancyLengthMm, widthMm: fancyWidthMm, prongCount })
       attachHeadToBand(head, { fingerSize, widthMm, thicknessMm, profile })
       group.add(head)
 
@@ -282,7 +282,7 @@ export function CadDesignPage() {
                     </div>
                   )}
 
-                  {stoneShape === 'round' && settingType === 'prong' && (
+                  {(stoneShape !== 'round' || settingType === 'prong') && (
                     <div>
                       <label className={labelCls}>Prongs</label>
                       <div className="grid grid-cols-2 gap-2">
@@ -294,9 +294,6 @@ export function CadDesignPage() {
                         ))}
                       </div>
                     </div>
-                  )}
-                  {stoneShape !== 'round' && (
-                    <p className="text-[11px] text-slate-400">Fancy shapes use 4 fixed prongs for now — adjustable count is a future refinement.</p>
                   )}
 
                   {stoneShape === 'round' && (
