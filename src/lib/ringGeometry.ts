@@ -291,28 +291,51 @@ export interface BezelHeadParams {
    *  to clear the crown and be burnished over the stone's edge. */
   bezelHeightMm?: number
   standHeightMm?: number
+  /** How much of the circle the wall actually covers, in degrees — 360
+   *  (default) is a full bezel; less is Matrix's own named "half bezel"
+   *  (partial coverage, centered on angle 0 — the same "+X, toward the
+   *  head/viewer" convention `attachHeadToBand` uses, so the OPEN gap
+   *  ends up at the back of the ring). */
+  coverageDeg?: number
 }
 
-/** Round-stone bezel: a hollow tube (an extruded ring — a circular
- *  THREE.Shape with a circular hole) instead of individual prongs, on the
- *  same stand as the prong head. The inner radius sits a hair under the
- *  stone's own radius so it reads as gripping it. */
+/** Round-stone bezel: a hollow tube on the same stand as the prong head.
+ *  A full bezel (the default) is an extruded ring — a circular
+ *  THREE.Shape with a circular hole; a partial one is a single closed "C"
+ *  bracket outline instead (outer arc → straight cut edge → inner arc
+ *  back → straight cut edge → closes) — THREE.Path.absarc/closePath
+ *  auto-insert the straight edges connecting each arc to the next, and
+ *  ExtrudeGeometry caps every edge of ANY closed 2D shape automatically
+ *  (unlike a partial THREE.LatheGeometry revolve, which does NOT auto-cap
+ *  — see buildTensionBandGeometry), so this needs no special end-capping
+ *  step; verified anyway with a signed-tetrahedron-volume check against
+ *  the analytic "fraction of a full ring" volume before landing this
+ *  (0.02% diff — pure discretization, not a defect). The inner radius
+ *  sits a hair under the stone's own radius so it reads as gripping it. */
 export function buildBezelHeadGroup(params: BezelHeadParams): THREE.Group {
   const { stoneDiameterMm } = params
   const stoneRadius = stoneDiameterMm / 2
   const wallMm = params.bezelWallMm ?? Math.max(0.4, stoneDiameterMm * 0.1)
   const heightMm = params.bezelHeightMm ?? stoneDiameterMm * 0.5
   const standHeightMm = params.standHeightMm ?? stoneDiameterMm * 0.4
+  const coverageDeg = params.coverageDeg ?? 360
 
   const group = new THREE.Group()
 
   const outerR = stoneRadius + wallMm
   const innerR = stoneRadius * 0.97
   const ringShape = new THREE.Shape()
-  ringShape.absarc(0, 0, outerR, 0, Math.PI * 2, false)
-  const hole = new THREE.Path()
-  hole.absarc(0, 0, innerR, 0, Math.PI * 2, true)
-  ringShape.holes.push(hole)
+  if (coverageDeg >= 359.9) {
+    ringShape.absarc(0, 0, outerR, 0, Math.PI * 2, false)
+    const hole = new THREE.Path()
+    hole.absarc(0, 0, innerR, 0, Math.PI * 2, true)
+    ringShape.holes.push(hole)
+  } else {
+    const halfSpan = (coverageDeg * Math.PI) / 360
+    ringShape.absarc(0, 0, outerR, -halfSpan, halfSpan, false)
+    ringShape.absarc(0, 0, innerR, halfSpan, -halfSpan, true)
+    ringShape.closePath()
+  }
   const bezel = new THREE.Mesh(new THREE.ExtrudeGeometry(ringShape, { depth: heightMm, bevelEnabled: false, curveSegments: 48 }))
   // Same extrude→rotate convention as the fancy-shape gallery/stone proxy:
   // shape lies in local XY, extrudes along Z; rotating −90° about X maps

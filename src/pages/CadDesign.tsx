@@ -90,6 +90,7 @@ export function CadDesignPage() {
   const [fancyLengthMm, setFancyLengthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.lengthMm)
   const [fancyWidthMm, setFancyWidthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.widthMm)
   const [settingType, setSettingType] = useState<SettingType>('prong')
+  const [bezelCoverage, setBezelCoverage] = useState<'full' | 'half'>('full')
   const [prongCount, setProngCount] = useState<4 | 6>(4)
   const [clusterPetalCount, setClusterPetalCount] = useState(6)
   const [clusterPetalStoneMm, setClusterPetalStoneMm] = useState(2)
@@ -197,7 +198,7 @@ export function CadDesignPage() {
       } else {
         const head = stoneShape === 'round'
           ? (settingType === 'bezel'
-              ? buildBezelHeadGroup({ stoneDiameterMm })
+              ? buildBezelHeadGroup({ stoneDiameterMm, coverageDeg: bezelCoverage === 'half' ? 180 : 360 })
               : settingType === 'cluster'
                 ? buildClusterHeadGroup({ centerStoneDiameterMm: stoneDiameterMm, petalCount: clusterPetalCount, petalStoneDiameterMm: clusterPetalStoneMm })
                 : settingType === 'illusion'
@@ -225,7 +226,7 @@ export function CadDesignPage() {
     }
     return group
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, taperAmount, includeMilgrain, includeRope, includeStone, stoneShape, settingType, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, taperAmount, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -517,6 +518,19 @@ export function CadDesignPage() {
                             <button key={t} type="button" onClick={() => setSettingType(t)}
                               className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${settingType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
                               {t}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {stoneShape === 'round' && settingType === 'bezel' && (
+                      <div>
+                        <label className={labelCls}>Bezel coverage</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(['full', 'half'] as const).map(c => (
+                            <button key={c} type="button" onClick={() => setBezelCoverage(c)}
+                              className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${bezelCoverage === c ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                              {c === 'half' ? 'Half bezel' : 'Full bezel'}
                             </button>
                           ))}
                         </div>
