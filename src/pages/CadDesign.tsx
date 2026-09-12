@@ -19,6 +19,7 @@ import {
   unionMetalParts, extractStoneMeshes,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
+import { parseImportedCadFile } from '@/lib/cadImport'
 
 type SettingType = 'prong' | 'bezel' | 'cluster' | 'tension' | 'illusion'
 
@@ -50,7 +51,7 @@ const PART_TAB: Record<string, Tab> = {
   'Pavé stone': 'side', 'Channel stone': 'side', 'Channel rail': 'side',
   'Flush stone': 'side', 'Flush collar': 'side',
   'Milgrain bead': 'band',
-  'Merged solid': 'solid',
+  'Merged solid': 'solid', Imported: 'solid',
 }
 import { Download, RotateCw, Scale, MousePointerClick } from 'lucide-react'
 
@@ -99,6 +100,27 @@ export function CadDesignPage() {
   const [mergeSolid, setMergeSolid] = useState(false)
   const [includeMilgrain, setIncludeMilgrain] = useState(false)
   const [autoRotate, setAutoRotate] = useState(false)
+  // Viewing an imported file (STL/OBJ/3MF) — the other half of the
+  // original CAD ask, independent of the parametric generator below.
+  // Non-null overrides the parametric model in the viewer/weight/export.
+  const [importedModel, setImportedModel] = useState<THREE.Object3D | null>(null)
+  const [importFileName, setImportFileName] = useState<string | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
+
+  const handleImportFile = async (file: File) => {
+    setImporting(true)
+    setImportError(null)
+    try {
+      const group = await parseImportedCadFile(file)
+      setImportedModel(group)
+      setImportFileName(file.name)
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Could not read this file.')
+    } finally {
+      setImporting(false)
+    }
+  }
   // Grouped like Matrix's own toolbar groups (Tools/Ring-Rail, Gems, Solid/
   // Surface) instead of one long scrolling form — same controls, just not
   // all visible at once.
@@ -217,23 +239,33 @@ export function CadDesignPage() {
     }
   }, [model, mergeSolid])
 
+  // What the viewer/weight-estimate/export actually operate on — the
+  // imported file when one's loaded, otherwise the parametric design.
+  const viewModel = importedModel ?? displayModel
+
   // Weight & cost estimate — volume comes straight off the displayed
   // geometry, so it always matches what's on screen (and in the STL). Once
-  // merged, this is exact (no more overlap double-counting).
-  const volumeMm3 = useMemo(() => computeVolumeMm3(displayModel), [displayModel])
+  // merged, this is exact (no more overlap double-counting). For an
+  // imported file, this assumes the WHOLE thing is one solid piece of the
+  // selected metal — disclosed in the UI, since an arbitrary import could
+  // be multi-material or already include gems this app has no way to tell
+  // apart from the metal.
+  const volumeMm3 = useMemo(() => computeVolumeMm3(viewModel), [viewModel])
   const weightGrams = estimateWeightGrams(volumeMm3, METAL_DENSITY_G_PER_CM3[metal])
   const pricePerGram = config.metalPriceMap[metal] ?? 0
   const estimatedMetalCost = weightGrams * pricePerGram
 
   const downloadStl = () => {
     const exporter = new STLExporter()
-    const stl = exporter.parse(displayModel, { binary: false })
+    const stl = exporter.parse(viewModel, { binary: false })
     const blob = new Blob([stl], { type: 'model/stl' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
     const stoneTag = includeStone ? (stoneShape === 'round' ? `-${caratWeight}ct-round-${settingType}` : `-${stoneShape}`) : ''
-    a.download = `ring-size${fingerSize}-w${widthMm}mm${stoneTag}.stl`
+    a.download = importedModel
+      ? `${importFileName?.replace(/\.[^.]+$/, '') || 'imported'}.stl`
+      : `ring-size${fingerSize}-w${widthMm}mm${stoneTag}.stl`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -255,9 +287,10 @@ export function CadDesignPage() {
             side stones (pavé, channel or flush), optional milgrain edging, and solid/export, grouped into tabs the
             way Matrix groups its own tools (Ring Rail, Gems, Milgrain, Parametric Boolean) instead of one long form.
             Click any part of the model in the viewer to select and identify it — click a single prong and you can
-            edit its height on its own, a first real per-instance edit, not just a global slider. This is not a
-            Matrix/RhinoGold replacement yet — the stone is a placeholder shape (not faceted gem geometry). Building
-            toward full parity step by step.
+            edit its height on its own, a first real per-instance edit, not just a global slider. Import an existing
+            STL/OBJ/3MF file (Solid tab) to view it right here too — the other half of the original ask. This is not
+            a Matrix/RhinoGold replacement yet — the stone is a placeholder shape (not faceted gem geometry).
+            Building toward full parity step by step.
           </p>
         </CardContent>
       </Card>
@@ -549,6 +582,32 @@ export function CadDesignPage() {
                     Couldn't merge this geometry ({mergeError}) — showing the unmerged preview instead.
                   </p>
                 )}
+
+                <div className="space-y-2 border-t border-slate-200 pt-3">
+                  <span className="text-sm font-semibold text-slate-900">Import a file to view</span>
+                  <p className="text-[11px] text-slate-400">
+                    View an existing STL, OBJ, or 3MF export (a real Matrix/Rhino/other CAD file) right here — the
+                    other half of the original ask, independent of the parametric design above. (.3dm, Rhino's own
+                    format, isn't supported yet.)
+                  </p>
+                  {importedModel ? (
+                    <div className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-600">
+                      <span className="truncate">Viewing: <strong>{importFileName}</strong></span>
+                      <button type="button" onClick={() => { setImportedModel(null); setImportFileName(null); setImportError(null) }}
+                        className="shrink-0 rounded-lg border border-slate-300 px-2 py-1 text-[11px] font-semibold hover:bg-slate-50">
+                        Back to design
+                      </button>
+                    </div>
+                  ) : (
+                    <input type="file" accept=".stl,.obj,.3mf"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f) }}
+                      className="block w-full text-xs text-slate-600" disabled={importing} />
+                  )}
+                  {importing && <p className="text-[11px] text-slate-400">Reading file…</p>}
+                  {importError && (
+                    <p className="rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700">{importError}</p>
+                  )}
+                </div>
               </div>
             )}
 
@@ -565,9 +624,11 @@ export function CadDesignPage() {
               </div>
               <p className="mt-1.5 text-[11px] text-slate-500">
                 From the actual displayed volume × {METAL_DENSITY_G_PER_CM3[metal]} g/cm³ for {JEWELRY_METAL_OPTIONS[metal].label},
-                at the same $/g the rest of the app prices from — metal only, gems excluded. {mergeSolid && !mergeError
-                  ? 'Merged into one solid, so this is exact (no more overlap double-counting).'
-                  : 'Band+head overlap slightly (not merged), so this reads a little high rather than low.'}
+                at the same $/g the rest of the app prices from. {importedModel
+                  ? "Assumes the whole imported file is one solid piece of this metal — this app can't tell a gem or a different material apart from the metal in a file it didn't build."
+                  : mergeSolid && !mergeError
+                    ? 'Metal only, gems excluded. Merged into one solid, so this is exact (no more overlap double-counting).'
+                    : 'Metal only, gems excluded. Band+head overlap slightly (not merged), so this reads a little high rather than low.'}
               </p>
             </div>
 
@@ -585,7 +646,7 @@ export function CadDesignPage() {
 
         <Card className="overflow-hidden rounded-[30px] border border-slate-200 shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
           <div className="relative">
-            <ModelViewer3D object={displayModel} color={METAL_COLORS[metal]} onSelectPart={handleSelectPart}
+            <ModelViewer3D object={viewModel} color={METAL_COLORS[metal]} onSelectPart={handleSelectPart}
               autoRotate={autoRotate} className="h-[420px] w-full sm:h-[520px]" />
             <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2 text-xs text-white shadow-sm backdrop-blur">
               <MousePointerClick className="h-3.5 w-3.5 shrink-0 text-amber-300" />
