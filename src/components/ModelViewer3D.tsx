@@ -43,6 +43,10 @@ interface ModelViewer3DProps {
    *  real click-to-select CAD interaction — currently identifies+highlights
    *  a part; editing that specific part is a future step. */
   onSelectPart?: (part: SelectedPart | null) => void
+  /** 360° turntable — Matrix's own "Animation" module includes exactly
+   *  this. Delegates to OrbitControls' own `autoRotate`, which keeps
+   *  spinning alongside (not instead of) manual orbit-dragging. */
+  autoRotate?: boolean
 }
 
 /**
@@ -52,7 +56,7 @@ interface ModelViewer3DProps {
  * both work, so this same component is the future home of an imported CAD
  * file's mesh, not just the parametric ring band.
  */
-export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className, onSelectPart }: ModelViewer3DProps) {
+export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className, onSelectPart, autoRotate = false }: ModelViewer3DProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const displayedRef = useRef<THREE.Object3D | null>(null)
   const materialRef = useRef<THREE.MeshStandardMaterial | null>(null)
@@ -60,6 +64,7 @@ export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, rou
   const highlightMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
+  const controlsRef = useRef<OrbitControls | null>(null)
   const selectedMeshRef = useRef<THREE.Mesh | null>(null)
   // Read inside the stable click handler below without re-registering the
   // DOM listener every time the caller passes a new callback instance.
@@ -88,6 +93,9 @@ export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, rou
     controls.dampingFactor = 0.08
     controls.minDistance = 8
     controls.maxDistance = 200
+    controls.autoRotate = autoRotate
+    controls.autoRotateSpeed = 4
+    controlsRef.current = controls
 
     // Studio-style three-point lighting so a metal material reads well
     // without needing an HDR environment map.
@@ -192,10 +200,11 @@ export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, rou
       container.removeChild(renderer.domElement)
       sceneRef.current = null
       cameraRef.current = null
+      controlsRef.current = null
     }
-    // Intentionally empty — color/metalness/roughness updates are applied
-    // to the existing material in the effect below rather than tearing
-    // down the whole renderer.
+    // Intentionally empty — color/metalness/roughness/autoRotate updates
+    // are applied to the existing material/controls in the effects below
+    // rather than tearing down the whole renderer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -261,6 +270,13 @@ export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, rou
     material.metalness = metalness
     material.roughness = roughness
   }, [color, metalness, roughness])
+
+  // Live-toggle the 360° turntable without touching anything else.
+  useEffect(() => {
+    const controls = controlsRef.current
+    if (!controls) return
+    controls.autoRotate = autoRotate
+  }, [autoRotate])
 
   return <div ref={containerRef} className={className} />
 }

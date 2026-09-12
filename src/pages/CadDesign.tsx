@@ -98,6 +98,7 @@ export function CadDesignPage() {
   const [paveStoneMm, setPaveStoneMm] = useState(1.2)
   const [mergeSolid, setMergeSolid] = useState(false)
   const [includeMilgrain, setIncludeMilgrain] = useState(false)
+  const [autoRotate, setAutoRotate] = useState(false)
   // Grouped like Matrix's own toolbar groups (Tools/Ring-Rail, Gems, Solid/
   // Surface) instead of one long scrolling form — same controls, just not
   // all visible at once.
@@ -585,7 +586,7 @@ export function CadDesignPage() {
         <Card className="overflow-hidden rounded-[30px] border border-slate-200 shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
           <div className="relative">
             <ModelViewer3D object={displayModel} color={METAL_COLORS[metal]} onSelectPart={handleSelectPart}
-              className="h-[420px] w-full sm:h-[520px]" />
+              autoRotate={autoRotate} className="h-[420px] w-full sm:h-[520px]" />
             <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2 text-xs text-white shadow-sm backdrop-blur">
               <MousePointerClick className="h-3.5 w-3.5 shrink-0 text-amber-300" />
               {selectedPart ? (
@@ -599,6 +600,10 @@ export function CadDesignPage() {
                 <span className="text-slate-300">Click a part of the model to select it</span>
               )}
             </div>
+            <button type="button" onClick={() => setAutoRotate(v => !v)}
+              className={`absolute right-3 top-3 flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold shadow-sm backdrop-blur transition ${autoRotate ? 'bg-amber-400 text-slate-900' : 'bg-slate-900/80 text-white hover:bg-slate-900'}`}>
+              <RotateCw className={`h-3.5 w-3.5 shrink-0 ${autoRotate ? 'animate-spin' : ''}`} /> Turntable
+            </button>
           </div>
         </Card>
       </section>
