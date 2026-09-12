@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js'
+import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js'
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { Card, CardContent } from '@/components/ui/card'
 import { ModelViewer3D, type SelectedPart } from '@/components/ModelViewer3D'
 import { FINGER_SIZE_OPTIONS, METAL_GROUPS } from '@/hooks/useQuoteBuilder'
@@ -118,6 +120,7 @@ export function CadDesignPage() {
   const [importFileName, setImportFileName] = useState<string | null>(null)
   const [importError, setImportError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
+  const [exportFormat, setExportFormat] = useState<'stl' | 'obj' | 'glb'>('stl')
 
   const handleImportFile = async (file: File) => {
     setImporting(true)
@@ -301,21 +304,47 @@ export function CadDesignPage() {
   const estimatedStoneCost = nearestDiamondSize?.basePrice ?? 0
   const estimatedTotalCost = estimatedMetalCost + estimatedStoneCost
 
-  const downloadStl = () => {
-    const exporter = new STLExporter()
-    const stl = exporter.parse(viewModel, { binary: false })
-    const blob = new Blob([stl], { type: 'model/stl' })
+  // Module 21 in the roadmap's master list ("export STL/OBJ/3MF/STEP/3DM/
+  // GLB/USDZ") — STL was the only option until now. OBJ and GLB (glTF's
+  // binary form) are both straightforward with three.js's own exporters;
+  // STEP/3DM/USDZ would each need their own heavier library, not done here.
+  const baseFilename = () => {
+    const stoneTag = includeStone ? (stoneShape === 'round' ? `-${caratWeight}ct-round-${settingType}` : `-${stoneShape}`) : ''
+    return importedModel
+      ? (importFileName?.replace(/\.[^.]+$/, '') || 'imported')
+      : `ring-size${fingerSize}-w${widthMm}mm${stoneTag}`
+  }
+  const triggerDownload = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    const stoneTag = includeStone ? (stoneShape === 'round' ? `-${caratWeight}ct-round-${settingType}` : `-${stoneShape}`) : ''
-    a.download = importedModel
-      ? `${importFileName?.replace(/\.[^.]+$/, '') || 'imported'}.stl`
-      : `ring-size${fingerSize}-w${widthMm}mm${stoneTag}.stl`
+    a.download = filename
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+  }
+  const downloadModel = () => {
+    const name = baseFilename()
+    if (exportFormat === 'stl') {
+      const stl = new STLExporter().parse(viewModel, { binary: false })
+      triggerDownload(new Blob([stl], { type: 'model/stl' }), `${name}.stl`)
+    } else if (exportFormat === 'obj') {
+      const obj = new OBJExporter().parse(viewModel)
+      triggerDownload(new Blob([obj], { type: 'text/plain' }), `${name}.obj`)
+    } else {
+      new GLTFExporter().parse(
+        viewModel,
+        result => {
+          const blob = result instanceof ArrayBuffer
+            ? new Blob([result], { type: 'model/gltf-binary' })
+            : new Blob([JSON.stringify(result)], { type: 'model/gltf+json' })
+          triggerDownload(blob, `${name}.glb`)
+        },
+        err => setImportError(err instanceof Error ? `Couldn't export as GLB: ${err.message}` : "Couldn't export as GLB."),
+        { binary: true },
+      )
+    }
   }
 
   return (
@@ -805,11 +834,19 @@ export function CadDesignPage() {
               </div>
             )}
 
-            <button type="button" onClick={downloadStl}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
-              style={{ backgroundColor: 'var(--theme-primary)' }}>
-              <Download className="h-4 w-4" /> Download STL
-            </button>
+            <div className="flex gap-2">
+              <select value={exportFormat} onChange={e => setExportFormat(e.target.value as 'stl' | 'obj' | 'glb')}
+                className={`${inputCls} w-28 shrink-0 uppercase`}>
+                <option value="stl">STL</option>
+                <option value="obj">OBJ</option>
+                <option value="glb">GLB</option>
+              </select>
+              <button type="button" onClick={downloadModel}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+                style={{ backgroundColor: 'var(--theme-primary)' }}>
+                <Download className="h-4 w-4" /> Download
+              </button>
+            </div>
             <p className="text-[11px] text-slate-400">
               Sizing uses a linear approximation of the standard US chart, and carat→diameter the standard
               6.5×∛carat estimate — cross-check both against your own charts before sending anything to production.
