@@ -23,6 +23,7 @@ import {
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
 import { parseImportedCadFile } from '@/lib/cadImport'
+import { listCadPresets, saveCadPreset, deleteCadPreset, type CadDesignParams, type SavedCadPreset } from '@/lib/cadPresets'
 
 type SettingType = 'prong' | 'bezel' | 'cluster' | 'tension' | 'illusion'
 
@@ -121,6 +122,54 @@ export function CadDesignPage() {
   const [importError, setImportError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [exportFormat, setExportFormat] = useState<'stl' | 'obj' | 'glb'>('stl')
+  // Content Manager (module 22) — save/load a full parameter set as a
+  // named preset. Loaded fresh from localStorage each time the list is
+  // opened (cheap, and keeps it correct if another tab just saved one).
+  const [presets, setPresets] = useState<SavedCadPreset[]>(() => listCadPresets())
+  const [presetName, setPresetName] = useState('')
+  const [presetMessage, setPresetMessage] = useState<string | null>(null)
+
+  const currentParams = (): CadDesignParams => ({
+    fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, metal,
+    includeStone, stoneShape, caratWeight, diamondType, fancyLengthMm, fancyWidthMm,
+    settingType, bezelCoverage, prongCount, clusterPetalCount, clusterPetalStoneMm,
+    includeHalo, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm,
+    mergeSolid, includeMilgrain, includeRope,
+  })
+
+  const applyPreset = (p: CadDesignParams) => {
+    setFingerSize(p.fingerSize); setWidthMm(p.widthMm); setThicknessMm(p.thicknessMm)
+    setProfile(p.profile as BandProfile); setShankStyle(p.shankStyle as typeof shankStyle)
+    setTaperAmount(p.taperAmount); setTwists(p.twists); setMetal(p.metal as JewelryMetalOption)
+    setIncludeStone(p.includeStone); setStoneShape(p.stoneShape as StoneShape); setCaratWeight(p.caratWeight)
+    setDiamondType(p.diamondType as typeof diamondType)
+    setFancyLengthMm(p.fancyLengthMm); setFancyWidthMm(p.fancyWidthMm)
+    setSettingType(p.settingType as SettingType); setBezelCoverage(p.bezelCoverage as typeof bezelCoverage)
+    setProngCount(p.prongCount as 4 | 6); setClusterPetalCount(p.clusterPetalCount); setClusterPetalStoneMm(p.clusterPetalStoneMm)
+    setIncludeHalo(p.includeHalo); setHaloCount(p.haloCount); setHaloStoneMm(p.haloStoneMm)
+    setIncludePave(p.includePave); setPaveSettingType(p.paveSettingType as typeof paveSettingType)
+    setPaveCount(p.paveCount); setPaveStoneMm(p.paveStoneMm)
+    setMergeSolid(p.mergeSolid); setIncludeMilgrain(p.includeMilgrain); setIncludeRope(p.includeRope)
+    setImportedModel(null); setImportFileName(null) // a loaded preset is the parametric design, not an import
+    setProngHeightOverridesMm({}) // per-instance overrides don't round-trip through a preset (indices may not line up)
+  }
+
+  const handleSavePreset = () => {
+    const name = presetName.trim()
+    if (!name) return
+    const saved = saveCadPreset(name, currentParams())
+    if (saved) {
+      setPresets(listCadPresets())
+      setPresetName('')
+      setPresetMessage(`Saved "${name}".`)
+    } else {
+      setPresetMessage("Couldn't save — this browser's storage may be full or restricted.")
+    }
+  }
+  const handleDeletePreset = (id: string) => {
+    deleteCadPreset(id)
+    setPresets(listCadPresets())
+  }
 
   const handleImportFile = async (file: File) => {
     setImporting(true)
@@ -374,6 +423,39 @@ export function CadDesignPage() {
       <section className="grid gap-4 lg:grid-cols-[1fr_1.3fr]">
         <Card className="rounded-[30px] border border-white/80 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
           <CardContent className="space-y-5 p-6 sm:p-7">
+            <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+              <span className="text-sm font-semibold text-slate-900">Presets</span>
+              <p className="text-[11px] text-slate-400">
+                Save/reuse the whole design as a named preset instead of re-entering every number — saved to THIS
+                browser only (not synced to your account or other devices yet).
+              </p>
+              <div className="flex gap-2">
+                <input type="text" value={presetName} onChange={e => setPresetName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleSavePreset() }}
+                  placeholder="Name this design…" className={inputCls} />
+                <button type="button" onClick={handleSavePreset} disabled={!presetName.trim()}
+                  className="shrink-0 rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
+                  Save
+                </button>
+              </div>
+              {presetMessage && <p className="text-[11px] text-slate-500">{presetMessage}</p>}
+              {presets.length > 0 && (
+                <ul className="max-h-32 space-y-1 overflow-y-auto">
+                  {presets.map(p => (
+                    <li key={p.id} className="flex items-center justify-between gap-2 rounded-lg bg-white px-2.5 py-1.5 text-xs">
+                      <span className="truncate">{p.name}</span>
+                      <span className="flex shrink-0 gap-1">
+                        <button type="button" onClick={() => applyPreset(p.params)}
+                          className="rounded-lg border border-slate-300 px-2 py-0.5 font-semibold hover:bg-slate-50">Load</button>
+                        <button type="button" onClick={() => handleDeletePreset(p.id)}
+                          className="rounded-lg border border-slate-300 px-2 py-0.5 font-semibold text-rose-600 hover:bg-rose-50">✕</button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             <div className="grid grid-cols-4 gap-1.5 rounded-2xl bg-slate-100 p-1">
               {([
                 ['band', 'Band'],
