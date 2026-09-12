@@ -10,6 +10,7 @@ import type { JewelryMetalOption } from '@/types'
 import {
   buildRingBandGeometry, usSizeToDiameterMm, type BandProfile,
   buildStoneHeadGroup, buildBezelHeadGroup, buildClusterHeadGroup, buildHaloGroup, attachHeadToBand, roundDiameterMmFromCarat,
+  defaultProngHeightMm,
   buildFancyStoneHeadGroup, type FancyStoneShape,
   buildPaveRow, buildChannelSetting, buildFlushSetting,
   buildTensionBandGeometry, buildTensionSetting, tensionGapDegForStone,
@@ -101,6 +102,10 @@ export function CadDesignPage() {
   // First real click-to-select CAD interaction: which part of the model
   // (if any) was last clicked in the viewer — see ModelViewer3D.
   const [selectedPart, setSelectedPart] = useState<SelectedPart | null>(null)
+  // First real PER-INSTANCE edit: override just ONE clicked prong's height
+  // (round prong setting only, for now — the pattern this proves out can
+  // extend to other repeated parts later). Keyed by prong index.
+  const [prongHeightOverridesMm, setProngHeightOverridesMm] = useState<Record<number, number>>({})
   // Selecting a part jumps to whichever tab actually controls it — bridges
   // "I clicked this" to "here's how to change it" even though the controls
   // are still per-feature (every prong, say) rather than per-instance yet.
@@ -111,6 +116,12 @@ export function CadDesignPage() {
 
   const innerDiameterMm = usSizeToDiameterMm(fingerSize)
   const stoneDiameterMm = roundDiameterMmFromCarat(caratWeight)
+  // The one part this app currently lets you edit AS the specific clicked
+  // instance, rather than as "every part of this type" — proves out the
+  // pattern for a future pass over the other repeated parts (pavé stones,
+  // halo stones, etc.).
+  const canEditProngInstance = selectedPart?.name === 'Prong' && selectedPart.instanceIndex !== undefined
+    && stoneShape === 'round' && settingType === 'prong'
   // Tension setting cuts the band itself, so it needs its own band geometry
   // (see ringGeometry.ts) — only meaningful for a round stone with a
   // center stone actually present.
@@ -155,7 +166,7 @@ export function CadDesignPage() {
                 ? buildClusterHeadGroup({ centerStoneDiameterMm: stoneDiameterMm, petalCount: clusterPetalCount, petalStoneDiameterMm: clusterPetalStoneMm })
                 : settingType === 'illusion'
                   ? buildIllusionHeadGroup({ stoneDiameterMm })
-                  : buildStoneHeadGroup({ stoneDiameterMm, prongCount }))
+                  : buildStoneHeadGroup({ stoneDiameterMm, prongCount, prongHeightOverridesMm }))
           : buildFancyStoneHeadGroup({ shape: stoneShape, lengthMm: fancyLengthMm, widthMm: fancyWidthMm, prongCount })
         attachHeadToBand(head, bandParamsBase)
         group.add(head)
@@ -178,7 +189,7 @@ export function CadDesignPage() {
     }
     return group
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneShape, settingType, stoneDiameterMm, prongCount, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, includeStone, stoneShape, settingType, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -238,9 +249,9 @@ export function CadDesignPage() {
             or pear),
             side stones (pavé, channel or flush) and solid/export, grouped into tabs the way Matrix groups its own
             tools (Ring Rail, Gems, Parametric Boolean) instead of one long form. Click any part of the model in the
-            viewer to select and identify it — the first step toward real click-to-design interaction, not just a
-            parametric form. This is not a Matrix/RhinoGold replacement yet — the stone is a placeholder shape (not
-            faceted gem geometry). Building toward full parity step by step.
+            viewer to select and identify it — click a single prong and you can edit its height on its own, the
+            first real per-instance edit, not just a global slider. This is not a Matrix/RhinoGold replacement yet —
+            the stone is a placeholder shape (not faceted gem geometry). Building toward full parity step by step.
           </p>
         </CardContent>
       </Card>
@@ -263,14 +274,46 @@ export function CadDesignPage() {
             </div>
 
             {selectedPart && PART_TAB[selectedPart.name] === activeTab && (
-              <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
-                <span>
-                  Selected <strong>{selectedPart.name}</strong> — controlled from the settings below. (Applies to every
-                  {' '}{selectedPart.name.toLowerCase()} in this design, not just the one you clicked, for now — click
-                  empty space in the model to deselect.)
-                </span>
-              </div>
+              canEditProngInstance ? (
+                <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                  <div className="flex items-center gap-2">
+                    <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Selected <strong>Prong #{(selectedPart.instanceIndex ?? 0) + 1}</strong> — editing just this one,
+                      independent of the others.
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input type="range" min={stoneDiameterMm * 0.25} max={stoneDiameterMm * 1.1} step={0.1}
+                      value={prongHeightOverridesMm[selectedPart.instanceIndex ?? 0] ?? defaultProngHeightMm(stoneDiameterMm)}
+                      onChange={e => setProngHeightOverridesMm(prev => ({ ...prev, [selectedPart.instanceIndex ?? 0]: Number(e.target.value) }))}
+                      className="flex-1" />
+                    <span className="w-14 shrink-0 text-right font-mono">
+                      {(prongHeightOverridesMm[selectedPart.instanceIndex ?? 0] ?? defaultProngHeightMm(stoneDiameterMm)).toFixed(1)}mm
+                    </span>
+                    {selectedPart.instanceIndex !== undefined && prongHeightOverridesMm[selectedPart.instanceIndex] !== undefined && (
+                      <button type="button"
+                        onClick={() => setProngHeightOverridesMm(prev => {
+                          const next = { ...prev }
+                          delete next[selectedPart.instanceIndex!]
+                          return next
+                        })}
+                        className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Selected <strong>{selectedPart.name}</strong> — controlled from the settings below. (Applies to every
+                    {' '}{selectedPart.name.toLowerCase()} in this design, not just the one you clicked, for now — click
+                    empty space in the model to deselect.)
+                  </span>
+                </div>
+              )
             )}
 
             {activeTab === 'band' && (

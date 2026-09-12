@@ -13,10 +13,14 @@ export interface SelectedPart {
   isStone: boolean
   /** The selected mesh's own world-space bounding-box size, in mm (the
    *  modeling unit everywhere in ringGeometry.ts) — a first, honest step
-   *  toward a real CAD "properties" panel: you can at least see what you
-   *  selected, even before this app lets you edit that specific instance
-   *  directly. */
+   *  toward a real CAD "properties" panel. */
   dimensionsMm: { x: number; y: number; z: number }
+  /** Which specific instance of this part (e.g. which of the 4 prongs) was
+   *  clicked, when the builder tagged one — see `userData.instanceIndex`
+   *  in ringGeometry.ts. Undefined for parts that only ever exist once
+   *  (the band, the gallery, the stone itself) or haven't been wired up
+   *  for per-instance editing yet. */
+  instanceIndex?: number
 }
 
 interface ModelViewer3DProps {
@@ -148,6 +152,7 @@ export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, rou
           name: hit.userData.partName,
           isStone: !!hit.userData.isStone,
           dimensionsMm: { x: size.x, y: size.y, z: size.z },
+          instanceIndex: typeof hit.userData.instanceIndex === 'number' ? hit.userData.instanceIndex : undefined,
         })
       } else {
         onSelectPartRef.current?.(null)
@@ -195,17 +200,27 @@ export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, rou
   }, [])
 
   // Swap the displayed object whenever it changes, without rebuilding the
-  // scene/renderer/controls. Any prior selection necessarily belonged to
-  // the OLD object (the new one was just rebuilt from the latest params),
-  // so it's cleared here rather than left pointing at a disposed mesh.
+  // scene/renderer/controls. The OLD mesh reference is about to be
+  // disposed either way, but a rebuild can happen because the currently
+  // SELECTED part was itself just edited (e.g. dragging one prong's height
+  // slider) — in that case the same logical part still exists in the new
+  // object and should stay visibly selected, not flicker deselected on
+  // every drag tick. So: remember the previous selection's IDENTITY
+  // (partName + instanceIndex, not the JS object) before disposing it, and
+  // try to re-find + re-highlight that same identity in the new object
+  // before falling back to clearing the selection.
   useEffect(() => {
     const scene = sceneRef.current
     const material = materialRef.current
     const stoneMaterial = stoneMaterialRef.current
-    if (!scene || !material || !stoneMaterial) return
+    const highlightMat = highlightMaterialRef.current
+    if (!scene || !material || !stoneMaterial || !highlightMat) return
 
+    const prevSelected = selectedMeshRef.current
+    const prevIdentity = prevSelected
+      ? { partName: prevSelected.userData.partName as string | undefined, instanceIndex: prevSelected.userData.instanceIndex as number | undefined }
+      : null
     selectedMeshRef.current = null
-    onSelectPartRef.current?.(null)
 
     if (displayedRef.current) {
       const prev = displayedRef.current
@@ -213,12 +228,28 @@ export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, rou
       prev.traverse(obj => { if (obj instanceof THREE.Mesh) obj.geometry.dispose() })
       displayedRef.current = null
     }
+
+    const meshes: THREE.Mesh[] = []
     if (object) {
       object.traverse(obj => {
-        if (obj instanceof THREE.Mesh) obj.material = obj.userData.isStone ? stoneMaterial : material
+        if (!(obj instanceof THREE.Mesh)) return
+        obj.material = obj.userData.isStone ? stoneMaterial : material
+        meshes.push(obj)
       })
       scene.add(object)
       displayedRef.current = object
+    }
+    const rehit = prevIdentity
+      ? meshes.find(m => m.userData.partName === prevIdentity.partName && m.userData.instanceIndex === prevIdentity.instanceIndex)
+      : undefined
+
+    if (rehit) {
+      rehit.material = highlightMat
+      selectedMeshRef.current = rehit
+      // Same part, by identity — leave the parent's selection state as-is
+      // rather than reporting a change.
+    } else {
+      onSelectPartRef.current?.(null)
     }
   }, [object])
 

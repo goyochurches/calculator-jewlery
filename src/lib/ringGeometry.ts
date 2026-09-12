@@ -124,6 +124,14 @@ export function roundDiameterMmFromCarat(carat: number): number {
   return 6.5 * Math.cbrt(Math.max(0, carat))
 }
 
+/** Every prong's default height (mm) for a given stone size — pulled out
+ *  as its own function (rather than left as an inline default) so the
+ *  CALLER can compute the same baseline a specific prong would otherwise
+ *  get, before overriding just that one — see `StoneHeadParams.prongHeightOverridesMm`. */
+export function defaultProngHeightMm(stoneDiameterMm: number): number {
+  return stoneDiameterMm * 0.55
+}
+
 export interface StoneHeadParams {
   /** Round-brilliant diameter, in mm (see roundDiameterMmFromCarat). */
   stoneDiameterMm: number
@@ -131,8 +139,14 @@ export interface StoneHeadParams {
   /** Diameter of each prong, in mm. */
   prongDiameterMm?: number
   /** How far the prong tips reach above the gallery ring, in mm — enough to
-   *  clear the stone's crown and grip it. */
+   *  clear the stone's crown and grip it. Applies to every prong UNLESS
+   *  overridden individually below. */
   prongHeightMm?: number
+  /** Per-instance height override (mm), keyed by prong index (0..prongCount-1,
+   *  same order/angle convention the build loop below uses) — the first real
+   *  "select ONE part and edit just it" interaction in this file. Every
+   *  index not present here still uses `prongHeightMm` (or its default). */
+  prongHeightOverridesMm?: Record<number, number>
   /** Height of the tapered stand connecting the gallery down to the band's
    *  outer surface, in mm. */
   standHeightMm?: number
@@ -149,7 +163,8 @@ export function buildStoneHeadGroup(params: StoneHeadParams): THREE.Group {
   const {
     stoneDiameterMm, prongCount,
     prongDiameterMm = Math.max(0.8, stoneDiameterMm * 0.12),
-    prongHeightMm = stoneDiameterMm * 0.55,
+    prongHeightMm = defaultProngHeightMm(stoneDiameterMm),
+    prongHeightOverridesMm,
     standHeightMm = stoneDiameterMm * 0.45,
   } = params
   const stoneRadius = stoneDiameterMm / 2
@@ -168,15 +183,17 @@ export function buildStoneHeadGroup(params: StoneHeadParams): THREE.Group {
   const prongOrbitRadius = stoneRadius + prongDiameterMm / 2
   for (let i = 0; i < prongCount; i++) {
     const angle = (i / prongCount) * Math.PI * 2
+    const thisHeightMm = prongHeightOverridesMm?.[i] ?? prongHeightMm
     const prong = new THREE.Mesh(
-      new THREE.CylinderGeometry(prongDiameterMm * 0.35, prongDiameterMm / 2, prongHeightMm, 12),
+      new THREE.CylinderGeometry(prongDiameterMm * 0.35, prongDiameterMm / 2, thisHeightMm, 12),
     )
     prong.position.set(
       Math.cos(angle) * prongOrbitRadius,
-      prongHeightMm / 2,
+      thisHeightMm / 2,
       Math.sin(angle) * prongOrbitRadius,
     )
     prong.userData.partName = 'Prong'
+    prong.userData.instanceIndex = i
     group.add(prong)
   }
 
