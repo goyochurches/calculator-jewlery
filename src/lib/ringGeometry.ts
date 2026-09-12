@@ -1042,19 +1042,12 @@ export function buildFancyStoneHeadGroup(params: FancyStoneHeadParams): THREE.Gr
   stand.userData.partName = 'Stand'
   group.add(stand)
 
-  // Stone placeholder — the footprint outline extruded with a bevel to
-  // fake a crown/pavilion taper, standing in for real faceted geometry.
-  const stoneDepth = maxHalf * 0.9
-  const stoneShape2D = new THREE.Shape(outline)
-  const bevelSize = Math.min(halfW, halfL) * 0.35
-  const stoneProxy = new THREE.Mesh(new THREE.ExtrudeGeometry(stoneShape2D, {
-    depth: stoneDepth * 0.5, bevelEnabled: true,
-    bevelThickness: stoneDepth * 0.5, bevelSize, bevelSegments: 6,
-  }))
-  stoneProxy.rotation.x = -Math.PI / 2
-  stoneProxy.position.y = 0
-  stoneProxy.userData.isStone = true
-  stoneProxy.userData.partName = 'Center stone'
+  // Real faceted crown+pavilion following this shape's own outline — same
+  // upgrade buildFacetedRoundStone already gave the round case. Girdle
+  // plane sits at local y=0, matching the gallery's own plane, so it needs
+  // no extra vertical offset.
+  const stoneProxy = buildFacetedFancyStone({ shape, lengthMm, widthMm })
+  stoneProxy.traverse(obj => { if (obj instanceof THREE.Mesh) obj.userData.partName = 'Center stone' })
   group.add(stoneProxy)
 
   group.traverse(obj => {
@@ -1572,6 +1565,115 @@ export function buildFacetedRoundStone(params: FacetedRoundStoneParams): THREE.G
 
   const pavilion = new THREE.Mesh(buildFacetedFrustum(girdleRadius, 0, pavilionDepth, facetCount))
   pavilion.position.y = -pavilionDepth / 2
+  pavilion.userData.isStone = true
+  group.add(pavilion)
+
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}
+
+// ── Faceted fancy-shape stones — generalizes the round case above ──────────
+// buildFacetedRoundStone's crown/pavilion are each a `buildFacetedFrustum`
+// between two CIRCLES. A fancy shape (oval/cushion/princess/marquise/pear)
+// needs the same idea between two copies of its own outline instead — this
+// generalizes the frustum into a "loft" between any two same-point-count
+// 2D outlines, point i of one corresponding to point i of the other.
+
+/** Loft between two outlines of the SAME point count (`buildStoneOutline`
+ *  called with the same `segments` for both — its point count depends only
+ *  on that, not on the halfW/halfL scale — guarantees this). Side faces
+ *  reuse the exact winding convention `buildFacetedFrustum`'s already
+ *  verified; the two caps fan-triangulate from each outline's own centroid
+ *  (valid since every shape `buildStoneOutline` produces is star-shaped
+ *  from its centroid — even pear, which isn't strictly convex, still has
+ *  every boundary point visible from a centroid near its own axis).
+ *  Verified before landing this against three independent known cases: an
+ *  exact-volume square prism, an exact-volume square pyramid (degenerate
+ *  bottom outline), and an oval "crown" shape — all watertight (origin-
+ *  invariance check) and matching their expected volumes. */
+function buildFacetedLoft(topOutline: THREE.Vector2[], bottomOutline: THREE.Vector2[], topY: number, bottomY: number): THREE.BufferGeometry {
+  const n = topOutline.length
+  const positions: number[] = []
+  const indices: number[] = []
+  const pushTri = (a: number, b: number, c: number) => indices.push(a, b, c)
+
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n
+    const topA = topOutline[i], topB = topOutline[j]
+    const botA = bottomOutline[i], botB = bottomOutline[j]
+    const base = positions.length / 3
+    positions.push(topA.x, topY, topA.y, topB.x, topY, topB.y, botB.x, bottomY, botB.y, botA.x, bottomY, botA.y)
+    pushTri(base, base + 2, base + 3)
+    pushTri(base, base + 1, base + 2)
+  }
+
+  const topCentroid = topOutline.reduce((acc, p) => acc.add(p), new THREE.Vector2()).multiplyScalar(1 / n)
+  const topCenterIdx = positions.length / 3
+  positions.push(topCentroid.x, topY, topCentroid.y)
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n
+    const base = positions.length / 3
+    positions.push(topOutline[i].x, topY, topOutline[i].y, topOutline[j].x, topY, topOutline[j].y)
+    pushTri(topCenterIdx, base + 1, base)
+  }
+  const botCentroid = bottomOutline.reduce((acc, p) => acc.add(p), new THREE.Vector2()).multiplyScalar(1 / n)
+  const botCenterIdx = positions.length / 3
+  positions.push(botCentroid.x, bottomY, botCentroid.y)
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n
+    const base = positions.length / 3
+    positions.push(bottomOutline[i].x, bottomY, bottomOutline[i].y, bottomOutline[j].x, bottomY, bottomOutline[j].y)
+    pushTri(botCenterIdx, base, base + 1)
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  return geometry
+}
+
+export interface FacetedFancyStoneParams {
+  shape: FancyStoneShape
+  lengthMm: number
+  widthMm: number
+  tableRatio?: number
+  crownHeightRatio?: number
+  pavilionDepthRatio?: number
+}
+
+/** Real faceted crown+pavilion for a fancy shape, following that shape's
+ *  own outline (`buildStoneOutline`) at the girdle, scaled down for the
+ *  table (crown top) and collapsed to a single point for the culet
+ *  (pavilion bottom) — same "table/crown-height/pavilion-depth as a
+ *  fraction of size" proportions `buildFacetedRoundStone` uses, here
+ *  measured against the shape's LARGER dimension (length or width) since
+ *  there's no single "diameter" for a non-round shape. Same local "+Y up,
+ *  girdle at y=0" convention as the round version, so it drops in wherever
+ *  `buildFancyStoneHeadGroup`'s current extruded/beveled proxy sits. */
+export function buildFacetedFancyStone(params: FacetedFancyStoneParams): THREE.Group {
+  const { shape, lengthMm, widthMm } = params
+  const tableRatio = params.tableRatio ?? 0.56
+  const crownHeightRatio = params.crownHeightRatio ?? 0.15
+  const pavilionDepthRatio = params.pavilionDepthRatio ?? 0.43
+  const halfW = widthMm / 2
+  const halfL = lengthMm / 2
+  const maxDim = Math.max(widthMm, lengthMm)
+  const crownHeight = maxDim * crownHeightRatio
+  const pavilionDepth = maxDim * pavilionDepthRatio
+
+  const girdleOutline = buildStoneOutline(shape, halfW, halfL)
+  const tableOutline = buildStoneOutline(shape, halfW * tableRatio, halfL * tableRatio)
+  const culetOutline = girdleOutline.map(() => new THREE.Vector2(0, 0))
+
+  const group = new THREE.Group()
+
+  const crown = new THREE.Mesh(buildFacetedLoft(tableOutline, girdleOutline, crownHeight, 0))
+  crown.userData.isStone = true
+  group.add(crown)
+
+  const pavilion = new THREE.Mesh(buildFacetedLoft(girdleOutline, culetOutline, 0, -pavilionDepth))
   pavilion.userData.isStone = true
   group.add(pavilion)
 

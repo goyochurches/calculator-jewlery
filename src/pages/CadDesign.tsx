@@ -483,9 +483,10 @@ export function CadDesignPage() {
             way Matrix groups its own tools (Ring Rail, Gems, Milgrain, Parametric Boolean) instead of one long form.
             Click any part of the model in the viewer to select and identify it — click a single prong and you can
             edit its height on its own, a first real per-instance edit, not just a global slider. Import an existing
-            STL/OBJ/3MF file (Solid tab) to view it right here too — the other half of the original ask. This is not
-            a Matrix/RhinoGold replacement yet — the stone is a placeholder shape (not faceted gem geometry).
-            Building toward full parity step by step.
+            STL/OBJ/3MF file (Solid tab) to view it right here too — the other half of the original ask. The center
+            stone (every shape) is now a real faceted crown+pavilion, not a placeholder — a simplified "single cut"
+            facet count, not full ideal-cut precision. This is not a Matrix/RhinoGold replacement yet — melee (pavé/
+            halo/channel/etc.) and cluster petals still use simple bead proxies. Building toward full parity step by step.
           </p>
         </CardContent>
       </Card>
