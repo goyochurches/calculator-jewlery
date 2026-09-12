@@ -32,6 +32,22 @@ const FANCY_SHAPE_DEFAULTS: Record<FancyStoneShape, { lengthMm: number; widthMm:
   marquise: { lengthMm: 10, widthMm: 5 },
   pear: { lengthMm: 9, widthMm: 6 },
 }
+
+type Tab = 'band' | 'center' | 'side' | 'solid'
+
+// Which tab's controls actually shape a given clicked part — every
+// `userData.partName` any ringGeometry.ts builder sets should have an
+// entry here. Selecting a part jumps straight to the tab that controls
+// it, instead of leaving the jeweler to hunt for the right slider.
+const PART_TAB: Record<string, Tab> = {
+  Band: 'band',
+  Gallery: 'center', Prong: 'center', Stand: 'center', 'Center stone': 'center',
+  'Bezel wall': 'center', 'Cluster plate': 'center', 'Cluster petal': 'center',
+  'Tension contact': 'center', 'Halo stone': 'center',
+  'Pavé stone': 'side', 'Channel stone': 'side', 'Channel rail': 'side',
+  'Flush stone': 'side', 'Flush collar': 'side',
+  'Merged solid': 'solid',
+}
 import { Download, RotateCw, Scale, MousePointerClick } from 'lucide-react'
 
 // Approximate render colors per metal — cosmetic only, doesn't drive
@@ -80,10 +96,17 @@ export function CadDesignPage() {
   // Grouped like Matrix's own toolbar groups (Tools/Ring-Rail, Gems, Solid/
   // Surface) instead of one long scrolling form — same controls, just not
   // all visible at once.
-  const [activeTab, setActiveTab] = useState<'band' | 'center' | 'side' | 'solid'>('band')
+  const [activeTab, setActiveTab] = useState<Tab>('band')
   // First real click-to-select CAD interaction: which part of the model
   // (if any) was last clicked in the viewer — see ModelViewer3D.
   const [selectedPart, setSelectedPart] = useState<SelectedPart | null>(null)
+  // Selecting a part jumps to whichever tab actually controls it — bridges
+  // "I clicked this" to "here's how to change it" even though the controls
+  // are still per-feature (every prong, say) rather than per-instance yet.
+  const handleSelectPart = (part: SelectedPart | null) => {
+    setSelectedPart(part)
+    if (part && PART_TAB[part.name]) setActiveTab(PART_TAB[part.name])
+  }
 
   const innerDiameterMm = usSizeToDiameterMm(fingerSize)
   const stoneDiameterMm = roundDiameterMmFromCarat(caratWeight)
@@ -232,6 +255,17 @@ export function CadDesignPage() {
                 </button>
               ))}
             </div>
+
+            {selectedPart && PART_TAB[selectedPart.name] === activeTab && (
+              <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Selected <strong>{selectedPart.name}</strong> — controlled from the settings below. (Applies to every
+                  {' '}{selectedPart.name.toLowerCase()} in this design, not just the one you clicked, for now — click
+                  empty space in the model to deselect.)
+                </span>
+              </div>
+            )}
 
             {activeTab === 'band' && (
               <div className="space-y-5">
@@ -487,7 +521,7 @@ export function CadDesignPage() {
 
         <Card className="overflow-hidden rounded-[30px] border border-slate-200 shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
           <div className="relative">
-            <ModelViewer3D object={displayModel} color={METAL_COLORS[metal]} onSelectPart={setSelectedPart}
+            <ModelViewer3D object={displayModel} color={METAL_COLORS[metal]} onSelectPart={handleSelectPart}
               className="h-[420px] w-full sm:h-[520px]" />
             <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2 text-xs text-white shadow-sm backdrop-blur">
               <MousePointerClick className="h-3.5 w-3.5 shrink-0 text-amber-300" />
