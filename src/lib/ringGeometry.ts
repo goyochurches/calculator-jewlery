@@ -111,6 +111,64 @@ export function buildRingBandGeometry(params: RingBandParams): THREE.BufferGeome
   return geometry
 }
 
+// ── Tapered shank — a real Ring Builder feature (module 2 in the roadmap's
+// master list): wider at the head, narrower at the back. THREE.LatheGeometry
+// can't vary its profile per angle, so this manually builds the same
+// ring-by-ring vertex/face pattern Lathe uses internally (see its own
+// source), evaluating buildBandProfile with a per-angle-SCALED width
+// instead of a fixed one — the first concrete use of a general "profile
+// swept along a varying path" primitive (Matrix's own Ring Rail/Profile
+// Sweep tools), proven out here before generalizing further.
+
+export interface TaperedBandParams extends RingBandParams {
+  /** How much wider the band is at the head (angle 0, +X — the same
+   *  convention `attachHeadToBand` uses) than at the back (angle 180°), as
+   *  a fraction — 0.3 means 30% wider at the head and 30% narrower at the
+   *  back, tapering smoothly (cosine) between. Note: because the average
+   *  of cos(angle) over a full revolution is exactly 0, tapering does NOT
+   *  change the band's total volume/weight — it only redistributes it
+   *  around the ring (verified with a signed-tetrahedron-volume check
+   *  against a numerically-integrated expectation before landing this). */
+  taperAmount: number
+}
+
+export function buildTaperedBandGeometry(params: TaperedBandParams): THREE.BufferGeometry {
+  const { taperAmount, radialSegments = 96 } = params
+  const positions: number[] = []
+  const indices: number[] = []
+
+  const ringsOfProfiles: THREE.Vector2[][] = []
+  for (let i = 0; i <= radialSegments; i++) {
+    const angle = (i / radialSegments) * Math.PI * 2
+    const widthScale = 1 + taperAmount * Math.cos(angle)
+    ringsOfProfiles.push(buildBandProfile({ ...params, widthMm: params.widthMm * widthScale }))
+  }
+  // Every ring has the same POINT COUNT regardless of the width value used
+  // (buildBandProfile's point count depends only on `profile`/arcSegments),
+  // so a single pointsPerRing is safe to reuse across all rings.
+  const pointsPerRing = ringsOfProfiles[0].length
+  for (let i = 0; i <= radialSegments; i++) {
+    const angle = (i / radialSegments) * Math.PI * 2
+    const sin = Math.sin(angle), cos = Math.cos(angle)
+    for (const p of ringsOfProfiles[i]) positions.push(p.x * sin, p.y, p.x * cos)
+  }
+  // Same face-index pattern THREE.LatheGeometry's own source uses.
+  for (let i = 0; i < radialSegments; i++) {
+    for (let j = 0; j < pointsPerRing - 1; j++) {
+      const base = j + i * pointsPerRing
+      const a = base, b = base + pointsPerRing, c = base + pointsPerRing + 1, d = base + 1
+      indices.push(a, b, d)
+      indices.push(c, d, b)
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  return geometry
+}
+
 // ── Center-stone head (prong basket) — round brilliant only for v1 ─────────
 // Fancy shapes (oval, princess, pear, marquise, cushion...) each need their
 // own prong-placement logic and are a separate future piece — see the CAD

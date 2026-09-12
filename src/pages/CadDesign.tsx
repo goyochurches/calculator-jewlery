@@ -14,6 +14,7 @@ import {
   buildFancyStoneHeadGroup, type FancyStoneShape,
   buildPaveRow, buildChannelSetting, buildFlushSetting,
   buildTensionBandGeometry, buildTensionSetting, tensionGapDegForStone,
+  buildTaperedBandGeometry,
   buildIllusionHeadGroup,
   buildMilgrainEdges, buildRopeEdge,
   unionMetalParts, extractStoneMeshes,
@@ -80,6 +81,7 @@ export function CadDesignPage() {
   const [widthMm, setWidthMm] = useState(2.5)
   const [thicknessMm, setThicknessMm] = useState(1.8)
   const [profile, setProfile] = useState<BandProfile>('comfort')
+  const [taperAmount, setTaperAmount] = useState(0)
   const [metal, setMetal] = useState<JewelryMetalOption>('gold-18k-yellow')
   const [includeStone, setIncludeStone] = useState(true)
   const [stoneShape, setStoneShape] = useState<StoneShape>('round')
@@ -178,7 +180,11 @@ export function CadDesignPage() {
     const group = new THREE.Group()
     const bandParamsBase = { fingerSize, widthMm, thicknessMm, profile }
     const band = new THREE.Mesh(
-      tensionActive ? buildTensionBandGeometry(bandParamsBase, tensionGapDeg) : buildRingBandGeometry(bandParamsBase),
+      tensionActive
+        ? buildTensionBandGeometry(bandParamsBase, tensionGapDeg)
+        : taperAmount !== 0
+          ? buildTaperedBandGeometry({ ...bandParamsBase, taperAmount })
+          : buildRingBandGeometry(bandParamsBase),
     )
     band.userData.partName = 'Band'
     group.add(band)
@@ -219,7 +225,7 @@ export function CadDesignPage() {
     }
     return group
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, includeMilgrain, includeRope, includeStone, stoneShape, settingType, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, taperAmount, includeMilgrain, includeRope, includeStone, stoneShape, settingType, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -310,7 +316,8 @@ export function CadDesignPage() {
           </div>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Parametric solitaire ring</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            Band, center stone (round — prong, bezel, cluster, tension or illusion — oval, cushion, princess, marquise
+            Band (optionally tapered — wider at the head, narrower at the back), center stone (round — prong, bezel,
+            cluster, tension or illusion — oval, cushion, princess, marquise
             or pear),
             side stones (pavé, channel or flush), optional milgrain or twisted-rope edging, and solid/export, grouped into tabs the
             way Matrix groups its own tools (Ring Rail, Gems, Milgrain, Parametric Boolean) instead of one long form.
@@ -416,6 +423,17 @@ export function CadDesignPage() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <label className={labelCls}>Tapered shank — {taperAmount === 0 ? 'off' : `${Math.round(taperAmount * 100)}% wider at the head`}</label>
+                  <input type="range" min={0} max={0.5} step={0.05} value={taperAmount}
+                    onChange={e => setTaperAmount(Number(e.target.value))} disabled={tensionActive} className="w-full" />
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Matrix's Ring Rail/Profile Sweep tools, generalized: the band gets wider at the head and narrower
+                    at the back instead of a fixed width all the way around. Doesn't change total metal weight — just
+                    redistributes it. {tensionActive && 'Not available with a tension-set band (it already replaces the full band).'}
+                  </p>
                 </div>
 
                 <div>
