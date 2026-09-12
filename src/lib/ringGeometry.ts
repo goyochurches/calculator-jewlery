@@ -1314,3 +1314,43 @@ export function buildIllusionHeadGroup(params: IllusionHeadParams): THREE.Group 
   })
   return group
 }
+
+// ── Milgrain — Matrix's own "Milgrain" decorative-surface tool ─────────────
+// A row of tiny beads along an edge — the classic finishing touch on a
+// band's outer rim. Purely decorative metal (not a gem), so it's included
+// like any other metal mesh in the weight estimate and the boolean union.
+
+export interface MilgrainParams {
+  /** Beads per full 360° revolution, on EACH edge — omit to derive a count
+   *  from the band's own circumference so bead spacing stays roughly
+   *  constant regardless of ring size. */
+  beadCount?: number
+  beadDiameterMm?: number
+}
+
+/** A row of small sphere beads running along BOTH edges where the band's
+ *  outer face meets its two side faces — the two edges you'd actually see
+ *  milgrain applied to on a real band. Built directly in the band's own
+ *  WORLD coordinates (like `buildPaveRow`), not the local head convention. */
+export function buildMilgrainEdges(params: MilgrainParams, band: RingBandParams): THREE.Group {
+  const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
+  const halfWidth = band.widthMm / 2
+  const beadDiameterMm = params.beadDiameterMm ?? Math.max(0.25, band.thicknessMm * 0.12)
+  const beadCount = params.beadCount
+    ?? Math.max(24, Math.round((2 * Math.PI * outerRadius) / (beadDiameterMm * 1.6)))
+
+  const group = new THREE.Group()
+  for (const edgeY of [halfWidth, -halfWidth]) {
+    for (let i = 0; i < beadCount; i++) {
+      const angle = (i / beadCount) * Math.PI * 2
+      const bead = new THREE.Mesh(new THREE.SphereGeometry(beadDiameterMm / 2, 10, 8))
+      bead.position.set(Math.cos(angle) * outerRadius, edgeY, Math.sin(angle) * outerRadius)
+      bead.userData.partName = 'Milgrain bead'
+      group.add(bead)
+    }
+  }
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}
