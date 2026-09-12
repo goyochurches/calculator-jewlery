@@ -14,7 +14,7 @@ import {
   buildStoneHeadGroup, buildBezelHeadGroup, buildClusterHeadGroup, buildHaloGroup, haloOrbitRadiusMm, attachHeadToBand, roundDiameterMmFromCarat,
   defaultProngHeightMm,
   buildFancyStoneHeadGroup, type FancyStoneShape,
-  buildPaveRow, buildChannelSetting, buildFlushSetting,
+  buildPaveRow, buildChannelSetting, buildFlushSetting, buildBarSetting,
   buildTensionBandGeometry, buildTensionSetting, tensionGapDegForStone,
   buildTaperedBandGeometry, buildTwistedBandGeometry,
   buildIllusionHeadGroup,
@@ -53,7 +53,7 @@ const PART_TAB: Record<string, Tab> = {
   'Bezel wall': 'center', 'Cluster plate': 'center', 'Cluster petal': 'center',
   'Tension contact': 'center', 'Halo stone': 'center', 'Illusion skirt': 'center',
   'Pavé stone': 'side', 'Channel stone': 'side', 'Channel rail': 'side',
-  'Flush stone': 'side', 'Flush collar': 'side',
+  'Flush stone': 'side', 'Flush collar': 'side', 'Bar stone': 'side', 'Bar post': 'side',
   'Milgrain bead': 'band', 'Rope strand': 'band',
   'Merged solid': 'solid', Imported: 'solid', 'Matching band': 'solid',
 }
@@ -104,7 +104,7 @@ export function CadDesignPage() {
   const [haloStoneMm, setHaloStoneMm] = useState(1.2)
   const [haloRingCount, setHaloRingCount] = useState<1 | 2 | 3>(1)
   const [includePave, setIncludePave] = useState(false)
-  const [paveSettingType, setPaveSettingType] = useState<'pave' | 'channel' | 'flush'>('pave')
+  const [paveSettingType, setPaveSettingType] = useState<'pave' | 'channel' | 'flush' | 'bar'>('pave')
   const [paveCount, setPaveCount] = useState(12)
   const [paveStoneMm, setPaveStoneMm] = useState(1.2)
   const [mergeSolid, setMergeSolid] = useState(false)
@@ -310,7 +310,9 @@ export function CadDesignPage() {
         ? buildChannelSetting({ count: paveCount, stoneDiameterMm: paveStoneMm }, bandParams)
         : paveSettingType === 'flush'
           ? buildFlushSetting({ count: paveCount, stoneDiameterMm: paveStoneMm }, bandParams)
-          : buildPaveRow({ count: paveCount, stoneDiameterMm: paveStoneMm, excludeIndices: excludedPaveIndices }, bandParams)
+          : paveSettingType === 'bar'
+            ? buildBarSetting({ count: paveCount, stoneDiameterMm: paveStoneMm }, bandParams)
+            : buildPaveRow({ count: paveCount, stoneDiameterMm: paveStoneMm, excludeIndices: excludedPaveIndices }, bandParams)
       group.add(sideStones)
     }
     if (includeMatchingBand) {
@@ -466,7 +468,7 @@ export function CadDesignPage() {
             Band (plain, tapered — wider at the head — or twisted-ribbon), center stone (round — prong, bezel,
             cluster, tension or illusion — oval, cushion, princess, marquise
             or pear),
-            side stones (pavé, channel or flush), optional milgrain or twisted-rope edging, an optional matching band,
+            side stones (pavé, channel, flush or bar), optional milgrain or twisted-rope edging, an optional matching band,
             and solid/export, grouped into tabs the
             way Matrix groups its own tools (Ring Rail, Gems, Milgrain, Parametric Boolean) instead of one long form.
             Click any part of the model in the viewer to select and identify it — click a single prong and you can
@@ -872,8 +874,8 @@ export function CadDesignPage() {
                   <>
                     <div>
                       <label className={labelCls}>Setting</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {([['pave', 'Pavé'], ['channel', 'Channel'], ['flush', 'Flush']] as const).map(([t, label]) => (
+                      <div className="grid grid-cols-4 gap-2">
+                        {([['pave', 'Pavé'], ['channel', 'Channel'], ['flush', 'Flush'], ['bar', 'Bar']] as const).map(([t, label]) => (
                           <button key={t} type="button" onClick={() => setPaveSettingType(t)}
                             className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${paveSettingType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
                             {label}

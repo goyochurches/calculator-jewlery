@@ -1737,3 +1737,71 @@ export function buildRopeEdge(params: RopeParams, band: RingBandParams): THREE.G
   })
   return group
 }
+
+// ── Bar setting ──────────────────────────────────────────────────────────────
+// A fourth side-stone setting type alongside pavé/channel/flush — Matrix's
+// own named "Bar setting": stones sit flush between thin vertical metal
+// posts/bars (one before the first stone, one after the last, and one
+// between each adjacent pair — a post is SHARED by its two neighboring
+// stones, the defining look), rather than continuous rails (channel) or
+// beads on top (pavé). Every bar is a plain BoxGeometry — already a
+// closed/watertight solid on its own, no verification needed beyond what
+// three.js itself already guarantees for a box.
+
+export interface BarSettingParams {
+  count: number
+  stoneDiameterMm: number
+  spreadDeg?: number
+  gapDeg?: number
+  barThicknessMm?: number
+  barHeightMm?: number
+}
+
+/** Stones at the SAME evenly-spaced angular positions pavé/channel/flush
+ *  use, flanked by a bar post at every gap between neighbors (and at each
+ *  outer end) — built directly in the band's WORLD coordinates, same
+ *  convention as those three. */
+export function buildBarSetting(params: BarSettingParams, band: RingBandParams): THREE.Group {
+  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12 } = params
+  const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
+  const stoneRadius = stoneDiameterMm / 2
+  const barThicknessMm = params.barThicknessMm ?? Math.max(0.4, stoneRadius * 0.35)
+  const barHeightMm = params.barHeightMm ?? stoneRadius * 1.1
+  const seatRadius = outerRadius - stoneRadius * 0.1
+  const perSide = Math.max(1, Math.round(count / 2))
+
+  const group = new THREE.Group()
+  for (const side of [1, -1]) {
+    const sideAnglesDeg: number[] = []
+    for (let i = 0; i < perSide; i++) {
+      const t = perSide === 1 ? 0 : i / (perSide - 1)
+      const angleDeg = side * (gapDeg + t * Math.max(0, spreadDeg - gapDeg))
+      sideAnglesDeg.push(angleDeg)
+      const rad = (angleDeg * Math.PI) / 180
+      const stone = new THREE.Mesh(new THREE.SphereGeometry(stoneRadius, 16, 12))
+      stone.position.set(Math.cos(rad) * seatRadius, barHeightMm * 0.2, Math.sin(rad) * seatRadius)
+      stone.userData.isStone = true
+      stone.userData.partName = 'Bar stone'
+      group.add(stone)
+    }
+
+    const sorted = [...sideAnglesDeg].sort((a, b) => a - b)
+    const halfStepDeg = perSide > 1 ? Math.abs(sorted[1] - sorted[0]) / 2 : Math.max(0, spreadDeg - gapDeg) / 2
+    const barAnglesDeg = [sorted[0] - halfStepDeg]
+    for (let i = 0; i < sorted.length - 1; i++) barAnglesDeg.push((sorted[i] + sorted[i + 1]) / 2)
+    barAnglesDeg.push(sorted[sorted.length - 1] + halfStepDeg)
+
+    for (const barAngleDeg of barAnglesDeg) {
+      const rad = (barAngleDeg * Math.PI) / 180
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(barThicknessMm, barHeightMm, barThicknessMm))
+      bar.position.set(Math.cos(rad) * seatRadius, 0, Math.sin(rad) * seatRadius)
+      bar.rotation.y = -rad
+      bar.userData.partName = 'Bar post'
+      group.add(bar)
+    }
+  }
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}
