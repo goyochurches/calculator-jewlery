@@ -108,6 +108,12 @@ export function CadDesignPage() {
   const [paveSettingType, setPaveSettingType] = useState<'pave' | 'channel' | 'flush' | 'bar' | 'invisible'>('pave')
   const [paveCount, setPaveCount] = useState(12)
   const [paveStoneMm, setPaveStoneMm] = useState(1.2)
+  // How far around the band (per side, from the head) side stones reach —
+  // was hardcoded at each builder's own 70° default until now, silently
+  // crowding a large stone count into a fixed arc instead of extending
+  // further around. 180° per side = a full eternity band (all the way
+  // around) — a named Ring Builder type in the master list.
+  const [sideSpreadDeg, setSideSpreadDeg] = useState(70)
   const [mergeSolid, setMergeSolid] = useState(false)
   // Matching Jewelry (module 14) — Matrix's own "Matching Band Rail": a
   // plain companion band, same finger size and metal, shown sitting right
@@ -308,14 +314,14 @@ export function CadDesignPage() {
     if (includePave) {
       const bandParams = { fingerSize, widthMm, thicknessMm, profile }
       const sideStones = paveSettingType === 'channel'
-        ? buildChannelSetting({ count: paveCount, stoneDiameterMm: paveStoneMm }, bandParams)
+        ? buildChannelSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg }, bandParams)
         : paveSettingType === 'flush'
-          ? buildFlushSetting({ count: paveCount, stoneDiameterMm: paveStoneMm }, bandParams)
+          ? buildFlushSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg }, bandParams)
           : paveSettingType === 'bar'
-            ? buildBarSetting({ count: paveCount, stoneDiameterMm: paveStoneMm }, bandParams)
+            ? buildBarSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg }, bandParams)
             : paveSettingType === 'invisible'
-              ? buildInvisibleSetting({ count: paveCount, stoneDiameterMm: paveStoneMm }, bandParams)
-              : buildPaveRow({ count: paveCount, stoneDiameterMm: paveStoneMm, excludeIndices: excludedPaveIndices }, bandParams)
+              ? buildInvisibleSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg }, bandParams)
+              : buildPaveRow({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices }, bandParams)
       group.add(sideStones)
     }
     if (includeMatchingBand) {
@@ -329,7 +335,7 @@ export function CadDesignPage() {
       group.add(matchingBand)
     }
     return group
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, includePave, paveSettingType, paveCount, paveStoneMm, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -898,6 +904,22 @@ export function CadDesignPage() {
                         <input type="number" min={0.5} max={3} step={0.1} value={paveStoneMm}
                           onChange={e => setPaveStoneMm(Math.max(0.5, Number(e.target.value) || 0.5))} className={inputCls} />
                       </div>
+                    </div>
+                    <div>
+                      <label className={labelCls}>
+                        Reach per side — {sideSpreadDeg}° {sideSpreadDeg >= 175 ? '(eternity — all the way around)' : 'from the head'}
+                      </label>
+                      <input type="range" min={20} max={179} step={1} value={sideSpreadDeg}
+                        onChange={e => setSideSpreadDeg(Number(e.target.value))} className="w-full" />
+                      <button type="button" onClick={() => setSideSpreadDeg(179)}
+                        className="mt-1.5 rounded-lg border border-slate-300 px-2.5 py-1 text-[11px] font-semibold hover:bg-slate-50">
+                        Full eternity band
+                      </button>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        How far around the band each side reaches, from the head — was fixed at 70° regardless of
+                        stone count until now, silently crowding a large count into that arc instead of extending
+                        further. "Eternity" (module 2's Ring Builder types) is just this maxed out.
+                      </p>
                     </div>
                     {paveSettingType === 'pave' && excludedPaveIndices.length > 0 && (
                       <div className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-600">
