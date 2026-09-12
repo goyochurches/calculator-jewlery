@@ -1171,3 +1171,129 @@ export function buildTensionSetting(params: TensionSettingParams, band: RingBand
   })
   return group
 }
+
+// ── Illusion setting — Matrix's own "illusion" setting TYPE ─────────────────
+// The last remaining named center-stone setting type. A small stone sits in
+// a faceted metal "skirt" flaring out wider than the stone itself — the cut
+// facets catch light and read, from a little distance, as more stone than
+// is actually there (the setting's whole point, hence the name).
+
+/** A frustum (or straight cylinder, if topRadius === bottomRadius) with
+ *  each side face given its OWN 4 vertices — never shared with its
+ *  neighbors — so it reads as genuinely FACETED (sharp creases between
+ *  faces) after this file's usual `computeVertexNormals()` post-pass.
+ *  THREE.CylinderGeometry shares vertices between adjacent side faces, so
+ *  computeVertexNormals would smooth right over them there — the opposite
+ *  of what an illusion setting's skirt needs. Fully capped (top + bottom),
+ *  so it stays a closed/watertight solid — verified with a signed-
+ *  tetrahedron-volume check against the analytic frustum volume formula
+ *  (matches to within the expected inscribed-polygon-vs-circle difference,
+ *  ~4.5% at 12 facets) and a per-triangle outward-normal check on every
+ *  side facet AND both caps before landing this. */
+function buildFacetedFrustum(topRadius: number, bottomRadius: number, height: number, facetCount: number): THREE.BufferGeometry {
+  const positions: number[] = []
+  const indices: number[] = []
+  const pushTri = (a: number, b: number, c: number) => indices.push(a, b, c)
+
+  for (let i = 0; i < facetCount; i++) {
+    const a0 = (i / facetCount) * Math.PI * 2
+    const a1 = ((i + 1) / facetCount) * Math.PI * 2
+    const topA = [Math.cos(a0) * topRadius, height / 2, Math.sin(a0) * topRadius]
+    const topB = [Math.cos(a1) * topRadius, height / 2, Math.sin(a1) * topRadius]
+    const botA = [Math.cos(a0) * bottomRadius, -height / 2, Math.sin(a0) * bottomRadius]
+    const botB = [Math.cos(a1) * bottomRadius, -height / 2, Math.sin(a1) * bottomRadius]
+    const base = positions.length / 3
+    for (const v of [topA, topB, botB, botA]) positions.push(...v)
+    // base+0=topA, base+1=topB, base+2=botB, base+3=botA — wound outward
+    // (verified empirically before landing this, not just by inspection).
+    pushTri(base, base + 2, base + 3)
+    pushTri(base, base + 1, base + 2)
+  }
+
+  const topCenterIdx = positions.length / 3
+  positions.push(0, height / 2, 0)
+  for (let i = 0; i < facetCount; i++) {
+    const a0 = (i / facetCount) * Math.PI * 2
+    const a1 = ((i + 1) / facetCount) * Math.PI * 2
+    const base = positions.length / 3
+    positions.push(Math.cos(a0) * topRadius, height / 2, Math.sin(a0) * topRadius)
+    positions.push(Math.cos(a1) * topRadius, height / 2, Math.sin(a1) * topRadius)
+    pushTri(topCenterIdx, base + 1, base)
+  }
+  const botCenterIdx = positions.length / 3
+  positions.push(0, -height / 2, 0)
+  for (let i = 0; i < facetCount; i++) {
+    const a0 = (i / facetCount) * Math.PI * 2
+    const a1 = ((i + 1) / facetCount) * Math.PI * 2
+    const base = positions.length / 3
+    positions.push(Math.cos(a0) * bottomRadius, -height / 2, Math.sin(a0) * bottomRadius)
+    positions.push(Math.cos(a1) * bottomRadius, -height / 2, Math.sin(a1) * bottomRadius)
+    pushTri(botCenterIdx, base, base + 1)
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  return geometry
+}
+
+export interface IllusionHeadParams {
+  stoneDiameterMm: number
+  /** Facets around the skirt — classic illusion settings show 8–16. */
+  facetCount?: number
+  standHeightMm?: number
+}
+
+/** Small stone gripped by a low bezel rim, sitting atop a faceted skirt
+ *  that flares out wider than the stone — same local "+Y up" convention as
+ *  every other head, so `attachHeadToBand` works unchanged. */
+export function buildIllusionHeadGroup(params: IllusionHeadParams): THREE.Group {
+  const { stoneDiameterMm, facetCount = 12 } = params
+  const stoneRadius = stoneDiameterMm / 2
+  const standHeightMm = params.standHeightMm ?? stoneDiameterMm * 0.4
+
+  const group = new THREE.Group()
+
+  // Faceted skirt — wider at the top (visible from above, where the
+  // illusion actually reads) tapering down to meet the stand.
+  const skirtTopRadius = stoneRadius * 2.1
+  const skirtBottomRadius = stoneRadius * 1.25
+  const skirtHeight = stoneRadius * 0.9
+  const skirt = new THREE.Mesh(buildFacetedFrustum(skirtTopRadius, skirtBottomRadius, skirtHeight, facetCount))
+  skirt.position.y = skirtHeight / 2
+  skirt.userData.partName = 'Illusion skirt'
+  group.add(skirt)
+
+  // Low bezel rim gripping the stone, sitting on top of the skirt.
+  const wallMm = Math.max(0.4, stoneDiameterMm * 0.1)
+  const rimHeightMm = stoneDiameterMm * 0.3
+  const outerR = stoneRadius + wallMm
+  const innerR = stoneRadius * 0.97
+  const ringShape = new THREE.Shape()
+  ringShape.absarc(0, 0, outerR, 0, Math.PI * 2, false)
+  const hole = new THREE.Path()
+  hole.absarc(0, 0, innerR, 0, Math.PI * 2, true)
+  ringShape.holes.push(hole)
+  const rim = new THREE.Mesh(new THREE.ExtrudeGeometry(ringShape, { depth: rimHeightMm, bevelEnabled: false, curveSegments: 48 }))
+  rim.rotation.x = -Math.PI / 2
+  rim.position.y = skirtHeight
+  rim.userData.partName = 'Bezel wall'
+  group.add(rim)
+
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(skirtBottomRadius * 0.9, skirtBottomRadius * 0.6, standHeightMm, 24))
+  stand.position.y = -standHeightMm / 2
+  stand.userData.partName = 'Stand'
+  group.add(stand)
+
+  const stoneProxy = new THREE.Mesh(new THREE.OctahedronGeometry(stoneRadius * 0.92))
+  stoneProxy.position.y = skirtHeight + rimHeightMm * 0.5
+  stoneProxy.scale.y = 0.8
+  stoneProxy.userData.isStone = true
+  stoneProxy.userData.partName = 'Center stone'
+  group.add(stoneProxy)
+
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}

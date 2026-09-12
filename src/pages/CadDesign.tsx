@@ -13,11 +13,12 @@ import {
   buildFancyStoneHeadGroup, type FancyStoneShape,
   buildPaveRow, buildChannelSetting, buildFlushSetting,
   buildTensionBandGeometry, buildTensionSetting, tensionGapDegForStone,
+  buildIllusionHeadGroup,
   unionMetalParts, extractStoneMeshes,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
 
-type SettingType = 'prong' | 'bezel' | 'cluster' | 'tension'
+type SettingType = 'prong' | 'bezel' | 'cluster' | 'tension' | 'illusion'
 
 type StoneShape = 'round' | FancyStoneShape
 
@@ -43,7 +44,7 @@ const PART_TAB: Record<string, Tab> = {
   Band: 'band',
   Gallery: 'center', Prong: 'center', Stand: 'center', 'Center stone': 'center',
   'Bezel wall': 'center', 'Cluster plate': 'center', 'Cluster petal': 'center',
-  'Tension contact': 'center', 'Halo stone': 'center',
+  'Tension contact': 'center', 'Halo stone': 'center', 'Illusion skirt': 'center',
   'Pavé stone': 'side', 'Channel stone': 'side', 'Channel rail': 'side',
   'Flush stone': 'side', 'Flush collar': 'side',
   'Merged solid': 'solid',
@@ -116,8 +117,10 @@ export function CadDesignPage() {
   const tensionActive = includeStone && stoneShape === 'round' && settingType === 'tension'
   // Round center stone only for now — see the roadmap memory. Halo doesn't
   // make sense around a tension-set stone (there's no gallery for it to
-  // ring, and it would sit right over the band's own gap).
-  const haloEligible = includeHalo && stoneShape === 'round' && !tensionActive
+  // ring, and it would sit right over the band's own gap) or an illusion
+  // setting (the faceted skirt already fills that same "make it look
+  // bigger" visual role, and would overlap it).
+  const haloEligible = includeHalo && stoneShape === 'round' && !tensionActive && settingType !== 'illusion'
   const outerRadiusMm = innerDiameterMm / 2 + thicknessMm
   const tensionGapDeg = tensionActive ? tensionGapDegForStone(stoneDiameterMm, outerRadiusMm) : 0
 
@@ -150,7 +153,9 @@ export function CadDesignPage() {
               ? buildBezelHeadGroup({ stoneDiameterMm })
               : settingType === 'cluster'
                 ? buildClusterHeadGroup({ centerStoneDiameterMm: stoneDiameterMm, petalCount: clusterPetalCount, petalStoneDiameterMm: clusterPetalStoneMm })
-                : buildStoneHeadGroup({ stoneDiameterMm, prongCount }))
+                : settingType === 'illusion'
+                  ? buildIllusionHeadGroup({ stoneDiameterMm })
+                  : buildStoneHeadGroup({ stoneDiameterMm, prongCount }))
           : buildFancyStoneHeadGroup({ shape: stoneShape, lengthMm: fancyLengthMm, widthMm: fancyWidthMm, prongCount })
         attachHeadToBand(head, bandParamsBase)
         group.add(head)
@@ -229,7 +234,8 @@ export function CadDesignPage() {
           </div>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Parametric solitaire ring</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            Band, center stone (round — prong, bezel, cluster or tension — oval, cushion, princess, marquise or pear),
+            Band, center stone (round — prong, bezel, cluster, tension or illusion — oval, cushion, princess, marquise
+            or pear),
             side stones (pavé, channel or flush) and solid/export, grouped into tabs the way Matrix groups its own
             tools (Ring Rail, Gems, Parametric Boolean) instead of one long form. Click any part of the model in the
             viewer to select and identify it — the first step toward real click-to-design interaction, not just a
@@ -347,8 +353,8 @@ export function CadDesignPage() {
                     {stoneShape === 'round' && (
                       <div>
                         <label className={labelCls}>Setting type</label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {(['prong', 'bezel', 'cluster', 'tension'] as const).map(t => (
+                        <div className="grid grid-cols-3 gap-2">
+                          {(['prong', 'bezel', 'cluster', 'tension', 'illusion'] as const).map(t => (
                             <button key={t} type="button" onClick={() => setSettingType(t)}
                               className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${settingType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
                               {t}
