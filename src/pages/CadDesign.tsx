@@ -14,7 +14,7 @@ import {
   buildFancyStoneHeadGroup, type FancyStoneShape,
   buildPaveRow, buildChannelSetting, buildFlushSetting,
   buildTensionBandGeometry, buildTensionSetting, tensionGapDegForStone,
-  buildTaperedBandGeometry,
+  buildTaperedBandGeometry, buildTwistedBandGeometry,
   buildIllusionHeadGroup,
   buildMilgrainEdges, buildRopeEdge,
   unionMetalParts, extractStoneMeshes, checkWatertightness,
@@ -81,7 +81,9 @@ export function CadDesignPage() {
   const [widthMm, setWidthMm] = useState(2.5)
   const [thicknessMm, setThicknessMm] = useState(1.8)
   const [profile, setProfile] = useState<BandProfile>('comfort')
-  const [taperAmount, setTaperAmount] = useState(0)
+  const [shankStyle, setShankStyle] = useState<'plain' | 'tapered' | 'twisted'>('plain')
+  const [taperAmount, setTaperAmount] = useState(0.3)
+  const [twists, setTwists] = useState(1)
   const [metal, setMetal] = useState<JewelryMetalOption>('gold-18k-yellow')
   const [includeStone, setIncludeStone] = useState(true)
   const [stoneShape, setStoneShape] = useState<StoneShape>('round')
@@ -187,9 +189,11 @@ export function CadDesignPage() {
     const band = new THREE.Mesh(
       tensionActive
         ? buildTensionBandGeometry(bandParamsBase, tensionGapDeg)
-        : taperAmount !== 0
+        : shankStyle === 'tapered'
           ? buildTaperedBandGeometry({ ...bandParamsBase, taperAmount })
-          : buildRingBandGeometry(bandParamsBase),
+          : shankStyle === 'twisted'
+            ? buildTwistedBandGeometry({ ...bandParamsBase, twists })
+            : buildRingBandGeometry(bandParamsBase),
     )
     band.userData.partName = 'Band'
     group.add(band)
@@ -230,7 +234,7 @@ export function CadDesignPage() {
     }
     return group
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, taperAmount, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -324,7 +328,7 @@ export function CadDesignPage() {
           </div>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Parametric solitaire ring</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            Band (optionally tapered — wider at the head, narrower at the back), center stone (round — prong, bezel,
+            Band (plain, tapered — wider at the head — or twisted-ribbon), center stone (round — prong, bezel,
             cluster, tension or illusion — oval, cushion, princess, marquise
             or pear),
             side stones (pavé, channel or flush), optional milgrain or twisted-rope edging, and solid/export, grouped into tabs the
@@ -434,14 +438,41 @@ export function CadDesignPage() {
                 </div>
 
                 <div>
-                  <label className={labelCls}>Tapered shank — {taperAmount === 0 ? 'off' : `${Math.round(taperAmount * 100)}% wider at the head`}</label>
-                  <input type="range" min={0} max={0.5} step={0.05} value={taperAmount}
-                    onChange={e => setTaperAmount(Number(e.target.value))} disabled={tensionActive} className="w-full" />
-                  <p className="mt-1 text-[11px] text-slate-400">
-                    Matrix's Ring Rail/Profile Sweep tools, generalized: the band gets wider at the head and narrower
-                    at the back instead of a fixed width all the way around. Doesn't change total metal weight — just
-                    redistributes it. {tensionActive && 'Not available with a tension-set band (it already replaces the full band).'}
-                  </p>
+                  <label className={labelCls}>Shank style</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['plain', 'tapered', 'twisted'] as const).map(s => (
+                      <button key={s} type="button" onClick={() => setShankStyle(s)} disabled={tensionActive}
+                        className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition disabled:cursor-not-allowed disabled:opacity-50 ${shankStyle === s ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                  {tensionActive && (
+                    <p className="mt-1 text-[11px] text-slate-400">Not available with a tension-set band (it already replaces the full band).</p>
+                  )}
+                  {shankStyle === 'tapered' && !tensionActive && (
+                    <div className="mt-2">
+                      <label className={labelCls}>{Math.round(taperAmount * 100)}% wider at the head</label>
+                      <input type="range" min={0.05} max={0.5} step={0.05} value={taperAmount}
+                        onChange={e => setTaperAmount(Number(e.target.value))} className="w-full" />
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        Matrix's Ring Rail/Profile Sweep tools, generalized: wider at the head, narrower at the back.
+                        Doesn't change total metal weight — just redistributes it.
+                      </p>
+                    </div>
+                  )}
+                  {shankStyle === 'twisted' && !tensionActive && (
+                    <div className="mt-2">
+                      <label className={labelCls}>{twists} full twist{twists === 1 ? '' : 's'} around the band</label>
+                      <input type="range" min={0.5} max={4} step={0.5} value={twists}
+                        onChange={e => setTwists(Number(e.target.value))} className="w-full" />
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        Matrix's own "Twist" transform, applied to the shank — a classic twisted-ribbon band. The
+                        band's own solid twists (different from the Rope edging above, which adds strands ON TOP of a
+                        plain band).
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div>
