@@ -11,7 +11,7 @@ import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import type { JewelryMetalOption } from '@/types'
 import {
   buildRingBandGeometry, usSizeToDiameterMm, type BandProfile,
-  buildStoneHeadGroup, buildBezelHeadGroup, buildClusterHeadGroup, buildHaloGroup, attachHeadToBand, roundDiameterMmFromCarat,
+  buildStoneHeadGroup, buildBezelHeadGroup, buildClusterHeadGroup, buildHaloGroup, haloOrbitRadiusMm, attachHeadToBand, roundDiameterMmFromCarat,
   defaultProngHeightMm,
   buildFancyStoneHeadGroup, type FancyStoneShape,
   buildPaveRow, buildChannelSetting, buildFlushSetting,
@@ -102,6 +102,7 @@ export function CadDesignPage() {
   const [includeHalo, setIncludeHalo] = useState(false)
   const [haloCount, setHaloCount] = useState(16)
   const [haloStoneMm, setHaloStoneMm] = useState(1.2)
+  const [haloRingCount, setHaloRingCount] = useState<1 | 2 | 3>(1)
   const [includePave, setIncludePave] = useState(false)
   const [paveSettingType, setPaveSettingType] = useState<'pave' | 'channel' | 'flush'>('pave')
   const [paveCount, setPaveCount] = useState(12)
@@ -227,6 +228,7 @@ export function CadDesignPage() {
   const canRemovePaveInstance = selectedPart?.name === 'Pavé stone' && selectedPart.instanceIndex !== undefined
     && paveSettingType === 'pave'
   const canRemoveHaloInstance = selectedPart?.name === 'Halo stone' && selectedPart.instanceIndex !== undefined
+    && haloRingCount === 1
   // Tension setting cuts the band itself, so it needs its own band geometry
   // (see ringGeometry.ts) — only meaningful for a round stone with a
   // center stone actually present.
@@ -286,9 +288,20 @@ export function CadDesignPage() {
       }
 
       if (haloEligible) {
-        const halo = buildHaloGroup({ stoneDiameterMm, haloCount, haloStoneDiameterMm: haloStoneMm, excludeIndices: excludedHaloIndices })
-        attachHeadToBand(halo, bandParamsBase)
-        group.add(halo)
+        // Double/triple halo (Matrix's own named variants): each extra
+        // ring stacks outside the previous one's own orbit + stone radius
+        // + a small gap, via haloOrbitRadiusMm — no new geometry primitive
+        // needed, just composing buildHaloGroup more than once.
+        let orbitRadiusMm = haloOrbitRadiusMm(stoneDiameterMm, haloStoneMm)
+        for (let ring = 0; ring < haloRingCount; ring++) {
+          const halo = buildHaloGroup({
+            stoneDiameterMm, haloCount, haloStoneDiameterMm: haloStoneMm, orbitRadiusMm,
+            excludeIndices: ring === 0 ? excludedHaloIndices : undefined,
+          })
+          attachHeadToBand(halo, bandParamsBase)
+          group.add(halo)
+          orbitRadiusMm += haloStoneMm + 0.4
+        }
       }
     }
     if (includePave) {
@@ -312,7 +325,7 @@ export function CadDesignPage() {
     }
     return group
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, excludedHaloIndices, includePave, paveSettingType, paveCount, paveStoneMm, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, includePave, paveSettingType, paveCount, paveStoneMm, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -801,6 +814,17 @@ export function CadDesignPage() {
                               <label className={labelCls}>Halo stone size (mm)</label>
                               <input type="number" min={0.5} max={3} step={0.1} value={haloStoneMm}
                                 onChange={e => setHaloStoneMm(Math.max(0.5, Number(e.target.value) || 0.5))} className={inputCls} />
+                            </div>
+                            <div className="col-span-2">
+                              <label className={labelCls}>Halo rings</label>
+                              <div className="grid grid-cols-3 gap-2">
+                                {([1, 2, 3] as const).map(n => (
+                                  <button key={n} type="button" onClick={() => setHaloRingCount(n)}
+                                    className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${haloRingCount === n ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                                    {n === 1 ? 'Single' : n === 2 ? 'Double' : 'Triple'}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
                           </div>
                         )}

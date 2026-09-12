@@ -543,9 +543,26 @@ export interface HaloParams {
   haloStoneDiameterMm?: number
   /** Gap between the center stone's edge and the halo stones, in mm. */
   gapMm?: number
+  /** Overrides the computed orbit radius entirely — how a caller stacks a
+   *  SECOND or THIRD halo ring outside the first (Matrix's own "double
+   *  halo"/"triple halo"): compute the first ring normally, read its
+   *  radius back via `haloOrbitRadiusMm`, then pass the next ring's own
+   *  radius (that value + both rings' stone radii + a small gap) in here
+   *  — see CadDesign.tsx. */
+  orbitRadiusMm?: number
   /** Instance indices (0-based, build order) to skip entirely — same
    *  per-instance removal pattern `buildPaveRow` uses. */
   excludeIndices?: Set<number>
+}
+
+/** The orbit radius (mm) `buildHaloGroup` would use for a given stone size/
+ *  gap, exposed on its own so a caller can stack additional rings outside
+ *  it without duplicating this formula — see `HaloParams.orbitRadiusMm`. */
+export function haloOrbitRadiusMm(stoneDiameterMm: number, haloStoneDiameterMm?: number, gapMm?: number): number {
+  const stoneRadius = stoneDiameterMm / 2
+  const haloStoneRadius = (haloStoneDiameterMm ?? Math.max(0.8, stoneDiameterMm * 0.18)) / 2
+  const gap = gapMm ?? haloStoneRadius * 0.6
+  return stoneRadius + gap + haloStoneRadius
 }
 
 /** Small stones evenly spaced in a full circle just outside the center
@@ -554,10 +571,8 @@ export interface HaloParams {
  *  so it lines up with the head it surrounds. */
 export function buildHaloGroup(params: HaloParams): THREE.Group {
   const { stoneDiameterMm, haloCount } = params
-  const stoneRadius = stoneDiameterMm / 2
   const haloStoneRadius = (params.haloStoneDiameterMm ?? Math.max(0.8, stoneDiameterMm * 0.18)) / 2
-  const gapMm = params.gapMm ?? haloStoneRadius * 0.6
-  const orbitRadius = stoneRadius + gapMm + haloStoneRadius
+  const orbitRadius = params.orbitRadiusMm ?? haloOrbitRadiusMm(stoneDiameterMm, params.haloStoneDiameterMm, params.gapMm)
 
   const group = new THREE.Group()
   for (let i = 0; i < haloCount; i++) {
