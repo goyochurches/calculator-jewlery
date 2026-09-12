@@ -256,6 +256,20 @@ export function roundDiameterMmFromCarat(carat: number): number {
   return 6.5 * Math.cbrt(Math.max(0, carat))
 }
 
+/** Rough carat-weight estimate for a fancy-shape stone from its
+ *  length×width footprint (mm) — the standard "well-proportioned depth"
+ *  approximation trade references publish per shape (length × width ×
+ *  a shape-specific constant). Used to connect a fancy center stone to
+ *  the app's real diamond price sheet (keyed by carat) the same way
+ *  `roundDiameterMmFromCarat`'s inverse direction already does for round —
+ *  not a substitute for actually weighing/grading a real stone. */
+export function estimateFancyCaratWeight(shape: FancyStoneShape, lengthMm: number, widthMm: number): number {
+  const factor: Record<FancyStoneShape, number> = {
+    oval: 0.0062, cushion: 0.0080, princess: 0.0083, marquise: 0.0058, pear: 0.0075,
+  }
+  return lengthMm * widthMm * factor[shape]
+}
+
 /** Every prong's default height (mm) for a given stone size — pulled out
  *  as its own function (rather than left as an inline default) so the
  *  CALLER can compute the same baseline a specific prong would otherwise

@@ -11,7 +11,7 @@ import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import type { JewelryMetalOption } from '@/types'
 import {
   buildRingBandGeometry, usSizeToDiameterMm, type BandProfile,
-  buildStoneHeadGroup, buildBezelHeadGroup, buildClusterHeadGroup, buildHaloGroup, haloOrbitRadiusMm, attachHeadToBand, roundDiameterMmFromCarat,
+  buildStoneHeadGroup, buildBezelHeadGroup, buildClusterHeadGroup, buildHaloGroup, haloOrbitRadiusMm, attachHeadToBand, roundDiameterMmFromCarat, estimateFancyCaratWeight,
   defaultProngHeightMm,
   buildFancyStoneHeadGroup, type FancyStoneShape,
   buildPaveRow, buildChannelSetting, buildFlushSetting, buildBarSetting, buildInvisibleSetting,
@@ -404,8 +404,9 @@ export function CadDesignPage() {
   // an honest approximation, disclosed as such in the UI, not a scale/
   // interpolation (diamond price per carat isn't linear, so scaling a
   // neighboring bucket's price would be actively misleading).
+  const effectiveCaratWeight = stoneShape === 'round' ? caratWeight : estimateFancyCaratWeight(stoneShape, fancyLengthMm, fancyWidthMm)
   const nearestDiamondSize = useMemo(() => {
-    if (!includeStone || stoneShape !== 'round') return undefined
+    if (!includeStone) return undefined
     const wantType = diamondType === 'lab-grown' ? 'LAB' : 'NATURAL'
     let best: typeof config.diamondSizes[number] | undefined
     let bestDiff = Infinity
@@ -413,11 +414,11 @@ export function CadDesignPage() {
       if (row.stoneType !== wantType) continue
       const rowCt = Number(row.sizeKey)
       if (!Number.isFinite(rowCt)) continue
-      const diff = Math.abs(rowCt - caratWeight)
+      const diff = Math.abs(rowCt - effectiveCaratWeight)
       if (diff < bestDiff) { bestDiff = diff; best = row }
     }
     return best
-  }, [config, includeStone, stoneShape, diamondType, caratWeight])
+  }, [config, includeStone, diamondType, effectiveCaratWeight])
   const estimatedStoneCost = nearestDiamondSize?.basePrice ?? 0
   const estimatedTotalCost = estimatedMetalCost + estimatedStoneCost
 
@@ -733,27 +734,25 @@ export function CadDesignPage() {
                       </div>
                     </div>
 
-                    {stoneShape === 'round' ? (
-                      <>
-                        <div>
-                          <label className={labelCls}>Carat weight</label>
-                          <input type="number" min={0.1} max={10} step={0.05} value={caratWeight}
-                            onChange={e => setCaratWeight(Math.max(0.1, Number(e.target.value) || 0.1))} className={inputCls} />
-                          <p className="mt-1 text-[11px] text-slate-400">≈ {stoneDiameterMm.toFixed(2)} mm diameter</p>
-                        </div>
-                        <div>
-                          <label className={labelCls}>Diamond type</label>
-                          <div className="grid grid-cols-2 gap-2">
-                            {(['natural', 'lab-grown'] as const).map(t => (
-                              <button key={t} type="button" onClick={() => setDiamondType(t)}
-                                className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${diamondType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                                {t === 'lab-grown' ? 'Lab-grown' : 'Natural'}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </>
-                    ) : null}
+                    {stoneShape === 'round' && (
+                      <div>
+                        <label className={labelCls}>Carat weight</label>
+                        <input type="number" min={0.1} max={10} step={0.05} value={caratWeight}
+                          onChange={e => setCaratWeight(Math.max(0.1, Number(e.target.value) || 0.1))} className={inputCls} />
+                        <p className="mt-1 text-[11px] text-slate-400">≈ {stoneDiameterMm.toFixed(2)} mm diameter</p>
+                      </div>
+                    )}
+                    <div>
+                      <label className={labelCls}>Diamond type</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {(['natural', 'lab-grown'] as const).map(t => (
+                          <button key={t} type="button" onClick={() => setDiamondType(t)}
+                            className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${diamondType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                            {t === 'lab-grown' ? 'Lab-grown' : 'Natural'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     {stoneShape === 'round' && (
                       <div>
                         <label className={labelCls}>Setting type</label>
@@ -1072,9 +1071,10 @@ export function CadDesignPage() {
                 </div>
                 <p className="mt-1.5 text-[11px] text-slate-500">
                   From the app's own diamond price sheet (the same one Quote Builder prices from) — closest LISTED size
-                  to {caratWeight.toFixed(2)}ct, not an interpolation (diamond price per carat isn't linear, so scaling
-                  a neighboring size's price would be misleading). Doesn't account for clarity/color/cut — use Quote
-                  Builder for an exact price.
+                  to {effectiveCaratWeight.toFixed(2)}ct{stoneShape !== 'round'
+                    ? ` (estimated from this ${fancyLengthMm}×${fancyWidthMm}mm footprint — a standard trade approximation, not a real stone's actual measured weight)`
+                    : ''}, not an interpolation (diamond price per carat isn't linear, so scaling a neighboring size's
+                  price would be misleading). Doesn't account for clarity/color/cut — use Quote Builder for an exact price.
                 </p>
                 <div className="mt-2 flex items-baseline justify-between border-t border-sky-200 pt-2 text-sm">
                   <span className="font-semibold text-slate-700">Estimated total (metal + stone)</span>
