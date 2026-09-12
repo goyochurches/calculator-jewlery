@@ -543,6 +543,9 @@ export interface HaloParams {
   haloStoneDiameterMm?: number
   /** Gap between the center stone's edge and the halo stones, in mm. */
   gapMm?: number
+  /** Instance indices (0-based, build order) to skip entirely — same
+   *  per-instance removal pattern `buildPaveRow` uses. */
+  excludeIndices?: Set<number>
 }
 
 /** Small stones evenly spaced in a full circle just outside the center
@@ -558,11 +561,13 @@ export function buildHaloGroup(params: HaloParams): THREE.Group {
 
   const group = new THREE.Group()
   for (let i = 0; i < haloCount; i++) {
+    if (params.excludeIndices?.has(i)) continue
     const angle = (i / haloCount) * Math.PI * 2
     const stone = new THREE.Mesh(new THREE.SphereGeometry(haloStoneRadius, 14, 10))
     stone.position.set(Math.cos(angle) * orbitRadius, 0, Math.sin(angle) * orbitRadius)
     stone.userData.isStone = true
     stone.userData.partName = 'Halo stone'
+    stone.userData.instanceIndex = i
     group.add(stone)
   }
   group.traverse(obj => {
