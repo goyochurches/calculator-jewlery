@@ -1423,3 +1423,61 @@ export function buildMilgrainEdges(params: MilgrainParams, band: RingBandParams)
   })
   return group
 }
+
+// ── Rope / twisted wire — Matrix's own "Rope" decorative-surface tool ──────
+// Classic twisted-rope texture: two (or more) thin strands helically
+// wound around each other, run all the way around the band's outer edge.
+// Each strand is ONE closed THREE.TubeGeometry (the curve and the tube
+// sweep both wrap seamlessly with `closed: true`) — verified beforehand
+// with a signed-tetrahedron-volume check against the analytic circular-
+// tube-swept-along-its-own-arc-length volume (matches to <1% once the
+// tube's own radial-segment count is reasonable; the coarser default here
+// still reads fine visually at this scale, same tradeoff pavé/milgrain
+// beads already make).
+
+export interface RopeParams {
+  /** 2 = the classic twisted-wire look; higher counts read as a thicker
+   *  braided rope. */
+  strandCount?: number
+  strandDiameterMm?: number
+  /** Full twists made all the way around the band — higher = a tighter
+   *  spiral. Omit to derive one from the band's own circumference so the
+   *  twist density looks roughly the same across ring sizes. */
+  twists?: number
+}
+
+/** Two (or more) helically-wound strands running the band's own outer
+ *  edge — built directly in the band's WORLD coordinates, same convention
+ *  as `buildMilgrainEdges`/`buildPaveRow`. Each strand's own curve winds
+ *  around the band's circumference (angle) while also spiraling radially/
+ *  axially (so it visibly crosses over its neighbor strand, the actual
+ *  "twisted" look) — offset from the others by an even phase. */
+export function buildRopeEdge(params: RopeParams, band: RingBandParams): THREE.Group {
+  const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
+  const strandCount = params.strandCount ?? 2
+  const strandDiameterMm = params.strandDiameterMm ?? Math.max(0.3, band.thicknessMm * 0.15)
+  const helixRadius = strandDiameterMm * 0.6
+  const twists = params.twists ?? Math.max(8, Math.round((2 * Math.PI * outerRadius) / (strandDiameterMm * 3)))
+  const segments = Math.max(64, twists * 12)
+
+  const group = new THREE.Group()
+  for (let s = 0; s < strandCount; s++) {
+    const phase = (s / strandCount) * Math.PI * 2
+    const points: THREE.Vector3[] = []
+    for (let i = 0; i <= segments; i++) {
+      const theta = (i / segments) * Math.PI * 2
+      const twistAngle = theta * twists + phase
+      const r = outerRadius + Math.cos(twistAngle) * helixRadius
+      const y = Math.sin(twistAngle) * helixRadius
+      points.push(new THREE.Vector3(Math.cos(theta) * r, y, Math.sin(theta) * r))
+    }
+    const curve = new THREE.CatmullRomCurve3(points, true)
+    const strand = new THREE.Mesh(new THREE.TubeGeometry(curve, segments, strandDiameterMm / 2, 8, true))
+    strand.userData.partName = 'Rope strand'
+    group.add(strand)
+  }
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}

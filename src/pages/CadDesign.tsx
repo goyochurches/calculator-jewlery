@@ -15,7 +15,7 @@ import {
   buildPaveRow, buildChannelSetting, buildFlushSetting,
   buildTensionBandGeometry, buildTensionSetting, tensionGapDegForStone,
   buildIllusionHeadGroup,
-  buildMilgrainEdges,
+  buildMilgrainEdges, buildRopeEdge,
   unionMetalParts, extractStoneMeshes,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
@@ -50,7 +50,7 @@ const PART_TAB: Record<string, Tab> = {
   'Tension contact': 'center', 'Halo stone': 'center', 'Illusion skirt': 'center',
   'Pavé stone': 'side', 'Channel stone': 'side', 'Channel rail': 'side',
   'Flush stone': 'side', 'Flush collar': 'side',
-  'Milgrain bead': 'band',
+  'Milgrain bead': 'band', 'Rope strand': 'band',
   'Merged solid': 'solid', Imported: 'solid',
 }
 import { Download, RotateCw, Scale, MousePointerClick } from 'lucide-react'
@@ -99,6 +99,7 @@ export function CadDesignPage() {
   const [paveStoneMm, setPaveStoneMm] = useState(1.2)
   const [mergeSolid, setMergeSolid] = useState(false)
   const [includeMilgrain, setIncludeMilgrain] = useState(false)
+  const [includeRope, setIncludeRope] = useState(false)
   const [autoRotate, setAutoRotate] = useState(false)
   // Viewing an imported file (STL/OBJ/3MF) — the other half of the
   // original CAD ask, independent of the parametric generator below.
@@ -181,6 +182,7 @@ export function CadDesignPage() {
     band.userData.partName = 'Band'
     group.add(band)
     if (includeMilgrain) group.add(buildMilgrainEdges({}, bandParamsBase))
+    if (includeRope) group.add(buildRopeEdge({}, bandParamsBase))
     if (includeStone) {
       if (tensionActive) {
         const tension = buildTensionSetting({ stoneDiameterMm, gapDeg: tensionGapDeg }, bandParamsBase)
@@ -216,7 +218,7 @@ export function CadDesignPage() {
     }
     return group
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, includeMilgrain, includeStone, stoneShape, settingType, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, includeMilgrain, includeRope, includeStone, stoneShape, settingType, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -284,7 +286,7 @@ export function CadDesignPage() {
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
             Band, center stone (round — prong, bezel, cluster, tension or illusion — oval, cushion, princess, marquise
             or pear),
-            side stones (pavé, channel or flush), optional milgrain edging, and solid/export, grouped into tabs the
+            side stones (pavé, channel or flush), optional milgrain or twisted-rope edging, and solid/export, grouped into tabs the
             way Matrix groups its own tools (Ring Rail, Gems, Milgrain, Parametric Boolean) instead of one long form.
             Click any part of the model in the viewer to select and identify it — click a single prong and you can
             edit its height on its own, a first real per-instance edit, not just a global slider. Import an existing
@@ -407,6 +409,15 @@ export function CadDesignPage() {
                     <p className="mt-0.5 text-[11px] text-slate-400">Matrix's own "Milgrain" tool — a beaded texture along both edges of the band.</p>
                   </span>
                   <input type="checkbox" checked={includeMilgrain} onChange={e => setIncludeMilgrain(e.target.checked)}
+                    className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+                </label>
+
+                <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                  <span>
+                    <span className="text-sm font-semibold text-slate-900">Rope / twisted wire</span>
+                    <p className="mt-0.5 text-[11px] text-slate-400">Matrix's own "Rope" tool — two twisted strands wound around the band's edge.</p>
+                  </span>
+                  <input type="checkbox" checked={includeRope} onChange={e => setIncludeRope(e.target.checked)}
                     className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
                 </label>
               </div>
