@@ -1805,3 +1805,60 @@ export function buildBarSetting(params: BarSettingParams, band: RingBandParams):
   })
   return group
 }
+
+// ── Invisible setting ────────────────────────────────────────────────────────
+// A fifth side-stone setting type — Matrix's own named "Invisible setting":
+// stones sit truly edge-to-edge (touching, zero gap), with NO visible metal
+// on top at all — real invisible settings hold each stone from below via a
+// groove cut into its pavilion, which isn't something worth modeling on a
+// placeholder stone proxy; the visible signature (a seamless "carpet" of
+// touching stones, no collar/rim/rail/post anywhere) is what this captures.
+// The one setting type here where the angular SPACING itself is derived
+// (from the stone size) rather than an independent spreadDeg/gapDeg pair —
+// pavé/channel/flush/bar all space stones apart with visible gaps; this one
+// specifically must NOT have gaps.
+
+export interface InvisibleSettingParams {
+  count: number
+  stoneDiameterMm: number
+  /** How far the row reaches around the band from the head, in degrees —
+   *  same convention as pavé/channel/flush/bar, but here it's a CAP on how
+   *  far the touching row extends, not a spread the stones are stretched
+   *  across; extra stones beyond what fits in this arc are simply not
+   *  placed rather than being spaced out to fill it. */
+  spreadDeg?: number
+  gapDeg?: number
+}
+
+/** Stones packed edge-to-edge (each adjacent pair's centers exactly one
+ *  diameter apart, angularly) starting `gapDeg` from the head, capped at
+ *  `spreadDeg` — built directly in the band's WORLD coordinates, same
+ *  convention as pavé/channel/flush/bar. */
+export function buildInvisibleSetting(params: InvisibleSettingParams, band: RingBandParams): THREE.Group {
+  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12 } = params
+  const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
+  const stoneRadius = stoneDiameterMm / 2
+  const seatRadius = outerRadius - stoneRadius * 0.1 // sit almost flush, like channel/bar
+  const perSide = Math.max(1, Math.round(count / 2))
+  // Angular step (degrees) so two adjacent stone centers at seatRadius are
+  // exactly one diameter apart — the geometric definition of "touching".
+  const stepDeg = (2 * stoneRadius / seatRadius) * (180 / Math.PI)
+
+  const group = new THREE.Group()
+  for (const side of [1, -1]) {
+    for (let i = 0; i < perSide; i++) {
+      const angleDeg = side * (gapDeg + i * stepDeg)
+      if (Math.abs(angleDeg) > spreadDeg) break // ran out of room in the allotted arc — stop rather than overlap
+      const rad = (angleDeg * Math.PI) / 180
+      const stone = new THREE.Mesh(new THREE.SphereGeometry(stoneRadius, 16, 12))
+      stone.position.set(Math.cos(rad) * seatRadius, 0, Math.sin(rad) * seatRadius)
+      stone.userData.isStone = true
+      stone.userData.partName = 'Invisible-set stone'
+      group.add(stone)
+    }
+  }
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}
