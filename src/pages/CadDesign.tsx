@@ -55,7 +55,7 @@ const PART_TAB: Record<string, Tab> = {
   'Pavé stone': 'side', 'Channel stone': 'side', 'Channel rail': 'side',
   'Flush stone': 'side', 'Flush collar': 'side',
   'Milgrain bead': 'band', 'Rope strand': 'band',
-  'Merged solid': 'solid', Imported: 'solid',
+  'Merged solid': 'solid', Imported: 'solid', 'Matching band': 'solid',
 }
 import { Download, RotateCw, Scale, MousePointerClick } from 'lucide-react'
 
@@ -107,6 +107,12 @@ export function CadDesignPage() {
   const [paveCount, setPaveCount] = useState(12)
   const [paveStoneMm, setPaveStoneMm] = useState(1.2)
   const [mergeSolid, setMergeSolid] = useState(false)
+  // Matching Jewelry (module 14) — Matrix's own "Matching Band Rail": a
+  // plain companion band, same finger size and metal, shown sitting right
+  // next to the main design like a wedding band would sit against this
+  // engagement ring.
+  const [includeMatchingBand, setIncludeMatchingBand] = useState(false)
+  const [matchingBandWidthMm, setMatchingBandWidthMm] = useState(2)
   const [includeMilgrain, setIncludeMilgrain] = useState(false)
   const [includeRope, setIncludeRope] = useState(false)
   const [autoRotate, setAutoRotate] = useState(false)
@@ -292,9 +298,19 @@ export function CadDesignPage() {
           : buildPaveRow({ count: paveCount, stoneDiameterMm: paveStoneMm, excludeIndices: excludedPaveIndices }, bandParams)
       group.add(sideStones)
     }
+    if (includeMatchingBand) {
+      // Sits right next to the main band, offset along the SAME axis the
+      // band's own profile uses for its width (Y, in this local space) —
+      // the real-world equivalent of a wedding band sitting flush against
+      // an engagement ring on the same finger.
+      const matchingBand = new THREE.Mesh(buildRingBandGeometry({ fingerSize, widthMm: matchingBandWidthMm, thicknessMm, profile }))
+      matchingBand.position.y = widthMm / 2 + matchingBandWidthMm / 2 + 0.3
+      matchingBand.userData.partName = 'Matching band'
+      group.add(matchingBand)
+    }
     return group
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, excludedHaloIndices, includePave, paveSettingType, paveCount, paveStoneMm, excludedPaveIndices])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, excludedHaloIndices, includePave, paveSettingType, paveCount, paveStoneMm, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -421,7 +437,8 @@ export function CadDesignPage() {
             Band (plain, tapered — wider at the head — or twisted-ribbon), center stone (round — prong, bezel,
             cluster, tension or illusion — oval, cushion, princess, marquise
             or pear),
-            side stones (pavé, channel or flush), optional milgrain or twisted-rope edging, and solid/export, grouped into tabs the
+            side stones (pavé, channel or flush), optional milgrain or twisted-rope edging, an optional matching band,
+            and solid/export, grouped into tabs the
             way Matrix groups its own tools (Ring Rail, Gems, Milgrain, Parametric Boolean) instead of one long form.
             Click any part of the model in the viewer to select and identify it — click a single prong and you can
             edit its height on its own, a first real per-instance edit, not just a global slider. Import an existing
@@ -901,6 +918,27 @@ export function CadDesignPage() {
                           </ul>
                         </>
                       )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 border-t border-slate-200 pt-3">
+                  <label className="flex items-center justify-between gap-3">
+                    <span>
+                      <span className="text-sm font-semibold text-slate-900">Matching band</span>
+                      <p className="mt-0.5 text-[11px] text-slate-400">
+                        Matrix's own "Matching Band Rail" — a plain companion band, same size and metal, shown sitting
+                        right next to this design like a wedding band would.
+                      </p>
+                    </span>
+                    <input type="checkbox" checked={includeMatchingBand} onChange={e => setIncludeMatchingBand(e.target.checked)}
+                      className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+                  </label>
+                  {includeMatchingBand && (
+                    <div>
+                      <label className={labelCls}>Matching band width (mm)</label>
+                      <input type="number" min={1} max={6} step={0.1} value={matchingBandWidthMm}
+                        onChange={e => setMatchingBandWidthMm(Math.max(1, Number(e.target.value) || 1))} className={inputCls} />
                     </div>
                   )}
                 </div>
