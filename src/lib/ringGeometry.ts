@@ -551,8 +551,10 @@ export interface HaloParams {
    *  — see CadDesign.tsx. */
   orbitRadiusMm?: number
   /** Instance indices (0-based, build order) to skip entirely — same
-   *  per-instance removal pattern `buildPaveRow` uses. */
-  excludeIndices?: Set<number>
+   *  per-instance removal pattern `buildPaveRow` uses. A plain array
+   *  (not a Set) so React state holding this stays a simple immutable
+   *  value the React Compiler can reason about. */
+  excludeIndices?: number[]
 }
 
 /** The orbit radius (mm) `buildHaloGroup` would use for a given stone size/
@@ -576,7 +578,7 @@ export function buildHaloGroup(params: HaloParams): THREE.Group {
 
   const group = new THREE.Group()
   for (let i = 0; i < haloCount; i++) {
-    if (params.excludeIndices?.has(i)) continue
+    if (params.excludeIndices?.includes(i)) continue
     const angle = (i / haloCount) * Math.PI * 2
     const stone = new THREE.Mesh(new THREE.SphereGeometry(haloStoneRadius, 14, 10))
     stone.position.set(Math.cos(angle) * orbitRadius, 0, Math.sin(angle) * orbitRadius)
@@ -1081,8 +1083,10 @@ export interface PaveRowParams {
   /** Instance indices to skip entirely (0-based, side=+1 first then
    *  side=-1, in build order) — the first real per-instance REMOVAL, not
    *  just an edit, proving the pattern for "click one stone, take it out"
-   *  the way the per-instance prong-height slider proved out editing. */
-  excludeIndices?: Set<number>
+   *  the way the per-instance prong-height slider proved out editing. A
+   *  plain array (not a Set) so React state holding this stays a simple
+   *  immutable value the React Compiler can reason about. */
+  excludeIndices?: number[]
 }
 
 /** A row of small placeholder stones (spheres — pavé doesn't need the
@@ -1104,7 +1108,7 @@ export function buildPaveRow(params: PaveRowParams, band: RingBandParams): THREE
   for (const side of [1, -1]) {
     for (let i = 0; i < perSide; i++) {
       const thisIndex = index++
-      if (excludeIndices?.has(thisIndex)) continue
+      if (excludeIndices?.includes(thisIndex)) continue
       const t = perSide === 1 ? 0 : i / (perSide - 1)
       const angleDeg = side * (gapDeg + t * Math.max(0, spreadDeg - gapDeg))
       const angle = (angleDeg * Math.PI) / 180

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js'
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js'
@@ -204,8 +204,8 @@ export function CadDesignPage() {
   // (round prong setting only, for now — the pattern this proves out can
   // extend to other repeated parts later). Keyed by prong index.
   const [prongHeightOverridesMm, setProngHeightOverridesMm] = useState<Record<number, number>>({})
-  const [excludedPaveIndices, setExcludedPaveIndices] = useState<Set<number>>(new Set())
-  const [excludedHaloIndices, setExcludedHaloIndices] = useState<Set<number>>(new Set())
+  const [excludedPaveIndices, setExcludedPaveIndices] = useState<number[]>([])
+  const [excludedHaloIndices, setExcludedHaloIndices] = useState<number[]>([])
   // Selecting a part jumps to whichever tab actually controls it — bridges
   // "I clicked this" to "here's how to change it" even though the controls
   // are still per-feature (every prong, say) rather than per-instance yet.
@@ -324,7 +324,6 @@ export function CadDesignPage() {
       group.add(matchingBand)
     }
     return group
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, includePave, paveSettingType, paveCount, paveStoneMm, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
@@ -351,13 +350,28 @@ export function CadDesignPage() {
   // What the viewer/weight-estimate/export actually operate on — the
   // imported file when one's loaded, otherwise the parametric design.
   const viewModel = importedModel ?? displayModel
-  // Stale results after any edit would be misleading — clear them so the
-  // page never shows a "watertight" verdict for a model that's since changed.
-  useEffect(() => setWatertightResults(null), [viewModel])
-  // Stale exclusions after the count/setting changes could hide the wrong
-  // stones (indices no longer meaning what they meant when excluded).
-  useEffect(() => setExcludedPaveIndices(new Set()), [paveCount, paveSettingType])
-  useEffect(() => setExcludedHaloIndices(new Set()), [haloCount])
+
+  // Three "reset some state when a dependency changes" cases, all using
+  // React's own recommended pattern (adjust state DURING render by
+  // comparing against a tracked previous value) instead of a useEffect —
+  // setState synchronously inside an effect body causes an avoidable extra
+  // commit/paint round-trip; this bails out of the stale render instead.
+  const [watertightForModel, setWatertightForModel] = useState<typeof viewModel | null>(null)
+  if (watertightForModel !== viewModel) {
+    setWatertightForModel(viewModel)
+    if (watertightResults !== null) setWatertightResults(null)
+  }
+  const paveExclusionKey = `${paveCount}:${paveSettingType}`
+  const [paveExclusionKeySeen, setPaveExclusionKeySeen] = useState(paveExclusionKey)
+  if (paveExclusionKeySeen !== paveExclusionKey) {
+    setPaveExclusionKeySeen(paveExclusionKey)
+    setExcludedPaveIndices([])
+  }
+  const [haloCountSeen, setHaloCountSeen] = useState(haloCount)
+  if (haloCountSeen !== haloCount) {
+    setHaloCountSeen(haloCount)
+    setExcludedHaloIndices([])
+  }
 
   // Weight & cost estimate — volume comes straight off the displayed
   // geometry, so it always matches what's on screen (and in the STL). Once
@@ -392,7 +406,7 @@ export function CadDesignPage() {
       if (diff < bestDiff) { bestDiff = diff; best = row }
     }
     return best
-  }, [config.diamondSizes, includeStone, stoneShape, diamondType, caratWeight])
+  }, [config, includeStone, stoneShape, diamondType, caratWeight])
   const estimatedStoneCost = nearestDiamondSize?.basePrice ?? 0
   const estimatedTotalCost = estimatedMetalCost + estimatedStoneCost
 
@@ -552,7 +566,7 @@ export function CadDesignPage() {
                     Selected <strong>Pavé stone #{(selectedPart.instanceIndex ?? 0) + 1}</strong>.
                   </span>
                   <button type="button"
-                    onClick={() => setExcludedPaveIndices(prev => new Set(prev).add(selectedPart.instanceIndex!))}
+                    onClick={() => setExcludedPaveIndices(prev => [...prev, selectedPart.instanceIndex!])}
                     className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
                     Remove this stone
                   </button>
@@ -564,7 +578,7 @@ export function CadDesignPage() {
                     Selected <strong>Halo stone #{(selectedPart.instanceIndex ?? 0) + 1}</strong>.
                   </span>
                   <button type="button"
-                    onClick={() => setExcludedHaloIndices(prev => new Set(prev).add(selectedPart.instanceIndex!))}
+                    onClick={() => setExcludedHaloIndices(prev => [...prev, selectedPart.instanceIndex!])}
                     className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
                     Remove this stone
                   </button>
@@ -828,10 +842,10 @@ export function CadDesignPage() {
                             </div>
                           </div>
                         )}
-                        {includeHalo && excludedHaloIndices.size > 0 && (
+                        {includeHalo && excludedHaloIndices.length > 0 && (
                           <div className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-600">
-                            <span>{excludedHaloIndices.size} halo stone{excludedHaloIndices.size === 1 ? '' : 's'} removed individually.</span>
-                            <button type="button" onClick={() => setExcludedHaloIndices(new Set())}
+                            <span>{excludedHaloIndices.length} halo stone{excludedHaloIndices.length === 1 ? '' : 's'} removed individually.</span>
+                            <button type="button" onClick={() => setExcludedHaloIndices([])}
                               className="shrink-0 rounded-lg border border-slate-300 px-2 py-1 font-semibold hover:bg-slate-50">
                               Restore all
                             </button>
@@ -879,10 +893,10 @@ export function CadDesignPage() {
                           onChange={e => setPaveStoneMm(Math.max(0.5, Number(e.target.value) || 0.5))} className={inputCls} />
                       </div>
                     </div>
-                    {paveSettingType === 'pave' && excludedPaveIndices.size > 0 && (
+                    {paveSettingType === 'pave' && excludedPaveIndices.length > 0 && (
                       <div className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-600">
-                        <span>{excludedPaveIndices.size} stone{excludedPaveIndices.size === 1 ? '' : 's'} removed individually.</span>
-                        <button type="button" onClick={() => setExcludedPaveIndices(new Set())}
+                        <span>{excludedPaveIndices.length} stone{excludedPaveIndices.length === 1 ? '' : 's'} removed individually.</span>
+                        <button type="button" onClick={() => setExcludedPaveIndices([])}
                           className="shrink-0 rounded-lg border border-slate-300 px-2 py-1 font-semibold hover:bg-slate-50">
                           Restore all
                         </button>
