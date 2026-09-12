@@ -76,6 +76,10 @@ export function CadDesignPage() {
   const [paveCount, setPaveCount] = useState(12)
   const [paveStoneMm, setPaveStoneMm] = useState(1.2)
   const [mergeSolid, setMergeSolid] = useState(false)
+  // Grouped like Matrix's own toolbar groups (Tools/Ring-Rail, Gems, Solid/
+  // Surface) instead of one long scrolling form — same controls, just not
+  // all visible at once.
+  const [activeTab, setActiveTab] = useState<'band' | 'center' | 'side' | 'solid'>('band')
 
   const innerDiameterMm = usSizeToDiameterMm(fingerSize)
   const stoneDiameterMm = roundDiameterMmFromCarat(caratWeight)
@@ -179,10 +183,10 @@ export function CadDesignPage() {
           </div>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Parametric solitaire ring</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            Band (size/width/thickness/profile) plus an optional head — round (prong, bezel or cluster), oval, cushion,
-            princess, marquise or pear — pavé, channel or flush side stones, and an optional boolean merge into one
-            real solid. This is not a Matrix/RhinoGold replacement yet — the stone is a placeholder shape (not faceted
-            gem geometry). Building toward full parity step by step.
+            Band, center stone (round — prong, bezel or cluster — oval, cushion, princess, marquise or pear), side
+            stones (pavé, channel or flush) and solid/export, grouped into tabs the way Matrix groups its own tools
+            (Ring Rail, Gems, Parametric Boolean) instead of one long form. This is not a Matrix/RhinoGold replacement
+            yet — the stone is a placeholder shape (not faceted gem geometry). Building toward full parity step by step.
           </p>
         </CardContent>
       </Card>
@@ -190,216 +194,240 @@ export function CadDesignPage() {
       <section className="grid gap-4 lg:grid-cols-[1fr_1.3fr]">
         <Card className="rounded-[30px] border border-white/80 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
           <CardContent className="space-y-5 p-6 sm:p-7">
-            <div>
-              <label className={labelCls}>Ring size</label>
-              <select value={fingerSize} onChange={e => setFingerSize(Number(e.target.value))} className={inputCls}>
-                {FINGER_SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <p className="mt-1 text-[11px] text-slate-400">≈ {innerDiameterMm.toFixed(2)} mm inside diameter</p>
+            <div className="grid grid-cols-4 gap-1.5 rounded-2xl bg-slate-100 p-1">
+              {([
+                ['band', 'Band'],
+                ['center', 'Center stone'],
+                ['side', 'Side stones'],
+                ['solid', 'Solid'],
+              ] as const).map(([tab, label]) => (
+                <button key={tab} type="button" onClick={() => setActiveTab(tab)}
+                  className={`rounded-xl px-2 py-2 text-xs font-semibold transition ${activeTab === tab ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                  {label}
+                </button>
+              ))}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>Band width (mm)</label>
-                <input type="number" min={1} max={12} step={0.1} value={widthMm}
-                  onChange={e => setWidthMm(Math.max(1, Number(e.target.value) || 1))} className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>Thickness (mm)</label>
-                <input type="number" min={0.8} max={4} step={0.1} value={thicknessMm}
-                  onChange={e => setThicknessMm(Math.max(0.8, Number(e.target.value) || 0.8))} className={inputCls} />
-              </div>
-            </div>
+            {activeTab === 'band' && (
+              <div className="space-y-5">
+                <div>
+                  <label className={labelCls}>Ring size</label>
+                  <select value={fingerSize} onChange={e => setFingerSize(Number(e.target.value))} className={inputCls}>
+                    {FINGER_SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                  <p className="mt-1 text-[11px] text-slate-400">≈ {innerDiameterMm.toFixed(2)} mm inside diameter</p>
+                </div>
 
-            <div>
-              <label className={labelCls}>Profile</label>
-              <div className="grid grid-cols-2 gap-2">
-                {(['flat', 'comfort'] as const).map(p => (
-                  <button key={p} type="button" onClick={() => setProfile(p)}
-                    className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${profile === p ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                    {p === 'flat' ? 'Flat band' : 'Comfort fit'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className={labelCls}>Metal</label>
-              <select value={metal} onChange={e => setMetal(e.target.value as JewelryMetalOption)} className={inputCls}>
-                {METAL_GROUPS.map(g => (
-                  <optgroup key={g.group} label={g.group}>
-                    {g.keys.map(key => <option key={key} value={key}>{JEWELRY_METAL_OPTIONS[key].label}</option>)}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
-              <label className="flex items-center justify-between gap-3">
-                <span className="text-sm font-semibold text-slate-900">Center stone</span>
-                <input type="checkbox" checked={includeStone} onChange={e => setIncludeStone(e.target.checked)}
-                  className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
-              </label>
-              {includeStone && (
-                <>
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className={labelCls}>Shape</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(Object.keys(STONE_SHAPE_LABELS) as StoneShape[]).map(shape => (
-                        <button key={shape} type="button" onClick={() => selectStoneShape(shape)}
-                          className={`rounded-xl border px-2.5 py-2 text-xs font-semibold transition ${stoneShape === shape ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                          {STONE_SHAPE_LABELS[shape]}
-                        </button>
-                      ))}
-                    </div>
+                    <label className={labelCls}>Band width (mm)</label>
+                    <input type="number" min={1} max={12} step={0.1} value={widthMm}
+                      onChange={e => setWidthMm(Math.max(1, Number(e.target.value) || 1))} className={inputCls} />
                   </div>
+                  <div>
+                    <label className={labelCls}>Thickness (mm)</label>
+                    <input type="number" min={0.8} max={4} step={0.1} value={thicknessMm}
+                      onChange={e => setThicknessMm(Math.max(0.8, Number(e.target.value) || 0.8))} className={inputCls} />
+                  </div>
+                </div>
 
-                  {stoneShape === 'round' ? (
+                <div>
+                  <label className={labelCls}>Profile</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['flat', 'comfort'] as const).map(p => (
+                      <button key={p} type="button" onClick={() => setProfile(p)}
+                        className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${profile === p ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                        {p === 'flat' ? 'Flat band' : 'Comfort fit'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className={labelCls}>Metal</label>
+                  <select value={metal} onChange={e => setMetal(e.target.value as JewelryMetalOption)} className={inputCls}>
+                    {METAL_GROUPS.map(g => (
+                      <optgroup key={g.group} label={g.group}>
+                        {g.keys.map(key => <option key={key} value={key}>{JEWELRY_METAL_OPTIONS[key].label}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'center' && (
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                <label className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold text-slate-900">Center stone</span>
+                  <input type="checkbox" checked={includeStone} onChange={e => setIncludeStone(e.target.checked)}
+                    className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+                </label>
+                {includeStone && (
+                  <>
                     <div>
-                      <label className={labelCls}>Carat weight</label>
-                      <input type="number" min={0.1} max={10} step={0.05} value={caratWeight}
-                        onChange={e => setCaratWeight(Math.max(0.1, Number(e.target.value) || 0.1))} className={inputCls} />
-                      <p className="mt-1 text-[11px] text-slate-400">≈ {stoneDiameterMm.toFixed(2)} mm diameter</p>
-                    </div>
-                  ) : null}
-                  {stoneShape === 'round' && (
-                    <div>
-                      <label className={labelCls}>Setting type</label>
+                      <label className={labelCls}>Shape</label>
                       <div className="grid grid-cols-3 gap-2">
-                        {(['prong', 'bezel', 'cluster'] as const).map(t => (
-                          <button key={t} type="button" onClick={() => setSettingType(t)}
-                            className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${settingType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                            {t}
+                        {(Object.keys(STONE_SHAPE_LABELS) as StoneShape[]).map(shape => (
+                          <button key={shape} type="button" onClick={() => selectStoneShape(shape)}
+                            className={`rounded-xl border px-2.5 py-2 text-xs font-semibold transition ${stoneShape === shape ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                            {STONE_SHAPE_LABELS[shape]}
                           </button>
                         ))}
                       </div>
                     </div>
-                  )}
-                  {stoneShape === 'round' && settingType === 'cluster' && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelCls}>Petal count</label>
-                        <input type="number" min={4} max={10} step={1} value={clusterPetalCount}
-                          onChange={e => setClusterPetalCount(Math.max(4, Number(e.target.value) || 4))} className={inputCls} />
-                      </div>
-                      <div>
-                        <label className={labelCls}>Petal stone size (mm)</label>
-                        <input type="number" min={0.8} max={5} step={0.1} value={clusterPetalStoneMm}
-                          onChange={e => setClusterPetalStoneMm(Math.max(0.8, Number(e.target.value) || 0.8))} className={inputCls} />
-                      </div>
-                    </div>
-                  )}
-                  {stoneShape !== 'round' && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelCls}>Length (mm)</label>
-                        <input type="number" min={2} max={20} step={0.1} value={fancyLengthMm}
-                          onChange={e => setFancyLengthMm(Math.max(2, Number(e.target.value) || 2))} className={inputCls} />
-                      </div>
-                      <div>
-                        <label className={labelCls}>Width (mm)</label>
-                        <input type="number" min={2} max={20} step={0.1} value={fancyWidthMm}
-                          onChange={e => setFancyWidthMm(Math.max(2, Number(e.target.value) || 2))} className={inputCls} />
-                      </div>
-                    </div>
-                  )}
 
-                  {(stoneShape !== 'round' || settingType === 'prong') && (
-                    <div>
-                      <label className={labelCls}>Prongs</label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {([4, 6] as const).map(n => (
-                          <button key={n} type="button" onClick={() => setProngCount(n)}
-                            className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${prongCount === n ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                            {n}
-                          </button>
-                        ))}
+                    {stoneShape === 'round' ? (
+                      <div>
+                        <label className={labelCls}>Carat weight</label>
+                        <input type="number" min={0.1} max={10} step={0.05} value={caratWeight}
+                          onChange={e => setCaratWeight(Math.max(0.1, Number(e.target.value) || 0.1))} className={inputCls} />
+                        <p className="mt-1 text-[11px] text-slate-400">≈ {stoneDiameterMm.toFixed(2)} mm diameter</p>
                       </div>
-                    </div>
-                  )}
-
-                  {stoneShape === 'round' && (
-                    <div className="space-y-3 border-t border-slate-200 pt-3">
-                      <label className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-semibold text-slate-900">Halo</span>
-                        <input type="checkbox" checked={includeHalo} onChange={e => setIncludeHalo(e.target.checked)}
-                          className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
-                      </label>
-                      {includeHalo && (
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className={labelCls}>Halo stone count</label>
-                            <input type="number" min={6} max={40} step={1} value={haloCount}
-                              onChange={e => setHaloCount(Math.max(6, Number(e.target.value) || 6))} className={inputCls} />
-                          </div>
-                          <div>
-                            <label className={labelCls}>Halo stone size (mm)</label>
-                            <input type="number" min={0.5} max={3} step={0.1} value={haloStoneMm}
-                              onChange={e => setHaloStoneMm(Math.max(0.5, Number(e.target.value) || 0.5))} className={inputCls} />
-                          </div>
+                    ) : null}
+                    {stoneShape === 'round' && (
+                      <div>
+                        <label className={labelCls}>Setting type</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {(['prong', 'bezel', 'cluster'] as const).map(t => (
+                            <button key={t} type="button" onClick={() => setSettingType(t)}
+                              className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${settingType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                              {t}
+                            </button>
+                          ))}
                         </div>
-                      )}
-                    </div>
-                  )}
-                  {stoneShape !== 'round' && includeHalo && (
-                    <p className="text-[11px] text-slate-400">Halo is round-center-stone only for now.</p>
-                  )}
-                </>
-              )}
-            </div>
+                      </div>
+                    )}
+                    {stoneShape === 'round' && settingType === 'cluster' && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>Petal count</label>
+                          <input type="number" min={4} max={10} step={1} value={clusterPetalCount}
+                            onChange={e => setClusterPetalCount(Math.max(4, Number(e.target.value) || 4))} className={inputCls} />
+                        </div>
+                        <div>
+                          <label className={labelCls}>Petal stone size (mm)</label>
+                          <input type="number" min={0.8} max={5} step={0.1} value={clusterPetalStoneMm}
+                            onChange={e => setClusterPetalStoneMm(Math.max(0.8, Number(e.target.value) || 0.8))} className={inputCls} />
+                        </div>
+                      </div>
+                    )}
+                    {stoneShape !== 'round' && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>Length (mm)</label>
+                          <input type="number" min={2} max={20} step={0.1} value={fancyLengthMm}
+                            onChange={e => setFancyLengthMm(Math.max(2, Number(e.target.value) || 2))} className={inputCls} />
+                        </div>
+                        <div>
+                          <label className={labelCls}>Width (mm)</label>
+                          <input type="number" min={2} max={20} step={0.1} value={fancyWidthMm}
+                            onChange={e => setFancyWidthMm(Math.max(2, Number(e.target.value) || 2))} className={inputCls} />
+                        </div>
+                      </div>
+                    )}
 
-            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
-              <label className="flex items-center justify-between gap-3">
-                <span className="text-sm font-semibold text-slate-900">Side stones</span>
-                <input type="checkbox" checked={includePave} onChange={e => setIncludePave(e.target.checked)}
-                  className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
-              </label>
-              {includePave && (
-                <>
-                  <div>
-                    <label className={labelCls}>Setting</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {([['pave', 'Pavé'], ['channel', 'Channel'], ['flush', 'Flush']] as const).map(([t, label]) => (
-                        <button key={t} type="button" onClick={() => setPaveSettingType(t)}
-                          className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${paveSettingType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className={labelCls}>Stone count</label>
-                      <input type="number" min={2} max={60} step={2} value={paveCount}
-                        onChange={e => setPaveCount(Math.max(2, Number(e.target.value) || 2))} className={inputCls} />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Stone size (mm)</label>
-                      <input type="number" min={0.5} max={3} step={0.1} value={paveStoneMm}
-                        onChange={e => setPaveStoneMm(Math.max(0.5, Number(e.target.value) || 0.5))} className={inputCls} />
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+                    {(stoneShape !== 'round' || settingType === 'prong') && (
+                      <div>
+                        <label className={labelCls}>Prongs</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {([4, 6] as const).map(n => (
+                            <button key={n} type="button" onClick={() => setProngCount(n)}
+                              className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${prongCount === n ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-            <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
-              <label className="flex items-center justify-between gap-3">
-                <span className="text-sm font-semibold text-slate-900">Merge into one solid</span>
-                <input type="checkbox" checked={mergeSolid} onChange={e => setMergeSolid(e.target.checked)}
-                  className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
-              </label>
-              <p className="text-[11px] text-slate-400">
-                MatrixGold's own "Parametric Boolean" tool — folds the metal parts (band, gallery, prongs, stand) into
-                one real watertight solid instead of separate overlapping meshes. Gems are never merged into the
-                metal — they're separate physical objects. Beta: can fail on some size combinations.
-              </p>
-              {mergeError && (
-                <p className="rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700">
-                  Couldn't merge this geometry ({mergeError}) — showing the unmerged preview instead.
+                    {stoneShape === 'round' && (
+                      <div className="space-y-3 border-t border-slate-200 pt-3">
+                        <label className="flex items-center justify-between gap-3">
+                          <span className="text-sm font-semibold text-slate-900">Halo</span>
+                          <input type="checkbox" checked={includeHalo} onChange={e => setIncludeHalo(e.target.checked)}
+                            className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+                        </label>
+                        {includeHalo && (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className={labelCls}>Halo stone count</label>
+                              <input type="number" min={6} max={40} step={1} value={haloCount}
+                                onChange={e => setHaloCount(Math.max(6, Number(e.target.value) || 6))} className={inputCls} />
+                            </div>
+                            <div>
+                              <label className={labelCls}>Halo stone size (mm)</label>
+                              <input type="number" min={0.5} max={3} step={0.1} value={haloStoneMm}
+                                onChange={e => setHaloStoneMm(Math.max(0.5, Number(e.target.value) || 0.5))} className={inputCls} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {stoneShape !== 'round' && includeHalo && (
+                      <p className="text-[11px] text-slate-400">Halo is round-center-stone only for now.</p>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'side' && (
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                <label className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold text-slate-900">Side stones</span>
+                  <input type="checkbox" checked={includePave} onChange={e => setIncludePave(e.target.checked)}
+                    className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+                </label>
+                {includePave && (
+                  <>
+                    <div>
+                      <label className={labelCls}>Setting</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {([['pave', 'Pavé'], ['channel', 'Channel'], ['flush', 'Flush']] as const).map(([t, label]) => (
+                          <button key={t} type="button" onClick={() => setPaveSettingType(t)}
+                            className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${paveSettingType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>Stone count</label>
+                        <input type="number" min={2} max={60} step={2} value={paveCount}
+                          onChange={e => setPaveCount(Math.max(2, Number(e.target.value) || 2))} className={inputCls} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Stone size (mm)</label>
+                        <input type="number" min={0.5} max={3} step={0.1} value={paveStoneMm}
+                          onChange={e => setPaveStoneMm(Math.max(0.5, Number(e.target.value) || 0.5))} className={inputCls} />
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'solid' && (
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                <label className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold text-slate-900">Merge into one solid</span>
+                  <input type="checkbox" checked={mergeSolid} onChange={e => setMergeSolid(e.target.checked)}
+                    className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+                </label>
+                <p className="text-[11px] text-slate-400">
+                  MatrixGold's own "Parametric Boolean" tool — folds the metal parts (band, gallery, prongs, stand) into
+                  one real watertight solid instead of separate overlapping meshes. Gems are never merged into the
+                  metal — they're separate physical objects. Beta: can fail on some size combinations.
                 </p>
-              )}
-            </div>
+                {mergeError && (
+                  <p className="rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700">
+                    Couldn't merge this geometry ({mergeError}) — showing the unmerged preview instead.
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
               <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-amber-700">
