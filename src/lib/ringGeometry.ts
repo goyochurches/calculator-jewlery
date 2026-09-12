@@ -206,16 +206,12 @@ export function buildStoneHeadGroup(params: StoneHeadParams): THREE.Group {
   stand.userData.partName = 'Stand'
   group.add(stand)
 
-  // Stone placeholder — an octahedron proxy standing in for a round
-  // brilliant's silhouette until real faceted gem geometry exists. Tagged
-  // isStone so weight/volume and the boolean-union step (which should only
-  // ever touch metal) both know to skip it — the gem is a separate
-  // physical object sitting IN the setting, not fused with the metal.
-  const stoneProxy = new THREE.Mesh(new THREE.OctahedronGeometry(stoneRadius * 0.92))
-  stoneProxy.position.y = stoneRadius * 0.5
-  stoneProxy.scale.y = 0.8
-  stoneProxy.userData.isStone = true
-  stoneProxy.userData.partName = 'Center stone'
+  // Real faceted stone — girdle plane sits at y=0, matching the gallery's
+  // own plane, so it needs no extra vertical offset (isStone is already
+  // tagged inside buildFacetedRoundStone; each of its meshes still needs
+  // ITS OWN partName since one primitive serves several settings).
+  const stoneProxy = buildFacetedRoundStone({ diameterMm: stoneDiameterMm })
+  stoneProxy.traverse(obj => { if (obj instanceof THREE.Mesh) obj.userData.partName = 'Center stone' })
   group.add(stoneProxy)
 
   group.traverse(obj => {
@@ -272,11 +268,8 @@ export function buildBezelHeadGroup(params: BezelHeadParams): THREE.Group {
   stand.userData.partName = 'Stand'
   group.add(stand)
 
-  const stoneProxy = new THREE.Mesh(new THREE.OctahedronGeometry(stoneRadius * 0.92))
-  stoneProxy.position.y = stoneRadius * 0.5
-  stoneProxy.scale.y = 0.8
-  stoneProxy.userData.isStone = true
-  stoneProxy.userData.partName = 'Center stone'
+  const stoneProxy = buildFacetedRoundStone({ diameterMm: stoneDiameterMm })
+  stoneProxy.traverse(obj => { if (obj instanceof THREE.Mesh) obj.userData.partName = 'Center stone' })
   group.add(stoneProxy)
 
   group.traverse(obj => {
@@ -331,7 +324,7 @@ export function buildClusterHeadGroup(params: ClusterHeadParams): THREE.Group {
   plate.userData.partName = 'Cluster plate'
   group.add(plate)
 
-  const addStoneWithProngs = (cx: number, cz: number, radius: number, prongCount: number, stoneLabel: string) => {
+  const addStoneWithProngs = (cx: number, cz: number, radius: number, prongCount: number, stoneLabel: string, faceted: boolean) => {
     const prongDiameterMm = Math.max(0.5, radius * 0.28)
     const prongHeightMm = radius * 1.1
     for (let i = 0; i < prongCount; i++) {
@@ -345,18 +338,30 @@ export function buildClusterHeadGroup(params: ClusterHeadParams): THREE.Group {
       prong.userData.partName = 'Prong'
       group.add(prong)
     }
-    const stoneProxy = new THREE.Mesh(new THREE.OctahedronGeometry(radius * 0.92))
-    stoneProxy.position.set(cx, plateThickness + radius * 0.5, cz)
-    stoneProxy.scale.y = 0.8
-    stoneProxy.userData.isStone = true
-    stoneProxy.userData.partName = stoneLabel
-    group.add(stoneProxy)
+    // Real faceted geometry for the rosette's own center stone (the one
+    // that actually reads as "the stone" from a normal viewing distance);
+    // petals stay simple octahedron proxies, same reasoning as pavé/halo
+    // melee elsewhere in this file — too small to read as anything but a
+    // tiny bead regardless.
+    if (faceted) {
+      const stoneProxy = buildFacetedRoundStone({ diameterMm: radius * 2 })
+      stoneProxy.position.set(cx, plateThickness, cz)
+      stoneProxy.traverse(obj => { if (obj instanceof THREE.Mesh) obj.userData.partName = stoneLabel })
+      group.add(stoneProxy)
+    } else {
+      const stoneProxy = new THREE.Mesh(new THREE.OctahedronGeometry(radius * 0.92))
+      stoneProxy.position.set(cx, plateThickness + radius * 0.5, cz)
+      stoneProxy.scale.y = 0.8
+      stoneProxy.userData.isStone = true
+      stoneProxy.userData.partName = stoneLabel
+      group.add(stoneProxy)
+    }
   }
 
-  addStoneWithProngs(0, 0, centerRadius, 4, 'Center stone')
+  addStoneWithProngs(0, 0, centerRadius, 4, 'Center stone', true)
   for (let i = 0; i < petalCount; i++) {
     const angle = (i / petalCount) * Math.PI * 2
-    addStoneWithProngs(Math.cos(angle) * orbitRadius, Math.sin(angle) * orbitRadius, petalRadius, 3, 'Cluster petal')
+    addStoneWithProngs(Math.cos(angle) * orbitRadius, Math.sin(angle) * orbitRadius, petalRadius, 3, 'Cluster petal', false)
   }
 
   const stand = new THREE.Mesh(new THREE.CylinderGeometry(plateRadius * 0.85, plateRadius * 0.55, standHeightMm, 24))
@@ -1160,11 +1165,9 @@ export function buildTensionSetting(params: TensionSettingParams, band: RingBand
   const group = new THREE.Group()
 
   const stoneCenter = new THREE.Vector3(outerRadius + stoneRadius * 0.15, stoneRadius * 0.5, 0)
-  const stone = new THREE.Mesh(new THREE.OctahedronGeometry(stoneRadius * 0.92))
+  const stone = buildFacetedRoundStone({ diameterMm: stoneDiameterMm })
   stone.position.copy(stoneCenter)
-  stone.scale.y = 0.8
-  stone.userData.isStone = true
-  stone.userData.partName = 'Center stone'
+  stone.traverse(obj => { if (obj instanceof THREE.Mesh) obj.userData.partName = 'Center stone' })
   group.add(stone)
 
   const gapRad = (gapDeg * Math.PI) / 180
@@ -1254,6 +1257,74 @@ function buildFacetedFrustum(topRadius: number, bottomRadius: number, height: nu
   return geometry
 }
 
+// ── Real faceted round stone — replaces the octahedron placeholder ─────────
+// Every "stoneProxy" elsewhere in this file has been a plain octahedron
+// since the very first CAD commit — an explicitly-disclosed placeholder,
+// not real gem geometry. This is the first real upgrade: an actual faceted
+// crown+pavilion, not a smooth/generic silhouette. Reuses
+// buildFacetedFrustum for both halves (a frustum for the crown — table at
+// top, girdle at bottom — and a degenerate frustum/cone for the pavilion —
+// girdle at top, tapering to a point at the culet — both already verified
+// watertight/correctly-wound above, including the bottomRadius=0 cone case
+// this pavilion needs).
+//
+// Facet count defaults to 8, matching a genuine simplified/"single cut"
+// round diamond's real facet arrangement (8 crown + 8 pavilion + table) —
+// small stones ARE actually cut this way in the real world, so this isn't
+// an arbitrary simplification dressed up as something it's not. It is
+// still simpler than a full 57-facet "round brilliant" (no separate star/
+// bezel/upper- and lower-girdle facet families) — disclosed honestly.
+
+export interface FacetedRoundStoneParams {
+  diameterMm: number
+  /** 8 = a real "single cut" facet count. Higher counts still read as a
+   *  faceted stone, just with more (smaller) facets per crown/pavilion —
+   *  not historically standard, but a reasonable stylistic choice. */
+  facetCount?: number
+  /** Table width as a fraction of the full diameter — real stones run
+   *  roughly 0.54–0.60 for a round brilliant; defaults to a typical 0.56. */
+  tableRatio?: number
+  /** Crown height and pavilion depth as fractions of the full diameter —
+   *  defaults approximate real "ideal cut" proportions (crown ≈0.15,
+   *  pavilion ≈0.43 of diameter). */
+  crownHeightRatio?: number
+  pavilionDepthRatio?: number
+}
+
+/** A real faceted stone (crown + pavilion meeting at a girdle), built with
+ *  its girdle plane at local y=0 and the table facing +Y (culet at −Y) —
+ *  same "+Y up" convention as every head in this file, so it drops straight
+ *  into any of them in place of the octahedron placeholder. Tagged
+ *  isStone; NOT tagged with a specific partName here — callers set that
+ *  (e.g. 'Center stone') since the same primitive serves several settings. */
+export function buildFacetedRoundStone(params: FacetedRoundStoneParams): THREE.Group {
+  const {
+    diameterMm, facetCount = 8,
+    tableRatio = 0.56, crownHeightRatio = 0.15, pavilionDepthRatio = 0.43,
+  } = params
+  const girdleRadius = diameterMm / 2
+  const tableRadius = girdleRadius * tableRatio
+  const crownHeight = diameterMm * crownHeightRatio
+  const pavilionDepth = diameterMm * pavilionDepthRatio
+
+  const group = new THREE.Group()
+
+  const crown = new THREE.Mesh(buildFacetedFrustum(tableRadius, girdleRadius, crownHeight, facetCount))
+  crown.position.y = crownHeight / 2
+  crown.userData.isStone = true
+  group.add(crown)
+
+  const pavilion = new THREE.Mesh(buildFacetedFrustum(girdleRadius, 0, pavilionDepth, facetCount))
+  pavilion.position.y = -pavilionDepth / 2
+  pavilion.userData.isStone = true
+  group.add(pavilion)
+
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}
+
 export interface IllusionHeadParams {
   stoneDiameterMm: number
   /** Facets around the skirt — classic illusion settings show 8–16. */
@@ -1302,11 +1373,9 @@ export function buildIllusionHeadGroup(params: IllusionHeadParams): THREE.Group 
   stand.userData.partName = 'Stand'
   group.add(stand)
 
-  const stoneProxy = new THREE.Mesh(new THREE.OctahedronGeometry(stoneRadius * 0.92))
+  const stoneProxy = buildFacetedRoundStone({ diameterMm: stoneDiameterMm })
   stoneProxy.position.y = skirtHeight + rimHeightMm * 0.5
-  stoneProxy.scale.y = 0.8
-  stoneProxy.userData.isStone = true
-  stoneProxy.userData.partName = 'Center stone'
+  stoneProxy.traverse(obj => { if (obj instanceof THREE.Mesh) obj.userData.partName = 'Center stone' })
   group.add(stoneProxy)
 
   group.traverse(obj => {
