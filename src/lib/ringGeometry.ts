@@ -160,6 +160,7 @@ export function buildStoneHeadGroup(params: StoneHeadParams): THREE.Group {
   const galleryTube = Math.max(0.3, prongDiameterMm * 0.4)
   const gallery = new THREE.Mesh(new THREE.TorusGeometry(stoneRadius, galleryTube, 12, 48))
   gallery.rotation.x = Math.PI / 2 // lie flat (torus defaults to standing in XY)
+  gallery.userData.partName = 'Gallery'
   group.add(gallery)
 
   // Prongs — tapered cylinders standing on the gallery, circling the stone
@@ -175,6 +176,7 @@ export function buildStoneHeadGroup(params: StoneHeadParams): THREE.Group {
       prongHeightMm / 2,
       Math.sin(angle) * prongOrbitRadius,
     )
+    prong.userData.partName = 'Prong'
     group.add(prong)
   }
 
@@ -184,6 +186,7 @@ export function buildStoneHeadGroup(params: StoneHeadParams): THREE.Group {
     new THREE.CylinderGeometry(stoneRadius * 0.75, stoneRadius * 0.5, standHeightMm, 24),
   )
   stand.position.y = -standHeightMm / 2
+  stand.userData.partName = 'Stand'
   group.add(stand)
 
   // Stone placeholder — an octahedron proxy standing in for a round
@@ -195,6 +198,7 @@ export function buildStoneHeadGroup(params: StoneHeadParams): THREE.Group {
   stoneProxy.position.y = stoneRadius * 0.5
   stoneProxy.scale.y = 0.8
   stoneProxy.userData.isStone = true
+  stoneProxy.userData.partName = 'Center stone'
   group.add(stoneProxy)
 
   group.traverse(obj => {
@@ -243,16 +247,19 @@ export function buildBezelHeadGroup(params: BezelHeadParams): THREE.Group {
   // shape lies in local XY, extrudes along Z; rotating −90° about X maps
   // that Z onto this group's +Y (up).
   bezel.rotation.x = -Math.PI / 2
+  bezel.userData.partName = 'Bezel wall'
   group.add(bezel)
 
   const stand = new THREE.Mesh(new THREE.CylinderGeometry(stoneRadius * 0.85, stoneRadius * 0.6, standHeightMm, 32))
   stand.position.y = -standHeightMm / 2
+  stand.userData.partName = 'Stand'
   group.add(stand)
 
   const stoneProxy = new THREE.Mesh(new THREE.OctahedronGeometry(stoneRadius * 0.92))
   stoneProxy.position.y = stoneRadius * 0.5
   stoneProxy.scale.y = 0.8
   stoneProxy.userData.isStone = true
+  stoneProxy.userData.partName = 'Center stone'
   group.add(stoneProxy)
 
   group.traverse(obj => {
@@ -304,9 +311,10 @@ export function buildClusterHeadGroup(params: ClusterHeadParams): THREE.Group {
   // in for a cluster's shared gallery/undergallery.
   const plate = new THREE.Mesh(new THREE.CylinderGeometry(plateRadius, plateRadius * 0.92, plateThickness, 48))
   plate.position.y = plateThickness / 2
+  plate.userData.partName = 'Cluster plate'
   group.add(plate)
 
-  const addStoneWithProngs = (cx: number, cz: number, radius: number, prongCount: number) => {
+  const addStoneWithProngs = (cx: number, cz: number, radius: number, prongCount: number, stoneLabel: string) => {
     const prongDiameterMm = Math.max(0.5, radius * 0.28)
     const prongHeightMm = radius * 1.1
     for (let i = 0; i < prongCount; i++) {
@@ -317,23 +325,26 @@ export function buildClusterHeadGroup(params: ClusterHeadParams): THREE.Group {
         plateThickness + prongHeightMm / 2,
         cz + Math.sin(angle) * (radius + prongDiameterMm / 2),
       )
+      prong.userData.partName = 'Prong'
       group.add(prong)
     }
     const stoneProxy = new THREE.Mesh(new THREE.OctahedronGeometry(radius * 0.92))
     stoneProxy.position.set(cx, plateThickness + radius * 0.5, cz)
     stoneProxy.scale.y = 0.8
     stoneProxy.userData.isStone = true
+    stoneProxy.userData.partName = stoneLabel
     group.add(stoneProxy)
   }
 
-  addStoneWithProngs(0, 0, centerRadius, 4)
+  addStoneWithProngs(0, 0, centerRadius, 4, 'Center stone')
   for (let i = 0; i < petalCount; i++) {
     const angle = (i / petalCount) * Math.PI * 2
-    addStoneWithProngs(Math.cos(angle) * orbitRadius, Math.sin(angle) * orbitRadius, petalRadius, 3)
+    addStoneWithProngs(Math.cos(angle) * orbitRadius, Math.sin(angle) * orbitRadius, petalRadius, 3, 'Cluster petal')
   }
 
   const stand = new THREE.Mesh(new THREE.CylinderGeometry(plateRadius * 0.85, plateRadius * 0.55, standHeightMm, 24))
   stand.position.y = -standHeightMm / 2
+  stand.userData.partName = 'Stand'
   group.add(stand)
 
   group.traverse(obj => {
@@ -374,6 +385,7 @@ export function buildHaloGroup(params: HaloParams): THREE.Group {
     const stone = new THREE.Mesh(new THREE.SphereGeometry(haloStoneRadius, 14, 10))
     stone.position.set(Math.cos(angle) * orbitRadius, 0, Math.sin(angle) * orbitRadius)
     stone.userData.isStone = true
+    stone.userData.partName = 'Halo stone'
     group.add(stone)
   }
   group.traverse(obj => {
@@ -738,6 +750,7 @@ export function buildFancyStoneHeadGroup(params: FancyStoneHeadParams): THREE.Gr
   const gallery = new THREE.Mesh(new THREE.ExtrudeGeometry(galleryShape, { depth: galleryDepth, bevelEnabled: false }))
   gallery.rotation.x = -Math.PI / 2
   gallery.position.y = -galleryDepth / 2
+  gallery.userData.partName = 'Gallery'
   group.add(gallery)
 
   const prongSeats = fancyProngPoints(shape, halfW, halfL, params.prongCount ?? 4)
@@ -751,6 +764,7 @@ export function buildFancyStoneHeadGroup(params: FancyStoneHeadParams): THREE.Gr
         : new THREE.CylinderGeometry(prongDiameterMm * 0.35, prongDiameterMm / 2, prongHeightMm, 12),
     )
     prong.position.set(seat.point.x, prongHeightMm / 2, seat.point.y)
+    prong.userData.partName = 'Prong'
     group.add(prong)
   }
 
@@ -758,6 +772,7 @@ export function buildFancyStoneHeadGroup(params: FancyStoneHeadParams): THREE.Gr
     new THREE.CylinderGeometry(maxHalf * 0.85, maxHalf * 0.6, standHeightMm, 24),
   )
   stand.position.y = -standHeightMm / 2
+  stand.userData.partName = 'Stand'
   group.add(stand)
 
   // Stone placeholder — the footprint outline extruded with a bevel to
@@ -772,6 +787,7 @@ export function buildFancyStoneHeadGroup(params: FancyStoneHeadParams): THREE.Gr
   stoneProxy.rotation.x = -Math.PI / 2
   stoneProxy.position.y = 0
   stoneProxy.userData.isStone = true
+  stoneProxy.userData.partName = 'Center stone'
   group.add(stoneProxy)
 
   group.traverse(obj => {
@@ -822,6 +838,7 @@ export function buildPaveRow(params: PaveRowParams, band: RingBandParams): THREE
       const stone = new THREE.Mesh(new THREE.SphereGeometry(stoneRadius, 16, 12))
       stone.position.set(Math.cos(angle) * seatRadius, 0, Math.sin(angle) * seatRadius)
       stone.userData.isStone = true
+      stone.userData.partName = 'Pavé stone'
       group.add(stone)
     }
   }
@@ -872,6 +889,7 @@ export function buildFlushSetting(params: FlushSettingParams, band: RingBandPara
       const stone = new THREE.Mesh(new THREE.SphereGeometry(stoneRadius, 16, 12))
       stone.position.set(cos * seatRadius, 0, sin * seatRadius)
       stone.userData.isStone = true
+      stone.userData.partName = 'Flush stone'
       group.add(stone)
 
       // The burnished collar — a small torus lying flat against the band's
@@ -881,6 +899,7 @@ export function buildFlushSetting(params: FlushSettingParams, band: RingBandPara
       const rim = new THREE.Mesh(new THREE.TorusGeometry(stoneRadius * 0.85, rimTube, 10, 24))
       rim.position.set(cos * outerRadius, 0, sin * outerRadius)
       rim.rotation.x = Math.PI / 2
+      rim.userData.partName = 'Flush collar'
       group.add(rim)
     }
   }
@@ -943,6 +962,7 @@ export function extractStoneMeshes(object: THREE.Object3D): THREE.Mesh[] {
     if (!(obj instanceof THREE.Mesh) || !obj.userData.isStone) return
     const mesh = new THREE.Mesh(worldBakedGeometry(obj))
     mesh.userData.isStone = true
+    mesh.userData.partName = obj.userData.partName
     stones.push(mesh)
   })
   return stones
@@ -1001,6 +1021,7 @@ export function buildChannelSetting(params: ChannelSettingParams, band: RingBand
       const stone = new THREE.Mesh(new THREE.SphereGeometry(stoneRadius, 16, 12))
       stone.position.set(Math.cos(rad) * seatRadius, wallHeightMm * 0.3, Math.sin(rad) * seatRadius)
       stone.userData.isStone = true
+      stone.userData.partName = 'Channel stone'
       group.add(stone)
     }
   }
@@ -1014,6 +1035,7 @@ export function buildChannelSetting(params: ChannelSettingParams, band: RingBand
       const yOffset = railSide * (stoneRadius + wallThicknessMm / 2)
       const curve = new THREE.CatmullRomCurve3(arcPoints3(seatRadius, yOffset, fromDeg, toDeg))
       const wall = new THREE.Mesh(new THREE.TubeGeometry(curve, 32, wallThicknessMm / 2, 8, false))
+      wall.userData.partName = 'Channel rail'
       group.add(wall)
     }
   }
@@ -1125,6 +1147,7 @@ export function buildTensionSetting(params: TensionSettingParams, band: RingBand
   stone.position.copy(stoneCenter)
   stone.scale.y = 0.8
   stone.userData.isStone = true
+  stone.userData.partName = 'Center stone'
   group.add(stone)
 
   const gapRad = (gapDeg * Math.PI) / 180
@@ -1139,6 +1162,7 @@ export function buildTensionSetting(params: TensionSettingParams, band: RingBand
     // edge toward the stone, base sitting at the edge itself.
     cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
     cone.position.copy(edgePoint).addScaledVector(dir, contactLength / 2)
+    cone.userData.partName = 'Tension contact'
     group.add(cone)
   }
 

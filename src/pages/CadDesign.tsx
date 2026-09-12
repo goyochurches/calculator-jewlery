@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js'
 import { Card, CardContent } from '@/components/ui/card'
-import { ModelViewer3D } from '@/components/ModelViewer3D'
+import { ModelViewer3D, type SelectedPart } from '@/components/ModelViewer3D'
 import { FINGER_SIZE_OPTIONS, METAL_GROUPS } from '@/hooks/useQuoteBuilder'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
@@ -32,7 +32,7 @@ const FANCY_SHAPE_DEFAULTS: Record<FancyStoneShape, { lengthMm: number; widthMm:
   marquise: { lengthMm: 10, widthMm: 5 },
   pear: { lengthMm: 9, widthMm: 6 },
 }
-import { Download, RotateCw, Scale } from 'lucide-react'
+import { Download, RotateCw, Scale, MousePointerClick } from 'lucide-react'
 
 // Approximate render colors per metal — cosmetic only, doesn't drive
 // pricing (that still comes from Master Tables / config.metalPriceMap
@@ -81,6 +81,9 @@ export function CadDesignPage() {
   // Surface) instead of one long scrolling form — same controls, just not
   // all visible at once.
   const [activeTab, setActiveTab] = useState<'band' | 'center' | 'side' | 'solid'>('band')
+  // First real click-to-select CAD interaction: which part of the model
+  // (if any) was last clicked in the viewer — see ModelViewer3D.
+  const [selectedPart, setSelectedPart] = useState<SelectedPart | null>(null)
 
   const innerDiameterMm = usSizeToDiameterMm(fingerSize)
   const stoneDiameterMm = roundDiameterMmFromCarat(caratWeight)
@@ -112,6 +115,7 @@ export function CadDesignPage() {
     const band = new THREE.Mesh(
       tensionActive ? buildTensionBandGeometry(bandParamsBase, tensionGapDeg) : buildRingBandGeometry(bandParamsBase),
     )
+    band.userData.partName = 'Band'
     group.add(band)
     if (includeStone) {
       if (tensionActive) {
@@ -159,7 +163,9 @@ export function CadDesignPage() {
       const unioned = unionMetalParts(model)
       if (!unioned) return { displayModel: model, mergeError: null }
       const merged = new THREE.Group()
-      merged.add(new THREE.Mesh(unioned))
+      const solid = new THREE.Mesh(unioned)
+      solid.userData.partName = 'Merged solid'
+      merged.add(solid)
       for (const stone of extractStoneMeshes(model)) merged.add(stone)
       return { displayModel: merged, mergeError: null }
     } catch (err) {
@@ -202,9 +208,10 @@ export function CadDesignPage() {
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
             Band, center stone (round — prong, bezel, cluster or tension — oval, cushion, princess, marquise or pear),
             side stones (pavé, channel or flush) and solid/export, grouped into tabs the way Matrix groups its own
-            tools (Ring Rail, Gems, Parametric Boolean) instead of one long form. This is not a Matrix/RhinoGold
-            replacement yet — the stone is a placeholder shape (not faceted gem geometry). Building toward full
-            parity step by step.
+            tools (Ring Rail, Gems, Parametric Boolean) instead of one long form. Click any part of the model in the
+            viewer to select and identify it — the first step toward real click-to-design interaction, not just a
+            parametric form. This is not a Matrix/RhinoGold replacement yet — the stone is a placeholder shape (not
+            faceted gem geometry). Building toward full parity step by step.
           </p>
         </CardContent>
       </Card>
@@ -479,7 +486,21 @@ export function CadDesignPage() {
         </Card>
 
         <Card className="overflow-hidden rounded-[30px] border border-slate-200 shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
-          <ModelViewer3D object={displayModel} color={METAL_COLORS[metal]} className="h-[420px] w-full sm:h-[520px]" />
+          <div className="relative">
+            <ModelViewer3D object={displayModel} color={METAL_COLORS[metal]} onSelectPart={setSelectedPart}
+              className="h-[420px] w-full sm:h-[520px]" />
+            <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2 text-xs text-white shadow-sm backdrop-blur">
+              <MousePointerClick className="h-3.5 w-3.5 shrink-0 text-amber-300" />
+              {selectedPart ? (
+                <span>
+                  <strong className="font-semibold">{selectedPart.name}</strong>
+                  {selectedPart.isStone ? <span className="text-slate-300"> · gem</span> : <span className="text-slate-300"> · metal</span>}
+                </span>
+              ) : (
+                <span className="text-slate-300">Click a part of the model to select it</span>
+              )}
+            </div>
+          </div>
         </Card>
       </section>
     </div>
