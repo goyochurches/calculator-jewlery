@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { Brush, Evaluator, ADDITION } from 'three-bvh-csg'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import type { JewelryMetalOption } from '@/types'
 
 // ── Ring-size ↔ millimeters ──────────────────────────────────────────────────
@@ -1015,6 +1016,130 @@ export function buildChannelSetting(params: ChannelSettingParams, band: RingBand
       const wall = new THREE.Mesh(new THREE.TubeGeometry(curve, 32, wallThicknessMm / 2, 8, false))
       group.add(wall)
     }
+  }
+
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}
+
+// ── Tension setting — Matrix's own "tension" setting TYPE ───────────────────
+// Unlike every other center-stone setting above, a tension setting isn't an
+// add-on sitting ON the band — the band itself is CUT (a gap at the top),
+// and the stone bridges that gap, gripped only by two small contact points
+// where the band's own two cut ends meet it. So this needs its own band
+// geometry (a partial revolve, not the full 360° torus every other feature
+// assumes) as well as its own "head".
+
+/** How wide (degrees) to cut the band's gap for a given stone/band size, so
+ *  the stone's own footprint comfortably bridges it — chord length ≈ 1.3×
+ *  the stone's diameter at the band's outer radius. Exported so the CALLER
+ *  computes this once and passes the SAME value to both
+ *  `buildTensionBandGeometry` and `buildTensionSetting` — they must agree,
+ *  or the contact points and the cut ends won't line up. */
+export function tensionGapDegForStone(stoneDiameterMm: number, outerRadiusMm: number): number {
+  const chord = stoneDiameterMm * 1.3
+  const ratio = Math.min(0.9, chord / (2 * outerRadiusMm))
+  const rad = 2 * Math.asin(ratio)
+  return Math.min(50, Math.max(10, (rad * 180) / Math.PI))
+}
+
+/** The band, revolved only through (360° − gapDeg) instead of the full
+ *  circle — THREE.LatheGeometry supports this directly via phiStart/
+ *  phiLength, but (unlike a full 360° revolve, where phi=0 and phi=2π
+ *  coincide and stitch the tube closed) a partial revolve leaves both cut
+ *  ends OPEN — no cap faces. Left alone, that's a non-manifold mesh: wrong
+ *  for `computeVolumeMm3` (verified — an earlier version of this exact
+ *  problem, the whole band missing ONE face, underestimated volume by
+ *  ~17%; see the fix in `buildBandProfile`) and unusable by
+ *  `unionMetalParts`'s CSG. So this builds two flat cap polygons — the same
+ *  cross-section profile, as a filled `THREE.Shape` — and rotates each into
+ *  place at its own cut angle using the same phi→world mapping the Lathe
+ *  itself uses (vertex = (x·sinφ, y, x·cosφ), which a plain rotateY(φ−90°)
+ *  of a flat shape built in local (x=radial, y=axial) reproduces exactly —
+ *  verified by hand against the Lathe's own vertex formula and cross-
+ *  checked with a signed-tetrahedron-volume script before landing this).
+ *  The gap sits centered on angle 0 (the same "+X" convention
+ *  `attachHeadToBand`/`buildPaveRow`/etc. all share), so its two cut edges
+ *  are at angle ±gapDeg/2. */
+export function buildTensionBandGeometry(params: RingBandParams, gapDeg: number): THREE.BufferGeometry {
+  const profileClosed = buildBandProfile(params)
+  const profile = profileClosed.slice(0, -1) // drop the closeLoop repeat — the Shape below closes itself
+  const gapRad = (gapDeg * Math.PI) / 180
+  const phiStart = gapRad / 2
+  const phiLength = Math.PI * 2 - gapRad
+
+  const lathe = new THREE.LatheGeometry(profileClosed, params.radialSegments ?? 96, phiStart, phiLength)
+
+  const capShape = new THREE.Shape(profile)
+  const capTemplate = new THREE.ShapeGeometry(capShape)
+  const makeCap = (phi: number, flip: boolean) => {
+    const g = capTemplate.clone()
+    g.rotateY(phi - Math.PI / 2)
+    if (flip) {
+      // The two cut ends face opposite directions along the revolve, so
+      // the second cap needs the opposite winding (and thus opposite
+      // outward normal) from the first.
+      const idx = g.getIndex()
+      if (idx) {
+        const arr = idx.array.slice()
+        for (let i = 0; i < arr.length; i += 3) { const t = arr[i]; arr[i] = arr[i + 1]; arr[i + 1] = t }
+        idx.array.set(arr)
+        idx.needsUpdate = true
+      }
+    }
+    return g
+  }
+  const merged = mergeGeometries([lathe, makeCap(phiStart, false), makeCap(phiStart + phiLength, true)])
+  merged.computeVertexNormals()
+  return merged
+}
+
+export interface TensionSettingParams {
+  stoneDiameterMm: number
+  /** Must be the SAME value passed to `buildTensionBandGeometry` for this
+   *  band, or the contact points won't line up with the actual cut ends —
+   *  see `tensionGapDegForStone`. */
+  gapDeg: number
+  contactDiameterMm?: number
+}
+
+/** The stone bridging the band's gap, plus two small tapered contact points
+ *  — one per cut end — angled inward to just touch the stone's girdle from
+ *  either side, standing in for the tiny bit of metal a real tension
+ *  setting relies on to grip the stone (no bezel wall, no prongs). Built
+ *  directly in the band's own WORLD coordinates (like `buildPaveRow`), not
+ *  the local "+Y up" convention the other heads use, since it has to line
+ *  up exactly with the band's own cut. */
+export function buildTensionSetting(params: TensionSettingParams, band: RingBandParams): THREE.Group {
+  const { stoneDiameterMm, gapDeg } = params
+  const stoneRadius = stoneDiameterMm / 2
+  const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
+  const contactDiameterMm = params.contactDiameterMm ?? Math.max(0.6, stoneDiameterMm * 0.14)
+
+  const group = new THREE.Group()
+
+  const stoneCenter = new THREE.Vector3(outerRadius + stoneRadius * 0.15, stoneRadius * 0.5, 0)
+  const stone = new THREE.Mesh(new THREE.OctahedronGeometry(stoneRadius * 0.92))
+  stone.position.copy(stoneCenter)
+  stone.scale.y = 0.8
+  stone.userData.isStone = true
+  group.add(stone)
+
+  const gapRad = (gapDeg * Math.PI) / 180
+  for (const edgeAngle of [gapRad / 2, -gapRad / 2]) {
+    const edgePoint = new THREE.Vector3(Math.cos(edgeAngle) * outerRadius, 0, Math.sin(edgeAngle) * outerRadius)
+    const dir = stoneCenter.clone().sub(edgePoint)
+    const length = dir.length()
+    dir.normalize()
+    const contactLength = length * 0.55
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(contactDiameterMm / 2, contactLength, 10))
+    // ConeGeometry's default axis is +Y — rotate it to point from this cut
+    // edge toward the stone, base sitting at the edge itself.
+    cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
+    cone.position.copy(edgePoint).addScaledVector(dir, contactLength / 2)
+    group.add(cone)
   }
 
   group.traverse(obj => {
