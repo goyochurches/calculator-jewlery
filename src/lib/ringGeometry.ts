@@ -39,22 +39,29 @@ export interface RingBandParams {
  *  as its `points` argument. Revolving a CLOSED loop 360° around Y produces
  *  a watertight torus-like solid directly, with no separate end caps needed
  *  — a ring band is topologically a torus (a tube bent into a circle), so
- *  this is the correct construction, not a shortcut. */
+ *  this is the correct construction, not a shortcut.
+ *
+ *  IMPORTANT: THREE.LatheGeometry only draws faces between CONSECUTIVE
+ *  points in the array (`points[j]` to `points[j+1]`) — it never wraps the
+ *  last point back to the first one. So a profile has to repeat its first
+ *  point at the end to actually close the loop; `closeLoop()` below does
+ *  that once, for every branch, rather than each branch remembering to. */
 export function buildBandProfile(params: RingBandParams): THREE.Vector2[] {
   const { widthMm, thicknessMm, profile, arcSegments = 16 } = params
   const innerRadius = usSizeToDiameterMm(params.fingerSize) / 2
   const outerRadius = innerRadius + thicknessMm
   const halfWidth = widthMm / 2
+  const closeLoop = (pts: THREE.Vector2[]): THREE.Vector2[] => [...pts, pts[0].clone()]
 
   if (profile === 'flat') {
     // Plain rectangle, traced once around: inner-bottom → inner-top →
-    // outer-top → outer-bottom → (back to start, closed by the caller).
-    return [
+    // outer-top → outer-bottom → back to inner-bottom (closeLoop).
+    return closeLoop([
       new THREE.Vector2(innerRadius, -halfWidth),
       new THREE.Vector2(innerRadius, halfWidth),
       new THREE.Vector2(outerRadius, halfWidth),
       new THREE.Vector2(outerRadius, -halfWidth),
-    ]
+    ])
   }
 
   // Comfort-fit: inner face stays flat (sits against the finger); the outer
@@ -79,14 +86,18 @@ export function buildBandProfile(params: RingBandParams): THREE.Vector2[] {
 
   const startAngle = Math.atan2(halfWidth, innerRadius - cx)
   const endAngle = Math.atan2(-halfWidth, innerRadius - cx)
+  // Start the arc itself at i=1 (skip i=0, which lands exactly on
+  // (innerRadius, -halfWidth) again — same point the array already opens
+  // with — to avoid a zero-length first edge).
   const points: THREE.Vector2[] = [new THREE.Vector2(innerRadius, -halfWidth)]
-  for (let i = 0; i <= arcSegments; i++) {
+  for (let i = 1; i <= arcSegments; i++) {
     const t = i / arcSegments
     const angle = endAngle + (startAngle - endAngle) * t
     points.push(new THREE.Vector2(cx + radius * Math.cos(angle), radius * Math.sin(angle)))
   }
-  // points now runs bottom → apex → top; caller closes top back to bottom.
-  return points
+  // points now runs bottom → apex → top; closeLoop adds the straight inner
+  // wall back down from top to bottom.
+  return closeLoop(points)
 }
 
 /** Full ring-band mesh, centered on the origin with the finger axis along Y.
