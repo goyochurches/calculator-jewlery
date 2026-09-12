@@ -195,6 +195,7 @@ export function CadDesignPage() {
   // (round prong setting only, for now — the pattern this proves out can
   // extend to other repeated parts later). Keyed by prong index.
   const [prongHeightOverridesMm, setProngHeightOverridesMm] = useState<Record<number, number>>({})
+  const [excludedPaveIndices, setExcludedPaveIndices] = useState<Set<number>>(new Set())
   // Selecting a part jumps to whichever tab actually controls it — bridges
   // "I clicked this" to "here's how to change it" even though the controls
   // are still per-feature (every prong, say) rather than per-instance yet.
@@ -211,6 +212,11 @@ export function CadDesignPage() {
   // halo stones, etc.).
   const canEditProngInstance = selectedPart?.name === 'Prong' && selectedPart.instanceIndex !== undefined
     && stoneShape === 'round' && settingType === 'prong'
+  // Second per-instance case, this time a REMOVAL rather than an edit —
+  // pavé only for now (channel/flush/halo don't have excludeIndices wired
+  // in yet, tracked in the roadmap memory).
+  const canRemovePaveInstance = selectedPart?.name === 'Pavé stone' && selectedPart.instanceIndex !== undefined
+    && paveSettingType === 'pave'
   // Tension setting cuts the band itself, so it needs its own band geometry
   // (see ringGeometry.ts) — only meaningful for a round stone with a
   // center stone actually present.
@@ -281,12 +287,12 @@ export function CadDesignPage() {
         ? buildChannelSetting({ count: paveCount, stoneDiameterMm: paveStoneMm }, bandParams)
         : paveSettingType === 'flush'
           ? buildFlushSetting({ count: paveCount, stoneDiameterMm: paveStoneMm }, bandParams)
-          : buildPaveRow({ count: paveCount, stoneDiameterMm: paveStoneMm }, bandParams)
+          : buildPaveRow({ count: paveCount, stoneDiameterMm: paveStoneMm, excludeIndices: excludedPaveIndices }, bandParams)
       group.add(sideStones)
     }
     return group
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm, excludedPaveIndices])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -315,6 +321,9 @@ export function CadDesignPage() {
   // Stale results after any edit would be misleading — clear them so the
   // page never shows a "watertight" verdict for a model that's since changed.
   useEffect(() => setWatertightResults(null), [viewModel])
+  // Stale exclusions after the count/setting changes could hide the wrong
+  // stones (indices no longer meaning what they meant when excluded).
+  useEffect(() => setExcludedPaveIndices(new Set()), [paveCount, paveSettingType])
 
   // Weight & cost estimate — volume comes straight off the displayed
   // geometry, so it always matches what's on screen (and in the STL). Once
@@ -500,6 +509,18 @@ export function CadDesignPage() {
                       </button>
                     )}
                   </div>
+                </div>
+              ) : canRemovePaveInstance ? (
+                <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                  <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
+                  <span className="flex-1">
+                    Selected <strong>Pavé stone #{(selectedPart.instanceIndex ?? 0) + 1}</strong>.
+                  </span>
+                  <button type="button"
+                    onClick={() => setExcludedPaveIndices(prev => new Set(prev).add(selectedPart.instanceIndex!))}
+                    className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
+                    Remove this stone
+                  </button>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
@@ -791,6 +812,21 @@ export function CadDesignPage() {
                           onChange={e => setPaveStoneMm(Math.max(0.5, Number(e.target.value) || 0.5))} className={inputCls} />
                       </div>
                     </div>
+                    {paveSettingType === 'pave' && excludedPaveIndices.size > 0 && (
+                      <div className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-600">
+                        <span>{excludedPaveIndices.size} stone{excludedPaveIndices.size === 1 ? '' : 's'} removed individually.</span>
+                        <button type="button" onClick={() => setExcludedPaveIndices(new Set())}
+                          className="shrink-0 rounded-lg border border-slate-300 px-2 py-1 font-semibold hover:bg-slate-50">
+                          Restore all
+                        </button>
+                      </div>
+                    )}
+                    {paveSettingType === 'pave' && (
+                      <p className="text-[11px] text-slate-400">
+                        Click any individual pavé stone in the viewer to remove just that one — a per-instance edit,
+                        same pattern as clicking a single prong.
+                      </p>
+                    )}
                   </>
                 )}
               </div>

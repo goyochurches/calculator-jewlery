@@ -1058,6 +1058,11 @@ export interface PaveRowParams {
   /** Angular gap left empty right next to the head's stand, in degrees,
    *  so pavé stones don't overlap it. */
   gapDeg?: number
+  /** Instance indices to skip entirely (0-based, side=+1 first then
+   *  side=-1, in build order) — the first real per-instance REMOVAL, not
+   *  just an edit, proving the pattern for "click one stone, take it out"
+   *  the way the per-instance prong-height slider proved out editing. */
+  excludeIndices?: Set<number>
 }
 
 /** A row of small placeholder stones (spheres — pavé doesn't need the
@@ -1068,15 +1073,18 @@ export interface PaveRowParams {
  *  reorientation since it's built straight onto the band's own outer
  *  surface at each angle. */
 export function buildPaveRow(params: PaveRowParams, band: RingBandParams): THREE.Group {
-  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12 } = params
+  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12, excludeIndices } = params
   const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
   const stoneRadius = stoneDiameterMm / 2
   const seatRadius = outerRadius - stoneRadius * 0.3 // sink each stone slightly into the band
   const perSide = Math.max(1, Math.round(count / 2))
 
   const group = new THREE.Group()
+  let index = 0
   for (const side of [1, -1]) {
     for (let i = 0; i < perSide; i++) {
+      const thisIndex = index++
+      if (excludeIndices?.has(thisIndex)) continue
       const t = perSide === 1 ? 0 : i / (perSide - 1)
       const angleDeg = side * (gapDeg + t * Math.max(0, spreadDeg - gapDeg))
       const angle = (angleDeg * Math.PI) / 180
@@ -1084,6 +1092,7 @@ export function buildPaveRow(params: PaveRowParams, band: RingBandParams): THREE
       stone.position.set(Math.cos(angle) * seatRadius, 0, Math.sin(angle) * seatRadius)
       stone.userData.isStone = true
       stone.userData.partName = 'Pavé stone'
+      stone.userData.instanceIndex = thisIndex
       group.add(stone)
     }
   }
