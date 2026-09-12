@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js'
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { Card, CardContent } from '@/components/ui/card'
-import { ModelViewer3D, type SelectedPart } from '@/components/ModelViewer3D'
+import { ModelViewer3D, type SelectedPart, type ModelViewer3DHandle, type CameraView } from '@/components/ModelViewer3D'
 import { FINGER_SIZE_OPTIONS, METAL_GROUPS } from '@/hooks/useQuoteBuilder'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
@@ -116,6 +116,8 @@ export function CadDesignPage() {
   const [includeMilgrain, setIncludeMilgrain] = useState(false)
   const [includeRope, setIncludeRope] = useState(false)
   const [autoRotate, setAutoRotate] = useState(false)
+  const [wireframe, setWireframe] = useState(false)
+  const viewerRef = useRef<ModelViewer3DHandle>(null)
   // Manufacturability check — Matrix's own "prepare for production"
   // concern. On-demand (a deliberate action, not continuous) since it's a
   // validation step, same as how Matrix itself exposes this.
@@ -1036,8 +1038,8 @@ export function CadDesignPage() {
 
         <Card className="overflow-hidden rounded-[30px] border border-slate-200 shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
           <div className="relative">
-            <ModelViewer3D object={viewModel} color={METAL_COLORS[metal]} onSelectPart={handleSelectPart}
-              autoRotate={autoRotate} className="h-[420px] w-full sm:h-[520px]" />
+            <ModelViewer3D ref={viewerRef} object={viewModel} color={METAL_COLORS[metal]} onSelectPart={handleSelectPart}
+              autoRotate={autoRotate} wireframe={wireframe} className="h-[420px] w-full sm:h-[520px]" />
             <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2 text-xs text-white shadow-sm backdrop-blur">
               <MousePointerClick className="h-3.5 w-3.5 shrink-0 text-amber-300" />
               {selectedPart ? (
@@ -1051,10 +1053,24 @@ export function CadDesignPage() {
                 <span className="text-slate-300">Click a part of the model to select it</span>
               )}
             </div>
-            <button type="button" onClick={() => setAutoRotate(v => !v)}
-              className={`absolute right-3 top-3 flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold shadow-sm backdrop-blur transition ${autoRotate ? 'bg-amber-400 text-slate-900' : 'bg-slate-900/80 text-white hover:bg-slate-900'}`}>
-              <RotateCw className={`h-3.5 w-3.5 shrink-0 ${autoRotate ? 'animate-spin' : ''}`} /> Turntable
-            </button>
+            <div className="absolute right-3 top-3 flex items-center gap-1.5">
+              <button type="button" onClick={() => setWireframe(v => !v)}
+                className={`rounded-xl px-3 py-2 text-xs font-semibold shadow-sm backdrop-blur transition ${wireframe ? 'bg-amber-400 text-slate-900' : 'bg-slate-900/80 text-white hover:bg-slate-900'}`}>
+                Wireframe
+              </button>
+              <button type="button" onClick={() => setAutoRotate(v => !v)}
+                className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold shadow-sm backdrop-blur transition ${autoRotate ? 'bg-amber-400 text-slate-900' : 'bg-slate-900/80 text-white hover:bg-slate-900'}`}>
+                <RotateCw className={`h-3.5 w-3.5 shrink-0 ${autoRotate ? 'animate-spin' : ''}`} /> Turntable
+              </button>
+            </div>
+            <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
+              {(['front', 'top', 'side', 'perspective'] as const satisfies readonly CameraView[]).map(view => (
+                <button key={view} type="button" onClick={() => viewerRef.current?.setView(view)}
+                  className="rounded-xl bg-slate-900/80 px-2.5 py-1.5 text-[11px] font-semibold capitalize text-white shadow-sm backdrop-blur transition hover:bg-slate-900">
+                  {view}
+                </button>
+              ))}
+            </div>
           </div>
         </Card>
       </section>

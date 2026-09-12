@@ -1,6 +1,15 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
-import { useEffect, useRef } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
+
+/** Named camera views — Matrix's own 3D Viewer module ("Front / Back /
+ *  Left / Right / Top / Bottom / Perspective"). Snapping to one is a
+ *  one-off camera move, not a persistent prop — see `ModelViewer3DHandle`. */
+export type CameraView = 'front' | 'top' | 'side' | 'perspective'
+
+export interface ModelViewer3DHandle {
+  setView: (view: CameraView) => void
+}
 
 /** What clicking a part of the model in the viewer reports back — the
  *  human-readable `userData.partName` every ringGeometry.ts builder now
@@ -47,6 +56,10 @@ interface ModelViewer3DProps {
    *  this. Delegates to OrbitControls' own `autoRotate`, which keeps
    *  spinning alongside (not instead of) manual orbit-dragging. */
   autoRotate?: boolean
+  /** Wireframe display mode — Matrix's own 3D Viewer module lists this
+   *  alongside Shaded/Realistic/Metal/Gemstone/Transparent/X-ray; this is
+   *  the first of those beyond the default shaded look. */
+  wireframe?: boolean
 }
 
 /**
@@ -56,7 +69,10 @@ interface ModelViewer3DProps {
  * both work, so this same component is the future home of an imported CAD
  * file's mesh, not just the parametric ring band.
  */
-export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className, onSelectPart, autoRotate = false }: ModelViewer3DProps) {
+export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>(function ModelViewer3D(
+  { object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className, onSelectPart, autoRotate = false, wireframe = false },
+  ref,
+) {
   const containerRef = useRef<HTMLDivElement>(null)
   const displayedRef = useRef<THREE.Object3D | null>(null)
   const materialRef = useRef<THREE.MeshStandardMaterial | null>(null)
@@ -278,5 +294,39 @@ export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, rou
     controls.autoRotate = autoRotate
   }, [autoRotate])
 
+  // Named camera views — snap the camera to a standard angle around
+  // whatever the controls' current target/distance is, so this respects
+  // however far the user has already zoomed. Exposed imperatively (not a
+  // persistent prop) since clicking "Front" is a one-off move, not a
+  // state the viewer holds — the user can freely orbit away from it after.
+  useImperativeHandle(ref, () => ({
+    setView: (view: CameraView) => {
+      const camera = cameraRef.current
+      const controls = controlsRef.current
+      if (!camera || !controls) return
+      const distance = camera.position.distanceTo(controls.target) || 40
+      const offsets: Record<CameraView, THREE.Vector3> = {
+        front: new THREE.Vector3(0, 0, 1),
+        top: new THREE.Vector3(0, 1, 0.001), // slight Z nudge avoids a degenerate up-vector straight down
+        side: new THREE.Vector3(1, 0, 0),
+        perspective: new THREE.Vector3(0.7, 0.55, 0.7),
+      }
+      const dir = offsets[view].normalize()
+      camera.position.copy(controls.target).addScaledVector(dir, distance)
+      camera.up.set(0, 1, 0)
+      controls.update()
+    },
+  }), [])
+
+  // Live-toggle wireframe mode on the metal/stone materials (not the
+  // amber selection highlight — that one stays solid so a selected part
+  // is still easy to spot in wireframe view).
+  useEffect(() => {
+    const material = materialRef.current
+    const stoneMaterial = stoneMaterialRef.current
+    if (material) material.wireframe = wireframe
+    if (stoneMaterial) stoneMaterial.wireframe = wireframe
+  }, [wireframe])
+
   return <div ref={containerRef} className={className} />
-}
+})
