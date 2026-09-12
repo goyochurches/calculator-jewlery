@@ -494,7 +494,9 @@ export function CadDesignPage() {
               {selectedPart ? (
                 <span>
                   <strong className="font-semibold">{selectedPart.name}</strong>
-                  {selectedPart.isStone ? <span className="text-slate-300"> · gem</span> : <span className="text-slate-300"> · metal</span>}
+                  <span className="text-slate-300">{selectedPart.isStone ? ' · gem · ' : ' · metal · '}
+                    {selectedPart.dimensionsMm.x.toFixed(1)}×{selectedPart.dimensionsMm.y.toFixed(1)}×{selectedPart.dimensionsMm.z.toFixed(1)}mm
+                  </span>
                 </span>
               ) : (
                 <span className="text-slate-300">Click a part of the model to select it</span>

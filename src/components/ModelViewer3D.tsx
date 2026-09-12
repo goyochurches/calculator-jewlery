@@ -11,6 +11,12 @@ import { useEffect, useRef } from 'react'
 export interface SelectedPart {
   name: string
   isStone: boolean
+  /** The selected mesh's own world-space bounding-box size, in mm (the
+   *  modeling unit everywhere in ringGeometry.ts) — a first, honest step
+   *  toward a real CAD "properties" panel: you can at least see what you
+   *  selected, even before this app lets you edit that specific instance
+   *  directly. */
+  dimensionsMm: { x: number; y: number; z: number }
 }
 
 interface ModelViewer3DProps {
@@ -137,7 +143,12 @@ export function ModelViewer3D({ object, color = '#d4af37', metalness = 0.85, rou
       if (hit instanceof THREE.Mesh && typeof hit.userData.partName === 'string') {
         hit.material = highlightMat
         selectedMeshRef.current = hit
-        onSelectPartRef.current?.({ name: hit.userData.partName, isStone: !!hit.userData.isStone })
+        const size = new THREE.Box3().setFromObject(hit).getSize(new THREE.Vector3())
+        onSelectPartRef.current?.({
+          name: hit.userData.partName,
+          isStone: !!hit.userData.isStone,
+          dimensionsMm: { x: size.x, y: size.y, z: size.z },
+        })
       } else {
         onSelectPartRef.current?.(null)
       }
