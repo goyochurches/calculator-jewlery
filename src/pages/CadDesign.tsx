@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js'
 import { Card, CardContent } from '@/components/ui/card'
@@ -17,7 +17,7 @@ import {
   buildTaperedBandGeometry,
   buildIllusionHeadGroup,
   buildMilgrainEdges, buildRopeEdge,
-  unionMetalParts, extractStoneMeshes,
+  unionMetalParts, extractStoneMeshes, checkWatertightness,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
 import { parseImportedCadFile } from '@/lib/cadImport'
@@ -105,6 +105,10 @@ export function CadDesignPage() {
   const [includeMilgrain, setIncludeMilgrain] = useState(false)
   const [includeRope, setIncludeRope] = useState(false)
   const [autoRotate, setAutoRotate] = useState(false)
+  // Manufacturability check — Matrix's own "prepare for production"
+  // concern. On-demand (a deliberate action, not continuous) since it's a
+  // validation step, same as how Matrix itself exposes this.
+  const [watertightResults, setWatertightResults] = useState<ReturnType<typeof checkWatertightness> | null>(null)
   // Viewing an imported file (STL/OBJ/3MF) — the other half of the
   // original CAD ask, independent of the parametric generator below.
   // Non-null overrides the parametric model in the viewer/weight/export.
@@ -252,6 +256,9 @@ export function CadDesignPage() {
   // What the viewer/weight-estimate/export actually operate on — the
   // imported file when one's loaded, otherwise the parametric design.
   const viewModel = importedModel ?? displayModel
+  // Stale results after any edit would be misleading — clear them so the
+  // page never shows a "watertight" verdict for a model that's since changed.
+  useEffect(() => setWatertightResults(null), [viewModel])
 
   // Weight & cost estimate — volume comes straight off the displayed
   // geometry, so it always matches what's on screen (and in the STL). Once
@@ -664,6 +671,37 @@ export function CadDesignPage() {
                     Couldn't merge this geometry ({mergeError}) — showing the unmerged preview instead.
                   </p>
                 )}
+
+                <div className="space-y-2 border-t border-slate-200 pt-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold text-slate-900">Check model</span>
+                    <button type="button" onClick={() => setWatertightResults(checkWatertightness(viewModel))}
+                      className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold hover:bg-slate-50">
+                      Run check
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    A real manufacturability check: every part should be a genuinely closed/watertight solid before
+                    you trust an export — the exact class of bug this app itself hit once (a band missing a face,
+                    silently under-computing weight by ~17%, fixed 2026-09-12).
+                  </p>
+                  {watertightResults && (
+                    <div className="rounded-xl bg-white px-3 py-2 text-xs">
+                      {watertightResults.every(r => r.watertight) ? (
+                        <p className="font-semibold text-emerald-700">✓ All {watertightResults.length} part{watertightResults.length === 1 ? '' : 's'} are watertight.</p>
+                      ) : (
+                        <>
+                          <p className="font-semibold text-rose-700">
+                            {watertightResults.filter(r => !r.watertight).length} of {watertightResults.length} parts are NOT watertight:
+                          </p>
+                          <ul className="mt-1 list-disc pl-4 text-slate-600">
+                            {watertightResults.filter(r => !r.watertight).map((r, i) => <li key={i}>{r.partName}</li>)}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 <div className="space-y-2 border-t border-slate-200 pt-3">
                   <span className="text-sm font-semibold text-slate-900">Import a file to view</span>

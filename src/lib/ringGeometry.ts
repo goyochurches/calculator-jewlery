@@ -567,6 +567,74 @@ export function computeVolumeMm3(object: THREE.Object3D, opts: { includeStones?:
   return total
 }
 
+// ── Manufacturability check — watertightness ─────────────────────────────────
+// A real "prepare for production" concern (module 15 in the roadmap's master
+// list): before trusting an export, every individual mesh should be a
+// genuinely closed/watertight solid — the class of bug already caught once
+// this session in buildBandProfile (a missing face, silently under-
+// computing weight by ~17%). This catches that class of defect directly
+// instead of relying on eyeballing a rendered preview.
+//
+// How: the divergence-theorem volume sum above (`signedTetraVolume`) is
+// mathematically INDEPENDENT of where the implicit origin sits — but only
+// for a genuinely CLOSED surface. Translate every vertex by a large
+// arbitrary offset and recompute: a closed mesh gives the same volume
+// either way (floating-point noise only, ~1e-8 relative); an open one (a
+// missing face) does NOT, because the "phantom" contribution of the
+// missing region depends on where the origin sits relative to the hole.
+// Verified against known-good primitives (Torus/Sphere/Box/Cylinder — all
+// correctly report watertight) and the exact already-fixed real bug (the
+// original unclosed band Lathe profile — correctly reports NOT watertight,
+// with a wildly different volume under the shift) before landing this. A
+// naive edge-topology check was tried FIRST and discarded: even three.js's
+// own BufferGeometryUtils.mergeVertices doesn't weld across a UV seam (it
+// considers every vertex attribute, not just position), so an index/edge-
+// based check false-flagged known-good shapes like a plain sphere.
+
+function volumeWithOffset(geometry: THREE.BufferGeometry, offset: THREE.Vector3): number {
+  const pos = geometry.attributes.position
+  if (!pos) return 0
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3()
+  let volume = 0
+  const readTriangle = (ia: number, ib: number, ic: number) => {
+    a.fromBufferAttribute(pos, ia).add(offset)
+    b.fromBufferAttribute(pos, ib).add(offset)
+    c.fromBufferAttribute(pos, ic).add(offset)
+    volume += signedTetraVolume(a, b, c)
+  }
+  if (geometry.index) {
+    const idx = geometry.index
+    for (let i = 0; i < idx.count; i += 3) readTriangle(idx.getX(i), idx.getX(i + 1), idx.getX(i + 2))
+  } else {
+    for (let i = 0; i < pos.count; i += 3) readTriangle(i, i + 1, i + 2)
+  }
+  return volume
+}
+
+export interface WatertightCheckResult {
+  partName: string
+  watertight: boolean
+}
+
+/** Checks every mesh inside `object` individually, using each one's WORLD-
+ *  baked geometry (same helper `unionMetalParts` uses) so the check
+ *  reflects what's actually displayed/exported, not raw local-space
+ *  geometry a transform might otherwise distort. */
+export function checkWatertightness(object: THREE.Object3D, tolerance = 1e-3): WatertightCheckResult[] {
+  const results: WatertightCheckResult[] = []
+  object.updateMatrixWorld(true)
+  object.traverse(obj => {
+    if (!(obj instanceof THREE.Mesh)) return
+    const geo = worldBakedGeometry(obj)
+    const v0 = volumeWithOffset(geo, new THREE.Vector3())
+    const v1 = volumeWithOffset(geo, new THREE.Vector3(1000, -2000, 3000))
+    const scale = Math.max(Math.abs(v0), 1e-9)
+    const watertight = Math.abs(v0 - v1) / scale < tolerance
+    results.push({ partName: typeof obj.userData.partName === 'string' ? obj.userData.partName : 'Unnamed part', watertight })
+  })
+  return results
+}
+
 /** Density (g/cm³) per metal — standard jewelry-industry reference values.
  *  Real alloys vary a little by manufacturer; treat this as an estimate to
  *  cross-check, not a certified figure. */
