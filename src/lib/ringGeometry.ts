@@ -982,6 +982,16 @@ export function estimateWeightGrams(volumeMm3: number, densityGPerCm3: number): 
 
 export type FancyStoneShape = 'oval' | 'cushion' | 'princess' | 'marquise' | 'pear'
 
+/** Mirrors a set of 2D points across an axis through the origin —
+ *  Matrix's own named "Mirror" transform. Generic/reusable: this file's
+ *  first concrete use is flipping which way a pear's point faces (see
+ *  `FancyStoneHeadParams.pointDirection`), but any future feature needing
+ *  a flipped outline can call this directly instead of writing its own
+ *  negate-loop. */
+export function mirrorPoints2D(points: THREE.Vector2[], axis: 'x' | 'y'): THREE.Vector2[] {
+  return points.map(p => (axis === 'x' ? new THREE.Vector2(-p.x, p.y) : new THREE.Vector2(p.x, -p.y)))
+}
+
 /** Closed footprint outline (as seen from above) for one fancy shape, in
  *  local (u, v) = (width-axis, length-axis) mm, centered on the origin.
  *  Oval/cushion/princess/marquise are symmetric about both axes, so the
@@ -1208,6 +1218,11 @@ export interface FancyStoneHeadParams {
   prongDiameterMm?: number
   prongHeightMm?: number
   standHeightMm?: number
+  /** Which way a PEAR's point faces ('up' = the outline's own default,
+   *  toward +v — see `buildStoneOutline`'s doc comment). Ignored for every
+   *  other shape (they're all symmetric, mirroring changes nothing). Uses
+   *  `mirrorPoints2D`, Matrix's own named "Mirror" transform. */
+  pointDirection?: 'up' | 'down'
 }
 
 /** Fancy-shape counterpart to buildStoneHeadGroup — same local convention
@@ -1225,7 +1240,8 @@ export function buildFancyStoneHeadGroup(params: FancyStoneHeadParams): THREE.Gr
   const standHeightMm = params.standHeightMm ?? maxHalf * 0.8
 
   const group = new THREE.Group()
-  const outline = buildStoneOutline(shape, halfW, halfL)
+  const flipPoint = shape === 'pear' && params.pointDirection === 'down'
+  const outline = flipPoint ? mirrorPoints2D(buildStoneOutline(shape, halfW, halfL), 'y') : buildStoneOutline(shape, halfW, halfL)
 
   // ExtrudeGeometry builds its shape in local XY and extrudes along local
   // Z; rotating −90° about X maps that Z (depth) onto this group's +Y (up)
@@ -1241,7 +1257,10 @@ export function buildFancyStoneHeadGroup(params: FancyStoneHeadParams): THREE.Gr
   gallery.userData.partName = 'Gallery'
   group.add(gallery)
 
-  const prongSeats = fancyProngPoints(shape, halfW, halfL, params.prongCount ?? 4)
+  const prongSeatsRaw = fancyProngPoints(shape, halfW, halfL, params.prongCount ?? 4)
+  const prongSeats = flipPoint
+    ? prongSeatsRaw.map(s => ({ point: mirrorPoints2D([s.point], 'y')[0], isTip: s.isTip }))
+    : prongSeatsRaw
   for (const seat of prongSeats) {
     // V-tip: a 3-sided wedge (ConeGeometry with 3 radial segments) instead
     // of a round taper — better protects a sharp outline point (a
@@ -1862,6 +1881,10 @@ export interface FacetedFancyStoneParams {
   tableRatio?: number
   crownHeightRatio?: number
   pavilionDepthRatio?: number
+  /** Must match whatever `buildFancyStoneHeadGroup` was given for the SAME
+   *  head — otherwise the stone points a different way than its own
+   *  gallery/prongs. See `FancyStoneHeadParams.pointDirection`. */
+  pointDirection?: 'up' | 'down'
 }
 
 /** Real faceted crown+pavilion for a fancy shape, following that shape's
@@ -1884,8 +1907,11 @@ export function buildFacetedFancyStone(params: FacetedFancyStoneParams): THREE.G
   const crownHeight = maxDim * crownHeightRatio
   const pavilionDepth = maxDim * pavilionDepthRatio
 
-  const girdleOutline = buildStoneOutline(shape, halfW, halfL)
-  const tableOutline = buildStoneOutline(shape, halfW * tableRatio, halfL * tableRatio)
+  const flipPoint = shape === 'pear' && params.pointDirection === 'down'
+  const girdleOutline0 = buildStoneOutline(shape, halfW, halfL)
+  const tableOutline0 = buildStoneOutline(shape, halfW * tableRatio, halfL * tableRatio)
+  const girdleOutline = flipPoint ? mirrorPoints2D(girdleOutline0, 'y') : girdleOutline0
+  const tableOutline = flipPoint ? mirrorPoints2D(tableOutline0, 'y') : tableOutline0
   const culetOutline = girdleOutline.map(() => new THREE.Vector2(0, 0))
 
   const group = new THREE.Group()

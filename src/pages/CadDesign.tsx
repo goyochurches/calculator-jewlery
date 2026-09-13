@@ -110,6 +110,12 @@ export function CadDesignPage() {
   const [diamondType, setDiamondType] = useState<'natural' | 'lab-grown'>('natural')
   const [fancyLengthMm, setFancyLengthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.lengthMm)
   const [fancyWidthMm, setFancyWidthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.widthMm)
+  // Mirror transform (module: Transforms — Bend/Mirror/Polar Array/Taper/
+  // Twist in Matrix's own toolbar). First concrete use: a pear's point can
+  // face either way around the band — every other supported fancy shape is
+  // symmetric about its own length axis, so mirroring changes nothing for
+  // them. Only shown/used when stoneShape === 'pear'.
+  const [pointDirection, setPointDirection] = useState<'up' | 'down'>('up')
   const [settingType, setSettingType] = useState<SettingType>('prong')
   const [bezelCoverage, setBezelCoverage] = useState<'full' | 'half'>('full')
   const [prongCount, setProngCount] = useState<4 | 6>(4)
@@ -174,7 +180,7 @@ export function CadDesignPage() {
     haloRingCount, sideStoneCount, sideStoneCaratWeight, sideSpreadDeg,
     includeMatchingBand, matchingBandWidthMm, splitStrandCount,
     includeSignetTop, signetShape, signetWidthMm, signetLengthMm, matchingBandCount,
-    includeFlutes, fluteCount,
+    includeFlutes, fluteCount, pointDirection,
   })
 
   const applyPreset = (p: CadDesignParams) => {
@@ -207,6 +213,7 @@ export function CadDesignPage() {
     setMatchingBandCount((p.matchingBandCount as 1 | 2 | 3) ?? 1)
     setIncludeFlutes(p.includeFlutes ?? false)
     setFluteCount(p.fluteCount ?? 24)
+    setPointDirection((p.pointDirection as 'up' | 'down') ?? 'up')
     setImportedModel(null); setImportFileName(null) // a loaded preset is the parametric design, not an import
     setProngHeightOverridesMm({}) // per-instance overrides don't round-trip through a preset (indices may not line up)
   }
@@ -349,7 +356,7 @@ export function CadDesignPage() {
                 : settingType === 'illusion'
                   ? buildIllusionHeadGroup({ stoneDiameterMm })
                   : buildStoneHeadGroup({ stoneDiameterMm, prongCount, prongHeightOverridesMm }))
-          : buildFancyStoneHeadGroup({ shape: stoneShape, lengthMm: fancyLengthMm, widthMm: fancyWidthMm, prongCount })
+          : buildFancyStoneHeadGroup({ shape: stoneShape, lengthMm: fancyLengthMm, widthMm: fancyWidthMm, prongCount, pointDirection })
         attachHeadToBand(head, bandParamsBase)
         group.add(head)
       }
@@ -433,7 +440,7 @@ export function CadDesignPage() {
       }
     }
     return group
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm, matchingBandCount])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -577,7 +584,7 @@ export function CadDesignPage() {
             five-stone or signet — no stone),
             center stone (round — prong, bezel,
             cluster, tension or illusion — oval, cushion, princess, marquise
-            or pear),
+            or pear, mirrorable point direction),
             side stones (pavé, channel, flush, bar or invisible), optional milgrain, twisted-rope or flute edging, an optional
             matching band,
             and solid/export, grouped into tabs the
@@ -1011,6 +1018,24 @@ export function CadDesignPage() {
                           <input type="number" min={2} max={20} step={0.1} value={fancyWidthMm}
                             onChange={e => setFancyWidthMm(Math.max(2, Number(e.target.value) || 2))} className={inputCls} />
                         </div>
+                      </div>
+                    )}
+
+                    {stoneShape === 'pear' && (
+                      <div>
+                        <label className={labelCls}>Point direction (Mirror)</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {([
+                            { value: 'up' as const, label: 'Toward hand' },
+                            { value: 'down' as const, label: 'Toward top' },
+                          ]).map(opt => (
+                            <button key={opt.value} type="button" onClick={() => setPointDirection(opt.value)}
+                              className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${pointDirection === opt.value ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                        <p className="mt-1 text-xs text-slate-400">Which way the pear's tip faces around the band — Matrix's own "Mirror" transform, flipped along the stone's own length axis.</p>
                       </div>
                     )}
 

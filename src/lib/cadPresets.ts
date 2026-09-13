@@ -53,6 +53,7 @@ export interface CadDesignParams {
   matchingBandCount?: number
   includeFlutes?: boolean
   fluteCount?: number
+  pointDirection?: string
 }
 
 export interface SavedCadPreset {
