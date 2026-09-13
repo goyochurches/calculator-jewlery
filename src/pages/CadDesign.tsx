@@ -394,6 +394,7 @@ export function CadDesignPage() {
       const group = await parseImportedCadFile(file)
       setImportedModel(group)
       setImportFileName(file.name)
+      setResizeEnabled(false) // a new file's own size has nothing to do with whatever the last one was scaled to
     } catch (err) {
       setImportError(err instanceof Error ? err.message : 'Could not read this file.')
     } finally {
@@ -733,9 +734,31 @@ export function CadDesignPage() {
     }
   }, [model, mergeSolid])
 
+  // Ring Re-Sizer — Matrix's own named tool, scoped here to an IMPORTED
+  // file (the parametric design already has its own real fingerSize
+  // control — "resizing" it is just changing that number, no separate
+  // tool needed). An imported file carries no size metadata this app can
+  // read, so resizing needs the user to say what size it currently IS —
+  // same two-number "from/to" convention any real ring-sizer tool uses.
+  // Uniform scale by the ratio of the two sizes' own inside diameters
+  // (usSizeToDiameterMm, the same conversion every other size-driven
+  // feature on this page already uses).
+  const [resizeEnabled, setResizeEnabled] = useState(false)
+  const [resizeCurrentSize, setResizeCurrentSize] = useState(6)
+  const [resizeTargetSize, setResizeTargetSize] = useState(6)
+  const resizeScaleFactor = usSizeToDiameterMm(resizeTargetSize) / usSizeToDiameterMm(resizeCurrentSize)
+
   // What the viewer/weight-estimate/export actually operate on — the
   // imported file when one's loaded, otherwise the parametric design.
-  const viewModel = importedModel ?? displayModel
+  const viewModel = useMemo(() => {
+    if (!importedModel) return displayModel
+    if (!resizeEnabled || resizeScaleFactor === 1) return importedModel
+    const wrapper = new THREE.Group()
+    wrapper.add(importedModel.clone(true))
+    wrapper.scale.setScalar(resizeScaleFactor)
+    wrapper.updateMatrixWorld(true)
+    return wrapper
+  }, [importedModel, displayModel, resizeEnabled, resizeScaleFactor])
 
   // Three "reset some state when a dependency changes" cases, all using
   // React's own recommended pattern (adjust state DURING render by
@@ -1943,7 +1966,7 @@ export function CadDesignPage() {
                   {importedModel ? (
                     <div className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-600">
                       <span className="truncate">Viewing: <strong>{importFileName}</strong></span>
-                      <button type="button" onClick={() => { setImportedModel(null); setImportFileName(null); setImportError(null) }}
+                      <button type="button" onClick={() => { setImportedModel(null); setImportFileName(null); setImportError(null); setResizeEnabled(false) }}
                         className="shrink-0 rounded-lg border border-slate-300 px-2 py-1 text-[11px] font-semibold hover:bg-slate-50">
                         Back to design
                       </button>
@@ -1961,6 +1984,46 @@ export function CadDesignPage() {
                     <p className="rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700">{importError}</p>
                   )}
                 </div>
+
+                {importedModel && (
+                  <div className="space-y-2 border-t border-slate-200 pt-3">
+                    <label className="flex items-center justify-between gap-3">
+                      <span>
+                        <span className="text-sm font-semibold text-slate-900">Ring Re-Sizer</span>
+                        <p className="mt-0.5 text-[11px] text-slate-400">
+                          Matrix's own named tool — scoped here to an imported file (the parametric design above
+                          already has its own real ring-size control, no separate resize step needed there). This
+                          app can't read a size from the file itself, so tell it what size the file currently IS.
+                        </p>
+                      </span>
+                      <input type="checkbox" checked={resizeEnabled} onChange={e => setResizeEnabled(e.target.checked)}
+                        className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+                    </label>
+                    {resizeEnabled && (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={labelCls}>Current size</label>
+                          <select value={resizeCurrentSize} onChange={e => setResizeCurrentSize(Number(e.target.value))} className={inputCls}>
+                            {FINGER_SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className={labelCls}>Target size</label>
+                          <select value={resizeTargetSize} onChange={e => setResizeTargetSize(Number(e.target.value))} className={inputCls}>
+                            {FINGER_SIZE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                          </select>
+                        </div>
+                        <p className="col-span-2 text-[11px] text-slate-400">
+                          Uniform scale ×{resizeScaleFactor.toFixed(3)} — same inside-diameter conversion every
+                          other size control on this page uses. A uniform scale changes EVERYTHING proportionally
+                          (band width/thickness, any stones, engraving) — a real resize on an actual piece often
+                          only stretches the shank, leaving the head/stones alone; this app doesn't model that
+                          distinction yet.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
