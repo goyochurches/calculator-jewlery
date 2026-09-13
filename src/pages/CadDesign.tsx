@@ -900,7 +900,7 @@ export function CadDesignPage() {
             way Matrix groups its own tools (Ring Rail, Gems, Milgrain, Parametric Boolean) instead of one long form.
             Click any part of the model in the viewer to select and identify it — click a single prong and you can
             edit its height on its own, a first real per-instance edit, not just a global slider. Import an existing
-            STL/OBJ/3MF file (Solid tab) to view it right here too — the other half of the original ask. The center
+            STL/OBJ/3MF or .3dm file (Solid tab) to view it right here too — the other half of the original ask. The center
             stone (every shape) is now a real faceted crown+pavilion, not a placeholder — a simplified "single cut"
             facet count, not full ideal-cut precision. This is not a Matrix/RhinoGold replacement yet — melee (pavé/
             halo/channel/etc.) and cluster petals still use simple bead proxies. Building toward full parity step by step.
@@ -1831,9 +1831,13 @@ export function CadDesignPage() {
                 <div className="space-y-2 border-t border-slate-200 pt-3">
                   <span className="text-sm font-semibold text-slate-900">Import a file to view</span>
                   <p className="text-[11px] text-slate-400">
-                    View an existing STL, OBJ, or 3MF export (a real Matrix/Rhino/other CAD file) right here — the
-                    other half of the original ask, independent of the parametric design above. (.3dm, Rhino's own
-                    format, isn't supported yet.)
+                    View an existing STL, OBJ, 3MF, or .3dm export (a real Matrix/Rhino/other CAD file) right here —
+                    the other half of the original ask, independent of the parametric design above. .3dm is early/
+                    beta: it can only read objects already saved as MESHES in the file (not BREP/NURBS surfaces —
+                    convert to a mesh in Rhino/Matrix first, or export as STL/OBJ/3MF instead, if this doesn't show
+                    anything), and the underlying WASM library hasn't been tested against a real Matrix/Rhino
+                    export by this app's own developer yet — the reading logic itself is verified, the real-world
+                    file compatibility isn't.
                   </p>
                   {importedModel ? (
                     <div className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-600">
@@ -1844,11 +1848,14 @@ export function CadDesignPage() {
                       </button>
                     </div>
                   ) : (
-                    <input type="file" accept=".stl,.obj,.3mf"
+                    <input type="file" accept=".stl,.obj,.3mf,.3dm"
                       onChange={e => { const f = e.target.files?.[0]; if (f) handleImportFile(f) }}
                       className="block w-full text-xs text-slate-600" disabled={importing} />
                   )}
                   {importing && <p className="text-[11px] text-slate-400">Reading file…</p>}
+                  {importedModel?.userData.importWarning && (
+                    <p className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-800">{importedModel.userData.importWarning as string}</p>
+                  )}
                   {importError && (
                     <p className="rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700">{importError}</p>
                   )}
