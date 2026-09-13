@@ -33,7 +33,7 @@ type StoneShape = 'round' | FancyStoneShape
 const STONE_SHAPE_LABELS: Record<StoneShape, string> = {
   round: 'Round', oval: 'Oval', cushion: 'Cushion', princess: 'Princess', marquise: 'Marquise', pear: 'Pear',
   emerald: 'Emerald', asscher: 'Asscher', radiant: 'Radiant',
-  hexagon: 'Hexagon', lozenge: 'Lozenge', trapezoid: 'Trapezoid',
+  hexagon: 'Hexagon', lozenge: 'Lozenge', trapezoid: 'Trapezoid', heart: 'Heart',
 }
 // Reasonable starting length×width (mm) per fancy shape, editable afterward.
 const FANCY_SHAPE_DEFAULTS: Record<FancyStoneShape, { lengthMm: number; widthMm: number }> = {
@@ -48,6 +48,7 @@ const FANCY_SHAPE_DEFAULTS: Record<FancyStoneShape, { lengthMm: number; widthMm:
   hexagon: { lengthMm: 8, widthMm: 6 },
   lozenge: { lengthMm: 9, widthMm: 5 },
   trapezoid: { lengthMm: 6, widthMm: 6 },
+  heart: { lengthMm: 9, widthMm: 8 },
 }
 
 type Tab = 'band' | 'center' | 'side' | 'solid'
@@ -120,9 +121,9 @@ export function CadDesignPage() {
   const [fancyWidthMm, setFancyWidthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.widthMm)
   // Mirror transform (module: Transforms — Bend/Mirror/Polar Array/Taper/
   // Twist in Matrix's own toolbar). First concrete use: a pear's point can
-  // face either way around the band — pear and trapezoid are the only
-  // supported fancy shapes NOT symmetric about their own length axis, so
-  // mirroring changes nothing for every other shape.
+  // face either way around the band — pear, trapezoid and heart are the
+  // only supported fancy shapes NOT symmetric about their own length
+  // axis, so mirroring changes nothing for every other shape.
   const [pointDirection, setPointDirection] = useState<'up' | 'down'>('up')
   const [settingType, setSettingType] = useState<SettingType>('prong')
   const [bezelCoverage, setBezelCoverage] = useState<'full' | 'half'>('full')
@@ -597,8 +598,8 @@ export function CadDesignPage() {
             five-stone or signet — no stone),
             center stone (round — custom 3-8 prongs, bezel,
             cluster, tension or illusion — oval, cushion, princess, marquise,
-            pear, emerald, asscher, radiant, hexagon, lozenge or trapezoid,
-            with mirrorable point direction for pear/trapezoid),
+            pear, emerald, asscher, radiant, hexagon, lozenge, trapezoid or
+            heart, with mirrorable point direction for pear/trapezoid/heart),
             side stones (pavé, channel, flush, bar or invisible), optional milgrain, twisted-rope or flute edging, an optional
             matching band,
             and solid/export, grouped into tabs the
@@ -1035,7 +1036,7 @@ export function CadDesignPage() {
                       </div>
                     )}
 
-                    {(stoneShape === 'pear' || stoneShape === 'trapezoid') && (
+                    {(stoneShape === 'pear' || stoneShape === 'trapezoid' || stoneShape === 'heart') && (
                       <div>
                         <label className={labelCls}>Point direction (Mirror)</label>
                         <div className="grid grid-cols-2 gap-2">

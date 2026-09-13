@@ -406,13 +406,13 @@ export function roundDiameterMmFromCarat(carat: number): number {
  *  not a substitute for actually weighing/grading a real stone. */
 export function estimateFancyCaratWeight(shape: FancyStoneShape, lengthMm: number, widthMm: number): number {
   const factor: Record<FancyStoneShape, number> = {
-    oval: 0.0062, cushion: 0.0080, princess: 0.0083, marquise: 0.0058, pear: 0.0075,
-    // These five constants are the well-published GIA/trade reference
-    // values (hence no individual citation each). The three below them
-    // (emerald/radiant/hexagon/lozenge/trapezoid) don't have an equally
-    // standard published constant, so they're estimated by analogy to the
-    // closest-shaped stone above — disclosed here rather than presented
-    // as equally authoritative.
+    // These six (oval/cushion/princess/marquise/pear/heart) are the
+    // well-published GIA/trade reference values (hence no individual
+    // citation each).
+    oval: 0.0062, cushion: 0.0080, princess: 0.0083, marquise: 0.0058, pear: 0.0075, heart: 0.0059,
+    // The six below don't have an equally standard published constant, so
+    // they're estimated by analogy to the closest-shaped stone above —
+    // disclosed here rather than presented as equally authoritative.
     emerald: 0.0092, asscher: 0.0080, radiant: 0.0080,
     hexagon: 0.0083, lozenge: 0.0060, trapezoid: 0.0071,
   }
@@ -997,7 +997,7 @@ export function estimateWeightGrams(volumeMm3: number, densityGPerCm3: number): 
 
 export type FancyStoneShape =
   | 'oval' | 'cushion' | 'princess' | 'marquise' | 'pear'
-  | 'emerald' | 'asscher' | 'radiant' | 'hexagon' | 'lozenge' | 'trapezoid'
+  | 'emerald' | 'asscher' | 'radiant' | 'hexagon' | 'lozenge' | 'trapezoid' | 'heart'
 
 /** Mirrors a set of 2D points across an axis through the origin —
  *  Matrix's own named "Mirror" transform. Generic/reusable: this file's
@@ -1014,8 +1014,8 @@ export function mirrorPoints2D(points: THREE.Vector2[], axis: 'x' | 'y'): THREE.
  *  Oval/cushion/princess/marquise/emerald/asscher/radiant/hexagon/lozenge
  *  are symmetric about both axes, so the extrude→rotate step in
  *  `buildFancyStoneHeadGroup` can't mirror them into anything different.
- *  Pear and trapezoid are only symmetric about u (width) — by convention
- *  their narrow/pointed end sits at +v, which after that same
+ *  Pear, trapezoid and heart are only symmetric about u (width) — by
+ *  convention their narrow/pointed end sits at +v, which after that same
  *  extrude→rotate step ends up facing a fixed direction relative to the
  *  band; purely a cosmetic pick (which way it points), not a correctness
  *  concern — see `pointDirection` (the Mirror transform) to flip it. */
@@ -1161,13 +1161,50 @@ function buildStoneOutline(shape: FancyStoneShape, halfW: number, halfL: number,
       ]
     case 'trapezoid':
       // Narrow at +v, wide at −v by convention (same "+v is the default
-      // point-like end" convention pear already uses) — this is the one
-      // OTHER shape besides pear that isn't symmetric about its own length
-      // axis, so `pointDirection` (Mirror transform) applies to it too.
+      // point-like end" convention pear already uses) — this is one of two
+      // OTHER shapes besides pear that isn't symmetric about its own length
+      // axis (see heart below), so `pointDirection` (Mirror transform)
+      // applies to it too.
       return [
         new THREE.Vector2(halfW * 0.55, halfL), new THREE.Vector2(-halfW * 0.55, halfL),
         new THREE.Vector2(-halfW, -halfL), new THREE.Vector2(halfW, -halfL),
       ]
+    case 'heart': {
+      // Classic closed-form parametric "heart curve" — (16·sin³t,
+      // 13·cos t − 5·cos 2t − 2·cos 3t − cos 4t) — a well-known equation
+      // with a genuine sharp cusp at t=π (the heart's point) and a
+      // shallow dip at t=0 (the cleft between the two lobes), rather than
+      // a hand-fitted arc construction like pear's. Sampled then affine-
+      // mapped into this file's (halfW, halfL) convention: the point
+      // faces +v (same convention as pear/trapezoid), the lobes' own
+      // rounded outer tops (the overall bounding box's OTHER extreme, not
+      // the cleft itself — the cleft is a dip partway between them, not
+      // the topmost point) map to −v.
+      //
+      // Sampled with t running its natural 0→2π direction (unlike
+      // lozenge's fix, no reversal needed here): the raw formula alone
+      // winds clockwise, but the y-remapping below (tip-at-+v requires a
+      // NEGATIVE-slope affine map, i.e. a reflection) flips it back to
+      // counter-clockwise, matching every other shape — verified via the
+      // same shoelace-area check that caught lozenge's winding earlier
+      // (reversing the sample order too would cancel that reflection and
+      // wind clockwise again — checked by hand, not just assumed).
+      const raw: THREE.Vector2[] = []
+      for (let i = 0; i < segments; i++) {
+        const t = (i / segments) * 2 * Math.PI
+        const x = 16 * Math.pow(Math.sin(t), 3)
+        const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)
+        raw.push(new THREE.Vector2(x, y))
+      }
+      const xMax = Math.max(...raw.map(p => Math.abs(p.x)))
+      const yMin = Math.min(...raw.map(p => p.y))
+      const yMax = Math.max(...raw.map(p => p.y))
+      const yRange = yMax - yMin
+      return raw.map(p => new THREE.Vector2(
+        (p.x / xMax) * halfW,
+        halfL - ((p.y - yMin) / yRange) * (2 * halfL),
+      ))
+    }
   }
 }
 
@@ -1337,6 +1374,37 @@ function fancyProngPoints(shape: FancyStoneShape, halfW: number, halfL: number, 
         { point: new THREE.Vector2(0, -halfL), isTip: false },
       ]
     }
+    case 'heart': {
+      // Rather than re-deriving the parametric curve's landmark points by
+      // hand (unlike pear's arc-based construction, this one has no clean
+      // closed form for "the point 55% of the way up the lobe"), sample
+      // the SAME outline this shape actually builds — same default
+      // segment count, so these seats land exactly ON the rendered curve,
+      // not a slightly different one — and pick points off it by
+      // property: max v = the tip (+v convention), max/min u = the two
+      // shoulders, and index 0 = the cleft (exactly u=0 by construction,
+      // since sampling starts at the curve's own t=0).
+      const outline = buildStoneOutline(shape, halfW, halfL)
+      const n = outline.length
+      let tipIdx = 0, rightIdx = 0, leftIdx = 0
+      for (let i = 1; i < n; i++) {
+        if (outline[i].y > outline[tipIdx].y) tipIdx = i
+        if (outline[i].x > outline[rightIdx].x) rightIdx = i
+        if (outline[i].x < outline[leftIdx].x) leftIdx = i
+      }
+      const tip: ProngSeat = { point: outline[tipIdx].clone(), isTip: true }
+      const shoulderR: ProngSeat = { point: outline[rightIdx].clone(), isTip: false }
+      const shoulderL: ProngSeat = { point: outline[leftIdx].clone(), isTip: false }
+      const cleft: ProngSeat = { point: outline[0].clone(), isTip: false }
+      if (count === 4) return [tip, shoulderR, cleft, shoulderL]
+      // 6: one more seat per lobe, further along the same sampled curve
+      // between each shoulder and the cleft (by array-index interpolation
+      // — approximate, disclosed as such, same spirit as pear's own
+      // shoulder(0.55) placement constant).
+      const lobeR: ProngSeat = { point: outline[Math.round(rightIdx / 2)].clone(), isTip: false }
+      const lobeL: ProngSeat = { point: outline[Math.round((leftIdx + n) / 2) % n].clone(), isTip: false }
+      return [tip, shoulderR, lobeR, cleft, lobeL, shoulderL]
+    }
   }
 }
 
@@ -1350,7 +1418,7 @@ export interface FancyStoneHeadParams {
   prongDiameterMm?: number
   prongHeightMm?: number
   standHeightMm?: number
-  /** Which way a PEAR or TRAPEZOID's narrow/pointed end faces ('up' = the
+  /** Which way a PEAR, TRAPEZOID or HEART's narrow/pointed end faces ('up' = the
    *  outline's own default, toward +v — see `buildStoneOutline`'s doc
    *  comment). Ignored for every other shape (they're all symmetric,
    *  mirroring changes nothing). Uses `mirrorPoints2D`, Matrix's own named
@@ -1373,7 +1441,7 @@ export function buildFancyStoneHeadGroup(params: FancyStoneHeadParams): THREE.Gr
   const standHeightMm = params.standHeightMm ?? maxHalf * 0.8
 
   const group = new THREE.Group()
-  const flipPoint = (shape === 'pear' || shape === 'trapezoid') && params.pointDirection === 'down'
+  const flipPoint = (shape === 'pear' || shape === 'trapezoid' || shape === 'heart') && params.pointDirection === 'down'
   const outline = flipPoint ? mirrorPoints2D(buildStoneOutline(shape, halfW, halfL), 'y') : buildStoneOutline(shape, halfW, halfL)
 
   // ExtrudeGeometry builds its shape in local XY and extrudes along local
@@ -2040,7 +2108,7 @@ export function buildFacetedFancyStone(params: FacetedFancyStoneParams): THREE.G
   const crownHeight = maxDim * crownHeightRatio
   const pavilionDepth = maxDim * pavilionDepthRatio
 
-  const flipPoint = (shape === 'pear' || shape === 'trapezoid') && params.pointDirection === 'down'
+  const flipPoint = (shape === 'pear' || shape === 'trapezoid' || shape === 'heart') && params.pointDirection === 'down'
   const girdleOutline0 = buildStoneOutline(shape, halfW, halfL)
   const tableOutline0 = buildStoneOutline(shape, halfW * tableRatio, halfL * tableRatio)
   const girdleOutline = flipPoint ? mirrorPoints2D(girdleOutline0, 'y') : girdleOutline0
