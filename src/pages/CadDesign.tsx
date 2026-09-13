@@ -19,7 +19,7 @@ import {
   buildTensionBandGeometry, buildTensionSetting, tensionGapDegForStone,
   buildTaperedBandGeometry, buildTwistedBandGeometry, buildSplitShankGeometry, buildCathedralBandGeometry,
   buildIllusionHeadGroup,
-  buildMilgrainEdges, buildRopeEdge,
+  buildMilgrainEdges, buildRopeEdge, buildFluteRibs,
   unionMetalParts, extractStoneMeshes, checkWatertightness,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
@@ -57,7 +57,7 @@ const PART_TAB: Record<string, Tab> = {
   'Flush stone': 'side', 'Flush collar': 'side', 'Bar stone': 'side', 'Bar post': 'side',
   'Invisible-set stone': 'side',
   'Side stone head': 'center', 'Shank strand': 'band', 'Signet top': 'center',
-  'Milgrain bead': 'band', 'Rope strand': 'band',
+  'Milgrain bead': 'band', 'Rope strand': 'band', 'Flute rib': 'band',
   'Merged solid': 'solid', Imported: 'solid', 'Matching band': 'solid',
 }
 import { Download, RotateCw, Scale, MousePointerClick } from 'lucide-react'
@@ -141,6 +141,8 @@ export function CadDesignPage() {
   const [matchingBandCount, setMatchingBandCount] = useState<1 | 2 | 3>(1)
   const [includeMilgrain, setIncludeMilgrain] = useState(false)
   const [includeRope, setIncludeRope] = useState(false)
+  const [includeFlutes, setIncludeFlutes] = useState(false)
+  const [fluteCount, setFluteCount] = useState(24)
   const [autoRotate, setAutoRotate] = useState(false)
   const [wireframe, setWireframe] = useState(false)
   const viewerRef = useRef<ModelViewer3DHandle>(null)
@@ -172,6 +174,7 @@ export function CadDesignPage() {
     haloRingCount, sideStoneCount, sideStoneCaratWeight, sideSpreadDeg,
     includeMatchingBand, matchingBandWidthMm, splitStrandCount,
     includeSignetTop, signetShape, signetWidthMm, signetLengthMm, matchingBandCount,
+    includeFlutes, fluteCount,
   })
 
   const applyPreset = (p: CadDesignParams) => {
@@ -202,6 +205,8 @@ export function CadDesignPage() {
     setSignetWidthMm(p.signetWidthMm ?? 12)
     setSignetLengthMm(p.signetLengthMm ?? 14)
     setMatchingBandCount((p.matchingBandCount as 1 | 2 | 3) ?? 1)
+    setIncludeFlutes(p.includeFlutes ?? false)
+    setFluteCount(p.fluteCount ?? 24)
     setImportedModel(null); setImportFileName(null) // a loaded preset is the parametric design, not an import
     setProngHeightOverridesMm({}) // per-instance overrides don't round-trip through a preset (indices may not line up)
   }
@@ -326,6 +331,7 @@ export function CadDesignPage() {
     }
     if (includeMilgrain) group.add(buildMilgrainEdges({}, bandParamsBase))
     if (includeRope) group.add(buildRopeEdge({}, bandParamsBase))
+    if (includeFlutes) group.add(buildFluteRibs({ count: fluteCount }, bandParamsBase))
     if (includeSignetTop) {
       const signetTop = buildSignetTopGroup({ shape: signetShape, widthMm: signetWidthMm, lengthMm: signetLengthMm })
       attachHeadToBand(signetTop, bandParamsBase)
@@ -427,7 +433,7 @@ export function CadDesignPage() {
       }
     }
     return group
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm, matchingBandCount])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm, matchingBandCount])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -572,7 +578,7 @@ export function CadDesignPage() {
             center stone (round — prong, bezel,
             cluster, tension or illusion — oval, cushion, princess, marquise
             or pear),
-            side stones (pavé, channel, flush, bar or invisible), optional milgrain or twisted-rope edging, an optional
+            side stones (pavé, channel, flush, bar or invisible), optional milgrain, twisted-rope or flute edging, an optional
             matching band,
             and solid/export, grouped into tabs the
             way Matrix groups its own tools (Ring Rail, Gems, Milgrain, Parametric Boolean) instead of one long form.
@@ -828,6 +834,25 @@ export function CadDesignPage() {
                   <input type="checkbox" checked={includeRope} onChange={e => setIncludeRope(e.target.checked)}
                     className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
                 </label>
+
+                <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                  <span>
+                    <span className="text-sm font-semibold text-slate-900">Flutes</span>
+                    <p className="mt-0.5 text-[11px] text-slate-400">
+                      Raised ribs around the band (real flutes are usually cut grooves — this app builds the added
+                      version, not a subtraction). Ties toward Matrix's Award Ring Builder.
+                    </p>
+                  </span>
+                  <input type="checkbox" checked={includeFlutes} onChange={e => setIncludeFlutes(e.target.checked)}
+                    className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+                </label>
+                {includeFlutes && (
+                  <div>
+                    <label className={labelCls}>Flute count</label>
+                    <input type="number" min={8} max={60} step={1} value={fluteCount}
+                      onChange={e => setFluteCount(Math.max(8, Number(e.target.value) || 8))} className={inputCls} />
+                  </div>
+                )}
               </div>
             )}
 

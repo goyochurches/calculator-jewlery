@@ -51,6 +51,8 @@ export interface CadDesignParams {
   signetWidthMm?: number
   signetLengthMm?: number
   matchingBandCount?: number
+  includeFlutes?: boolean
+  fluteCount?: number
 }
 
 export interface SavedCadPreset {

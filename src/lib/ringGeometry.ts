@@ -2061,6 +2061,44 @@ export function buildRopeEdge(params: RopeParams, band: RingBandParams): THREE.G
   return group
 }
 
+// ── Flutes — a third band-edging decoration, alongside milgrain/rope ───────
+// Real flutes are usually CONCAVE grooves cut into the metal (a boolean
+// subtraction, not attempted here); this builds RAISED ribs instead — the
+// same honest tradeoff milgrain's beads and rope's strands already make
+// (an additive decoration standing in for a cut one), disclosed as such.
+// Ties toward Matrix's Award Ring Builder (module 12 in the roadmap's
+// master list), which names fluted side panels as one of its own options.
+
+export interface FluteParams {
+  count: number
+  ribWidthMm?: number
+  ribHeightMm?: number
+}
+
+/** Thin vertical (spanning the band's own width) raised bars evenly spaced
+ *  around the band's outer edge — plain BoxGeometry, already a closed
+ *  solid on its own like the Bar setting's own posts. */
+export function buildFluteRibs(params: FluteParams, band: RingBandParams): THREE.Group {
+  const { count } = params
+  const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
+  const ribWidthMm = params.ribWidthMm ?? Math.max(0.4, band.thicknessMm * 0.15)
+  const ribHeightMm = params.ribHeightMm ?? band.thicknessMm * 0.25
+
+  const group = new THREE.Group()
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2
+    const rib = new THREE.Mesh(new THREE.BoxGeometry(ribWidthMm, band.widthMm * 0.9, ribHeightMm))
+    rib.position.set(Math.cos(angle) * (outerRadius + ribHeightMm / 2), 0, Math.sin(angle) * (outerRadius + ribHeightMm / 2))
+    rib.rotation.y = -angle
+    rib.userData.partName = 'Flute rib'
+    group.add(rib)
+  }
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}
+
 // ── Bar setting ──────────────────────────────────────────────────────────────
 // A fourth side-stone setting type alongside pavé/channel/flush — Matrix's
 // own named "Bar setting": stones sit flush between thin vertical metal
