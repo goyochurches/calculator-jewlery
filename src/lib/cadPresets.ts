@@ -61,6 +61,11 @@ export interface CadDesignParams {
   galleryWireCount?: number
   includeBandText?: boolean
   bandText?: string
+  includeSidePanels?: boolean
+  sidePanelShape?: string
+  sidePanelWidthMm?: number
+  sidePanelLengthMm?: number
+  sidePanelText?: string
 }
 
 export interface SavedCadPreset {

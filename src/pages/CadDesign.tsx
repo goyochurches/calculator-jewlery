@@ -69,6 +69,7 @@ const PART_TAB: Record<string, Tab> = {
   'Invisible-set stone': 'side',
   'Side stone head': 'center', 'Shank strand': 'band', 'Signet top': 'center', 'Engraved text': 'center',
   'Milgrain bead': 'band', 'Rope strand': 'band', 'Flute rib': 'band', 'Gallery wire': 'center', 'Band text': 'band',
+  'Side panel': 'solid', 'Side panel text': 'solid',
   'Merged solid': 'solid', Imported: 'solid', 'Matching band': 'solid',
 }
 import { Download, RotateCw, Scale, MousePointerClick } from 'lucide-react'
@@ -191,6 +192,14 @@ export function CadDesignPage() {
   // flat-plate-only engraving. Works on any ring, not just a signet.
   const [includeBandText, setIncludeBandText] = useState(false)
   const [bandText, setBandText] = useState('')
+  // Side panels — Matrix's own Award Ring Builder concept (championship
+  // rings carrying a logo/year on flat panels flanking the main setting).
+  // Zero new geometry: reuses buildSignetTopGroup at two extra angles.
+  const [includeSidePanels, setIncludeSidePanels] = useState(false)
+  const [sidePanelShape, setSidePanelShape] = useState<'oval' | 'cushion' | 'princess'>('princess')
+  const [sidePanelWidthMm, setSidePanelWidthMm] = useState(6)
+  const [sidePanelLengthMm, setSidePanelLengthMm] = useState(8)
+  const [sidePanelText, setSidePanelText] = useState('')
   const [autoRotate, setAutoRotate] = useState(false)
   const [wireframe, setWireframe] = useState(false)
   const viewerRef = useRef<ModelViewer3DHandle>(null)
@@ -230,6 +239,7 @@ export function CadDesignPage() {
     includeRingLaborFee, ringLaborTierKey,
     includeFlutes, fluteCount, pointDirection, includeGalleryWire, galleryWireCount,
     includeBandText, bandText,
+    includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText,
   })
 
   const applyPreset = (p: CadDesignParams) => {
@@ -269,6 +279,11 @@ export function CadDesignPage() {
     setGalleryWireCount(p.galleryWireCount ?? 6)
     setIncludeBandText(p.includeBandText ?? false)
     setBandText(p.bandText ?? '')
+    setIncludeSidePanels(p.includeSidePanels ?? false)
+    setSidePanelShape((p.sidePanelShape as typeof sidePanelShape) ?? 'princess')
+    setSidePanelWidthMm(p.sidePanelWidthMm ?? 6)
+    setSidePanelLengthMm(p.sidePanelLengthMm ?? 8)
+    setSidePanelText(p.sidePanelText ?? '')
     setPointDirection((p.pointDirection as 'up' | 'down') ?? 'up')
     setImportedModel(null); setImportFileName(null) // a loaded preset is the parametric design, not an import
     setProngHeightOverridesMm({}) // per-instance overrides don't round-trip through a preset (indices may not line up)
@@ -513,6 +528,26 @@ export function CadDesignPage() {
         }
       }
     }
+
+    // Side panels — Matrix's own Award Ring Builder concept (championship/
+    // award rings often carry a team logo/year on flat panels flanking the
+    // main setting), generalized here as a plain add-on any ring can use
+    // rather than gated behind a separate "ring type". Zero new geometry:
+    // reuses `buildSignetTopGroup`'s own flat-plate-plus-raised-text
+    // construction (already independently verified) at two extra angular
+    // positions instead of writing a new primitive.
+    if (includeSidePanels) {
+      for (const [angleDeg, idx] of [[90, 0], [270, 1]] as const) {
+        const panel = buildSignetTopGroup({ shape: sidePanelShape, widthMm: sidePanelWidthMm, lengthMm: sidePanelLengthMm, engraveText: sidePanelText })
+        panel.traverse(obj => {
+          if (!(obj instanceof THREE.Mesh)) return
+          obj.userData.partName = obj.userData.partName === 'Engraved text' ? 'Side panel text' : 'Side panel'
+          obj.userData.instanceIndex = idx
+        })
+        attachHeadToBand(panel, bandParamsBase, angleDeg)
+        group.add(panel)
+      }
+    }
     if (includePave) {
       const bandParams = { fingerSize, widthMm, thicknessMm, profile }
       const sideStones = paveSettingType === 'channel'
@@ -554,7 +589,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -750,7 +785,8 @@ export function CadDesignPage() {
             trapezoid/heart/trillion),
             side stones (pavé, channel, flush, bar or invisible), optional milgrain, twisted-rope, flute edging or
             filigree gallery wire, an optional
-            matching band, raised text engraving on a signet's flat top or wrapped around the band itself,
+            matching band, optional Award Ring side panels, raised text engraving on a signet's flat top or
+            wrapped around the band itself,
             and solid/export, grouped into tabs the
             way Matrix groups its own tools (Ring Rail, Gems, Milgrain, Parametric Boolean) instead of one long form.
             Click any part of the model in the viewer to select and identify it — click a single prong and you can
@@ -1576,6 +1612,52 @@ export function CadDesignPage() {
                             </button>
                           ))}
                         </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2 border-t border-slate-200 pt-3">
+                  <label className="flex items-center justify-between gap-3">
+                    <span>
+                      <span className="text-sm font-semibold text-slate-900">Side panels</span>
+                      <p className="mt-0.5 text-[11px] text-slate-400">
+                        Matrix's own Award Ring Builder concept — flat panels flanking the main setting (a
+                        championship ring's team/year plaques), generalized here as a plain add-on any ring can
+                        use. Two panels, mirrored left/right; reuses the same flat-plate/raised-text construction
+                        as the signet top.
+                      </p>
+                    </span>
+                    <input type="checkbox" checked={includeSidePanels} onChange={e => setIncludeSidePanels(e.target.checked)}
+                      className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+                  </label>
+                  {includeSidePanels && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="col-span-2">
+                        <label className={labelCls}>Panel shape</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {(['oval', 'cushion', 'princess'] as const).map(s => (
+                            <button key={s} type="button" onClick={() => setSidePanelShape(s)}
+                              className={`rounded-xl border px-2.5 py-2 text-xs font-semibold capitalize transition ${sidePanelShape === s ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                              {s}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <label className={labelCls}>Width (mm)</label>
+                        <input type="number" min={3} max={15} step={0.5} value={sidePanelWidthMm}
+                          onChange={e => setSidePanelWidthMm(Math.max(3, Number(e.target.value) || 3))} className={inputCls} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Length (mm)</label>
+                        <input type="number" min={3} max={15} step={0.5} value={sidePanelLengthMm}
+                          onChange={e => setSidePanelLengthMm(Math.max(3, Number(e.target.value) || 3))} className={inputCls} />
+                      </div>
+                      <div className="col-span-2">
+                        <label className={labelCls}>Panel text (both panels)</label>
+                        <input type="text" maxLength={6} value={sidePanelText}
+                          onChange={e => setSidePanelText(e.target.value)} placeholder="e.g. 24" className={inputCls} />
                       </div>
                     </div>
                   )}
