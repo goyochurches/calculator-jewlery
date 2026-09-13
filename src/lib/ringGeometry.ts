@@ -611,10 +611,25 @@ export function buildHaloGroup(params: HaloParams): THREE.Group {
  *  surface at angle 0 (the Lathe convention's +X direction — see
  *  buildBandProfile) so its "up" axis points radially outward, matching how
  *  a stone sits above the shank when worn. Mutates and returns `head`. */
-export function attachHeadToBand(head: THREE.Group, band: RingBandParams): THREE.Group {
+export function attachHeadToBand(head: THREE.Group, band: RingBandParams, angleDeg = 0): THREE.Group {
   const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
-  head.rotation.z = -Math.PI / 2
-  head.position.set(outerRadius, 0, 0)
+  const angleRad = (angleDeg * Math.PI) / 180
+  // Same reorientation the angleDeg=0 case always used (rotate -90° about Z
+  // so local +Y points radially outward, i.e. +X), composed via quaternions
+  // — NOT via setting .rotation.y and .rotation.z as two Euler components,
+  // which would compose in Three.js's fixed XYZ intrinsic order and give
+  // the WRONG combined orientation (verified by hand + a quick script
+  // before landing this: naively setting both Euler components gives a
+  // head whose "outward" direction does NOT match its own position angle
+  // for anything but 0/180°). Composing explicitly as
+  // "spin around the band's Y axis, applied AFTER the local reorient" is
+  // the one that keeps every head's local +Y pointing in the SAME
+  // direction as its own position vector at every angle — checked
+  // numerically at 0/30/90/-45/180° before trusting it.
+  const reorient = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2)
+  const spinAroundY = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -angleRad)
+  head.quaternion.copy(spinAroundY).multiply(reorient)
+  head.position.set(Math.cos(angleRad) * outerRadius, 0, Math.sin(angleRad) * outerRadius)
   return head
 }
 

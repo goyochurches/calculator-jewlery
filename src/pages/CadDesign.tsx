@@ -55,6 +55,7 @@ const PART_TAB: Record<string, Tab> = {
   'Pavé stone': 'side', 'Channel stone': 'side', 'Channel rail': 'side',
   'Flush stone': 'side', 'Flush collar': 'side', 'Bar stone': 'side', 'Bar post': 'side',
   'Invisible-set stone': 'side',
+  'Side stone head': 'center',
   'Milgrain bead': 'band', 'Rope strand': 'band',
   'Merged solid': 'solid', Imported: 'solid', 'Matching band': 'solid',
 }
@@ -92,6 +93,12 @@ export function CadDesignPage() {
   const [includeStone, setIncludeStone] = useState(true)
   const [stoneShape, setStoneShape] = useState<StoneShape>('round')
   const [caratWeight, setCaratWeight] = useState(1)
+  // Ring TYPE (module 2 in the roadmap's master list) — three-stone/
+  // five-stone are Matrix-named ring types, not a separate setting: extra
+  // smaller round prong heads flanking the center stone, sharing the same
+  // band. 0 = solitaire (the only type this app had until now).
+  const [sideStoneCount, setSideStoneCount] = useState<0 | 2 | 4>(0)
+  const [sideStoneCaratWeight, setSideStoneCaratWeight] = useState(0.25)
   const [diamondType, setDiamondType] = useState<'natural' | 'lab-grown'>('natural')
   const [fancyLengthMm, setFancyLengthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.lengthMm)
   const [fancyWidthMm, setFancyWidthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.widthMm)
@@ -310,6 +317,38 @@ export function CadDesignPage() {
           orbitRadiusMm += haloStoneMm + 0.4
         }
       }
+
+      // Three-stone / five-stone (module 2's named ring TYPES) — extra
+      // smaller round prong heads flanking the center stone, sharing the
+      // same band. Round + prong + no tension only, for now (a tension-set
+      // band already replaces the whole band at angle 0, leaving no clean
+      // place to hang side heads; fancy-shape side stones are a separate
+      // future scope).
+      if (sideStoneCount > 0 && stoneShape === 'round' && settingType === 'prong' && !tensionActive) {
+        const sideStoneDiameterMm = roundDiameterMmFromCarat(sideStoneCaratWeight)
+        const sideRadius = sideStoneDiameterMm / 2
+        const centerRadius = stoneDiameterMm / 2
+        const gapMm = 0.4
+        const outerRadiusForSpacing = innerDiameterMm / 2 + thicknessMm
+        // Chain spacing along the band's own circumference (mm, converted
+        // to degrees via the outer radius): the FIRST side stone clears the
+        // center stone's own edge; each one after that clears the PREVIOUS
+        // side stone's edge instead — correct regardless of how many stones
+        // are chained, unlike a single uniform angular step would be.
+        const firstStepMm = centerRadius + gapMm + sideRadius
+        const laterStepMm = sideRadius * 2 + gapMm
+        const perSide = sideStoneCount / 2
+        for (const side of [1, -1]) {
+          for (let i = 0; i < perSide; i++) {
+            const distMm = firstStepMm + laterStepMm * i
+            const angleDeg = side * (distMm / outerRadiusForSpacing) * (180 / Math.PI)
+            const sideHead = buildStoneHeadGroup({ stoneDiameterMm: sideStoneDiameterMm, prongCount: 4 })
+            sideHead.traverse(obj => { if (obj instanceof THREE.Mesh) obj.userData.partName = 'Side stone head' })
+            attachHeadToBand(sideHead, bandParamsBase, angleDeg)
+            group.add(sideHead)
+          }
+        }
+      }
     }
     if (includePave) {
       const bandParams = { fingerSize, widthMm, thicknessMm, profile }
@@ -335,7 +374,7 @@ export function CadDesignPage() {
       group.add(matchingBand)
     }
     return group
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -764,6 +803,32 @@ export function CadDesignPage() {
                             </button>
                           ))}
                         </div>
+                      </div>
+                    )}
+                    {stoneShape === 'round' && settingType === 'prong' && !tensionActive && (
+                      <div className="space-y-3 border-t border-slate-200 pt-3">
+                        <div>
+                          <label className={labelCls}>Ring type</label>
+                          <div className="grid grid-cols-3 gap-2">
+                            {([[0, 'Solitaire'], [2, 'Three-stone'], [4, 'Five-stone']] as const).map(([n, label]) => (
+                              <button key={n} type="button" onClick={() => setSideStoneCount(n)}
+                                className={`rounded-xl border px-2.5 py-2 text-xs font-semibold transition ${sideStoneCount === n ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                          <p className="mt-1 text-[11px] text-slate-400">
+                            Matrix's own named Ring Builder types — smaller round prong heads flanking the center
+                            stone, sharing the same band.
+                          </p>
+                        </div>
+                        {sideStoneCount > 0 && (
+                          <div>
+                            <label className={labelCls}>Side stone carat weight (each)</label>
+                            <input type="number" min={0.05} max={2} step={0.05} value={sideStoneCaratWeight}
+                              onChange={e => setSideStoneCaratWeight(Math.max(0.05, Number(e.target.value) || 0.05))} className={inputCls} />
+                          </div>
+                        )}
                       </div>
                     )}
                     {stoneShape === 'round' && settingType === 'bezel' && (
