@@ -118,7 +118,12 @@ export function CadDesignPage() {
   const [pointDirection, setPointDirection] = useState<'up' | 'down'>('up')
   const [settingType, setSettingType] = useState<SettingType>('prong')
   const [bezelCoverage, setBezelCoverage] = useState<'full' | 'half'>('full')
-  const [prongCount, setProngCount] = useState<4 | 6>(4)
+  // Round stones support any prong count (the geometry loop is generic by
+  // angle); fancy shapes still snap to 4 or 6 (their prong seats are
+  // anchored to shape-specific landmark points — corners/tips — not evenly
+  // spaced by angle, see fancyProngPoints's own doc comment) — closes the
+  // "custom prong count beyond 4/6" gap noted in the roadmap, for round.
+  const [prongCount, setProngCount] = useState(4)
   const [clusterPetalCount, setClusterPetalCount] = useState(6)
   const [clusterPetalStoneMm, setClusterPetalStoneMm] = useState(2)
   const [includeHalo, setIncludeHalo] = useState(false)
@@ -191,7 +196,7 @@ export function CadDesignPage() {
     setDiamondType(p.diamondType as typeof diamondType)
     setFancyLengthMm(p.fancyLengthMm); setFancyWidthMm(p.fancyWidthMm)
     setSettingType(p.settingType as SettingType); setBezelCoverage(p.bezelCoverage as typeof bezelCoverage)
-    setProngCount(p.prongCount as 4 | 6); setClusterPetalCount(p.clusterPetalCount); setClusterPetalStoneMm(p.clusterPetalStoneMm)
+    setProngCount(p.prongCount); setClusterPetalCount(p.clusterPetalCount); setClusterPetalStoneMm(p.clusterPetalStoneMm)
     setIncludeHalo(p.includeHalo); setHaloCount(p.haloCount); setHaloStoneMm(p.haloStoneMm)
     setIncludePave(p.includePave); setPaveSettingType(p.paveSettingType as typeof paveSettingType)
     setPaveCount(p.paveCount); setPaveStoneMm(p.paveStoneMm)
@@ -356,7 +361,7 @@ export function CadDesignPage() {
                 : settingType === 'illusion'
                   ? buildIllusionHeadGroup({ stoneDiameterMm })
                   : buildStoneHeadGroup({ stoneDiameterMm, prongCount, prongHeightOverridesMm }))
-          : buildFancyStoneHeadGroup({ shape: stoneShape, lengthMm: fancyLengthMm, widthMm: fancyWidthMm, prongCount, pointDirection })
+          : buildFancyStoneHeadGroup({ shape: stoneShape, lengthMm: fancyLengthMm, widthMm: fancyWidthMm, prongCount: (prongCount >= 5 ? 6 : 4), pointDirection })
         attachHeadToBand(head, bandParamsBase)
         group.add(head)
       }
@@ -1039,7 +1044,22 @@ export function CadDesignPage() {
                       </div>
                     )}
 
-                    {(stoneShape !== 'round' || settingType === 'prong') && (
+                    {stoneShape === 'round' && settingType === 'prong' && (
+                      <div>
+                        <label className={labelCls}>Prongs</label>
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={() => setProngCount(Math.max(3, prongCount - 1))}
+                            className="h-9 w-9 shrink-0 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-600 transition hover:border-slate-300">−</button>
+                          <input type="number" min={3} max={8} step={1} value={prongCount}
+                            onChange={e => setProngCount(Math.min(8, Math.max(3, Number(e.target.value) || 3)))}
+                            className={`${inputCls} text-center`} />
+                          <button type="button" onClick={() => setProngCount(Math.min(8, prongCount + 1))}
+                            className="h-9 w-9 shrink-0 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-600 transition hover:border-slate-300">+</button>
+                        </div>
+                        <p className="mt-1 text-xs text-slate-400">Any count from 3–8, evenly spaced — round is the only shape whose prongs aren't anchored to fixed landmark points, so it's the only one this can be fully custom for.</p>
+                      </div>
+                    )}
+                    {stoneShape !== 'round' && (
                       <div>
                         <label className={labelCls}>Prongs</label>
                         <div className="grid grid-cols-2 gap-2">

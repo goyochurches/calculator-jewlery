@@ -422,7 +422,14 @@ export function defaultProngHeightMm(stoneDiameterMm: number): number {
 export interface StoneHeadParams {
   /** Round-brilliant diameter, in mm (see roundDiameterMmFromCarat). */
   stoneDiameterMm: number
-  prongCount: 4 | 6
+  /** Any count works — the build loop below spaces prongs evenly by angle
+   *  regardless of N (unlike the fancy-shape version, which anchors prongs
+   *  to shape-specific landmark points like corners/tips and is still
+   *  limited to 4 or 6 — see `FancyStoneHeadParams.prongCount`). Sane range
+   *  for a round stone is roughly 3 (barely holds it) to 8 (crowded on
+   *  anything but a large stone); not clamped here, so the UI is
+   *  responsible for keeping it sensible. */
+  prongCount: number
   /** Diameter of each prong, in mm. */
   prongDiameterMm?: number
   /** How far the prong tips reach above the gallery ring, in mm — enough to
