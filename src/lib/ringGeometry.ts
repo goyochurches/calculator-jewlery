@@ -2529,6 +2529,100 @@ export function buildFluteRibs(params: FluteParams, band: RingBandParams): THREE
   return group
 }
 
+// ── Capped tube — a general reusable primitive ──────────────────────────────
+// `THREE.TubeGeometry` never caps its own ends (unlike a closed loop such as
+// `buildRopeEdge`'s strands, an OPEN tube — a wire with two free ends — is
+// left with two holes, which silently corrupts `computeVolumeMm3`'s signed-
+// tetrahedron sum exactly the way the original band-profile bug did (see
+// that fix's note near `buildBandProfile`). A naive "build a separate circle
+// and rotate it to face the tangent" cap was tried FIRST and discarded: with
+// real curvature, the tube's own cross-section rolls along the path (Frenet/
+// parallel-transport frames), so an independently-rotated circle's rim
+// vertices land at different angular positions than the tube wall's actual
+// boundary loop — merged, it produces a badly non-manifold seam (verified
+// wrong: an origin-shift volume check showed relative differences over
+// 100× at some angles). The fix: reuse the tube's OWN already-generated
+// boundary-loop vertices directly (fan triangles from the curve's endpoint
+// to that exact loop) instead of building an independent circle — a shared,
+// exact seam by construction, not an approximation. Verified watertight
+// (origin-shift volume check, <1e-4 relative diff) across many angle/size/
+// segment-count combinations before trusting this.
+function buildCappedTube(curve: THREE.Curve<THREE.Vector3>, radiusMm: number, tubularSegments = 16, radialSegments = 8): THREE.BufferGeometry {
+  const tube = new THREE.TubeGeometry(curve, tubularSegments, radiusMm, radialSegments, false)
+  const makeFanCap = (ringIndex: number, center: THREE.Vector3, flip: boolean): THREE.BufferGeometry => {
+    const pos = tube.attributes.position
+    const base = ringIndex * (radialSegments + 1)
+    const positions = [center.x, center.y, center.z]
+    for (let j = 0; j < radialSegments; j++) positions.push(pos.getX(base + j), pos.getY(base + j), pos.getZ(base + j))
+    const indices: number[] = []
+    for (let j = 0; j < radialSegments; j++) {
+      const a = 1 + j, b = 1 + ((j + 1) % radialSegments)
+      indices.push(0, ...(flip ? [b, a] : [a, b]))
+    }
+    const n = 1 + radialSegments
+    const cap = new THREE.BufferGeometry()
+    cap.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+    // mergeGeometries requires every input to share the same attribute set
+    // as the tube (position/normal/uv) — placeholder values here, fixed up
+    // by the computeVertexNormals() call on the final merged result below.
+    cap.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(n * 3).fill(0), 3))
+    cap.setAttribute('uv', new THREE.Float32BufferAttribute(new Array(n * 2).fill(0), 2))
+    cap.setIndex(indices)
+    return cap
+  }
+  // The two ends need OPPOSITE winding (verified, not assumed) — same
+  // "the two cut ends face opposite directions" reasoning already noted on
+  // `buildTensionBandGeometry`'s own two manual caps.
+  const capStart = makeFanCap(0, curve.getPointAt(0), false)
+  const capEnd = makeFanCap(tubularSegments, curve.getPointAt(1), true)
+  const merged = mergeGeometries([tube, capStart, capEnd])
+  merged.computeVertexNormals()
+  return merged
+}
+
+// ── Gallery wire (filigree) — Matrix's own decorative-surface tool ─────────
+// Thin curved wires arcing from the gallery ring down to the band, a
+// vintage/antique-style "basket" look, standing in for (or alongside) the
+// stand's plain solid cone. Built in the head's own local "+Y up" space, so
+// `attachHeadToBand` positions it the same way it already does for the rest
+// of the head.
+
+export interface GalleryWireParams {
+  stoneDiameterMm: number
+  standHeightMm: number
+  wireCount?: number
+  wireDiameterMm?: number
+}
+
+/** Each wire is a real closed (capped) solid via `buildCappedTube` — unlike
+ *  an uncapped tube, this is genuinely watertight and contributes a correct
+ *  weight, not a silently-wrong one. Round center stone only for now (same
+ *  scoping as halo/cluster — a fancy-shape version would need the wire
+ *  anchor points to follow that shape's own outline instead of a circle). */
+export function buildGalleryWireGroup(params: GalleryWireParams): THREE.Group {
+  const { stoneDiameterMm, standHeightMm } = params
+  const wireCount = params.wireCount ?? 6
+  const stoneRadius = stoneDiameterMm / 2
+  const wireDiameterMm = params.wireDiameterMm ?? Math.max(0.3, stoneDiameterMm * 0.05)
+  const topRadius = stoneRadius * 0.85
+  const bottomRadius = stoneRadius * 0.5
+  const bellyRadius = stoneRadius * 1.15 // bows outward past the gallery — the classic filigree "belly"
+
+  const group = new THREE.Group()
+  for (let i = 0; i < wireCount; i++) {
+    const angle = (i / wireCount) * Math.PI * 2
+    const top = new THREE.Vector3(Math.cos(angle) * topRadius, 0, Math.sin(angle) * topRadius)
+    const mid = new THREE.Vector3(Math.cos(angle) * bellyRadius, -standHeightMm * 0.5, Math.sin(angle) * bellyRadius)
+    const bottom = new THREE.Vector3(Math.cos(angle) * bottomRadius, -standHeightMm, Math.sin(angle) * bottomRadius)
+    const curve = new THREE.CatmullRomCurve3([top, mid, bottom])
+    const wire = new THREE.Mesh(buildCappedTube(curve, wireDiameterMm / 2))
+    wire.userData.partName = 'Gallery wire'
+    wire.userData.instanceIndex = i
+    group.add(wire)
+  }
+  return group
+}
+
 // ── Bar setting ──────────────────────────────────────────────────────────────
 // A fourth side-stone setting type alongside pavé/channel/flush — Matrix's
 // own named "Bar setting": stones sit flush between thin vertical metal

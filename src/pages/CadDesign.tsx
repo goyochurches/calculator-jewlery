@@ -19,7 +19,7 @@ import {
   buildTensionBandGeometry, buildTensionSetting, tensionGapDegForStone,
   buildTaperedBandGeometry, buildTwistedBandGeometry, buildSplitShankGeometry, buildCathedralBandGeometry,
   buildIllusionHeadGroup,
-  buildMilgrainEdges, buildRopeEdge, buildFluteRibs,
+  buildMilgrainEdges, buildRopeEdge, buildFluteRibs, buildGalleryWireGroup,
   unionMetalParts, extractStoneMeshes, checkWatertightness,
   checkMinimumWallThickness, defaultProngDiameterMm, defaultGalleryTubeMm, RECOMMENDED_MIN_WALL_MM,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
@@ -68,7 +68,7 @@ const PART_TAB: Record<string, Tab> = {
   'Flush stone': 'side', 'Flush collar': 'side', 'Bar stone': 'side', 'Bar post': 'side',
   'Invisible-set stone': 'side',
   'Side stone head': 'center', 'Shank strand': 'band', 'Signet top': 'center', 'Engraved text': 'center',
-  'Milgrain bead': 'band', 'Rope strand': 'band', 'Flute rib': 'band',
+  'Milgrain bead': 'band', 'Rope strand': 'band', 'Flute rib': 'band', 'Gallery wire': 'center',
   'Merged solid': 'solid', Imported: 'solid', 'Matching band': 'solid',
 }
 import { Download, RotateCw, Scale, MousePointerClick } from 'lucide-react'
@@ -182,6 +182,10 @@ export function CadDesignPage() {
   const [includeRope, setIncludeRope] = useState(false)
   const [includeFlutes, setIncludeFlutes] = useState(false)
   const [fluteCount, setFluteCount] = useState(24)
+  // Gallery wire (filigree) — thin curved wires under the head, a vintage/
+  // antique-style basket look. Round + prong only, see ringGeometry.ts.
+  const [includeGalleryWire, setIncludeGalleryWire] = useState(false)
+  const [galleryWireCount, setGalleryWireCount] = useState(6)
   const [autoRotate, setAutoRotate] = useState(false)
   const [wireframe, setWireframe] = useState(false)
   const viewerRef = useRef<ModelViewer3DHandle>(null)
@@ -219,7 +223,7 @@ export function CadDesignPage() {
     includeMatchingBand, matchingBandWidthMm, splitStrandCount,
     includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, matchingBandCount,
     includeRingLaborFee, ringLaborTierKey,
-    includeFlutes, fluteCount, pointDirection,
+    includeFlutes, fluteCount, pointDirection, includeGalleryWire, galleryWireCount,
   })
 
   const applyPreset = (p: CadDesignParams) => {
@@ -255,6 +259,8 @@ export function CadDesignPage() {
     setMatchingBandCount((p.matchingBandCount as 1 | 2 | 3) ?? 1)
     setIncludeFlutes(p.includeFlutes ?? false)
     setFluteCount(p.fluteCount ?? 24)
+    setIncludeGalleryWire(p.includeGalleryWire ?? false)
+    setGalleryWireCount(p.galleryWireCount ?? 6)
     setPointDirection((p.pointDirection as 'up' | 'down') ?? 'up')
     setImportedModel(null); setImportFileName(null) // a loaded preset is the parametric design, not an import
     setProngHeightOverridesMm({}) // per-instance overrides don't round-trip through a preset (indices may not line up)
@@ -437,6 +443,16 @@ export function CadDesignPage() {
           : buildFancyStoneHeadGroup({ shape: stoneShape, lengthMm: fancyLengthMm, widthMm: fancyWidthMm, prongCount: (prongCount >= 5 ? 6 : 4), pointDirection })
         attachHeadToBand(head, bandParamsBase)
         group.add(head)
+
+        // Gallery wire (filigree) — round + prong only, same scoping as
+        // halo/cluster (bezel/cluster/illusion already have their own
+        // distinct undergallery structure; a fancy-shape version would
+        // need anchor points following that shape's own outline).
+        if (includeGalleryWire && stoneShape === 'round' && settingType === 'prong' && !tensionActive) {
+          const wires = buildGalleryWireGroup({ stoneDiameterMm, standHeightMm: stoneDiameterMm * 0.45, wireCount: galleryWireCount })
+          attachHeadToBand(wires, bandParamsBase)
+          group.add(wires)
+        }
       }
 
       if (haloEligible) {
@@ -529,7 +545,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -723,7 +739,8 @@ export function CadDesignPage() {
             pear, emerald, asscher, radiant, hexagon, lozenge, trapezoid,
             heart or trillion, with mirrorable point direction for pear/
             trapezoid/heart/trillion),
-            side stones (pavé, channel, flush, bar or invisible), optional milgrain, twisted-rope or flute edging, an optional
+            side stones (pavé, channel, flush, bar or invisible), optional milgrain, twisted-rope, flute edging or
+            filigree gallery wire, an optional
             matching band, raised text engraving on a signet's flat top,
             and solid/export, grouped into tabs the
             way Matrix groups its own tools (Ring Rail, Gems, Milgrain, Parametric Boolean) instead of one long form.
@@ -1307,6 +1324,28 @@ export function CadDesignPage() {
                               className="shrink-0 rounded-lg border border-slate-300 px-2 py-1 font-semibold hover:bg-slate-50">
                               Restore all
                             </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {stoneShape === 'round' && settingType === 'prong' && !tensionActive && (
+                      <div className="space-y-3 border-t border-slate-200 pt-3">
+                        <label className="flex items-center justify-between gap-3">
+                          <span>
+                            <span className="text-sm font-semibold text-slate-900">Gallery wire (filigree)</span>
+                            <p className="mt-0.5 text-[11px] text-slate-400">
+                              Thin curved wires under the head instead of a plain solid stand — a vintage/antique
+                              basket look.
+                            </p>
+                          </span>
+                          <input type="checkbox" checked={includeGalleryWire} onChange={e => setIncludeGalleryWire(e.target.checked)}
+                            className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+                        </label>
+                        {includeGalleryWire && (
+                          <div>
+                            <label className={labelCls}>Wire count</label>
+                            <input type="number" min={3} max={12} step={1} value={galleryWireCount}
+                              onChange={e => setGalleryWireCount(Math.max(3, Number(e.target.value) || 3))} className={inputCls} />
                           </div>
                         )}
                       </div>
