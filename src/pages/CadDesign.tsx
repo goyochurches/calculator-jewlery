@@ -57,24 +57,36 @@ const FANCY_SHAPE_DEFAULTS: Record<FancyStoneShape, { lengthMm: number; widthMm:
   trillion: { lengthMm: 8, widthMm: 8 },
 }
 
-type Tab = 'band' | 'center' | 'side' | 'solid'
+// Matches Matrix's own real toolbar groups (pasted by the user straight
+// from the app's own UI — see the CAD roadmap memory's "Real MatrixGold
+// toolbar catalog"), not an ad-hoc split of this page's own choosing:
+// "Ring Rail" (Tools group: Ring Rail/Outside/Cathedral Ring Rail —
+// shank/profile), "Gems" (the Gems group — Base/Gem/Pavé/Gems on Curve,
+// covering both the center stone and side/melee stones as one group,
+// same as Matrix does), "Solid/Surface" (that group's own name —
+// Milgrain/Rope/Smart Pattern/Parametric Boolean, plus the closely
+// related Award Ring/Text tools), "Production" (this app's own addition
+// — manufacturability checks, pricing, export — Matrix doesn't have a
+// single named toolbar group for this, it's spread across separate
+// dialogs there).
+type Tab = 'ringrail' | 'gems' | 'surface' | 'production'
 
 // Which tab's controls actually shape a given clicked part — every
 // `userData.partName` any ringGeometry.ts builder sets should have an
 // entry here. Selecting a part jumps straight to the tab that controls
 // it, instead of leaving the jeweler to hunt for the right slider.
 const PART_TAB: Record<string, Tab> = {
-  Band: 'band',
-  Gallery: 'center', Prong: 'center', Stand: 'center', 'Center stone': 'center',
-  'Bezel wall': 'center', 'Cluster plate': 'center', 'Cluster petal': 'center',
-  'Tension contact': 'center', 'Halo stone': 'center', 'Illusion skirt': 'center',
-  'Pavé stone': 'side', 'Channel stone': 'side', 'Channel rail': 'side',
-  'Flush stone': 'side', 'Flush collar': 'side', 'Bar stone': 'side', 'Bar post': 'side',
-  'Invisible-set stone': 'side',
-  'Side stone head': 'center', 'Shank strand': 'band', 'Signet top': 'center', 'Engraved text': 'center',
-  'Milgrain bead': 'band', 'Rope strand': 'band', 'Flute rib': 'band', 'Gallery wire': 'center', 'Band text': 'band',
-  'Side panel': 'solid', 'Side panel text': 'solid', 'Pattern motif': 'band', 'Logo': 'solid',
-  'Merged solid': 'solid', Imported: 'solid', 'Matching band': 'solid',
+  Band: 'ringrail',
+  Gallery: 'gems', Prong: 'gems', Stand: 'gems', 'Center stone': 'gems',
+  'Bezel wall': 'gems', 'Cluster plate': 'gems', 'Cluster petal': 'gems',
+  'Tension contact': 'gems', 'Halo stone': 'gems', 'Illusion skirt': 'gems',
+  'Pavé stone': 'gems', 'Channel stone': 'gems', 'Channel rail': 'gems',
+  'Flush stone': 'gems', 'Flush collar': 'gems', 'Bar stone': 'gems', 'Bar post': 'gems',
+  'Invisible-set stone': 'gems',
+  'Side stone head': 'gems', 'Shank strand': 'ringrail', 'Signet top': 'gems', 'Engraved text': 'gems',
+  'Milgrain bead': 'surface', 'Rope strand': 'surface', 'Flute rib': 'surface', 'Gallery wire': 'gems', 'Band text': 'surface',
+  'Side panel': 'surface', 'Side panel text': 'surface', 'Pattern motif': 'surface', 'Logo': 'surface',
+  'Merged solid': 'surface', Imported: 'production', 'Matching band': 'surface',
 }
 import { Download, RotateCw, Scale, MousePointerClick } from 'lucide-react'
 
@@ -405,7 +417,7 @@ export function CadDesignPage() {
   // Grouped like Matrix's own toolbar groups (Tools/Ring-Rail, Gems, Solid/
   // Surface) instead of one long scrolling form — same controls, just not
   // all visible at once.
-  const [activeTab, setActiveTab] = useState<Tab>('band')
+  const [activeTab, setActiveTab] = useState<Tab>('ringrail')
   // First real click-to-select CAD interaction: which part of the model
   // (if any) was last clicked in the viewer — see ModelViewer3D.
   const [selectedPart, setSelectedPart] = useState<SelectedPart | null>(null)
@@ -916,11 +928,12 @@ export function CadDesignPage() {
             filigree gallery wire or a star/diamond/geometric Smart Pattern, an optional
             matching band, optional Award Ring side panels, raised text engraving on a signet's flat top or
             wrapped around the band itself, SVG logo/artwork import,
-            and solid/export, grouped into tabs the
-            way Matrix groups its own tools (Ring Rail, Gems, Milgrain, Parametric Boolean) instead of one long form.
+            and solid/export, grouped into tabs named after Matrix's OWN real toolbar groups (Ring Rail, Gems,
+            Solid/Surface — plus a Production tab this app adds on top, for checks/pricing/export) instead of one
+            long form or this app's own invented categories.
             Click any part of the model in the viewer to select and identify it — click a single prong and you can
             edit its height on its own, a first real per-instance edit, not just a global slider. Import an existing
-            STL/OBJ/3MF or .3dm file (Solid tab) to view it right here too — the other half of the original ask. The center
+            STL/OBJ/3MF or .3dm file (Production tab) to view it right here too — the other half of the original ask. The center
             stone (every shape) is now a real faceted crown+pavilion, not a placeholder — a simplified "single cut"
             facet count, not full ideal-cut precision. This is not a Matrix/RhinoGold replacement yet — melee (pavé/
             halo/channel/etc.) and cluster petals still use simple bead proxies. Building toward full parity step by step.
@@ -966,10 +979,10 @@ export function CadDesignPage() {
 
             <div className="grid grid-cols-4 gap-1.5 rounded-2xl bg-slate-100 p-1">
               {([
-                ['band', 'Band'],
-                ['center', 'Center stone'],
-                ['side', 'Side stones'],
-                ['solid', 'Solid'],
+                ['ringrail', 'Ring Rail'],
+                ['gems', 'Gems'],
+                ['surface', 'Solid/Surface'],
+                ['production', 'Production'],
               ] as const).map(([tab, label]) => (
                 <button key={tab} type="button" onClick={() => setActiveTab(tab)}
                   className={`rounded-xl px-2 py-2 text-xs font-semibold transition ${activeTab === tab ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
@@ -1119,7 +1132,7 @@ export function CadDesignPage() {
               )
             )}
 
-            {activeTab === 'band' && (
+            {activeTab === 'ringrail' && (
               <div className="space-y-5">
                 <div>
                   <label className={labelCls}>Ring size</label>
@@ -1226,7 +1239,11 @@ export function CadDesignPage() {
                     ))}
                   </select>
                 </div>
+              </div>
+            )}
 
+            {activeTab === 'surface' && (
+              <div className="space-y-5">
                 <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
                   <span>
                     <span className="text-sm font-semibold text-slate-900">Milgrain edging</span>
@@ -1320,7 +1337,7 @@ export function CadDesignPage() {
               </div>
             )}
 
-            {activeTab === 'center' && (
+            {activeTab === 'gems' && (
               <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
                 <label className="flex items-center justify-between gap-3">
                   <span>
@@ -1626,7 +1643,7 @@ export function CadDesignPage() {
               </div>
             )}
 
-            {activeTab === 'side' && (
+            {activeTab === 'gems' && (
               <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
                 <label className="flex items-center justify-between gap-3">
                   <span className="text-sm font-semibold text-slate-900">Side stones</span>
@@ -1694,7 +1711,7 @@ export function CadDesignPage() {
               </div>
             )}
 
-            {activeTab === 'solid' && (
+            {activeTab === 'surface' && (
               <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
                 <label className="flex items-center justify-between gap-3">
                   <span className="text-sm font-semibold text-slate-900">Merge into one solid</span>
@@ -1887,8 +1904,12 @@ export function CadDesignPage() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
 
-                <div className="space-y-2 border-t border-slate-200 pt-3">
+            {activeTab === 'production' && (
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                <div className="space-y-2">
                   <span className="text-sm font-semibold text-slate-900">Import a file to view</span>
                   <p className="text-[11px] text-slate-400">
                     View an existing STL, OBJ, 3MF, or .3dm export (a real Matrix/Rhino/other CAD file) right here —
@@ -1920,8 +1941,12 @@ export function CadDesignPage() {
                     <p className="rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700">{importError}</p>
                   )}
                 </div>
+              </div>
+            )}
 
-                <div className="space-y-2 border-t border-slate-200 pt-3">
+            {activeTab === 'surface' && (
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                <div className="space-y-2">
                   <span className="text-sm font-semibold text-slate-900">Logo/artwork import</span>
                   <p className="text-[11px] text-slate-400">
                     Matrix's own "Logo import" — SVG only (it's already vector, unlike DXF/PNG which each need their
