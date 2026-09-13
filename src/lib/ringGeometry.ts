@@ -894,6 +894,13 @@ export interface HaloParams {
    *  (not a Set) so React state holding this stays a simple immutable
    *  value the React Compiler can reason about. */
   excludeIndices?: number[]
+  /** Per-instance diameter override (mm), same keying/convention as
+   *  `StoneHeadParams.prongDiameterOverridesMm` — the SAME simplification
+   *  that one already discloses applies here too: only the one stone's
+   *  own sphere changes size, its orbit POSITION still comes from the
+   *  shared `haloStoneDiameterMm`, so a much bigger override can
+   *  slightly overlap its neighbors. */
+  stoneDiameterOverridesMm?: Record<number, number>
 }
 
 /** The orbit radius (mm) `buildHaloGroup` would use for a given stone size/
@@ -919,7 +926,8 @@ export function buildHaloGroup(params: HaloParams): THREE.Group {
   for (let i = 0; i < haloCount; i++) {
     if (params.excludeIndices?.includes(i)) continue
     const angle = (i / haloCount) * Math.PI * 2
-    const stone = new THREE.Mesh(new THREE.SphereGeometry(haloStoneRadius, 14, 10))
+    const thisRadius = (params.stoneDiameterOverridesMm?.[i] ?? params.haloStoneDiameterMm ?? haloStoneRadius * 2) / 2
+    const stone = new THREE.Mesh(new THREE.SphereGeometry(thisRadius, 14, 10))
     stone.position.set(Math.cos(angle) * orbitRadius, 0, Math.sin(angle) * orbitRadius)
     stone.userData.isStone = true
     stone.userData.partName = 'Halo stone'
@@ -1825,6 +1833,11 @@ export interface PaveRowParams {
    *  plain array (not a Set) so React state holding this stays a simple
    *  immutable value the React Compiler can reason about. */
   excludeIndices?: number[]
+  /** Per-instance diameter override (mm), same keying/convention as
+   *  `HaloParams.stoneDiameterOverridesMm`/`StoneHeadParams.prongDiameterOverridesMm` —
+   *  only the one stone's own sphere changes size, its seat POSITION
+   *  still comes from the shared `stoneDiameterMm`. */
+  stoneDiameterOverridesMm?: Record<number, number>
 }
 
 /** A row of small placeholder stones (spheres — pavé doesn't need the
@@ -1835,7 +1848,7 @@ export interface PaveRowParams {
  *  reorientation since it's built straight onto the band's own outer
  *  surface at each angle. */
 export function buildPaveRow(params: PaveRowParams, band: RingBandParams): THREE.Group {
-  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12, excludeIndices } = params
+  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12, excludeIndices, stoneDiameterOverridesMm } = params
   const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
   const stoneRadius = stoneDiameterMm / 2
   const seatRadius = outerRadius - stoneRadius * 0.3 // sink each stone slightly into the band
@@ -1850,7 +1863,8 @@ export function buildPaveRow(params: PaveRowParams, band: RingBandParams): THREE
       const t = perSide === 1 ? 0 : i / (perSide - 1)
       const angleDeg = side * (gapDeg + t * Math.max(0, spreadDeg - gapDeg))
       const angle = (angleDeg * Math.PI) / 180
-      const stone = new THREE.Mesh(new THREE.SphereGeometry(stoneRadius, 16, 12))
+      const thisRadius = (stoneDiameterOverridesMm?.[thisIndex] ?? stoneDiameterMm) / 2
+      const stone = new THREE.Mesh(new THREE.SphereGeometry(thisRadius, 16, 12))
       stone.position.set(Math.cos(angle) * seatRadius, 0, Math.sin(angle) * seatRadius)
       stone.userData.isStone = true
       stone.userData.partName = 'Pavé stone'

@@ -419,6 +419,10 @@ export function CadDesignPage() {
   const [excludedPaveIndices, setExcludedPaveIndices] = useState<number[]>([])
   const [excludedHaloIndices, setExcludedHaloIndices] = useState<number[]>([])
   const [excludedClusterIndices, setExcludedClusterIndices] = useState<number[]>([])
+  // Per-instance SIZE editing extended to pavé/halo — the same override
+  // pattern round prongs already proved out with height+diameter.
+  const [paveStoneDiameterOverridesMm, setPaveStoneDiameterOverridesMm] = useState<Record<number, number>>({})
+  const [haloStoneDiameterOverridesMm, setHaloStoneDiameterOverridesMm] = useState<Record<number, number>>({})
   // Selecting a part jumps to whichever tab actually controls it — bridges
   // "I clicked this" to "here's how to change it" even though the controls
   // are still per-feature (every prong, say) rather than per-instance yet.
@@ -559,6 +563,7 @@ export function CadDesignPage() {
           const halo = buildHaloGroup({
             stoneDiameterMm, haloCount, haloStoneDiameterMm: haloStoneMm, orbitRadiusMm,
             excludeIndices: ring === 0 ? excludedHaloIndices : undefined,
+            stoneDiameterOverridesMm: ring === 0 ? haloStoneDiameterOverridesMm : undefined,
           })
           attachHeadToBand(halo, bandParamsBase)
           group.add(halo)
@@ -638,7 +643,7 @@ export function CadDesignPage() {
             ? buildBarSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices }, bandParams)
             : paveSettingType === 'invisible'
               ? buildInvisibleSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices }, bandParams)
-              : buildPaveRow({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices }, bandParams)
+              : buildPaveRow({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices, stoneDiameterOverridesMm: paveStoneDiameterOverridesMm }, bandParams)
       group.add(sideStones)
     }
     if (includeMatchingBand) {
@@ -669,7 +674,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, logoSvgText, logoSizeMm, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, logoSvgText, logoSizeMm, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -725,11 +730,13 @@ export function CadDesignPage() {
   if (paveExclusionKeySeen !== paveExclusionKey) {
     setPaveExclusionKeySeen(paveExclusionKey)
     setExcludedPaveIndices([])
+    setPaveStoneDiameterOverridesMm({})
   }
   const [haloCountSeen, setHaloCountSeen] = useState(haloCount)
   if (haloCountSeen !== haloCount) {
     setHaloCountSeen(haloCount)
     setExcludedHaloIndices([])
+    setHaloStoneDiameterOverridesMm({})
   }
   const [clusterPetalCountSeen, setClusterPetalCountSeen] = useState(clusterPetalCount)
   if (clusterPetalCountSeen !== clusterPetalCount) {
@@ -790,15 +797,28 @@ export function CadDesignPage() {
   // in the UI rather than modeled as its own independent choice).
   const estimatedMeleeCost = useMemo(() => {
     let total = 0
-    // Counts here subtract individually-removed instances (excludeIndices
-    // only ever applies to the first halo ring, matching the model
-    // useMemo's own `ring === 0 ? excludedHaloIndices : undefined` logic
-    // above) — this melee pricing shipped before per-instance removal
-    // existed for pavé/halo, so it originally always priced the FULL
-    // configured count even after a stone was removed; fixed here rather
-    // than left as a known drift between the model and its own price tag.
-    if (haloEligible) total += nearestDiamondPrice(caratFromRoundDiameterMm(haloStoneMm), diamondType) * (haloCount * haloRingCount - excludedHaloIndices.length)
-    if (includePave) total += nearestDiamondPrice(caratFromRoundDiameterMm(paveStoneMm), diamondType) * (paveCount - excludedPaveIndices.length)
+    // Individual removals/size overrides only ever apply to pavé and to
+    // halo's FIRST ring (matching the model useMemo's own
+    // `ring === 0 ? excludedHaloIndices : undefined` convention) — priced
+    // stone-by-stone for exactly that reason, rather than a flat
+    // count×size that would silently ignore a per-instance size edit.
+    if (haloEligible) {
+      for (let i = 0; i < haloCount; i++) {
+        if (excludedHaloIndices.includes(i)) continue
+        const d = haloStoneDiameterOverridesMm[i] ?? haloStoneMm
+        total += nearestDiamondPrice(caratFromRoundDiameterMm(d), diamondType)
+      }
+      if (haloRingCount > 1) {
+        total += nearestDiamondPrice(caratFromRoundDiameterMm(haloStoneMm), diamondType) * haloCount * (haloRingCount - 1)
+      }
+    }
+    if (includePave) {
+      for (let i = 0; i < paveCount; i++) {
+        if (excludedPaveIndices.includes(i)) continue
+        const d = paveStoneDiameterOverridesMm[i] ?? paveStoneMm
+        total += nearestDiamondPrice(caratFromRoundDiameterMm(d), diamondType)
+      }
+    }
     if (sideStoneCount > 0 && stoneShape === 'round' && settingType === 'prong' && !tensionActive) {
       total += nearestDiamondPrice(sideStoneCaratWeight, diamondType) * sideStoneCount
     }
@@ -808,8 +828,8 @@ export function CadDesignPage() {
     return total
     // eslint-disable-next-line react-hooks/exhaustive-deps -- same reasoning as estimatedStoneCost above: nearestDiamondPrice is a fresh closure every render, its real inputs (config, diamondType) are already listed below.
   }, [
-    config, diamondType, haloEligible, haloStoneMm, haloCount, haloRingCount, excludedHaloKey,
-    includePave, paveStoneMm, paveCount, excludedPaveKey,
+    config, diamondType, haloEligible, haloStoneMm, haloCount, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm,
+    includePave, paveStoneMm, paveCount, excludedPaveKey, paveStoneDiameterOverridesMm,
     sideStoneCount, stoneShape, settingType, tensionActive, sideStoneCaratWeight,
     clusterPetalStoneMm, clusterPetalCount, excludedClusterKey,
   ])
@@ -1012,28 +1032,68 @@ export function CadDesignPage() {
                   </div>
                 </div>
               ) : canRemovePaveInstance ? (
-                <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
-                  <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
-                  <span className="flex-1">
-                    Selected <strong>{selectedPart.name} #{(selectedPart.instanceIndex ?? 0) + 1}</strong>.
-                  </span>
-                  <button type="button"
-                    onClick={() => setExcludedPaveIndices(prev => [...prev, selectedPart.instanceIndex!])}
-                    className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
-                    Remove this stone
-                  </button>
+                <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                  <div className="flex items-center gap-2">
+                    <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
+                    <span className="flex-1">
+                      Selected <strong>{selectedPart.name} #{(selectedPart.instanceIndex ?? 0) + 1}</strong>.
+                    </span>
+                    <button type="button"
+                      onClick={() => setExcludedPaveIndices(prev => [...prev, selectedPart.instanceIndex!])}
+                      className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
+                      Remove this stone
+                    </button>
+                  </div>
+                  {paveSettingType === 'pave' && (
+                    <div className="flex items-center gap-2">
+                      <span className="w-14 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-amber-600">Size</span>
+                      <input type="range" min={0.5} max={paveStoneMm * 2.5} step={0.05}
+                        value={paveStoneDiameterOverridesMm[selectedPart.instanceIndex ?? 0] ?? paveStoneMm}
+                        onChange={e => setPaveStoneDiameterOverridesMm(prev => ({ ...prev, [selectedPart.instanceIndex ?? 0]: Number(e.target.value) }))}
+                        className="flex-1" />
+                      <span className="w-14 shrink-0 text-right font-mono">
+                        {(paveStoneDiameterOverridesMm[selectedPart.instanceIndex ?? 0] ?? paveStoneMm).toFixed(2)}mm
+                      </span>
+                      {selectedPart.instanceIndex !== undefined && paveStoneDiameterOverridesMm[selectedPart.instanceIndex] !== undefined && (
+                        <button type="button"
+                          onClick={() => setPaveStoneDiameterOverridesMm(prev => { const next = { ...prev }; delete next[selectedPart.instanceIndex!]; return next })}
+                          className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
+                          Reset
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : canRemoveHaloInstance ? (
-                <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
-                  <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
-                  <span className="flex-1">
-                    Selected <strong>Halo stone #{(selectedPart.instanceIndex ?? 0) + 1}</strong>.
-                  </span>
-                  <button type="button"
-                    onClick={() => setExcludedHaloIndices(prev => [...prev, selectedPart.instanceIndex!])}
-                    className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
-                    Remove this stone
-                  </button>
+                <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                  <div className="flex items-center gap-2">
+                    <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
+                    <span className="flex-1">
+                      Selected <strong>Halo stone #{(selectedPart.instanceIndex ?? 0) + 1}</strong>.
+                    </span>
+                    <button type="button"
+                      onClick={() => setExcludedHaloIndices(prev => [...prev, selectedPart.instanceIndex!])}
+                      className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
+                      Remove this stone
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-14 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-amber-600">Size</span>
+                    <input type="range" min={0.5} max={haloStoneMm * 2.5} step={0.05}
+                      value={haloStoneDiameterOverridesMm[selectedPart.instanceIndex ?? 0] ?? haloStoneMm}
+                      onChange={e => setHaloStoneDiameterOverridesMm(prev => ({ ...prev, [selectedPart.instanceIndex ?? 0]: Number(e.target.value) }))}
+                      className="flex-1" />
+                    <span className="w-14 shrink-0 text-right font-mono">
+                      {(haloStoneDiameterOverridesMm[selectedPart.instanceIndex ?? 0] ?? haloStoneMm).toFixed(2)}mm
+                    </span>
+                    {selectedPart.instanceIndex !== undefined && haloStoneDiameterOverridesMm[selectedPart.instanceIndex] !== undefined && (
+                      <button type="button"
+                        onClick={() => setHaloStoneDiameterOverridesMm(prev => { const next = { ...prev }; delete next[selectedPart.instanceIndex!]; return next })}
+                        className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
+                        Reset
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : canRemoveClusterInstance ? (
                 <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
