@@ -238,6 +238,7 @@ export function CadDesignPage() {
     setPointDirection((p.pointDirection as 'up' | 'down') ?? 'up')
     setImportedModel(null); setImportFileName(null) // a loaded preset is the parametric design, not an import
     setProngHeightOverridesMm({}) // per-instance overrides don't round-trip through a preset (indices may not line up)
+    setProngDiameterOverridesMm({})
   }
 
   const handleSavePreset = () => {
@@ -297,6 +298,9 @@ export function CadDesignPage() {
   // (round prong setting only, for now — the pattern this proves out can
   // extend to other repeated parts later). Keyed by prong index.
   const [prongHeightOverridesMm, setProngHeightOverridesMm] = useState<Record<number, number>>({})
+  // Second per-instance-editable prong property, same pattern as height
+  // above (click one prong → override just its own diameter).
+  const [prongDiameterOverridesMm, setProngDiameterOverridesMm] = useState<Record<number, number>>({})
   const [excludedPaveIndices, setExcludedPaveIndices] = useState<number[]>([])
   const [excludedHaloIndices, setExcludedHaloIndices] = useState<number[]>([])
   // Selecting a part jumps to whichever tab actually controls it — bridges
@@ -405,7 +409,7 @@ export function CadDesignPage() {
                 ? buildClusterHeadGroup({ centerStoneDiameterMm: stoneDiameterMm, petalCount: clusterPetalCount, petalStoneDiameterMm: clusterPetalStoneMm })
                 : settingType === 'illusion'
                   ? buildIllusionHeadGroup({ stoneDiameterMm })
-                  : buildStoneHeadGroup({ stoneDiameterMm, prongCount, prongHeightOverridesMm }))
+                  : buildStoneHeadGroup({ stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm }))
           : buildFancyStoneHeadGroup({ shape: stoneShape, lengthMm: fancyLengthMm, widthMm: fancyWidthMm, prongCount: (prongCount >= 5 ? 6 : 4), pointDirection })
         attachHeadToBand(head, bandParamsBase)
         group.add(head)
@@ -501,7 +505,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -757,6 +761,7 @@ export function CadDesignPage() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <span className="w-12 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-amber-600">Height</span>
                     <input type="range" min={stoneDiameterMm * 0.25} max={stoneDiameterMm * 1.1} step={0.1}
                       value={prongHeightOverridesMm[selectedPart.instanceIndex ?? 0] ?? defaultProngHeightMm(stoneDiameterMm)}
                       onChange={e => setProngHeightOverridesMm(prev => ({ ...prev, [selectedPart.instanceIndex ?? 0]: Number(e.target.value) }))}
@@ -767,6 +772,27 @@ export function CadDesignPage() {
                     {selectedPart.instanceIndex !== undefined && prongHeightOverridesMm[selectedPart.instanceIndex] !== undefined && (
                       <button type="button"
                         onClick={() => setProngHeightOverridesMm(prev => {
+                          const next = { ...prev }
+                          delete next[selectedPart.instanceIndex!]
+                          return next
+                        })}
+                        className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
+                        Reset
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-12 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-amber-600">Diameter</span>
+                    <input type="range" min={0.5} max={defaultProngDiameterMm(stoneDiameterMm) * 2.5} step={0.05}
+                      value={prongDiameterOverridesMm[selectedPart.instanceIndex ?? 0] ?? defaultProngDiameterMm(stoneDiameterMm)}
+                      onChange={e => setProngDiameterOverridesMm(prev => ({ ...prev, [selectedPart.instanceIndex ?? 0]: Number(e.target.value) }))}
+                      className="flex-1" />
+                    <span className="w-14 shrink-0 text-right font-mono">
+                      {(prongDiameterOverridesMm[selectedPart.instanceIndex ?? 0] ?? defaultProngDiameterMm(stoneDiameterMm)).toFixed(2)}mm
+                    </span>
+                    {selectedPart.instanceIndex !== undefined && prongDiameterOverridesMm[selectedPart.instanceIndex] !== undefined && (
+                      <button type="button"
+                        onClick={() => setProngDiameterOverridesMm(prev => {
                           const next = { ...prev }
                           delete next[selectedPart.instanceIndex!]
                           return next

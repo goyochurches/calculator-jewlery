@@ -477,6 +477,16 @@ export interface StoneHeadParams {
    *  "select ONE part and edit just it" interaction in this file. Every
    *  index not present here still uses `prongHeightMm` (or its default). */
   prongHeightOverridesMm?: Record<number, number>
+  /** Per-instance diameter override (mm), same keying/convention as
+   *  `prongHeightOverridesMm` above — the SECOND per-instance-editable
+   *  prong property. Only the one prong's own cylinder changes; its
+   *  orbit POSITION still comes from the shared `prongDiameterMm` (same
+   *  simplification the height override already makes for the gallery/
+   *  stand), so a much fatter override can visually overlap the stone
+   *  slightly and a much thinner one can leave a small gap — an honest
+   *  approximation, not a full re-solve of the head's layout for one
+   *  prong's sake. */
+  prongDiameterOverridesMm?: Record<number, number>
   /** Height of the tapered stand connecting the gallery down to the band's
    *  outer surface, in mm. */
   standHeightMm?: number
@@ -495,6 +505,7 @@ export function buildStoneHeadGroup(params: StoneHeadParams): THREE.Group {
     prongDiameterMm = defaultProngDiameterMm(stoneDiameterMm),
     prongHeightMm = defaultProngHeightMm(stoneDiameterMm),
     prongHeightOverridesMm,
+    prongDiameterOverridesMm,
     standHeightMm = stoneDiameterMm * 0.45,
   } = params
   const stoneRadius = stoneDiameterMm / 2
@@ -514,8 +525,9 @@ export function buildStoneHeadGroup(params: StoneHeadParams): THREE.Group {
   for (let i = 0; i < prongCount; i++) {
     const angle = (i / prongCount) * Math.PI * 2
     const thisHeightMm = prongHeightOverridesMm?.[i] ?? prongHeightMm
+    const thisDiameterMm = prongDiameterOverridesMm?.[i] ?? prongDiameterMm
     const prong = new THREE.Mesh(
-      new THREE.CylinderGeometry(prongDiameterMm * 0.35, prongDiameterMm / 2, thisHeightMm, 12),
+      new THREE.CylinderGeometry(thisDiameterMm * 0.35, thisDiameterMm / 2, thisHeightMm, 12),
     )
     prong.position.set(
       Math.cos(angle) * prongOrbitRadius,
