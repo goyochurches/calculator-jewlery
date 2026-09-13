@@ -1878,6 +1878,10 @@ export interface FlushSettingParams {
   stoneDiameterMm: number
   spreadDeg?: number
   gapDeg?: number
+  /** Same per-instance removal pattern `buildPaveRow` already proved out —
+   *  removes the stone AND its own burnished collar (an orphaned collar
+   *  ring with no stone in it would look wrong). */
+  excludeIndices?: number[]
 }
 
 /** A row of stones sunk into the band's outer surface, each ringed by a
@@ -1885,7 +1889,7 @@ export interface FlushSettingParams {
  *  defining visual signature of a flush/gypsy setting (no prongs, no
  *  rails, just metal burnished over the stone's edge). */
 export function buildFlushSetting(params: FlushSettingParams, band: RingBandParams): THREE.Group {
-  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12 } = params
+  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12, excludeIndices } = params
   const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
   const stoneRadius = stoneDiameterMm / 2
   // Sunk much deeper than pavé's shallow sink (0.3×) or channel's near-flush
@@ -1895,8 +1899,11 @@ export function buildFlushSetting(params: FlushSettingParams, band: RingBandPara
   const perSide = Math.max(1, Math.round(count / 2))
 
   const group = new THREE.Group()
+  let index = 0
   for (const side of [1, -1]) {
     for (let i = 0; i < perSide; i++) {
+      const thisIndex = index++
+      if (excludeIndices?.includes(thisIndex)) continue
       const t = perSide === 1 ? 0 : i / (perSide - 1)
       const angleDeg = side * (gapDeg + t * Math.max(0, spreadDeg - gapDeg))
       const angle = (angleDeg * Math.PI) / 180
@@ -1906,6 +1913,7 @@ export function buildFlushSetting(params: FlushSettingParams, band: RingBandPara
       stone.position.set(cos * seatRadius, 0, sin * seatRadius)
       stone.userData.isStone = true
       stone.userData.partName = 'Flush stone'
+      stone.userData.instanceIndex = thisIndex
       group.add(stone)
 
       // The burnished collar — a small torus lying flat against the band's
@@ -1916,6 +1924,7 @@ export function buildFlushSetting(params: FlushSettingParams, band: RingBandPara
       rim.position.set(cos * outerRadius, 0, sin * outerRadius)
       rim.rotation.x = Math.PI / 2
       rim.userData.partName = 'Flush collar'
+      rim.userData.instanceIndex = thisIndex
       group.add(rim)
     }
   }
@@ -1997,6 +2006,11 @@ export interface ChannelSettingParams {
   gapDeg?: number
   wallHeightMm?: number
   wallThicknessMm?: number
+  /** Same per-instance removal pattern `buildPaveRow` already proved out.
+   *  Channel's own rail walls span the WHOLE arc (not per-stone), so
+   *  removing a stone here doesn't orphan anything else, unlike flush's
+   *  own collar or cluster's own petal prongs. */
+  excludeIndices?: number[]
 }
 
 /** Points along a circular arc (radius `r`, at axial height `y`) from
@@ -2019,7 +2033,7 @@ function arcPoints3(r: number, y: number, fromDeg: number, toDeg: number, segmen
  *  TorusGeometry's own arc/rotation parameters (easier to reason about
  *  correctly against this file's existing angle convention). */
 export function buildChannelSetting(params: ChannelSettingParams, band: RingBandParams): THREE.Group {
-  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12 } = params
+  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12, excludeIndices } = params
   const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
   const stoneRadius = stoneDiameterMm / 2
   const wallHeightMm = params.wallHeightMm ?? stoneRadius * 0.8
@@ -2029,8 +2043,11 @@ export function buildChannelSetting(params: ChannelSettingParams, band: RingBand
 
   const group = new THREE.Group()
 
+  let index = 0
   for (const side of [1, -1]) {
     for (let i = 0; i < perSide; i++) {
+      const thisIndex = index++
+      if (excludeIndices?.includes(thisIndex)) continue
       const t = perSide === 1 ? 0 : i / (perSide - 1)
       const deg = side * (gapDeg + t * Math.max(0, spreadDeg - gapDeg))
       const rad = (deg * Math.PI) / 180
@@ -2038,19 +2055,26 @@ export function buildChannelSetting(params: ChannelSettingParams, band: RingBand
       stone.position.set(Math.cos(rad) * seatRadius, wallHeightMm * 0.3, Math.sin(rad) * seatRadius)
       stone.userData.isStone = true
       stone.userData.partName = 'Channel stone'
+      stone.userData.instanceIndex = thisIndex
       group.add(stone)
     }
   }
 
   // Two wall arcs (one per side of the head) × two rails each (flanking
-  // the stones along the width axis).
+  // the stones along the width axis). Each rail is a real CAPPED tube
+  // (`buildCappedTube`, the same primitive gallery wire uses) — this was
+  // a genuine pre-existing gap, found and fixed while touching this
+  // function for the exclude-indices work above: a plain uncapped
+  // TubeGeometry here would silently corrupt computeVolumeMm3's weight
+  // estimate for any channel-setting design, the same open-mesh bug
+  // class as the original band-profile bug.
   for (const side of [1, -1]) {
     const fromDeg = side === 1 ? gapDeg : -spreadDeg
     const toDeg = side === 1 ? spreadDeg : -gapDeg
     for (const railSide of [1, -1]) {
       const yOffset = railSide * (stoneRadius + wallThicknessMm / 2)
       const curve = new THREE.CatmullRomCurve3(arcPoints3(seatRadius, yOffset, fromDeg, toDeg))
-      const wall = new THREE.Mesh(new THREE.TubeGeometry(curve, 32, wallThicknessMm / 2, 8, false))
+      const wall = new THREE.Mesh(buildCappedTube(curve, wallThicknessMm / 2, 32, 8))
       wall.userData.partName = 'Channel rail'
       group.add(wall)
     }
@@ -3017,6 +3041,13 @@ export interface BarSettingParams {
   gapDeg?: number
   barThicknessMm?: number
   barHeightMm?: number
+  /** Same per-instance removal pattern `buildPaveRow` already proved
+   *  out — removes only the STONE, not its neighboring bar post(s): bar
+   *  setting's posts are shared structural elements between adjacent
+   *  stones (the defining look), so removing them too on one stone's
+   *  removal would be a bigger, separate design decision than a plain
+   *  "take this stone out" edit. */
+  excludeIndices?: number[]
 }
 
 /** Stones at the SAME evenly-spaced angular positions pavé/channel/flush
@@ -3024,7 +3055,7 @@ export interface BarSettingParams {
  *  outer end) — built directly in the band's WORLD coordinates, same
  *  convention as those three. */
 export function buildBarSetting(params: BarSettingParams, band: RingBandParams): THREE.Group {
-  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12 } = params
+  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12, excludeIndices } = params
   const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
   const stoneRadius = stoneDiameterMm / 2
   const barThicknessMm = params.barThicknessMm ?? Math.max(0.4, stoneRadius * 0.35)
@@ -3033,17 +3064,25 @@ export function buildBarSetting(params: BarSettingParams, band: RingBandParams):
   const perSide = Math.max(1, Math.round(count / 2))
 
   const group = new THREE.Group()
+  let index = 0
   for (const side of [1, -1]) {
     const sideAnglesDeg: number[] = []
     for (let i = 0; i < perSide; i++) {
+      const thisIndex = index++
       const t = perSide === 1 ? 0 : i / (perSide - 1)
       const angleDeg = side * (gapDeg + t * Math.max(0, spreadDeg - gapDeg))
+      // Collected for EVERY stone, even an excluded one — the bar posts'
+      // own positions depend on knowing all stone angles, so an excluded
+      // stone's own empty slot should still keep its posts exactly where
+      // they'd otherwise be, not shift its neighbors closer.
       sideAnglesDeg.push(angleDeg)
+      if (excludeIndices?.includes(thisIndex)) continue
       const rad = (angleDeg * Math.PI) / 180
       const stone = new THREE.Mesh(new THREE.SphereGeometry(stoneRadius, 16, 12))
       stone.position.set(Math.cos(rad) * seatRadius, barHeightMm * 0.2, Math.sin(rad) * seatRadius)
       stone.userData.isStone = true
       stone.userData.partName = 'Bar stone'
+      stone.userData.instanceIndex = thisIndex
       group.add(stone)
     }
 
@@ -3090,6 +3129,11 @@ export interface InvisibleSettingParams {
    *  placed rather than being spaced out to fill it. */
   spreadDeg?: number
   gapDeg?: number
+  /** Same per-instance removal pattern `buildPaveRow` already proved
+   *  out. Removing one stone from an otherwise-touching row leaves a
+   *  visible gap where it sat (the row isn't re-packed to close the
+   *  gap) — an honest "this one's missing", not a re-flowed layout. */
+  excludeIndices?: number[]
 }
 
 /** Stones packed edge-to-edge (each adjacent pair's centers exactly one
@@ -3097,7 +3141,7 @@ export interface InvisibleSettingParams {
  *  `spreadDeg` — built directly in the band's WORLD coordinates, same
  *  convention as pavé/channel/flush/bar. */
 export function buildInvisibleSetting(params: InvisibleSettingParams, band: RingBandParams): THREE.Group {
-  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12 } = params
+  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12, excludeIndices } = params
   const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
   const stoneRadius = stoneDiameterMm / 2
   const seatRadius = outerRadius - stoneRadius * 0.1 // sit almost flush, like channel/bar
@@ -3107,15 +3151,19 @@ export function buildInvisibleSetting(params: InvisibleSettingParams, band: Ring
   const stepDeg = (2 * stoneRadius / seatRadius) * (180 / Math.PI)
 
   const group = new THREE.Group()
+  let index = 0
   for (const side of [1, -1]) {
     for (let i = 0; i < perSide; i++) {
+      const thisIndex = index++
       const angleDeg = side * (gapDeg + i * stepDeg)
       if (Math.abs(angleDeg) > spreadDeg) break // ran out of room in the allotted arc — stop rather than overlap
+      if (excludeIndices?.includes(thisIndex)) continue
       const rad = (angleDeg * Math.PI) / 180
       const stone = new THREE.Mesh(new THREE.SphereGeometry(stoneRadius, 16, 12))
       stone.position.set(Math.cos(rad) * seatRadius, 0, Math.sin(rad) * seatRadius)
       stone.userData.isStone = true
       stone.userData.partName = 'Invisible-set stone'
+      stone.userData.instanceIndex = thisIndex
       group.add(stone)
     }
   }

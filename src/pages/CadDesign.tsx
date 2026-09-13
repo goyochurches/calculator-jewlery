@@ -436,11 +436,14 @@ export function CadDesignPage() {
   const canEditProngInstance = selectedPart?.name === 'Prong' && selectedPart.instanceIndex !== undefined
     && stoneShape === 'round' && settingType === 'prong'
   // Second per-instance case, this time a REMOVAL rather than an edit —
-  // pavé, halo (single-ring only) and now cluster petals. Channel/flush/
-  // bar/invisible side stones still don't have excludeIndices wired in,
-  // tracked in the roadmap memory.
-  const canRemovePaveInstance = selectedPart?.name === 'Pavé stone' && selectedPart.instanceIndex !== undefined
-    && paveSettingType === 'pave'
+  // pavé, halo (single-ring only), cluster petals, and now every side-
+  // stone setting type (channel/flush/bar/invisible all have
+  // excludeIndices wired in too, same pattern as pavé itself).
+  const SIDE_STONE_PART_NAMES: Record<typeof paveSettingType, string> = {
+    pave: 'Pavé stone', channel: 'Channel stone', flush: 'Flush stone',
+    bar: 'Bar stone', invisible: 'Invisible-set stone',
+  }
+  const canRemovePaveInstance = selectedPart?.name === SIDE_STONE_PART_NAMES[paveSettingType] && selectedPart.instanceIndex !== undefined
   const canRemoveHaloInstance = selectedPart?.name === 'Halo stone' && selectedPart.instanceIndex !== undefined
     && haloRingCount === 1
   const canRemoveClusterInstance = selectedPart?.name === 'Cluster petal' && selectedPart.instanceIndex !== undefined
@@ -628,13 +631,13 @@ export function CadDesignPage() {
     if (includePave) {
       const bandParams = { fingerSize, widthMm, thicknessMm, profile }
       const sideStones = paveSettingType === 'channel'
-        ? buildChannelSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg }, bandParams)
+        ? buildChannelSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices }, bandParams)
         : paveSettingType === 'flush'
-          ? buildFlushSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg }, bandParams)
+          ? buildFlushSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices }, bandParams)
           : paveSettingType === 'bar'
-            ? buildBarSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg }, bandParams)
+            ? buildBarSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices }, bandParams)
             : paveSettingType === 'invisible'
-              ? buildInvisibleSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg }, bandParams)
+              ? buildInvisibleSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices }, bandParams)
               : buildPaveRow({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices }, bandParams)
       group.add(sideStones)
     }
@@ -1012,7 +1015,7 @@ export function CadDesignPage() {
                 <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
                   <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
                   <span className="flex-1">
-                    Selected <strong>Pavé stone #{(selectedPart.instanceIndex ?? 0) + 1}</strong>.
+                    Selected <strong>{selectedPart.name} #{(selectedPart.instanceIndex ?? 0) + 1}</strong>.
                   </span>
                   <button type="button"
                     onClick={() => setExcludedPaveIndices(prev => [...prev, selectedPart.instanceIndex!])}
@@ -1611,7 +1614,7 @@ export function CadDesignPage() {
                         further. "Eternity" (module 2's Ring Builder types) is just this maxed out.
                       </p>
                     </div>
-                    {paveSettingType === 'pave' && excludedPaveIndices.length > 0 && (
+                    {excludedPaveIndices.length > 0 && (
                       <div className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-600">
                         <span>{excludedPaveIndices.length} stone{excludedPaveIndices.length === 1 ? '' : 's'} removed individually.</span>
                         <button type="button" onClick={() => setExcludedPaveIndices([])}
