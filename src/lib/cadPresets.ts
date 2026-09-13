@@ -61,6 +61,8 @@ export interface CadDesignParams {
   galleryWireCount?: number
   includeBandText?: boolean
   bandText?: string
+  includePattern?: boolean
+  patternMotif?: string
   includeSidePanels?: boolean
   sidePanelShape?: string
   sidePanelWidthMm?: number

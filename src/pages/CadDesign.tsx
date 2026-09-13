@@ -20,6 +20,7 @@ import {
   buildTaperedBandGeometry, buildTwistedBandGeometry, buildSplitShankGeometry, buildCathedralBandGeometry,
   buildIllusionHeadGroup,
   buildMilgrainEdges, buildRopeEdge, buildFluteRibs, buildGalleryWireGroup, buildBandTextGroup, estimateBandTextWidthMm,
+  buildPatternMotifs, type PatternMotif,
   unionMetalParts, extractStoneMeshes, checkWatertightness,
   checkMinimumWallThickness, defaultProngDiameterMm, defaultGalleryTubeMm, RECOMMENDED_MIN_WALL_MM,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
@@ -69,7 +70,7 @@ const PART_TAB: Record<string, Tab> = {
   'Invisible-set stone': 'side',
   'Side stone head': 'center', 'Shank strand': 'band', 'Signet top': 'center', 'Engraved text': 'center',
   'Milgrain bead': 'band', 'Rope strand': 'band', 'Flute rib': 'band', 'Gallery wire': 'center', 'Band text': 'band',
-  'Side panel': 'solid', 'Side panel text': 'solid',
+  'Side panel': 'solid', 'Side panel text': 'solid', 'Pattern motif': 'band',
   'Merged solid': 'solid', Imported: 'solid', 'Matching band': 'solid',
 }
 import { Download, RotateCw, Scale, MousePointerClick } from 'lucide-react'
@@ -192,6 +193,11 @@ export function CadDesignPage() {
   // flat-plate-only engraving. Works on any ring, not just a signet.
   const [includeBandText, setIncludeBandText] = useState(false)
   const [bandText, setBandText] = useState('')
+  // Pattern Engine (Smart Pattern) — a repeated decorative motif around
+  // the band, same placement mechanism as milgrain/flutes, different
+  // motif shape (star/diamond/geometric).
+  const [includePattern, setIncludePattern] = useState(false)
+  const [patternMotif, setPatternMotif] = useState<PatternMotif>('star')
   // Side panels — Matrix's own Award Ring Builder concept (championship
   // rings carrying a logo/year on flat panels flanking the main setting).
   // Zero new geometry: reuses buildSignetTopGroup at two extra angles.
@@ -238,7 +244,7 @@ export function CadDesignPage() {
     includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, matchingBandCount,
     includeRingLaborFee, ringLaborTierKey,
     includeFlutes, fluteCount, pointDirection, includeGalleryWire, galleryWireCount,
-    includeBandText, bandText,
+    includeBandText, bandText, includePattern, patternMotif,
     includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText,
   })
 
@@ -279,6 +285,8 @@ export function CadDesignPage() {
     setGalleryWireCount(p.galleryWireCount ?? 6)
     setIncludeBandText(p.includeBandText ?? false)
     setBandText(p.bandText ?? '')
+    setIncludePattern(p.includePattern ?? false)
+    setPatternMotif((p.patternMotif as PatternMotif) ?? 'star')
     setIncludeSidePanels(p.includeSidePanels ?? false)
     setSidePanelShape((p.sidePanelShape as typeof sidePanelShape) ?? 'princess')
     setSidePanelWidthMm(p.sidePanelWidthMm ?? 6)
@@ -447,6 +455,7 @@ export function CadDesignPage() {
     if (includeRope) group.add(buildRopeEdge({}, bandParamsBase))
     if (includeFlutes) group.add(buildFluteRibs({ count: fluteCount }, bandParamsBase))
     if (includeBandText && bandText.trim()) group.add(buildBandTextGroup({ text: bandText }, bandParamsBase))
+    if (includePattern) group.add(buildPatternMotifs({ motif: patternMotif }, bandParamsBase))
     if (includeSignetTop) {
       const signetTop = buildSignetTopGroup({ shape: signetShape, widthMm: signetWidthMm, lengthMm: signetLengthMm, engraveText })
       attachHeadToBand(signetTop, bandParamsBase)
@@ -589,7 +598,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -783,8 +792,8 @@ export function CadDesignPage() {
             pear, emerald, asscher, radiant, hexagon, lozenge, trapezoid,
             heart or trillion, with mirrorable point direction for pear/
             trapezoid/heart/trillion),
-            side stones (pavé, channel, flush, bar or invisible), optional milgrain, twisted-rope, flute edging or
-            filigree gallery wire, an optional
+            side stones (pavé, channel, flush, bar or invisible), optional milgrain, twisted-rope, flute edging,
+            filigree gallery wire or a star/diamond/geometric Smart Pattern, an optional
             matching band, optional Award Ring side panels, raised text engraving on a signet's flat top or
             wrapped around the band itself,
             and solid/export, grouped into tabs the
@@ -1124,6 +1133,28 @@ export function CadDesignPage() {
                         </p>
                       )
                     })()}
+                  </div>
+                )}
+
+                <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                  <span>
+                    <span className="text-sm font-semibold text-slate-900">Pattern (Smart Pattern)</span>
+                    <p className="mt-0.5 text-[11px] text-slate-400">
+                      Matrix's own "Smart Pattern" tool — a repeated decorative motif around the band, same
+                      placement as milgrain/flutes with a choice of motif shape.
+                    </p>
+                  </span>
+                  <input type="checkbox" checked={includePattern} onChange={e => setIncludePattern(e.target.checked)}
+                    className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+                </label>
+                {includePattern && (
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['star', 'diamond', 'geometric'] as const).map(m => (
+                      <button key={m} type="button" onClick={() => setPatternMotif(m)}
+                        className={`rounded-xl border px-2.5 py-2 text-xs font-semibold capitalize transition ${patternMotif === m ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                        {m}
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>

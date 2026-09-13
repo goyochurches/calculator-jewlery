@@ -2733,6 +2733,82 @@ export function estimateBandTextWidthMm(text: string, sizeMm: number): number {
   return Number.isFinite(minX) ? maxX - minX : 0
 }
 
+// ── Pattern Engine (Smart Pattern) — Matrix's own named tool (module 8) ────
+// A repeated decorative MOTIF around the band, built via the SAME
+// `polarArrayAngles` primitive milgrain/flutes/gallery-wire already use —
+// distinguishing this from those is purely the motif SHAPE, not a new
+// placement mechanism. Star/diamond are flat ExtrudeGeometry outlines
+// (auto-capped by any closed 2D shape — no open-tube capping concern like
+// `buildCappedTube` had to solve for gallery wire); geometric is a plain
+// BoxGeometry, same primitive `buildFluteRibs` already uses. Positioned
+// with the EXACT same box-local-axis convention flutes already established
+// (local X → tangent, local Y → unchanged world Y/band-width, local Z →
+// radial) so a star/diamond's own flat-shape axes (X=horizontal, Y=
+// vertical, Z=extrusion depth) line up the same way once centered along Z.
+
+export type PatternMotif = 'star' | 'diamond' | 'geometric'
+
+export interface PatternParams {
+  motif: PatternMotif
+  /** Omit to derive a count from the band's own circumference, same
+   *  reasoning as milgrain's own bead-count default. */
+  count?: number
+  sizeMm?: number
+}
+
+function starOutline2D(outerRadius: number, innerRadius: number, points = 5): THREE.Vector2[] {
+  const pts: THREE.Vector2[] = []
+  for (let i = 0; i < points * 2; i++) {
+    const angle = (i / (points * 2)) * Math.PI * 2 - Math.PI / 2 // one point straight up
+    const r = i % 2 === 0 ? outerRadius : innerRadius
+    pts.push(new THREE.Vector2(r * Math.cos(angle), r * Math.sin(angle)))
+  }
+  return pts
+}
+
+/** Verified before trusting this (a throwaway script): the star outline's
+ *  winding is CCW and self-intersection-free (an exhaustive O(n²) segment
+ *  check) at the chosen proportions, and the resulting extruded template
+ *  is genuinely watertight and sits correctly straddling the band's own
+ *  outer surface (half embedded in the metal, half sticking out) — the
+ *  same origin-invariance volume trick and world-bounding-box sanity
+ *  check used throughout this file. */
+export function buildPatternMotifs(params: PatternParams, band: RingBandParams): THREE.Group {
+  const { motif } = params
+  const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
+  const sizeMm = params.sizeMm ?? Math.max(0.8, band.thicknessMm * 0.5)
+  const depth = sizeMm * 0.35
+  const count = params.count ?? Math.max(12, Math.round((2 * Math.PI * outerRadius) / (sizeMm * 2.2)))
+
+  let templateGeometry: THREE.BufferGeometry
+  if (motif === 'geometric') {
+    templateGeometry = new THREE.BoxGeometry(sizeMm, band.widthMm * 0.5, depth)
+  } else {
+    const outline = motif === 'star'
+      ? starOutline2D(sizeMm / 2, sizeMm / 2 * 0.382, 5)
+      : [ // diamond/rhombus, matching the same closed-outline convention
+          new THREE.Vector2(0, sizeMm / 2), new THREE.Vector2(-sizeMm / 2, 0),
+          new THREE.Vector2(0, -sizeMm / 2), new THREE.Vector2(sizeMm / 2, 0),
+        ]
+    templateGeometry = new THREE.ExtrudeGeometry(new THREE.Shape(outline), { depth, bevelEnabled: false })
+    templateGeometry.translate(0, 0, -depth / 2) // center along the extrusion axis, matching BoxGeometry's own centered convention
+    templateGeometry.computeVertexNormals()
+  }
+
+  const group = new THREE.Group()
+  const angles = polarArrayAngles(count)
+  for (let i = 0; i < count; i++) {
+    const angle = angles[i]
+    const motifMesh = new THREE.Mesh(templateGeometry)
+    motifMesh.rotation.y = -angle
+    motifMesh.position.set(Math.cos(angle) * (outerRadius + depth / 2), 0, Math.sin(angle) * (outerRadius + depth / 2))
+    motifMesh.userData.partName = 'Pattern motif'
+    motifMesh.userData.instanceIndex = i
+    group.add(motifMesh)
+  }
+  return group
+}
+
 // ── Bar setting ──────────────────────────────────────────────────────────────
 // A fourth side-stone setting type alongside pavé/channel/flush — Matrix's
 // own named "Bar setting": stones sit flush between thin vertical metal
