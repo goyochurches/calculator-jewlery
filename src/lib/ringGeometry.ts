@@ -547,8 +547,9 @@ export function buildStoneHeadGroup(params: StoneHeadParams): THREE.Group {
   // Prongs — tapered cylinders standing on the gallery, circling the stone
   // just outside its girdle, tips tapering in slightly to suggest a grip.
   const prongOrbitRadius = stoneRadius + prongDiameterMm / 2
+  const prongAngles = polarArrayAngles(prongCount)
   for (let i = 0; i < prongCount; i++) {
-    const angle = (i / prongCount) * Math.PI * 2
+    const angle = prongAngles[i]
     const thisHeightMm = prongHeightOverridesMm?.[i] ?? prongHeightMm
     const thisDiameterMm = prongDiameterOverridesMm?.[i] ?? prongDiameterMm
     const prong = new THREE.Mesh(
@@ -813,8 +814,9 @@ export function buildClusterHeadGroup(params: ClusterHeadParams): THREE.Group {
   const addStoneWithProngs = (cx: number, cz: number, radius: number, prongCount: number, stoneLabel: string, faceted: boolean, instanceIndex?: number) => {
     const prongDiameterMm = Math.max(0.5, radius * 0.28)
     const prongHeightMm = radius * 1.1
+    const prongAngles = polarArrayAngles(prongCount)
     for (let i = 0; i < prongCount; i++) {
-      const angle = (i / prongCount) * Math.PI * 2
+      const angle = prongAngles[i]
       const prong = new THREE.Mesh(new THREE.CylinderGeometry(prongDiameterMm * 0.35, prongDiameterMm / 2, prongHeightMm, 10))
       prong.position.set(
         cx + Math.cos(angle) * (radius + prongDiameterMm / 2),
@@ -848,9 +850,10 @@ export function buildClusterHeadGroup(params: ClusterHeadParams): THREE.Group {
 
   addStoneWithProngs(0, 0, centerRadius, 4, 'Center stone', true)
   const excludeSet = new Set(params.excludeIndices ?? [])
+  const petalAngles = polarArrayAngles(petalCount)
   for (let i = 0; i < petalCount; i++) {
     if (excludeSet.has(i)) continue
-    const angle = (i / petalCount) * Math.PI * 2
+    const angle = petalAngles[i]
     addStoneWithProngs(Math.cos(angle) * orbitRadius, Math.sin(angle) * orbitRadius, petalRadius, 3, 'Cluster petal', false, i)
   }
 
@@ -1162,6 +1165,27 @@ export type FancyStoneShape =
  *  negate-loop. */
 export function mirrorPoints2D(points: THREE.Vector2[], axis: 'x' | 'y'): THREE.Vector2[] {
   return points.map(p => (axis === 'x' ? new THREE.Vector2(-p.x, p.y) : new THREE.Vector2(p.x, -p.y)))
+}
+
+/** Matrix's own named "Polar Array" transform (Transform group: Bend/
+ *  Mirror/Polar Array/Taper/Twist — Mirror above, Taper and Twist are
+ *  already proven out as shank styles; this is the third). N evenly
+ *  spaced angles (radians) around a full circle, starting at `startDeg`.
+ *  Every "place N things evenly around a circle" construction in this
+ *  file (prongs, pavé, halo, cluster petals, milgrain beads, flutes) was
+ *  already doing this exact math inline (`(i / count) * 2π`); this pulls
+ *  it out as a reusable, explicitly-named primitive rather than leaving
+ *  it as an uncredited implementation detail of each feature that
+ *  happens to need it — a handful of call sites (the ones this file's
+ *  own comments already point to as "the same math") now call this
+ *  directly instead of repeating the formula, as a real proof of use,
+ *  not just a decorative addition; the ones left untouched are
+ *  unaffected (identical formula either way). */
+export function polarArrayAngles(count: number, startDeg = 0): number[] {
+  const startRad = (startDeg * Math.PI) / 180
+  const angles: number[] = []
+  for (let i = 0; i < count; i++) angles.push(startRad + (i / count) * Math.PI * 2)
+  return angles
 }
 
 /** Closed footprint outline (as seen from above) for one fancy shape, in
@@ -2418,9 +2442,10 @@ export function buildMilgrainEdges(params: MilgrainParams, band: RingBandParams)
     ?? Math.max(24, Math.round((2 * Math.PI * outerRadius) / (beadDiameterMm * 1.6)))
 
   const group = new THREE.Group()
+  const beadAngles = polarArrayAngles(beadCount)
   for (const edgeY of [halfWidth, -halfWidth]) {
     for (let i = 0; i < beadCount; i++) {
-      const angle = (i / beadCount) * Math.PI * 2
+      const angle = beadAngles[i]
       const bead = new THREE.Mesh(new THREE.SphereGeometry(beadDiameterMm / 2, 10, 8))
       bead.position.set(Math.cos(angle) * outerRadius, edgeY, Math.sin(angle) * outerRadius)
       bead.userData.partName = 'Milgrain bead'
@@ -2515,8 +2540,9 @@ export function buildFluteRibs(params: FluteParams, band: RingBandParams): THREE
   const ribHeightMm = params.ribHeightMm ?? band.thicknessMm * 0.25
 
   const group = new THREE.Group()
+  const ribAngles = polarArrayAngles(count)
   for (let i = 0; i < count; i++) {
-    const angle = (i / count) * Math.PI * 2
+    const angle = ribAngles[i]
     const rib = new THREE.Mesh(new THREE.BoxGeometry(ribWidthMm, band.widthMm * 0.9, ribHeightMm))
     rib.position.set(Math.cos(angle) * (outerRadius + ribHeightMm / 2), 0, Math.sin(angle) * (outerRadius + ribHeightMm / 2))
     rib.rotation.y = -angle
@@ -2609,8 +2635,9 @@ export function buildGalleryWireGroup(params: GalleryWireParams): THREE.Group {
   const bellyRadius = stoneRadius * 1.15 // bows outward past the gallery — the classic filigree "belly"
 
   const group = new THREE.Group()
+  const wireAngles = polarArrayAngles(wireCount)
   for (let i = 0; i < wireCount; i++) {
-    const angle = (i / wireCount) * Math.PI * 2
+    const angle = wireAngles[i]
     const top = new THREE.Vector3(Math.cos(angle) * topRadius, 0, Math.sin(angle) * topRadius)
     const mid = new THREE.Vector3(Math.cos(angle) * bellyRadius, -standHeightMm * 0.5, Math.sin(angle) * bellyRadius)
     const bottom = new THREE.Vector3(Math.cos(angle) * bottomRadius, -standHeightMm, Math.sin(angle) * bottomRadius)
