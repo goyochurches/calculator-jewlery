@@ -1,7 +1,32 @@
 import * as THREE from 'three'
 import { Brush, Evaluator, ADDITION } from 'three-bvh-csg'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { Font } from 'three/examples/jsm/loaders/FontLoader.js'
 import type { JewelryMetalOption } from '@/types'
+import engravingFontData from '@/assets/fonts/helvetiker_regular.typeface.json'
+
+// Module 11 (Text/Engraving) was blocked for a while — three.js's own npm
+// package ships FontLoader/TextGeometry's CODE but not any actual font
+// DATA (that lives only in the three.js GitHub repo's examples/fonts/,
+// not in node_modules). Bundling this one JSON file (imported as a
+// regular ES module, so it's part of the build, not a runtime fetch)
+// unblocks it. `Font`'s constructor is synchronous — no FontLoader.load()
+// async round-trip needed since the data is already in hand at import
+// time.
+const engravingFont = new Font(engravingFontData)
+
+/** This bundled font (Helvetiker) covers Latin letters/digits/basic
+ *  punctuation but NOT accented characters (no ñ/á/é/í/ó/ú/ü) — a real
+ *  gap for Spanish names, disclosed here rather than silently dropping a
+ *  letter or crashing on it (an unrecognized character otherwise throws
+ *  inside Font.generateShapes). Degrades accented input to its closest
+ *  plain-ASCII form (Unicode NFD decomposition + strip combining marks:
+ *  "Niño" → "Nino") rather than failing outright; anything the font
+ *  still doesn't have after that (emoji, other scripts) is dropped. */
+export function sanitizeForEngraving(text: string): string {
+  const stripped = text.normalize('NFD').replace(/[̀-ͯ]/g, '')
+  return Array.from(stripped).filter(ch => ch === '\n' || ch in engravingFontData.glyphs).join('')
+}
 
 // ── Ring-size ↔ millimeters ──────────────────────────────────────────────────
 // US ring size → inside diameter (mm). Linear approximation fit to the
@@ -658,6 +683,20 @@ export interface SignetTopParams {
   /** How far the flat top face sits above the band, in mm. */
   heightMm?: number
   standHeightMm?: number
+  /** Raised (embossed) text/initials on the flat top — Matrix's own
+   *  "Text on Curve"/"Text Objects" tools, scoped here to a signet's
+   *  genuinely flat top face rather than the much harder general case of
+   *  wrapping text around the band's own curved surface (a separate,
+   *  future step — see the CAD roadmap memory). Passed through
+   *  `sanitizeForEngraving` first, so an unsupported character degrades
+   *  instead of crashing. Only RAISED text is built (one of several
+   *  named options in Matrix's own tool — emboss/deboss/cut/engrave —
+   *  the simplest and safest to get right without a boolean subtraction;
+   *  disclosed, not the full set). */
+  engraveText?: string
+  /** Text height, in mm — defaults to a third of the plate's own smaller
+   *  half-dimension, small enough to comfortably fit inside it. */
+  engraveSizeMm?: number
 }
 
 /** A flat (slightly beveled) plate on its own stand — no stone. Same local
@@ -675,13 +714,39 @@ export function buildSignetTopGroup(params: SignetTopParams): THREE.Group {
   const outline = buildStoneOutline(shape, halfW, halfL)
   const topShape2D = new THREE.Shape(outline)
   const bevelSize = Math.min(halfW, halfL) * 0.08
-  const top = new THREE.Mesh(new THREE.ExtrudeGeometry(topShape2D, {
+  const topGeometry = new THREE.ExtrudeGeometry(topShape2D, {
     depth: heightMm * 0.7, bevelEnabled: true,
     bevelThickness: heightMm * 0.3, bevelSize, bevelSegments: 4,
-  }))
+  })
+  const top = new THREE.Mesh(topGeometry)
   top.rotation.x = -Math.PI / 2
   top.userData.partName = 'Signet top'
   group.add(top)
+
+  const cleanText = params.engraveText ? sanitizeForEngraving(params.engraveText) : ''
+  if (cleanText.length > 0) {
+    const engraveSizeMm = params.engraveSizeMm ?? Math.min(halfW, halfL) * 0.7
+    const engraveDepthMm = heightMm * 0.15
+    const textShapes = engravingFont.generateShapes(cleanText, engraveSizeMm)
+    const textGeometry = new THREE.ExtrudeGeometry(textShapes, { depth: engraveDepthMm, bevelEnabled: false })
+    textGeometry.computeBoundingBox()
+    const textBox = textGeometry.boundingBox!
+    // Center the text in both directions of its own local (pre-rotation)
+    // 2D plane, then sit it exactly flush against the plate's own top
+    // surface — read from topGeometry's OWN local bounding box rather
+    // than a hand-derived "depth + bevelThickness" formula (the bevel's
+    // exact reach isn't a clean closed form worth re-deriving by hand);
+    // both meshes share the identical rotation.x=-π/2 below, under which
+    // local +Z maps to world +Y, so the plate's local z-max IS exactly
+    // the world Y the text needs to start from.
+    topGeometry.computeBoundingBox()
+    const plateTopLocalZ = topGeometry.boundingBox!.max.z
+    textGeometry.translate(-(textBox.min.x + textBox.max.x) / 2, -(textBox.min.y + textBox.max.y) / 2, plateTopLocalZ)
+    const text = new THREE.Mesh(textGeometry)
+    text.rotation.x = -Math.PI / 2
+    text.userData.partName = 'Engraved text'
+    group.add(text)
+  }
 
   const stand = new THREE.Mesh(new THREE.CylinderGeometry(maxHalf * 0.85, maxHalf * 0.6, standHeightMm, 24))
   stand.position.y = -standHeightMm / 2

@@ -54,6 +54,7 @@ export interface CadDesignParams {
   includeFlutes?: boolean
   fluteCount?: number
   pointDirection?: string
+  engraveText?: string
 }
 
 export interface SavedCadPreset {

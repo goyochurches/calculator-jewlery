@@ -12,7 +12,7 @@ import type { JewelryMetalOption } from '@/types'
 import {
   buildRingBandGeometry, usSizeToDiameterMm, type BandProfile,
   buildStoneHeadGroup, buildBezelHeadGroup, buildClusterHeadGroup, buildHaloGroup, haloOrbitRadiusMm, attachHeadToBand, roundDiameterMmFromCarat, caratFromRoundDiameterMm, estimateFancyCaratWeight,
-  buildSignetTopGroup,
+  buildSignetTopGroup, sanitizeForEngraving,
   defaultProngHeightMm,
   buildFancyStoneHeadGroup, type FancyStoneShape,
   buildPaveRow, buildChannelSetting, buildFlushSetting, buildBarSetting, buildInvisibleSetting,
@@ -67,7 +67,7 @@ const PART_TAB: Record<string, Tab> = {
   'Pavé stone': 'side', 'Channel stone': 'side', 'Channel rail': 'side',
   'Flush stone': 'side', 'Flush collar': 'side', 'Bar stone': 'side', 'Bar post': 'side',
   'Invisible-set stone': 'side',
-  'Side stone head': 'center', 'Shank strand': 'band', 'Signet top': 'center',
+  'Side stone head': 'center', 'Shank strand': 'band', 'Signet top': 'center', 'Engraved text': 'center',
   'Milgrain bead': 'band', 'Rope strand': 'band', 'Flute rib': 'band',
   'Merged solid': 'solid', Imported: 'solid', 'Matching band': 'solid',
 }
@@ -118,6 +118,12 @@ export function CadDesignPage() {
   const [signetShape, setSignetShape] = useState<'oval' | 'cushion' | 'princess'>('oval')
   const [signetWidthMm, setSignetWidthMm] = useState(12)
   const [signetLengthMm, setSignetLengthMm] = useState(14)
+  // Engraving (module 11 — "Text on Curve"/"Text Objects"), scoped to
+  // the signet's genuinely flat top face for now (a general curved-band
+  // version is a separate, harder future step). Raw user input, run
+  // through sanitizeForEngraving only at BUILD time (in ringGeometry.ts)
+  // — kept here for a live "here's what will actually render" preview.
+  const [engraveText, setEngraveText] = useState('')
   const [diamondType, setDiamondType] = useState<'natural' | 'lab-grown'>('natural')
   const [fancyLengthMm, setFancyLengthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.lengthMm)
   const [fancyWidthMm, setFancyWidthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.widthMm)
@@ -201,7 +207,7 @@ export function CadDesignPage() {
     mergeSolid, includeMilgrain, includeRope,
     haloRingCount, sideStoneCount, sideStoneCaratWeight, sideSpreadDeg,
     includeMatchingBand, matchingBandWidthMm, splitStrandCount,
-    includeSignetTop, signetShape, signetWidthMm, signetLengthMm, matchingBandCount,
+    includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, matchingBandCount,
     includeFlutes, fluteCount, pointDirection,
   })
 
@@ -232,6 +238,7 @@ export function CadDesignPage() {
     setSignetShape((p.signetShape as typeof signetShape) ?? 'oval')
     setSignetWidthMm(p.signetWidthMm ?? 12)
     setSignetLengthMm(p.signetLengthMm ?? 14)
+    setEngraveText(p.engraveText ?? '')
     setMatchingBandCount((p.matchingBandCount as 1 | 2 | 3) ?? 1)
     setIncludeFlutes(p.includeFlutes ?? false)
     setFluteCount(p.fluteCount ?? 24)
@@ -394,7 +401,7 @@ export function CadDesignPage() {
     if (includeRope) group.add(buildRopeEdge({}, bandParamsBase))
     if (includeFlutes) group.add(buildFluteRibs({ count: fluteCount }, bandParamsBase))
     if (includeSignetTop) {
-      const signetTop = buildSignetTopGroup({ shape: signetShape, widthMm: signetWidthMm, lengthMm: signetLengthMm })
+      const signetTop = buildSignetTopGroup({ shape: signetShape, widthMm: signetWidthMm, lengthMm: signetLengthMm, engraveText })
       attachHeadToBand(signetTop, bandParamsBase)
       group.add(signetTop)
     } else if (includeStone) {
@@ -505,7 +512,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -687,7 +694,7 @@ export function CadDesignPage() {
             heart or trillion, with mirrorable point direction for pear/
             trapezoid/heart/trillion),
             side stones (pavé, channel, flush, bar or invisible), optional milgrain, twisted-rope or flute edging, an optional
-            matching band,
+            matching band, raised text engraving on a signet's flat top,
             and solid/export, grouped into tabs the
             way Matrix groups its own tools (Ring Rail, Gems, Milgrain, Parametric Boolean) instead of one long form.
             Click any part of the model in the viewer to select and identify it — click a single prong and you can
@@ -1021,6 +1028,20 @@ export function CadDesignPage() {
                       <label className={labelCls}>Length (mm)</label>
                       <input type="number" min={6} max={25} step={0.5} value={signetLengthMm}
                         onChange={e => setSignetLengthMm(Math.max(6, Number(e.target.value) || 6))} className={inputCls} />
+                    </div>
+                    <div className="col-span-2">
+                      <label className={labelCls}>Engraved initials (raised text)</label>
+                      <input type="text" maxLength={6} value={engraveText}
+                        onChange={e => setEngraveText(e.target.value)} placeholder="e.g. JD" className={inputCls} />
+                      <p className="mt-1 text-xs text-slate-400">
+                        Matrix's own "Text on Curve"/"Text Objects" tools — raised only for now (not
+                        debossed/carved), and scoped to this flat top face (wrapping text around the curved band
+                        itself is a separate, harder future step). The bundled font doesn't have accented
+                        characters (ñ/á/é/…) — they render as their plain letter instead
+                        {engraveText && sanitizeForEngraving(engraveText) !== engraveText
+                          ? ` (will render as "${sanitizeForEngraving(engraveText)}")`
+                          : ''}. Keep it short — long text isn't auto-scaled to fit the plate yet.
+                      </p>
                     </div>
                   </div>
                 )}
