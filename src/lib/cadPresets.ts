@@ -59,6 +59,8 @@ export interface CadDesignParams {
   ringLaborTierKey?: string
   includeGalleryWire?: boolean
   galleryWireCount?: number
+  includeBandText?: boolean
+  bandText?: string
 }
 
 export interface SavedCadPreset {

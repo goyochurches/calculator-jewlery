@@ -19,7 +19,7 @@ import {
   buildTensionBandGeometry, buildTensionSetting, tensionGapDegForStone,
   buildTaperedBandGeometry, buildTwistedBandGeometry, buildSplitShankGeometry, buildCathedralBandGeometry,
   buildIllusionHeadGroup,
-  buildMilgrainEdges, buildRopeEdge, buildFluteRibs, buildGalleryWireGroup,
+  buildMilgrainEdges, buildRopeEdge, buildFluteRibs, buildGalleryWireGroup, buildBandTextGroup, estimateBandTextWidthMm,
   unionMetalParts, extractStoneMeshes, checkWatertightness,
   checkMinimumWallThickness, defaultProngDiameterMm, defaultGalleryTubeMm, RECOMMENDED_MIN_WALL_MM,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
@@ -68,7 +68,7 @@ const PART_TAB: Record<string, Tab> = {
   'Flush stone': 'side', 'Flush collar': 'side', 'Bar stone': 'side', 'Bar post': 'side',
   'Invisible-set stone': 'side',
   'Side stone head': 'center', 'Shank strand': 'band', 'Signet top': 'center', 'Engraved text': 'center',
-  'Milgrain bead': 'band', 'Rope strand': 'band', 'Flute rib': 'band', 'Gallery wire': 'center',
+  'Milgrain bead': 'band', 'Rope strand': 'band', 'Flute rib': 'band', 'Gallery wire': 'center', 'Band text': 'band',
   'Merged solid': 'solid', Imported: 'solid', 'Matching band': 'solid',
 }
 import { Download, RotateCw, Scale, MousePointerClick } from 'lucide-react'
@@ -186,6 +186,11 @@ export function CadDesignPage() {
   // antique-style basket look. Round + prong only, see ringGeometry.ts.
   const [includeGalleryWire, setIncludeGalleryWire] = useState(false)
   const [galleryWireCount, setGalleryWireCount] = useState(6)
+  // Band text (Text on Curve) — raised text wrapped around the band's
+  // OUTER surface via a genuine cylindrical Bend, unlike the signet's own
+  // flat-plate-only engraving. Works on any ring, not just a signet.
+  const [includeBandText, setIncludeBandText] = useState(false)
+  const [bandText, setBandText] = useState('')
   const [autoRotate, setAutoRotate] = useState(false)
   const [wireframe, setWireframe] = useState(false)
   const viewerRef = useRef<ModelViewer3DHandle>(null)
@@ -224,6 +229,7 @@ export function CadDesignPage() {
     includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, matchingBandCount,
     includeRingLaborFee, ringLaborTierKey,
     includeFlutes, fluteCount, pointDirection, includeGalleryWire, galleryWireCount,
+    includeBandText, bandText,
   })
 
   const applyPreset = (p: CadDesignParams) => {
@@ -261,6 +267,8 @@ export function CadDesignPage() {
     setFluteCount(p.fluteCount ?? 24)
     setIncludeGalleryWire(p.includeGalleryWire ?? false)
     setGalleryWireCount(p.galleryWireCount ?? 6)
+    setIncludeBandText(p.includeBandText ?? false)
+    setBandText(p.bandText ?? '')
     setPointDirection((p.pointDirection as 'up' | 'down') ?? 'up')
     setImportedModel(null); setImportFileName(null) // a loaded preset is the parametric design, not an import
     setProngHeightOverridesMm({}) // per-instance overrides don't round-trip through a preset (indices may not line up)
@@ -423,6 +431,7 @@ export function CadDesignPage() {
     if (includeMilgrain) group.add(buildMilgrainEdges({}, bandParamsBase))
     if (includeRope) group.add(buildRopeEdge({}, bandParamsBase))
     if (includeFlutes) group.add(buildFluteRibs({ count: fluteCount }, bandParamsBase))
+    if (includeBandText && bandText.trim()) group.add(buildBandTextGroup({ text: bandText }, bandParamsBase))
     if (includeSignetTop) {
       const signetTop = buildSignetTopGroup({ shape: signetShape, widthMm: signetWidthMm, lengthMm: signetLengthMm, engraveText })
       attachHeadToBand(signetTop, bandParamsBase)
@@ -545,7 +554,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -741,7 +750,7 @@ export function CadDesignPage() {
             trapezoid/heart/trillion),
             side stones (pavé, channel, flush, bar or invisible), optional milgrain, twisted-rope, flute edging or
             filigree gallery wire, an optional
-            matching band, raised text engraving on a signet's flat top,
+            matching band, raised text engraving on a signet's flat top or wrapped around the band itself,
             and solid/export, grouped into tabs the
             way Matrix groups its own tools (Ring Rail, Gems, Milgrain, Parametric Boolean) instead of one long form.
             Click any part of the model in the viewer to select and identify it — click a single prong and you can
@@ -1047,6 +1056,38 @@ export function CadDesignPage() {
                     <label className={labelCls}>Flute count</label>
                     <input type="number" min={8} max={60} step={1} value={fluteCount}
                       onChange={e => setFluteCount(Math.max(8, Number(e.target.value) || 8))} className={inputCls} />
+                  </div>
+                )}
+
+                <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+                  <span>
+                    <span className="text-sm font-semibold text-slate-900">Text on curve (band engraving)</span>
+                    <p className="mt-0.5 text-[11px] text-slate-400">
+                      Raised text wrapped around the band's own outer surface — Matrix's own "Text on Curve" tool,
+                      via a genuine cylindrical bend (not just a flat plate like the signet's own engraving).
+                      Deliberately on the OUTER surface: raised text on the inside would press against skin.
+                    </p>
+                  </span>
+                  <input type="checkbox" checked={includeBandText} onChange={e => setIncludeBandText(e.target.checked)}
+                    className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+                </label>
+                {includeBandText && (
+                  <div>
+                    <input type="text" maxLength={20} value={bandText}
+                      onChange={e => setBandText(e.target.value)} placeholder="e.g. FOREVER YOURS" className={inputCls} />
+                    {(() => {
+                      const sizeMm = widthMm * 0.4
+                      const widthNeeded = estimateBandTextWidthMm(bandText, sizeMm)
+                      const circumference = 2 * Math.PI * outerRadiusMm
+                      const tooLong = widthNeeded > circumference * 0.85
+                      return (
+                        <p className={`mt-1 text-xs ${tooLong ? 'text-amber-600' : 'text-slate-400'}`}>
+                          {tooLong
+                            ? `This will wrap most of the way (or all the way) around the band at this width — shorten it or it'll visually overlap itself.`
+                            : `The bundled font doesn't have accented characters (ñ/á/é/…) — they render as their plain letter instead.`}
+                        </p>
+                      )
+                    })()}
                   </div>
                 )}
               </div>

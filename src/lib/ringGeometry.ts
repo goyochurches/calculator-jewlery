@@ -2650,6 +2650,89 @@ export function buildGalleryWireGroup(params: GalleryWireParams): THREE.Group {
   return group
 }
 
+// ── Band text (Text on Curve) — Matrix's own decorative-surface tool ───────
+// The harder case deferred when engraving first shipped scoped to the
+// signet's genuinely FLAT top (`SignetTopParams.engraveText`): wrapping
+// text around the band's own CURVED outer surface. Unblocked here via a
+// genuine cylindrical BEND — the last of the five Transform-group tools
+// (Bend/Mirror/Polar Array/Taper/Twist) to become a real primitive in this
+// file. Deliberately the OUTER surface, not inner: raised text on the
+// INSIDE of a worn ring would press uncomfortably against skin — a real
+// ergonomics reason, not just an implementation convenience (a real
+// inside-the-band inscription would need to be DEBOSSED/carved, the same
+// boolean-subtraction gap the signet text's own doc comment already
+// discloses, not attempted here either).
+
+export interface BandTextParams {
+  text: string
+  sizeMm?: number
+  depthMm?: number
+}
+
+/** Each character's own flat extruded shape gets bent around the band's
+ *  circumference by mapping its local reading-direction coordinate (x) to
+ *  an angle (θ = −x / outerRadius — the sign matters, see below) and its
+ *  extrusion depth (z) to an outward radial offset, leaving the "up"
+ *  coordinate (y) as the band's own axial/width direction, unchanged.
+ *
+ *  Verified before trusting this (a throwaway script, same rigor as every
+ *  other non-trivial geometric claim in this file):
+ *  1. The bend preserves WATERTIGHTNESS — a flat extruded-text mesh (already
+ *     a genuinely closed 2-manifold, confirmed independently) stays closed
+ *     after every vertex is moved by this map, confirmed via the same
+ *     origin-shift volume trick `checkWatertightness` itself uses.
+ *  2. The bend does NOT introduce a mirror/reflection — tried the naive
+ *     θ = +x/outerRadius first: it flipped the mesh's own volume SIGN
+ *     relative to the flat (unbent) version, which means it silently
+ *     turns the extrusion inside-out (equivalent to mirroring the
+ *     letters). θ = −x/outerRadius keeps the same sign as the flat
+ *     mesh — confirmed, not assumed, by comparing signed volumes before
+ *     and after bending. */
+export function buildBandTextGroup(params: BandTextParams, band: RingBandParams): THREE.Group {
+  const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
+  const sizeMm = params.sizeMm ?? band.widthMm * 0.4
+  const depthMm = params.depthMm ?? band.thicknessMm * 0.12
+  const cleanText = sanitizeForEngraving(params.text)
+  const group = new THREE.Group()
+  if (cleanText.length === 0) return group
+
+  const shapes = engravingFont.generateShapes(cleanText, sizeMm)
+  const geometry = new THREE.ExtrudeGeometry(shapes, { depth: depthMm, bevelEnabled: false })
+  geometry.computeBoundingBox()
+  const box = geometry.boundingBox!
+  geometry.translate(-(box.min.x + box.max.x) / 2, -(box.min.y + box.max.y) / 2, 0)
+
+  const pos = geometry.attributes.position
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i)
+    const theta = -x / outerRadius
+    const r = outerRadius + z
+    pos.setXYZ(i, r * Math.cos(theta), y, r * Math.sin(theta))
+  }
+  pos.needsUpdate = true
+  geometry.computeVertexNormals()
+
+  const mesh = new THREE.Mesh(geometry)
+  mesh.userData.partName = 'Band text'
+  group.add(mesh)
+  return group
+}
+
+/** Rough arc-length this text would need at a given size — lets the UI warn
+ *  before the text wraps around more than the band's own circumference
+ *  (visually overlapping itself) without building the full 3D geometry
+ *  just to check. */
+export function estimateBandTextWidthMm(text: string, sizeMm: number): number {
+  const cleanText = sanitizeForEngraving(text)
+  if (cleanText.length === 0) return 0
+  const shapes = engravingFont.generateShapes(cleanText, sizeMm)
+  let minX = Infinity, maxX = -Infinity
+  for (const shape of shapes) {
+    for (const pt of shape.getPoints()) { minX = Math.min(minX, pt.x); maxX = Math.max(maxX, pt.x) }
+  }
+  return Number.isFinite(minX) ? maxX - minX : 0
+}
+
 // ── Bar setting ──────────────────────────────────────────────────────────────
 // A fourth side-stone setting type alongside pavé/channel/flush — Matrix's
 // own named "Bar setting": stones sit flush between thin vertical metal
