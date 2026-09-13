@@ -1149,7 +1149,7 @@ export function CadDesignPage() {
                 </label>
                 {includePattern && (
                   <div className="grid grid-cols-3 gap-2">
-                    {(['star', 'diamond', 'geometric'] as const).map(m => (
+                    {(['star', 'diamond', 'geometric', 'leaf', 'flower'] as const).map(m => (
                       <button key={m} type="button" onClick={() => setPatternMotif(m)}
                         className={`rounded-xl border px-2.5 py-2 text-xs font-semibold capitalize transition ${patternMotif === m ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
                         {m}

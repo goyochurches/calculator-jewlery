@@ -2746,7 +2746,7 @@ export function estimateBandTextWidthMm(text: string, sizeMm: number): number {
 // radial) so a star/diamond's own flat-shape axes (X=horizontal, Y=
 // vertical, Z=extrusion depth) line up the same way once centered along Z.
 
-export type PatternMotif = 'star' | 'diamond' | 'geometric'
+export type PatternMotif = 'star' | 'diamond' | 'geometric' | 'leaf' | 'flower'
 
 export interface PatternParams {
   motif: PatternMotif
@@ -2766,13 +2766,32 @@ function starOutline2D(outerRadius: number, innerRadius: number, points = 5): TH
   return pts
 }
 
-/** Verified before trusting this (a throwaway script): the star outline's
- *  winding is CCW and self-intersection-free (an exhaustive O(n²) segment
- *  check) at the chosen proportions, and the resulting extruded template
- *  is genuinely watertight and sits correctly straddling the band's own
- *  outer surface (half embedded in the metal, half sticking out) — the
- *  same origin-invariance volume trick and world-bounding-box sanity
- *  check used throughout this file. */
+/** A rounded N-lobed rosette — Matrix's own organic-primitive-adjacent
+ *  "flower" motif (module 9's blob/flower/petal primitives overlap with
+ *  the Pattern Engine's own motif list here). `r(θ) = R·(0.35 +
+ *  0.65·max(0, cos(petals·θ)))` never reaches 0 (unlike a bare rose
+ *  curve, which would pinch to a cusp at the center between petals),
+ *  giving smooth rounded lobes instead — verified CCW/self-intersection-
+ *  free at 5 and 6 petals before trusting it. */
+function flowerOutline2D(radius: number, petals = 5, segments = 96): THREE.Vector2[] {
+  const pts: THREE.Vector2[] = []
+  for (let i = 0; i < segments; i++) {
+    const theta = (i / segments) * Math.PI * 2
+    const r = radius * (0.35 + 0.65 * Math.max(0, Math.cos(petals * theta)))
+    pts.push(new THREE.Vector2(r * Math.cos(theta), r * Math.sin(theta)))
+  }
+  return pts
+}
+
+/** Verified before trusting this (a throwaway script): the star and flower
+ *  outlines' winding is CCW and self-intersection-free (an exhaustive O(n²)
+ *  segment check) at the chosen proportions (leaf/diamond reuse already-
+ *  verified constructions — marquise's own vesica, and a plain rhombus —
+ *  so weren't re-checked from scratch), and the resulting extruded
+ *  template is genuinely watertight and sits correctly straddling the
+ *  band's own outer surface (half embedded in the metal, half sticking
+ *  out) — the same origin-invariance volume trick and world-bounding-box
+ *  sanity check used throughout this file. */
 export function buildPatternMotifs(params: PatternParams, band: RingBandParams): THREE.Group {
   const { motif } = params
   const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
@@ -2786,10 +2805,17 @@ export function buildPatternMotifs(params: PatternParams, band: RingBandParams):
   } else {
     const outline = motif === 'star'
       ? starOutline2D(sizeMm / 2, sizeMm / 2 * 0.382, 5)
-      : [ // diamond/rhombus, matching the same closed-outline convention
-          new THREE.Vector2(0, sizeMm / 2), new THREE.Vector2(-sizeMm / 2, 0),
-          new THREE.Vector2(0, -sizeMm / 2), new THREE.Vector2(sizeMm / 2, 0),
-        ]
+      : motif === 'flower'
+        ? flowerOutline2D(sizeMm / 2, 5)
+        : motif === 'leaf'
+          // Reuses the marquise/vesica construction verbatim (already
+          // independently verified when it shipped as a gemstone shape)
+          // at motif scale — an elongated pointed-oval reads as a leaf.
+          ? buildStoneOutline('marquise', sizeMm / 3, sizeMm / 2)
+          : [ // diamond/rhombus, matching the same closed-outline convention
+              new THREE.Vector2(0, sizeMm / 2), new THREE.Vector2(-sizeMm / 2, 0),
+              new THREE.Vector2(0, -sizeMm / 2), new THREE.Vector2(sizeMm / 2, 0),
+            ]
     templateGeometry = new THREE.ExtrudeGeometry(new THREE.Shape(outline), { depth, bevelEnabled: false })
     templateGeometry.translate(0, 0, -depth / 2) // center along the extrusion axis, matching BoxGeometry's own centered convention
     templateGeometry.computeVertexNormals()
