@@ -55,6 +55,8 @@ export interface CadDesignParams {
   fluteCount?: number
   pointDirection?: string
   engraveText?: string
+  includeRingLaborFee?: boolean
+  ringLaborTierKey?: string
 }
 
 export interface SavedCadPreset {

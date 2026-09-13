@@ -124,6 +124,16 @@ export function CadDesignPage() {
   // through sanitizeForEngraving only at BUILD time (in ringGeometry.ts)
   // — kept here for a live "here's what will actually render" preview.
   const [engraveText, setEngraveText] = useState('')
+  // Ring labor fee (module 17, Pricing Engine) — a real flat fee per tier,
+  // read directly from the app's own `config.ringLaborTiers` (the SAME
+  // tiers Quote Builder itself uses) rather than guessing tier names/
+  // fees. Deliberately opt-in (not a guessed default tier), and
+  // deliberately does NOT add a "CAD design labor" fee alongside it —
+  // Quote Builder's own pricing hardcodes that to $0 today (see the CAD
+  // roadmap memory's deferral note), so inventing one here would be
+  // inconsistent with the rest of the app.
+  const [includeRingLaborFee, setIncludeRingLaborFee] = useState(false)
+  const [ringLaborTierKey, setRingLaborTierKey] = useState('')
   const [diamondType, setDiamondType] = useState<'natural' | 'lab-grown'>('natural')
   const [fancyLengthMm, setFancyLengthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.lengthMm)
   const [fancyWidthMm, setFancyWidthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.widthMm)
@@ -208,6 +218,7 @@ export function CadDesignPage() {
     haloRingCount, sideStoneCount, sideStoneCaratWeight, sideSpreadDeg,
     includeMatchingBand, matchingBandWidthMm, splitStrandCount,
     includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, matchingBandCount,
+    includeRingLaborFee, ringLaborTierKey,
     includeFlutes, fluteCount, pointDirection,
   })
 
@@ -239,6 +250,8 @@ export function CadDesignPage() {
     setSignetWidthMm(p.signetWidthMm ?? 12)
     setSignetLengthMm(p.signetLengthMm ?? 14)
     setEngraveText(p.engraveText ?? '')
+    setIncludeRingLaborFee(p.includeRingLaborFee ?? false)
+    setRingLaborTierKey(p.ringLaborTierKey ?? '')
     setMatchingBandCount((p.matchingBandCount as 1 | 2 | 3) ?? 1)
     setIncludeFlutes(p.includeFlutes ?? false)
     setFluteCount(p.fluteCount ?? 24)
@@ -647,7 +660,8 @@ export function CadDesignPage() {
     sideStoneCount, stoneShape, settingType, tensionActive, sideStoneCaratWeight,
     clusterPetalStoneMm, clusterPetalCount, excludedClusterKey,
   ])
-  const estimatedTotalCost = estimatedMetalCost + estimatedStoneCost + estimatedMeleeCost
+  const estimatedLaborCost = includeRingLaborFee ? (config.ringLaborMap[ringLaborTierKey]?.fee ?? 0) : 0
+  const estimatedTotalCost = estimatedMetalCost + estimatedStoneCost + estimatedMeleeCost + estimatedLaborCost
 
   // Module 21 in the roadmap's master list ("export STL/OBJ/3MF/STEP/3DM/
   // GLB/USDZ") — STL was the only option until now. OBJ and GLB (glTF's
@@ -1536,7 +1550,7 @@ export function CadDesignPage() {
               </p>
             </div>
 
-            {(nearestDiamondSize || estimatedMeleeCost > 0) && (
+            {(nearestDiamondSize || estimatedMeleeCost > 0 || estimatedLaborCost > 0) && (
               <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-4">
                 <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-sky-700">
                   <Scale className="h-3.5 w-3.5" /> Estimated stone cost
@@ -1568,12 +1582,46 @@ export function CadDesignPage() {
                     practice; this app doesn't yet model that as its own choice).
                   </p>
                 )}
+                {estimatedLaborCost > 0 && (
+                  <div className="mt-2 flex items-baseline justify-between border-t border-sky-200 pt-2">
+                    <span className="text-lg font-semibold text-slate-900">${estimatedLaborCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-sm text-slate-500">ring labor — {config.ringLaborMap[ringLaborTierKey]?.label ?? ringLaborTierKey}</span>
+                  </div>
+                )}
                 <div className="mt-2 flex items-baseline justify-between border-t border-sky-200 pt-2 text-sm">
-                  <span className="font-semibold text-slate-700">Estimated total (metal + stones)</span>
+                  <span className="font-semibold text-slate-700">Estimated total (metal + stones + labor)</span>
                   <strong className="text-slate-900">${estimatedTotalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
                 </div>
               </div>
             )}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <label className="flex items-center justify-between gap-3">
+                <span>
+                  <span className="text-sm font-semibold text-slate-900">Ring labor fee</span>
+                  <p className="mt-0.5 text-[11px] text-slate-400">
+                    A real flat fee per tier, from the app's own ring-labor pricing (the same tiers Quote Builder
+                    itself uses) — not a guessed number. Doesn't add a separate "CAD design labor" fee: Quote
+                    Builder's own pricing doesn't charge for that today either.
+                  </p>
+                </span>
+                <input type="checkbox" checked={includeRingLaborFee} onChange={e => setIncludeRingLaborFee(e.target.checked)}
+                  className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+              </label>
+              {includeRingLaborFee && (
+                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-200 pt-3 sm:grid-cols-4">
+                  {config.ringLaborTiers.length === 0 ? (
+                    <p className="col-span-full text-xs text-slate-400">No ring-labor tiers are configured yet.</p>
+                  ) : (
+                    [...config.ringLaborTiers].sort((a, b) => a.sortOrder - b.sortOrder).map(tier => (
+                      <button key={tier.tierKey} type="button" onClick={() => setRingLaborTierKey(tier.tierKey)}
+                        className={`rounded-xl border px-2.5 py-2 text-xs font-semibold transition ${ringLaborTierKey === tier.tierKey ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                        {tier.label}
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="flex gap-2">
               <select value={exportFormat} onChange={e => setExportFormat(e.target.value as 'stl' | 'obj' | 'glb')}
