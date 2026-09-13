@@ -16,7 +16,7 @@ import {
   buildFancyStoneHeadGroup, type FancyStoneShape,
   buildPaveRow, buildChannelSetting, buildFlushSetting, buildBarSetting, buildInvisibleSetting,
   buildTensionBandGeometry, buildTensionSetting, tensionGapDegForStone,
-  buildTaperedBandGeometry, buildTwistedBandGeometry,
+  buildTaperedBandGeometry, buildTwistedBandGeometry, buildSplitShankGeometry,
   buildIllusionHeadGroup,
   buildMilgrainEdges, buildRopeEdge,
   unionMetalParts, extractStoneMeshes, checkWatertightness,
@@ -55,7 +55,7 @@ const PART_TAB: Record<string, Tab> = {
   'Pavé stone': 'side', 'Channel stone': 'side', 'Channel rail': 'side',
   'Flush stone': 'side', 'Flush collar': 'side', 'Bar stone': 'side', 'Bar post': 'side',
   'Invisible-set stone': 'side',
-  'Side stone head': 'center',
+  'Side stone head': 'center', 'Shank strand': 'band',
   'Milgrain bead': 'band', 'Rope strand': 'band',
   'Merged solid': 'solid', Imported: 'solid', 'Matching band': 'solid',
 }
@@ -86,7 +86,8 @@ export function CadDesignPage() {
   const [widthMm, setWidthMm] = useState(2.5)
   const [thicknessMm, setThicknessMm] = useState(1.8)
   const [profile, setProfile] = useState<BandProfile>('comfort')
-  const [shankStyle, setShankStyle] = useState<'plain' | 'tapered' | 'twisted'>('plain')
+  const [shankStyle, setShankStyle] = useState<'plain' | 'tapered' | 'twisted' | 'split'>('plain')
+  const [splitStrandCount, setSplitStrandCount] = useState<2 | 3>(2)
   const [taperAmount, setTaperAmount] = useState(0.3)
   const [twists, setTwists] = useState(1)
   const [metal, setMetal] = useState<JewelryMetalOption>('gold-18k-yellow')
@@ -158,6 +159,8 @@ export function CadDesignPage() {
     settingType, bezelCoverage, prongCount, clusterPetalCount, clusterPetalStoneMm,
     includeHalo, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm,
     mergeSolid, includeMilgrain, includeRope,
+    haloRingCount, sideStoneCount, sideStoneCaratWeight, sideSpreadDeg,
+    includeMatchingBand, matchingBandWidthMm, splitStrandCount,
   })
 
   const applyPreset = (p: CadDesignParams) => {
@@ -173,6 +176,16 @@ export function CadDesignPage() {
     setIncludePave(p.includePave); setPaveSettingType(p.paveSettingType as typeof paveSettingType)
     setPaveCount(p.paveCount); setPaveStoneMm(p.paveStoneMm)
     setMergeSolid(p.mergeSolid); setIncludeMilgrain(p.includeMilgrain); setIncludeRope(p.includeRope)
+    // Added after the first preset version shipped — fall back to the same
+    // defaults the state itself starts with, so an OLDER saved preset
+    // (missing these fields entirely) still loads without breaking.
+    setHaloRingCount((p.haloRingCount as 1 | 2 | 3) ?? 1)
+    setSideStoneCount((p.sideStoneCount as 0 | 2 | 4) ?? 0)
+    setSideStoneCaratWeight(p.sideStoneCaratWeight ?? 0.25)
+    setSideSpreadDeg(p.sideSpreadDeg ?? 70)
+    setIncludeMatchingBand(p.includeMatchingBand ?? false)
+    setMatchingBandWidthMm(p.matchingBandWidthMm ?? 2)
+    setSplitStrandCount((p.splitStrandCount as 2 | 3) ?? 2)
     setImportedModel(null); setImportFileName(null) // a loaded preset is the parametric design, not an import
     setProngHeightOverridesMm({}) // per-instance overrides don't round-trip through a preset (indices may not line up)
   }
@@ -270,17 +283,29 @@ export function CadDesignPage() {
   const model = useMemo(() => {
     const group = new THREE.Group()
     const bandParamsBase = { fingerSize, widthMm, thicknessMm, profile }
-    const band = new THREE.Mesh(
-      tensionActive
-        ? buildTensionBandGeometry(bandParamsBase, tensionGapDeg)
-        : shankStyle === 'tapered'
-          ? buildTaperedBandGeometry({ ...bandParamsBase, taperAmount })
-          : shankStyle === 'twisted'
-            ? buildTwistedBandGeometry({ ...bandParamsBase, twists })
-            : buildRingBandGeometry(bandParamsBase),
-    )
-    band.userData.partName = 'Band'
-    group.add(band)
+    if (!tensionActive && shankStyle === 'split') {
+      // Split shank returns one geometry PER STRAND (2 or 3), not a single
+      // band — each becomes its own mesh, unlike every other shank style.
+      const strands = buildSplitShankGeometry({ ...bandParamsBase, strandCount: splitStrandCount })
+      strands.forEach((geo, i) => {
+        const strand = new THREE.Mesh(geo)
+        strand.userData.partName = 'Shank strand'
+        strand.userData.instanceIndex = i
+        group.add(strand)
+      })
+    } else {
+      const band = new THREE.Mesh(
+        tensionActive
+          ? buildTensionBandGeometry(bandParamsBase, tensionGapDeg)
+          : shankStyle === 'tapered'
+            ? buildTaperedBandGeometry({ ...bandParamsBase, taperAmount })
+            : shankStyle === 'twisted'
+              ? buildTwistedBandGeometry({ ...bandParamsBase, twists })
+              : buildRingBandGeometry(bandParamsBase),
+      )
+      band.userData.partName = 'Band'
+      group.add(band)
+    }
     if (includeMilgrain) group.add(buildMilgrainEdges({}, bandParamsBase))
     if (includeRope) group.add(buildRopeEdge({}, bandParamsBase))
     if (includeStone) {
@@ -374,7 +399,7 @@ export function CadDesignPage() {
       group.add(matchingBand)
     }
     return group
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -514,7 +539,8 @@ export function CadDesignPage() {
           </div>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Parametric solitaire ring</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            Band (plain, tapered — wider at the head — or twisted-ribbon), center stone (round — prong, bezel,
+            Band (plain, tapered, twisted-ribbon or split-shank), ring type (solitaire, three-stone or five-stone),
+            center stone (round — prong, bezel,
             cluster, tension or illusion — oval, cushion, princess, marquise
             or pear),
             side stones (pavé, channel, flush, bar or invisible), optional milgrain or twisted-rope edging, an optional
@@ -685,8 +711,8 @@ export function CadDesignPage() {
 
                 <div>
                   <label className={labelCls}>Shank style</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(['plain', 'tapered', 'twisted'] as const).map(s => (
+                  <div className="grid grid-cols-4 gap-2">
+                    {(['plain', 'tapered', 'twisted', 'split'] as const).map(s => (
                       <button key={s} type="button" onClick={() => setShankStyle(s)} disabled={tensionActive}
                         className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition disabled:cursor-not-allowed disabled:opacity-50 ${shankStyle === s ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
                         {s}
@@ -716,6 +742,23 @@ export function CadDesignPage() {
                         Matrix's own "Twist" transform, applied to the shank — a classic twisted-ribbon band. The
                         band's own solid twists (different from the Rope edging above, which adds strands ON TOP of a
                         plain band).
+                      </p>
+                    </div>
+                  )}
+                  {shankStyle === 'split' && !tensionActive && (
+                    <div className="mt-2">
+                      <label className={labelCls}>Strands</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {([2, 3] as const).map(n => (
+                          <button key={n} type="button" onClick={() => setSplitStrandCount(n)}
+                            className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${splitStrandCount === n ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        A named Ring Builder TYPE (Split Shank Builder) — the band divides into {splitStrandCount} parallel
+                        strands framing the setting, merging back into one toward the back.
                       </p>
                     </div>
                   )}

@@ -36,6 +36,16 @@ export interface CadDesignParams {
   mergeSolid: boolean
   includeMilgrain: boolean
   includeRope: boolean
+  // Added after the first version of this file shipped — optional so an
+  // OLDER saved preset (missing these entirely) still loads safely; the
+  // page falls back to a sensible default for anything undefined.
+  haloRingCount?: number
+  sideStoneCount?: number
+  sideStoneCaratWeight?: number
+  sideSpreadDeg?: number
+  includeMatchingBand?: boolean
+  matchingBandWidthMm?: number
+  splitStrandCount?: number
 }
 
 export interface SavedCadPreset {

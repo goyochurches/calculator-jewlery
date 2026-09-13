@@ -243,6 +243,84 @@ export function buildTwistedBandGeometry(params: TwistedBandParams): THREE.Buffe
   return geometry
 }
 
+// ── Split shank — a named Ring Builder TYPE (module 2) ─────────────────────
+// The band divides into 2 or 3 parallel strands near the head (framing the
+// setting from either side) and merges back into a single band toward the
+// back. Each strand is its OWN full closed loop (same manual ring-by-ring
+// construction buildTaperedBandGeometry/buildTwistedBandGeometry already
+// use), with the profile TRANSLATED along the band's own width axis by a
+// per-angle offset — unlike Twist's ROTATION, a translation never changes
+// a ring's own cross-sectional area, so each strand's volume matches a
+// plain full band's exactly regardless of the offset (verified before
+// landing this, along with watertightness — both exact/negligible-error).
+
+/** Ease factor (1 at the head, 0 by the far side of the transition) for how
+ *  far a strand has split apart at a given angle — smoothstep, so the
+ *  merge reads as a smooth taper rather than a sudden kink. */
+function splitSpreadFactor(absAngleDeg: number, splitSpanDeg: number, transitionSpanDeg: number): number {
+  if (absAngleDeg <= splitSpanDeg) return 1
+  if (absAngleDeg >= splitSpanDeg + transitionSpanDeg) return 0
+  const t = (absAngleDeg - splitSpanDeg) / transitionSpanDeg
+  return 1 - t * t * (3 - 2 * t) // smoothstep
+}
+
+export interface SplitShankParams extends RingBandParams {
+  /** 2 or 3 parallel strands. */
+  strandCount: 2 | 3
+  /** How far each outer strand sits from the shared centerline (mm) at
+   *  maximum separation, right at the head. */
+  splitOffsetMm?: number
+  /** Angular half-width (degrees, centered on the head at angle 0) the
+   *  strands stay fully split before starting to ease back together. */
+  splitSpanDeg?: number
+  /** Extra angular span (degrees) over which the strands smoothly
+   *  converge from splitSpanDeg out to fully merged. */
+  transitionSpanDeg?: number
+}
+
+/** One strand's geometry per array entry (2 or 3, matching strandCount) —
+ *  the middle one (for strandCount=3) stays on the centerline the whole
+ *  way around; the outer one(s) diverge near the head. Each is
+ *  individually a real closed/watertight solid. */
+export function buildSplitShankGeometry(params: SplitShankParams): THREE.BufferGeometry[] {
+  const { strandCount, radialSegments = 180 } = params
+  const splitOffsetMm = params.splitOffsetMm ?? params.widthMm * 1.3
+  const splitSpanDeg = params.splitSpanDeg ?? 35
+  const transitionSpanDeg = params.transitionSpanDeg ?? 45
+  const profile = buildBandProfile(params)
+  const pointsPerRing = profile.length
+
+  // Relative position per strand: strandCount=2 → [-1, 1] (no straight
+  // middle strand); strandCount=3 → [-1, 0, 1] (middle stays centered).
+  const relativePositions = strandCount === 2 ? [-1, 1] : [-1, 0, 1]
+
+  return relativePositions.map(relPos => {
+    const positions: number[] = []
+    const indices: number[] = []
+    for (let i = 0; i <= radialSegments; i++) {
+      const thetaDeg = (i / radialSegments) * 360
+      const signedThetaDeg = thetaDeg > 180 ? thetaDeg - 360 : thetaDeg
+      const offset = splitSpreadFactor(Math.abs(signedThetaDeg), splitSpanDeg, transitionSpanDeg) * splitOffsetMm * relPos
+      const theta = (thetaDeg * Math.PI) / 180
+      const sin = Math.sin(theta), cos = Math.cos(theta)
+      for (const p of profile) positions.push(p.x * sin, p.y + offset, p.x * cos)
+    }
+    for (let i = 0; i < radialSegments; i++) {
+      for (let j = 0; j < pointsPerRing - 1; j++) {
+        const base = j + i * pointsPerRing
+        const a = base, b = base + pointsPerRing, c = base + pointsPerRing + 1, d = base + 1
+        indices.push(a, b, d)
+        indices.push(c, d, b)
+      }
+    }
+    const geometry = new THREE.BufferGeometry()
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+    geometry.setIndex(indices)
+    geometry.computeVertexNormals()
+    return geometry
+  })
+}
+
 // ── Center-stone head (prong basket) — round brilliant only for v1 ─────────
 // Fancy shapes (oval, princess, pear, marquise, cushion...) each need their
 // own prong-placement logic and are a separate future piece — see the CAD
