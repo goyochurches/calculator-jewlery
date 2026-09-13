@@ -407,6 +407,14 @@ export function roundDiameterMmFromCarat(carat: number): number {
 export function estimateFancyCaratWeight(shape: FancyStoneShape, lengthMm: number, widthMm: number): number {
   const factor: Record<FancyStoneShape, number> = {
     oval: 0.0062, cushion: 0.0080, princess: 0.0083, marquise: 0.0058, pear: 0.0075,
+    // These five constants are the well-published GIA/trade reference
+    // values (hence no individual citation each). The three below them
+    // (emerald/radiant/hexagon/lozenge/trapezoid) don't have an equally
+    // standard published constant, so they're estimated by analogy to the
+    // closest-shaped stone above — disclosed here rather than presented
+    // as equally authoritative.
+    emerald: 0.0092, asscher: 0.0080, radiant: 0.0080,
+    hexagon: 0.0083, lozenge: 0.0060, trapezoid: 0.0071,
   }
   return lengthMm * widthMm * factor[shape]
 }
@@ -987,7 +995,9 @@ export function estimateWeightGrams(volumeMm3: number, densityGPerCm3: number): 
 // deferred (its asymmetric outline needs more careful curve-fitting than
 // the exact constructions below) — see the CAD roadmap memory.
 
-export type FancyStoneShape = 'oval' | 'cushion' | 'princess' | 'marquise' | 'pear'
+export type FancyStoneShape =
+  | 'oval' | 'cushion' | 'princess' | 'marquise' | 'pear'
+  | 'emerald' | 'asscher' | 'radiant' | 'hexagon' | 'lozenge' | 'trapezoid'
 
 /** Mirrors a set of 2D points across an axis through the origin —
  *  Matrix's own named "Mirror" transform. Generic/reusable: this file's
@@ -1001,13 +1011,14 @@ export function mirrorPoints2D(points: THREE.Vector2[], axis: 'x' | 'y'): THREE.
 
 /** Closed footprint outline (as seen from above) for one fancy shape, in
  *  local (u, v) = (width-axis, length-axis) mm, centered on the origin.
- *  Oval/cushion/princess/marquise are symmetric about both axes, so the
- *  extrude→rotate step in `buildFancyStoneHeadGroup` can't mirror them
- *  into anything different. Pear is only symmetric about u (width) —
- *  by convention its point sits at +v, which after that same
+ *  Oval/cushion/princess/marquise/emerald/asscher/radiant/hexagon/lozenge
+ *  are symmetric about both axes, so the extrude→rotate step in
+ *  `buildFancyStoneHeadGroup` can't mirror them into anything different.
+ *  Pear and trapezoid are only symmetric about u (width) — by convention
+ *  their narrow/pointed end sits at +v, which after that same
  *  extrude→rotate step ends up facing a fixed direction relative to the
- *  band; purely a cosmetic pick (which way the pear points), not a
- *  correctness concern. */
+ *  band; purely a cosmetic pick (which way it points), not a correctness
+ *  concern — see `pointDirection` (the Mirror transform) to flip it. */
 function buildStoneOutline(shape: FancyStoneShape, halfW: number, halfL: number, segments = 64): THREE.Vector2[] {
   switch (shape) {
     case 'oval': {
@@ -1115,7 +1126,62 @@ function buildStoneOutline(shape: FancyStoneShape, halfW: number, halfL: number,
       }
       return pts
     }
+    case 'emerald': case 'asscher': case 'radiant':
+      // Step-cut "cut-corner rectangle" — all three shapes share this same
+      // outline construction (a 45° chamfer at each corner, sized to the
+      // shorter side so a long emerald cut doesn't get an oversized
+      // chamfer). What actually distinguishes them in a real stone is the
+      // FACET pattern inside that outline (emerald's long parallel step
+      // facets vs. radiant's crisscross brilliant-style facets vs.
+      // asscher's usual near-square proportions) — this engine doesn't
+      // model facet PATTERN, only the crown/pavilion/table split every
+      // faceted stone already gets (see buildFacetedFancyStone), so the
+      // three are honestly identical here; disclosed rather than faked.
+      return cutCornerRectOutline(halfW, halfL)
+    case 'hexagon':
+      // Elongated "long hexagon" — flat top/bottom edges, pointed left/
+      // right tips. A common gem-cut hexagon profile (distinct from a
+      // regular 6-gon, which would look too squat for a center stone).
+      return [
+        new THREE.Vector2(halfW * 0.5, halfL), new THREE.Vector2(-halfW * 0.5, halfL),
+        new THREE.Vector2(-halfW, 0),
+        new THREE.Vector2(-halfW * 0.5, -halfL), new THREE.Vector2(halfW * 0.5, -halfL),
+        new THREE.Vector2(halfW, 0),
+      ]
+    case 'lozenge':
+      // A rhombus — like marquise's silhouette but with dead-straight
+      // sides instead of curved arcs (a distinct named cut, not a
+      // simplification of marquise). Wound counter-clockwise (top → left →
+      // bottom → right), matching every other shape's winding here —
+      // verified against a throwaway shoelace-area script; the naive
+      // top→right→bottom→left order winds clockwise instead.
+      return [
+        new THREE.Vector2(0, halfL), new THREE.Vector2(-halfW, 0),
+        new THREE.Vector2(0, -halfL), new THREE.Vector2(halfW, 0),
+      ]
+    case 'trapezoid':
+      // Narrow at +v, wide at −v by convention (same "+v is the default
+      // point-like end" convention pear already uses) — this is the one
+      // OTHER shape besides pear that isn't symmetric about its own length
+      // axis, so `pointDirection` (Mirror transform) applies to it too.
+      return [
+        new THREE.Vector2(halfW * 0.55, halfL), new THREE.Vector2(-halfW * 0.55, halfL),
+        new THREE.Vector2(-halfW, -halfL), new THREE.Vector2(halfW, -halfL),
+      ]
   }
+}
+
+/** Shared by emerald/asscher/radiant — see their case in `buildStoneOutline`
+ *  above for why all three use the same construction. 8 vertices: a 45°
+ *  chamfer at each of a rectangle's 4 corners. */
+function cutCornerRectOutline(halfW: number, halfL: number): THREE.Vector2[] {
+  const inset = Math.min(halfW, halfL) * 0.28
+  return [
+    new THREE.Vector2(halfW - inset, halfL), new THREE.Vector2(-halfW + inset, halfL),
+    new THREE.Vector2(-halfW, halfL - inset), new THREE.Vector2(-halfW, -halfL + inset),
+    new THREE.Vector2(-halfW + inset, -halfL), new THREE.Vector2(halfW - inset, -halfL),
+    new THREE.Vector2(halfW, -halfL + inset), new THREE.Vector2(halfW, halfL - inset),
+  ]
 }
 
 /** Where to seat prongs for each fancy shape — hand-picked safe points
@@ -1212,6 +1278,65 @@ function fancyProngPoints(shape: FancyStoneShape, halfW: number, halfL: number, 
         bottom,
       ]
     }
+    case 'emerald': case 'asscher': case 'radiant': {
+      // Real emerald-cut prongs traditionally sit ON the corner chamfers,
+      // not on the long edges — so 4 prongs = the 4 chamfer midpoints.
+      const inset = Math.min(halfW, halfL) * 0.28
+      const chamferMids: ProngSeat[] = [
+        { point: new THREE.Vector2(-halfW + inset / 2, halfL - inset / 2), isTip: false },
+        { point: new THREE.Vector2(-halfW + inset / 2, -halfL + inset / 2), isTip: false },
+        { point: new THREE.Vector2(halfW - inset / 2, -halfL + inset / 2), isTip: false },
+        { point: new THREE.Vector2(halfW - inset / 2, halfL - inset / 2), isTip: false },
+      ]
+      if (count === 4) return chamferMids
+      // 6: chamfers + the long top/bottom edge midpoints, same pattern
+      // princess/cushion already use for their own 6-prong case.
+      return [
+        ...chamferMids,
+        { point: new THREE.Vector2(0, halfL), isTip: false },
+        { point: new THREE.Vector2(0, -halfL), isTip: false },
+      ]
+    }
+    case 'hexagon':
+      // This shape's own 6 vertices ARE its natural prong seats (2 sharp
+      // side tips + 4 top/bottom corners) — unlike the shapes above, there
+      // isn't a sensible "4-prong" reduction that still reads as a hexagon
+      // outline, so the count param is intentionally ignored here (the UI
+      // discloses this rather than pretending a 4-prong toggle does
+      // anything for this shape).
+      return [
+        { point: new THREE.Vector2(halfW * 0.5, halfL), isTip: false },
+        { point: new THREE.Vector2(-halfW * 0.5, halfL), isTip: false },
+        { point: new THREE.Vector2(-halfW, 0), isTip: true },
+        { point: new THREE.Vector2(-halfW * 0.5, -halfL), isTip: false },
+        { point: new THREE.Vector2(halfW * 0.5, -halfL), isTip: false },
+        { point: new THREE.Vector2(halfW, 0), isTip: true },
+      ]
+    case 'lozenge':
+      // Same reasoning as hexagon above — its own 4 vertices (2 sharp
+      // tips on the length axis) are the natural seats; count is ignored.
+      return [
+        { point: new THREE.Vector2(0, halfL), isTip: true },
+        { point: new THREE.Vector2(halfW, 0), isTip: false },
+        { point: new THREE.Vector2(0, -halfL), isTip: true },
+        { point: new THREE.Vector2(-halfW, 0), isTip: false },
+      ]
+    case 'trapezoid': {
+      const corners: ProngSeat[] = [
+        { point: new THREE.Vector2(halfW * 0.55, halfL), isTip: false },
+        { point: new THREE.Vector2(-halfW * 0.55, halfL), isTip: false },
+        { point: new THREE.Vector2(-halfW, -halfL), isTip: false },
+        { point: new THREE.Vector2(halfW, -halfL), isTip: false },
+      ]
+      if (count === 4) return corners
+      // 6: corners plus the narrow-top and wide-bottom edge midpoints —
+      // keeps the same left/right symmetry the outline itself has.
+      return [
+        ...corners,
+        { point: new THREE.Vector2(0, halfL), isTip: false },
+        { point: new THREE.Vector2(0, -halfL), isTip: false },
+      ]
+    }
   }
 }
 
@@ -1225,10 +1350,11 @@ export interface FancyStoneHeadParams {
   prongDiameterMm?: number
   prongHeightMm?: number
   standHeightMm?: number
-  /** Which way a PEAR's point faces ('up' = the outline's own default,
-   *  toward +v — see `buildStoneOutline`'s doc comment). Ignored for every
-   *  other shape (they're all symmetric, mirroring changes nothing). Uses
-   *  `mirrorPoints2D`, Matrix's own named "Mirror" transform. */
+  /** Which way a PEAR or TRAPEZOID's narrow/pointed end faces ('up' = the
+   *  outline's own default, toward +v — see `buildStoneOutline`'s doc
+   *  comment). Ignored for every other shape (they're all symmetric,
+   *  mirroring changes nothing). Uses `mirrorPoints2D`, Matrix's own named
+   *  "Mirror" transform. */
   pointDirection?: 'up' | 'down'
 }
 
@@ -1247,7 +1373,7 @@ export function buildFancyStoneHeadGroup(params: FancyStoneHeadParams): THREE.Gr
   const standHeightMm = params.standHeightMm ?? maxHalf * 0.8
 
   const group = new THREE.Group()
-  const flipPoint = shape === 'pear' && params.pointDirection === 'down'
+  const flipPoint = (shape === 'pear' || shape === 'trapezoid') && params.pointDirection === 'down'
   const outline = flipPoint ? mirrorPoints2D(buildStoneOutline(shape, halfW, halfL), 'y') : buildStoneOutline(shape, halfW, halfL)
 
   // ExtrudeGeometry builds its shape in local XY and extrudes along local
@@ -1914,7 +2040,7 @@ export function buildFacetedFancyStone(params: FacetedFancyStoneParams): THREE.G
   const crownHeight = maxDim * crownHeightRatio
   const pavilionDepth = maxDim * pavilionDepthRatio
 
-  const flipPoint = shape === 'pear' && params.pointDirection === 'down'
+  const flipPoint = (shape === 'pear' || shape === 'trapezoid') && params.pointDirection === 'down'
   const girdleOutline0 = buildStoneOutline(shape, halfW, halfL)
   const tableOutline0 = buildStoneOutline(shape, halfW * tableRatio, halfL * tableRatio)
   const girdleOutline = flipPoint ? mirrorPoints2D(girdleOutline0, 'y') : girdleOutline0
