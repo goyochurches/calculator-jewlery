@@ -321,6 +321,69 @@ export function buildSplitShankGeometry(params: SplitShankParams): THREE.BufferG
   })
 }
 
+// ── Cathedral shank — a named Ring Builder TYPE (module 2) ─────────────────
+// Matrix's own "Cathedral Ring Rail": the band rises (radially thicker,
+// like a Gothic arch's flying buttress) right at the head, easing back to
+// its base thickness toward the back. Same manual ring-by-ring
+// construction as buildTaperedBandGeometry, but scales THICKNESS per angle
+// instead of width, and uses splitSpreadFactor's smoothstep bump (peaks at
+// the head, stays at the BASE thickness — not negative/oscillating — away
+// from it) instead of taper's symmetric cosine, since a localized rise is
+// the correct shape here, not a full-revolution wider/narrower swing.
+// Scaling thicknessMm only moves buildBandProfile's OUTER radius (the
+// inner radius is fixed by fingerSize alone) — exactly the right behavior:
+// the ring still fits the same finger, the rise is purely on the outside.
+
+export interface CathedralBandParams extends RingBandParams {
+  /** How much thicker (radially), as a fraction of the base thickness, the
+   *  band gets at its peak right at the head — 0.6 means 60% thicker. */
+  riseAmount?: number
+  /** Angular half-width (degrees, centered on the head) the rise stays at
+   *  its peak before easing back down. */
+  riseSpanDeg?: number
+  /** Extra angular span (degrees) over which the rise eases from its peak
+   *  back down to the base thickness. */
+  transitionSpanDeg?: number
+}
+
+export function buildCathedralBandGeometry(params: CathedralBandParams): THREE.BufferGeometry {
+  const { radialSegments = 180 } = params
+  const riseAmount = params.riseAmount ?? 0.6
+  const riseSpanDeg = params.riseSpanDeg ?? 15
+  const transitionSpanDeg = params.transitionSpanDeg ?? 35
+
+  const ringsOfProfiles: THREE.Vector2[][] = []
+  for (let i = 0; i <= radialSegments; i++) {
+    const angleDeg = (i / radialSegments) * 360
+    const signedAngleDeg = angleDeg > 180 ? angleDeg - 360 : angleDeg
+    const riseFactor = splitSpreadFactor(Math.abs(signedAngleDeg), riseSpanDeg, transitionSpanDeg)
+    const thicknessScale = 1 + riseAmount * riseFactor
+    ringsOfProfiles.push(buildBandProfile({ ...params, thicknessMm: params.thicknessMm * thicknessScale }))
+  }
+  const pointsPerRing = ringsOfProfiles[0].length
+  const positions: number[] = []
+  const indices: number[] = []
+  for (let i = 0; i <= radialSegments; i++) {
+    const angle = (i / radialSegments) * Math.PI * 2
+    const sin = Math.sin(angle), cos = Math.cos(angle)
+    for (const p of ringsOfProfiles[i]) positions.push(p.x * sin, p.y, p.x * cos)
+  }
+  for (let i = 0; i < radialSegments; i++) {
+    for (let j = 0; j < pointsPerRing - 1; j++) {
+      const base = j + i * pointsPerRing
+      const a = base, b = base + pointsPerRing, c = base + pointsPerRing + 1, d = base + 1
+      indices.push(a, b, d)
+      indices.push(c, d, b)
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  return geometry
+}
+
 // ── Center-stone head (prong basket) — round brilliant only for v1 ─────────
 // Fancy shapes (oval, princess, pear, marquise, cushion...) each need their
 // own prong-placement logic and are a separate future piece — see the CAD

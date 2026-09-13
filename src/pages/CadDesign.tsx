@@ -16,7 +16,7 @@ import {
   buildFancyStoneHeadGroup, type FancyStoneShape,
   buildPaveRow, buildChannelSetting, buildFlushSetting, buildBarSetting, buildInvisibleSetting,
   buildTensionBandGeometry, buildTensionSetting, tensionGapDegForStone,
-  buildTaperedBandGeometry, buildTwistedBandGeometry, buildSplitShankGeometry,
+  buildTaperedBandGeometry, buildTwistedBandGeometry, buildSplitShankGeometry, buildCathedralBandGeometry,
   buildIllusionHeadGroup,
   buildMilgrainEdges, buildRopeEdge,
   unionMetalParts, extractStoneMeshes, checkWatertightness,
@@ -86,7 +86,7 @@ export function CadDesignPage() {
   const [widthMm, setWidthMm] = useState(2.5)
   const [thicknessMm, setThicknessMm] = useState(1.8)
   const [profile, setProfile] = useState<BandProfile>('comfort')
-  const [shankStyle, setShankStyle] = useState<'plain' | 'tapered' | 'twisted' | 'split'>('plain')
+  const [shankStyle, setShankStyle] = useState<'plain' | 'tapered' | 'twisted' | 'split' | 'cathedral'>('plain')
   const [splitStrandCount, setSplitStrandCount] = useState<2 | 3>(2)
   const [taperAmount, setTaperAmount] = useState(0.3)
   const [twists, setTwists] = useState(1)
@@ -301,7 +301,9 @@ export function CadDesignPage() {
             ? buildTaperedBandGeometry({ ...bandParamsBase, taperAmount })
             : shankStyle === 'twisted'
               ? buildTwistedBandGeometry({ ...bandParamsBase, twists })
-              : buildRingBandGeometry(bandParamsBase),
+              : shankStyle === 'cathedral'
+                ? buildCathedralBandGeometry(bandParamsBase)
+                : buildRingBandGeometry(bandParamsBase),
       )
       band.userData.partName = 'Band'
       group.add(band)
@@ -539,7 +541,7 @@ export function CadDesignPage() {
           </div>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Parametric solitaire ring</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            Band (plain, tapered, twisted-ribbon or split-shank), ring type (solitaire, three-stone or five-stone),
+            Band (plain, tapered, twisted-ribbon, split-shank or cathedral), ring type (solitaire, three-stone or five-stone),
             center stone (round — prong, bezel,
             cluster, tension or illusion — oval, cushion, princess, marquise
             or pear),
@@ -711,8 +713,8 @@ export function CadDesignPage() {
 
                 <div>
                   <label className={labelCls}>Shank style</label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {(['plain', 'tapered', 'twisted', 'split'] as const).map(s => (
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['plain', 'tapered', 'twisted', 'split', 'cathedral'] as const).map(s => (
                       <button key={s} type="button" onClick={() => setShankStyle(s)} disabled={tensionActive}
                         className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition disabled:cursor-not-allowed disabled:opacity-50 ${shankStyle === s ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
                         {s}
@@ -761,6 +763,13 @@ export function CadDesignPage() {
                         strands framing the setting, merging back into one toward the back.
                       </p>
                     </div>
+                  )}
+                  {shankStyle === 'cathedral' && !tensionActive && (
+                    <p className="mt-2 text-[11px] text-slate-400">
+                      Matrix's own "Cathedral Ring Rail" — the band rises (radially thicker, like a Gothic arch) right
+                      at the head, easing back to its normal thickness toward the back. Adds metal (and weight) —
+                      unlike Taper, this doesn't just redistribute it.
+                    </p>
                   )}
                 </div>
 
