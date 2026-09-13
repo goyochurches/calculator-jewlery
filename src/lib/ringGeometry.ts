@@ -397,6 +397,14 @@ export function roundDiameterMmFromCarat(carat: number): number {
   return 6.5 * Math.cbrt(Math.max(0, carat))
 }
 
+/** Inverse of the above — carat weight from a round stone's diameter
+ *  (mm). Used to connect MELEE (pavé/halo/cluster-petal stones, sized by
+ *  mm in this UI, not carat) to the app's real diamond price sheet the
+ *  same way the center stone already is. */
+export function caratFromRoundDiameterMm(diameterMm: number): number {
+  return Math.pow(Math.max(0, diameterMm) / 6.5, 3)
+}
+
 /** Rough carat-weight estimate for a fancy-shape stone from its
  *  length×width footprint (mm) — the standard "well-proportioned depth"
  *  approximation trade references publish per shape (length × width ×

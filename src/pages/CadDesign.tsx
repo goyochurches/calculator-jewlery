@@ -11,7 +11,7 @@ import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import type { JewelryMetalOption } from '@/types'
 import {
   buildRingBandGeometry, usSizeToDiameterMm, type BandProfile,
-  buildStoneHeadGroup, buildBezelHeadGroup, buildClusterHeadGroup, buildHaloGroup, haloOrbitRadiusMm, attachHeadToBand, roundDiameterMmFromCarat, estimateFancyCaratWeight,
+  buildStoneHeadGroup, buildBezelHeadGroup, buildClusterHeadGroup, buildHaloGroup, haloOrbitRadiusMm, attachHeadToBand, roundDiameterMmFromCarat, caratFromRoundDiameterMm, estimateFancyCaratWeight,
   buildSignetTopGroup,
   defaultProngHeightMm,
   buildFancyStoneHeadGroup, type FancyStoneShape,
@@ -570,22 +570,55 @@ export function CadDesignPage() {
   // interpolation (diamond price per carat isn't linear, so scaling a
   // neighboring bucket's price would be actively misleading).
   const effectiveCaratWeight = stoneShape === 'round' ? caratWeight : estimateFancyCaratWeight(stoneShape, fancyLengthMm, fancyWidthMm)
-  const nearestDiamondSize = useMemo(() => {
-    if (!includeStone) return undefined
-    const wantType = diamondType === 'lab-grown' ? 'LAB' : 'NATURAL'
+  // Nearest-bucket lookup, pulled out so melee (below) can reuse it
+  // instead of re-walking config.diamondSizes per melee category.
+  const findNearestDiamondRow = (targetCarat: number, type: typeof diamondType): typeof config.diamondSizes[number] | undefined => {
+    const wantType = type === 'lab-grown' ? 'LAB' : 'NATURAL'
     let best: typeof config.diamondSizes[number] | undefined
     let bestDiff = Infinity
     for (const row of config.diamondSizes) {
       if (row.stoneType !== wantType) continue
       const rowCt = Number(row.sizeKey)
       if (!Number.isFinite(rowCt)) continue
-      const diff = Math.abs(rowCt - effectiveCaratWeight)
+      const diff = Math.abs(rowCt - targetCarat)
       if (diff < bestDiff) { bestDiff = diff; best = row }
     }
     return best
-  }, [config, includeStone, diamondType, effectiveCaratWeight])
+  }
+  const nearestDiamondPrice = (targetCarat: number, type: typeof diamondType): number => findNearestDiamondRow(targetCarat, type)?.basePrice ?? 0
+  const nearestDiamondSize = useMemo(
+    () => (includeStone ? findNearestDiamondRow(effectiveCaratWeight, diamondType) : undefined),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- findNearestDiamondRow is a plain (non-memoized) closure over config, recreated every render; listing it would defeat this memo's own point (it'd never skip). Its real inputs (config, diamondType) are already listed directly below.
+    [config, includeStone, diamondType, effectiveCaratWeight],
+  )
   const estimatedStoneCost = nearestDiamondSize?.basePrice ?? 0
-  const estimatedTotalCost = estimatedMetalCost + estimatedStoneCost
+  // Melee — every OTHER stone in the design besides the center one: pavé/
+  // channel/flush/bar/invisible side stones (one shared count+size for
+  // all five, see paveCount/paveStoneMm), halo, three-stone/five-stone
+  // side heads, and cluster petals. None of these were connected to real
+  // pricing before now — only the center stone was. Priced using the
+  // SAME Natural/Lab-grown selection as the center stone (a simplifying
+  // assumption — real melee is sometimes sourced separately — disclosed
+  // in the UI rather than modeled as its own independent choice).
+  const estimatedMeleeCost = useMemo(() => {
+    let total = 0
+    if (haloEligible) total += nearestDiamondPrice(caratFromRoundDiameterMm(haloStoneMm), diamondType) * haloCount * haloRingCount
+    if (includePave) total += nearestDiamondPrice(caratFromRoundDiameterMm(paveStoneMm), diamondType) * paveCount
+    if (sideStoneCount > 0 && stoneShape === 'round' && settingType === 'prong' && !tensionActive) {
+      total += nearestDiamondPrice(sideStoneCaratWeight, diamondType) * sideStoneCount
+    }
+    if (stoneShape === 'round' && settingType === 'cluster') {
+      total += nearestDiamondPrice(caratFromRoundDiameterMm(clusterPetalStoneMm), diamondType) * clusterPetalCount
+    }
+    return total
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- same reasoning as estimatedStoneCost above: nearestDiamondPrice is a fresh closure every render, its real inputs (config, diamondType) are already listed below.
+  }, [
+    config, diamondType, haloEligible, haloStoneMm, haloCount, haloRingCount,
+    includePave, paveStoneMm, paveCount,
+    sideStoneCount, stoneShape, settingType, tensionActive, sideStoneCaratWeight,
+    clusterPetalStoneMm, clusterPetalCount,
+  ])
+  const estimatedTotalCost = estimatedMetalCost + estimatedStoneCost + estimatedMeleeCost
 
   // Module 21 in the roadmap's master list ("export STL/OBJ/3MF/STEP/3DM/
   // GLB/USDZ") — STL was the only option until now. OBJ and GLB (glTF's
@@ -1416,15 +1449,17 @@ export function CadDesignPage() {
               </p>
             </div>
 
-            {nearestDiamondSize && (
+            {(nearestDiamondSize || estimatedMeleeCost > 0) && (
               <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-4">
                 <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-sky-700">
-                  <Scale className="h-3.5 w-3.5" /> Estimated center-stone cost
+                  <Scale className="h-3.5 w-3.5" /> Estimated stone cost
                 </div>
-                <div className="mt-2 flex items-baseline justify-between">
-                  <span className="text-2xl font-semibold text-slate-900">${estimatedStoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
-                  <span className="text-sm text-slate-500">{nearestDiamondSize.label}</span>
-                </div>
+                {nearestDiamondSize && (
+                  <div className="mt-2 flex items-baseline justify-between">
+                    <span className="text-2xl font-semibold text-slate-900">${estimatedStoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-sm text-slate-500">center — {nearestDiamondSize.label}</span>
+                  </div>
+                )}
                 <p className="mt-1.5 text-[11px] text-slate-500">
                   From the app's own diamond price sheet (the same one Quote Builder prices from) — closest LISTED size
                   to {effectiveCaratWeight.toFixed(2)}ct{stoneShape !== 'round'
@@ -1432,8 +1467,22 @@ export function CadDesignPage() {
                     : ''}, not an interpolation (diamond price per carat isn't linear, so scaling a neighboring size's
                   price would be misleading). Doesn't account for clarity/color/cut — use Quote Builder for an exact price.
                 </p>
+                {estimatedMeleeCost > 0 && (
+                  <div className="mt-2 flex items-baseline justify-between border-t border-sky-200 pt-2">
+                    <span className="text-lg font-semibold text-slate-900">${estimatedMeleeCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-sm text-slate-500">melee (side stones/halo/petals)</span>
+                  </div>
+                )}
+                {estimatedMeleeCost > 0 && (
+                  <p className="mt-1.5 text-[11px] text-slate-500">
+                    Every OTHER stone besides the center one — pavé/channel/flush/bar/invisible side stones, halo,
+                    three/five-stone side heads, or cluster petals — priced the same way, using the same
+                    Natural/Lab-grown selection as the center stone (melee is sometimes sourced separately in
+                    practice; this app doesn't yet model that as its own choice).
+                  </p>
+                )}
                 <div className="mt-2 flex items-baseline justify-between border-t border-sky-200 pt-2 text-sm">
-                  <span className="font-semibold text-slate-700">Estimated total (metal + stone)</span>
+                  <span className="font-semibold text-slate-700">Estimated total (metal + stones)</span>
                   <strong className="text-slate-900">${estimatedTotalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
                 </div>
               </div>
