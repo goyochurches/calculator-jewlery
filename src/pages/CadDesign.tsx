@@ -137,6 +137,19 @@ export function CadDesignPage() {
   // inconsistent with the rest of the app.
   const [includeRingLaborFee, setIncludeRingLaborFee] = useState(false)
   const [ringLaborTierKey, setRingLaborTierKey] = useState('')
+  // Setting labor fee — the OTHER real labor line Quote Builder tracks
+  // (config.setterMap, per-stone SETTING labor, distinct from ring
+  // labor/casting). Previously deferred: this page's own settingType/
+  // paveSettingType strings don't line up with the real setterType keys
+  // (only a small subset was ever inspectable — customer_melee/channel/
+  // bezel/fancy/center), so rather than guess a mapping, this reads the
+  // real `config.setters` list directly (same "let the user pick from
+  // the actual configured options" pattern ring labor already uses) —
+  // no guessing needed. Quantity defaults to this design's own REAL
+  // stone count (see totalStoneCount below), not a guess either.
+  const [includeSetterFee, setIncludeSetterFee] = useState(false)
+  const [setterTypeKey, setSetterTypeKey] = useState('')
+  const [setterQuantityOverride, setSetterQuantityOverride] = useState<number | null>(null)
   const [diamondType, setDiamondType] = useState<'natural' | 'lab-grown'>('natural')
   const [fancyLengthMm, setFancyLengthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.lengthMm)
   const [fancyWidthMm, setFancyWidthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.widthMm)
@@ -251,7 +264,7 @@ export function CadDesignPage() {
     haloRingCount, sideStoneCount, sideStoneCaratWeight, sideSpreadDeg,
     includeMatchingBand, matchingBandWidthMm, splitStrandCount,
     includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, matchingBandCount,
-    includeRingLaborFee, ringLaborTierKey,
+    includeRingLaborFee, ringLaborTierKey, includeSetterFee, setterTypeKey,
     includeFlutes, fluteCount, pointDirection, includeGalleryWire, galleryWireCount,
     includeBandText, bandText, includePattern, patternMotif,
     includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText,
@@ -287,6 +300,9 @@ export function CadDesignPage() {
     setEngraveText(p.engraveText ?? '')
     setIncludeRingLaborFee(p.includeRingLaborFee ?? false)
     setRingLaborTierKey(p.ringLaborTierKey ?? '')
+    setIncludeSetterFee(p.includeSetterFee ?? false)
+    setSetterTypeKey(p.setterTypeKey ?? '')
+    setSetterQuantityOverride(null)
     setMatchingBandCount((p.matchingBandCount as 1 | 2 | 3) ?? 1)
     setIncludeFlutes(p.includeFlutes ?? false)
     setFluteCount(p.fluteCount ?? 24)
@@ -764,7 +780,21 @@ export function CadDesignPage() {
     clusterPetalStoneMm, clusterPetalCount, excludedClusterKey,
   ])
   const estimatedLaborCost = includeRingLaborFee ? (config.ringLaborMap[ringLaborTierKey]?.fee ?? 0) : 0
-  const estimatedTotalCost = estimatedMetalCost + estimatedStoneCost + estimatedMeleeCost + estimatedLaborCost
+  // Total stone count across the design — a REAL count (not a guess),
+  // used to default the setting-labor fee's own quantity below.
+  const totalStoneCount = useMemo(() => {
+    let count = 0
+    if (includeStone && !includeSignetTop) count += 1 // the center stone itself
+    if (haloEligible) count += Math.max(0, haloCount * haloRingCount - excludedHaloIndices.length)
+    if (includePave) count += Math.max(0, paveCount - excludedPaveIndices.length)
+    if (sideStoneCount > 0 && stoneShape === 'round' && settingType === 'prong' && !tensionActive) count += sideStoneCount
+    if (stoneShape === 'round' && settingType === 'cluster') count += Math.max(0, clusterPetalCount - excludedClusterIndices.length)
+    return count
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- same reasoning as estimatedMeleeCost above: excludedHaloKey/excludedPaveKey/excludedClusterKey (joined-string stand-ins) are what's actually listed, not the arrays themselves — see where they're defined for why.
+  }, [includeStone, includeSignetTop, haloEligible, haloCount, haloRingCount, excludedHaloKey, includePave, paveCount, excludedPaveKey, sideStoneCount, stoneShape, settingType, tensionActive, clusterPetalCount, excludedClusterKey])
+  const setterQuantity = setterQuantityOverride ?? totalStoneCount
+  const estimatedSetterFee = includeSetterFee ? (config.setterMap[setterTypeKey]?.fee ?? 0) * setterQuantity : 0
+  const estimatedTotalCost = estimatedMetalCost + estimatedStoneCost + estimatedMeleeCost + estimatedLaborCost + estimatedSetterFee
 
   // Module 21 in the roadmap's master list ("export STL/OBJ/3MF/STEP/3DM/
   // GLB/USDZ") — STL was the only option until now. OBJ and GLB (glTF's
@@ -1809,7 +1839,7 @@ export function CadDesignPage() {
               </p>
             </div>
 
-            {(nearestDiamondSize || estimatedMeleeCost > 0 || estimatedLaborCost > 0) && (
+            {(nearestDiamondSize || estimatedMeleeCost > 0 || estimatedLaborCost > 0 || estimatedSetterFee > 0) && (
               <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-4">
                 <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-widest text-sky-700">
                   <Scale className="h-3.5 w-3.5" /> Estimated stone cost
@@ -1847,6 +1877,12 @@ export function CadDesignPage() {
                     <span className="text-sm text-slate-500">ring labor — {config.ringLaborMap[ringLaborTierKey]?.label ?? ringLaborTierKey}</span>
                   </div>
                 )}
+                {estimatedSetterFee > 0 && (
+                  <div className="mt-2 flex items-baseline justify-between border-t border-sky-200 pt-2">
+                    <span className="text-lg font-semibold text-slate-900">${estimatedSetterFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-sm text-slate-500">setting labor — {setterQuantity}× {config.setterMap[setterTypeKey]?.label ?? setterTypeKey}</span>
+                  </div>
+                )}
                 <div className="mt-2 flex items-baseline justify-between border-t border-sky-200 pt-2 text-sm">
                   <span className="font-semibold text-slate-700">Estimated total (metal + stones + labor)</span>
                   <strong className="text-slate-900">${estimatedTotalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
@@ -1878,6 +1914,48 @@ export function CadDesignPage() {
                       </button>
                     ))
                   )}
+                </div>
+              )}
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <label className="flex items-center justify-between gap-3">
+                <span>
+                  <span className="text-sm font-semibold text-slate-900">Setting labor fee</span>
+                  <p className="mt-0.5 text-[11px] text-slate-400">
+                    The OTHER real labor line Quote Builder tracks — per-stone setting labor, from the app's own
+                    real setter-fee list (not a guessed mapping from this page's own setting types). Quantity
+                    defaults to this design's own real stone count ({totalStoneCount}).
+                  </p>
+                </span>
+                <input type="checkbox" checked={includeSetterFee} onChange={e => setIncludeSetterFee(e.target.checked)}
+                  className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+              </label>
+              {includeSetterFee && (
+                <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
+                  {config.setters.length === 0 ? (
+                    <p className="text-xs text-slate-400">No setter fees are configured yet.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                      {[...config.setters].sort((a, b) => a.sortOrder - b.sortOrder).map(setter => (
+                        <button key={setter.typeKey} type="button" onClick={() => setSetterTypeKey(setter.typeKey)}
+                          className={`rounded-xl border px-2.5 py-2 text-xs font-semibold transition ${setterTypeKey === setter.typeKey ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                          {setter.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <label className={labelCls}>Quantity</label>
+                    <input type="number" min={0} step={1} value={setterQuantity}
+                      onChange={e => setSetterQuantityOverride(Math.max(0, Number(e.target.value) || 0))}
+                      className={`${inputCls} w-24`} />
+                    {setterQuantityOverride !== null && (
+                      <button type="button" onClick={() => setSetterQuantityOverride(null)}
+                        className="shrink-0 rounded-lg border border-slate-300 px-2 py-1 text-[11px] font-semibold hover:bg-slate-50">
+                        Reset to actual count
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

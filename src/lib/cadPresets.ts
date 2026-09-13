@@ -57,6 +57,8 @@ export interface CadDesignParams {
   engraveText?: string
   includeRingLaborFee?: boolean
   ringLaborTierKey?: string
+  includeSetterFee?: boolean
+  setterTypeKey?: string
   includeGalleryWire?: boolean
   galleryWireCount?: number
   includeBandText?: boolean
