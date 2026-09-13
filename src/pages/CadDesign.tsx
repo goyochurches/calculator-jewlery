@@ -282,6 +282,15 @@ export function CadDesignPage() {
   const [logoFileName, setLogoFileName] = useState<string | null>(null)
   const [logoSizeMm, setLogoSizeMm] = useState(8)
   const [logoError, setLogoError] = useState<string | null>(null)
+  // Position around the band, in degrees — was hardcoded to 180° (opposite
+  // the main setting) until now. First real use of a "Move" transform
+  // (Matrix's Transform > Base tool): dragging the logo's own gizmo in the
+  // viewer (see ModelViewer3D's onMoveAngle) writes back to this SAME
+  // state a slider would, rather than a separate untracked position — the
+  // model is still fully regenerated from parameters every render, so a
+  // dragged object has to resolve to a real parameter or it would snap
+  // back on the next rebuild.
+  const [logoAngleDeg, setLogoAngleDeg] = useState(180)
   // Content Manager (module 22) — save/load a full parameter set as a
   // named preset. Loaded fresh from localStorage each time the list is
   // opened (cheap, and keeps it correct if another tab just saved one).
@@ -669,7 +678,7 @@ export function CadDesignPage() {
     // reasoning Award Ring side panels' own ±90° placement already used.
     if (logoSvgText) {
       const logo = buildLogoGroup({ svgText: logoSvgText, sizeMm: logoSizeMm })
-      attachHeadToBand(logo, bandParamsBase, 180)
+      attachHeadToBand(logo, bandParamsBase, logoAngleDeg)
       group.add(logo)
     }
     if (includePave) {
@@ -713,7 +722,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, logoSvgText, logoSizeMm, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, petalStoneDiameterOverridesMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, logoSvgText, logoSizeMm, logoAngleDeg, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, petalStoneDiameterOverridesMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -1195,6 +1204,14 @@ export function CadDesignPage() {
                       </button>
                     )}
                   </div>
+                </div>
+              ) : selectedPart.name === 'Logo' ? (
+                <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Selected <strong>Logo</strong> — drag it in the 3D view to reposition it around the band (Matrix's
+                    "Move" transform tool), or use the slider on the Production tab. Click empty space to deselect.
+                  </span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
@@ -2090,8 +2107,8 @@ export function CadDesignPage() {
                   <span className="text-sm font-semibold text-slate-900">Logo/artwork import</span>
                   <p className="text-[11px] text-slate-400">
                     Matrix's own "Logo import" — SVG only (it's already vector, unlike DXF/PNG which each need their
-                    own separate parser, not built yet). Placed as a raised relief directly opposite the main
-                    setting (angle 180°) — a maker's-mark-style position.
+                    own separate parser, not built yet). Placed as a raised relief around the band — defaults
+                    opposite the main setting (180°), a maker's-mark-style position.
                   </p>
                   {logoSvgText ? (
                     <div className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-600">
@@ -2107,11 +2124,24 @@ export function CadDesignPage() {
                       className="block w-full text-xs text-slate-600" />
                   )}
                   {logoSvgText && (
-                    <div>
-                      <label className={labelCls}>Logo size (mm, larger dimension)</label>
-                      <input type="number" min={2} max={20} step={0.5} value={logoSizeMm}
-                        onChange={e => setLogoSizeMm(Math.max(2, Number(e.target.value) || 2))} className={inputCls} />
-                    </div>
+                    <>
+                      <div>
+                        <label className={labelCls}>Logo size (mm, larger dimension)</label>
+                        <input type="number" min={2} max={20} step={0.5} value={logoSizeMm}
+                          onChange={e => setLogoSizeMm(Math.max(2, Number(e.target.value) || 2))} className={inputCls} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Position around band (°)</label>
+                        <input type="range" min={-180} max={180} step={1} value={logoAngleDeg}
+                          onChange={e => setLogoAngleDeg(Number(e.target.value))} className="w-full" />
+                        <p className="mt-1 text-[11px] text-slate-400">
+                          {logoAngleDeg}° — or click the logo in the 3D view and drag it around the band directly
+                          (Matrix's "Move" transform tool); dragging it away from the band's own surface has no
+                          lasting effect, since only the angle is a real parameter — it snaps back to the band on
+                          the next change.
+                        </p>
+                      </div>
+                    </>
                   )}
                   {logoError && (
                     <p className="rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700">{logoError}</p>
@@ -2297,6 +2327,7 @@ export function CadDesignPage() {
         <Card className="overflow-hidden rounded-[30px] border border-slate-200 shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
           <div className="relative">
             <ModelViewer3D ref={viewerRef} object={viewModel} color={METAL_COLORS[metal]} onSelectPart={handleSelectPart}
+              onMoveAngle={(partName, angleDeg) => { if (partName === 'Logo') setLogoAngleDeg(angleDeg) }}
               autoRotate={autoRotate} wireframe={wireframe} className="h-[420px] w-full sm:h-[520px]" />
             <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2 text-xs text-white shadow-sm backdrop-blur">
               <MousePointerClick className="h-3.5 w-3.5 shrink-0 text-amber-300" />

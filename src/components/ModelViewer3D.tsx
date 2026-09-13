@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 
 /** Named camera views — Matrix's own 3D Viewer module ("Front / Back /
@@ -9,6 +10,22 @@ export type CameraView = 'front' | 'top' | 'side' | 'perspective'
 
 export interface ModelViewer3DHandle {
   setView: (view: CameraView) => void
+}
+
+/** Walks up from a clicked mesh to the nearest ancestor tagged
+ *  `userData.isMovableRoot` — that ancestor (not the individual mesh) is
+ *  what `attachHeadToBand` actually transforms, so it's what the drag
+ *  gizmo needs to attach to. Returns null if nothing in the chain (or a
+ *  null starting point) is movable. Module-level, not a component method,
+ *  so the one-time setup effect below can reference it without becoming a
+ *  stale-closure dependency risk. */
+function findMovableRoot(start: THREE.Object3D | null): THREE.Object3D | null {
+  let cur: THREE.Object3D | null = start
+  while (cur) {
+    if (cur.userData.isMovableRoot) return cur
+    cur = cur.parent
+  }
+  return null
 }
 
 /** What clicking a part of the model in the viewer reports back — the
@@ -52,6 +69,18 @@ interface ModelViewer3DProps {
    *  real click-to-select CAD interaction — currently identifies+highlights
    *  a part; editing that specific part is a future step. */
   onSelectPart?: (part: SelectedPart | null) => void
+  /** Called after dragging a movable part's own gizmo (see
+   *  `userData.isMovableRoot`/`movablePartName` in ringGeometry.ts) —
+   *  Matrix's Transform > Base "Move" tool, the first real drag-to-
+   *  reposition interaction in the viewer. Reports the part's own name
+   *  and its NEW angle (degrees) around the band, computed from the
+   *  dragged object's resulting X/Z world position — the same convention
+   *  `attachHeadToBand`'s own `angleDeg` parameter uses. Only the angular
+   *  component of a drag is meaningful (radial/vertical movement has no
+   *  parameter to persist it, so it snaps back on the next rebuild) —
+   *  this stays honest with the fact the whole model is regenerated from
+   *  parameters every render, not a free scene graph. */
+  onMoveAngle?: (partName: string, angleDeg: number) => void
   /** 360° turntable — Matrix's own "Animation" module includes exactly
    *  this. Delegates to OrbitControls' own `autoRotate`, which keeps
    *  spinning alongside (not instead of) manual orbit-dragging. */
@@ -70,7 +99,7 @@ interface ModelViewer3DProps {
  * file's mesh, not just the parametric ring band.
  */
 export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>(function ModelViewer3D(
-  { object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className, onSelectPart, autoRotate = false, wireframe = false },
+  { object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className, onSelectPart, onMoveAngle, autoRotate = false, wireframe = false },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -81,11 +110,14 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const controlsRef = useRef<OrbitControls | null>(null)
+  const transformControlsRef = useRef<TransformControls | null>(null)
   const selectedMeshRef = useRef<THREE.Mesh | null>(null)
   // Read inside the stable click handler below without re-registering the
   // DOM listener every time the caller passes a new callback instance.
   const onSelectPartRef = useRef(onSelectPart)
   useEffect(() => { onSelectPartRef.current = onSelectPart }, [onSelectPart])
+  const onMoveAngleRef = useRef(onMoveAngle)
+  useEffect(() => { onMoveAngleRef.current = onMoveAngle }, [onMoveAngle])
 
   // One-time scene/camera/renderer/controls setup, torn down on unmount.
   useEffect(() => {
@@ -112,6 +144,39 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     controls.autoRotate = autoRotate
     controls.autoRotateSpeed = 4
     controlsRef.current = controls
+
+    // "Move" transform gizmo (Matrix's Transform > Base) — attached only to
+    // whichever movable-root ancestor was last clicked (see handleClick
+    // below); detached (invisible) otherwise. Translate-only, and only the
+    // X/Z handles/planes are shown since every movable part here is
+    // positioned by an ANGLE around the band, not a free 3D offset — Y and
+    // the radial component of a drag are read but intentionally discarded
+    // (see onMoveAngle's own doc comment).
+    const transformControls = new TransformControls(camera, renderer.domElement)
+    transformControls.setMode('translate')
+    transformControls.showY = false
+    scene.add(transformControls.getHelper())
+    transformControlsRef.current = transformControls
+    transformControls.addEventListener('dragging-changed', (event) => {
+      controls.enabled = !event.value
+    })
+    // Interacting with the gizmo (mouseDown only fires when a handle was
+    // actually hit — see TransformControls' own pointerDown) still lets the
+    // browser's native 'click' fire afterward on the SAME canvas element
+    // (stopping propagation on pointerdown doesn't cancel a later native
+    // click). Without this flag, handleClick below would immediately
+    // deselect/detach right after every drag, since its own raycast never
+    // hits the gizmo (added to `scene`, not to `displayed`).
+    let ignoreNextClick = false
+    transformControls.addEventListener('mouseDown', () => { ignoreNextClick = true })
+    transformControls.addEventListener('mouseUp', () => {
+      const obj = transformControls.object
+      const partName = obj?.userData.movablePartName
+      if (obj && typeof partName === 'string') {
+        const angleDeg = (Math.atan2(obj.position.z, obj.position.x) * 180) / Math.PI
+        onMoveAngleRef.current?.(partName, angleDeg)
+      }
+    })
 
     // Studio-style three-point lighting so a metal material reads well
     // without needing an HDR environment map.
@@ -149,6 +214,7 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     const raycaster = new THREE.Raycaster()
     const pointerNdc = new THREE.Vector2()
     const handleClick = (event: MouseEvent) => {
+      if (ignoreNextClick) { ignoreNextClick = false; return }
       const cam = cameraRef.current
       const displayed = displayedRef.current
       const stoneMat = stoneMaterialRef.current
@@ -181,6 +247,15 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
       } else {
         onSelectPartRef.current?.(null)
       }
+
+      // Attach/detach the "Move" gizmo to whichever movable-root ancestor
+      // the click landed on (independent of the partName-based selection
+      // above — a click can select a non-movable part, or miss entirely,
+      // in which case the gizmo just disappears).
+      const movableRoot = findMovableRoot(hit ?? null)
+      const tc = transformControlsRef.current
+      if (movableRoot) tc?.attach(movableRoot)
+      else tc?.detach()
     }
     renderer.domElement.addEventListener('click', handleClick)
 
@@ -208,6 +283,7 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
       running = false
       resizeObserver.disconnect()
       renderer.domElement.removeEventListener('click', handleClick)
+      transformControls.dispose()
       controls.dispose()
       material.dispose()
       stoneMaterial.dispose()
@@ -217,6 +293,7 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
       sceneRef.current = null
       cameraRef.current = null
       controlsRef.current = null
+      transformControlsRef.current = null
     }
     // Intentionally empty — color/metalness/roughness/autoRotate updates
     // are applied to the existing material/controls in the effects below
@@ -276,6 +353,16 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     } else {
       onSelectPartRef.current?.(null)
     }
+
+    // Same identity-preservation idea for the "Move" gizmo: if the part it
+    // was attached to still exists (by identity) in the rebuilt object,
+    // re-attach to its new movable-root ancestor rather than dropping the
+    // gizmo on every parameter tweak while mid-drag-adjacent edits happen
+    // (e.g. changing logo size while the logo is still selected).
+    const tc = transformControlsRef.current
+    const newMovableRoot = rehit ? findMovableRoot(rehit) : null
+    if (newMovableRoot) tc?.attach(newMovableRoot)
+    else tc?.detach()
   }, [object])
 
   // Live-update material appearance without touching geometry.

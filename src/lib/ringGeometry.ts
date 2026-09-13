@@ -3145,6 +3145,12 @@ export function buildLogoGroup(params: LogoImportParams): THREE.Group {
   const mesh = new THREE.Mesh(geometry)
   mesh.userData.partName = 'Logo'
   group.add(mesh)
+  // Tagged as a movable root — see ModelViewer3D's TransformControls
+  // integration (Matrix's Transform > Base "Move" tool). `attachHeadToBand`
+  // transforms THIS group as a whole (not the mesh directly), so the drag
+  // gizmo needs to attach here, not to the child mesh.
+  group.userData.isMovableRoot = true
+  group.userData.movablePartName = 'Logo'
   return group
 }
 
