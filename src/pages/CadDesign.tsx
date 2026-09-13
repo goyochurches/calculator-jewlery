@@ -24,6 +24,7 @@ import {
   buildLogoGroup,
   unionMetalParts, extractStoneMeshes, checkWatertightness,
   checkMinimumWallThickness, defaultProngDiameterMm, defaultGalleryTubeMm, RECOMMENDED_MIN_WALL_MM,
+  scaleForCastingShrinkage, CASTING_SHRINKAGE_PERCENT,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
 import { parseImportedCadFile } from '@/lib/cadImport'
@@ -240,6 +241,12 @@ export function CadDesignPage() {
   const [importError, setImportError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [exportFormat, setExportFormat] = useState<'stl' | 'obj' | 'glb'>('stl')
+  // Casting shrinkage compensation (module 15, Manufacturing prep) — opt-
+  // in export-time scale-up so the CAST piece ends up at the intended
+  // size after the metal shrinks cooling in the mold. Never affects the
+  // on-screen preview or the weight/cost estimate (those should reflect
+  // the piece's own real intended size) — applied only inside downloadModel.
+  const [compensateShrinkage, setCompensateShrinkage] = useState(false)
   // Logo/artwork import (module 21/12) — SVG only (it's already vector,
   // unlike DXF/PNG which each need their own separate parser, not
   // attempted here). Transient like the STL/OBJ import above, not part
@@ -818,20 +825,22 @@ export function CadDesignPage() {
   }
   const downloadModel = () => {
     const name = baseFilename()
+    const exportObject = compensateShrinkage ? scaleForCastingShrinkage(viewModel, metal) : viewModel
+    const shrinkTag = compensateShrinkage ? '-shrink-comp' : ''
     if (exportFormat === 'stl') {
-      const stl = new STLExporter().parse(viewModel, { binary: false })
-      triggerDownload(new Blob([stl], { type: 'model/stl' }), `${name}.stl`)
+      const stl = new STLExporter().parse(exportObject, { binary: false })
+      triggerDownload(new Blob([stl], { type: 'model/stl' }), `${name}${shrinkTag}.stl`)
     } else if (exportFormat === 'obj') {
-      const obj = new OBJExporter().parse(viewModel)
-      triggerDownload(new Blob([obj], { type: 'text/plain' }), `${name}.obj`)
+      const obj = new OBJExporter().parse(exportObject)
+      triggerDownload(new Blob([obj], { type: 'text/plain' }), `${name}${shrinkTag}.obj`)
     } else {
       new GLTFExporter().parse(
-        viewModel,
+        exportObject,
         result => {
           const blob = result instanceof ArrayBuffer
             ? new Blob([result], { type: 'model/gltf-binary' })
             : new Blob([JSON.stringify(result)], { type: 'model/gltf+json' })
-          triggerDownload(blob, `${name}.glb`)
+          triggerDownload(blob, `${name}${shrinkTag}.glb`)
         },
         err => setImportError(err instanceof Error ? `Couldn't export as GLB: ${err.message}` : "Couldn't export as GLB."),
         { binary: true },
@@ -1960,6 +1969,18 @@ export function CadDesignPage() {
               )}
             </div>
 
+            <label className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2">
+              <span>
+                <span className="text-xs font-semibold text-slate-900">Compensate for casting shrinkage</span>
+                <p className="text-[11px] text-slate-400">
+                  Scales the EXPORTED file up by {JEWELRY_METAL_OPTIONS[metal].label}'s own {CASTING_SHRINKAGE_PERCENT[metal].toFixed(2)}% shrinkage estimate
+                  (standard trade guidance — confirm against your own foundry's real number). Never affects the
+                  preview or the weight/cost estimate above.
+                </p>
+              </span>
+              <input type="checkbox" checked={compensateShrinkage} onChange={e => setCompensateShrinkage(e.target.checked)}
+                className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+            </label>
             <div className="flex gap-2">
               <select value={exportFormat} onChange={e => setExportFormat(e.target.value as 'stl' | 'obj' | 'glb')}
                 className={`${inputCls} w-28 shrink-0 uppercase`}>

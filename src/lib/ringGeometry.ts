@@ -1126,6 +1126,44 @@ export const RECOMMENDED_MIN_WALL_MM: Record<JewelryMetalOption, number> = {
   silver: 1.0,
 }
 
+/** Casting shrinkage, as a percent linear dimension lost when the molten
+ *  metal cools and solidifies in the mold (module 15, Manufacturing prep).
+ *  A cast piece's own final size is smaller than the wax/print pattern it
+ *  was cast from by roughly this much — real foundries compensate by
+ *  scaling the PATTERN up by `1 / (1 − shrinkage)` before casting, which
+ *  `scaleForCastingShrinkage` below applies. These percentages are
+ *  standard trade reference figures (denser platinum shrinks noticeably
+ *  less than lighter gold alloys; silver is close to gold) — every real
+ *  foundry calibrates its own number from its own equipment/alloy batches,
+ *  so treat this as a starting estimate to confirm with the shop's actual
+ *  caster, not a certified value. */
+export const CASTING_SHRINKAGE_PERCENT: Record<JewelryMetalOption, number> = {
+  platinum: 1.0,
+  'gold-14k-white': 1.75, 'gold-14k-yellow': 1.75, 'gold-14k-rose': 1.75,
+  'gold-18k-white': 1.5, 'gold-18k-yellow': 1.5, 'gold-18k-rose': 1.5,
+  'gold-14k': 1.75, 'gold-18k': 1.5,
+  silver: 2.0,
+}
+
+/** Scales a clone of `object` up by the compensating factor for the given
+ *  metal's own casting shrinkage — the pattern to actually cast/print,
+ *  not the piece's own intended final size. Returns the SAME object
+ *  (identity scale) when shrinkage is 0, so callers can use this
+ *  unconditionally without a separate no-op branch. Geometry data isn't
+ *  deep-cloned (only the wrapping transform is new), so this is cheap and
+ *  never mutates the original — safe to call right before export without
+ *  touching whatever the on-screen preview or weight estimate use. */
+export function scaleForCastingShrinkage(object: THREE.Object3D, metal: JewelryMetalOption): THREE.Object3D {
+  const percent = CASTING_SHRINKAGE_PERCENT[metal] ?? 0
+  if (percent <= 0) return object
+  const factor = 1 / (1 - percent / 100)
+  const wrapper = new THREE.Group()
+  wrapper.add(object.clone(true))
+  wrapper.scale.setScalar(factor)
+  wrapper.updateMatrixWorld(true)
+  return wrapper
+}
+
 /** Density (g/cm³) per metal — standard jewelry-industry reference values.
  *  Real alloys vary a little by manufacturer; treat this as an estimate to
  *  cross-check, not a certified figure. */
