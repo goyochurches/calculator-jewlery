@@ -310,6 +310,7 @@ export function CadDesignPage() {
   const [prongDiameterOverridesMm, setProngDiameterOverridesMm] = useState<Record<number, number>>({})
   const [excludedPaveIndices, setExcludedPaveIndices] = useState<number[]>([])
   const [excludedHaloIndices, setExcludedHaloIndices] = useState<number[]>([])
+  const [excludedClusterIndices, setExcludedClusterIndices] = useState<number[]>([])
   // Selecting a part jumps to whichever tab actually controls it — bridges
   // "I clicked this" to "here's how to change it" even though the controls
   // are still per-feature (every prong, say) rather than per-instance yet.
@@ -327,12 +328,14 @@ export function CadDesignPage() {
   const canEditProngInstance = selectedPart?.name === 'Prong' && selectedPart.instanceIndex !== undefined
     && stoneShape === 'round' && settingType === 'prong'
   // Second per-instance case, this time a REMOVAL rather than an edit —
-  // pavé only for now (channel/flush/halo don't have excludeIndices wired
-  // in yet, tracked in the roadmap memory).
+  // pavé, halo (single-ring only) and now cluster petals. Channel/flush/
+  // bar/invisible side stones still don't have excludeIndices wired in,
+  // tracked in the roadmap memory.
   const canRemovePaveInstance = selectedPart?.name === 'Pavé stone' && selectedPart.instanceIndex !== undefined
     && paveSettingType === 'pave'
   const canRemoveHaloInstance = selectedPart?.name === 'Halo stone' && selectedPart.instanceIndex !== undefined
     && haloRingCount === 1
+  const canRemoveClusterInstance = selectedPart?.name === 'Cluster petal' && selectedPart.instanceIndex !== undefined
   // Tension setting cuts the band itself, so it needs its own band geometry
   // (see ringGeometry.ts) — only meaningful for a round stone with a
   // center stone actually present.
@@ -355,6 +358,7 @@ export function CadDesignPage() {
   // inside the memo body, unchanged).
   const excludedHaloKey = excludedHaloIndices.join(',')
   const excludedPaveKey = excludedPaveIndices.join(',')
+  const excludedClusterKey = excludedClusterIndices.join(',')
   const outerRadiusMm = innerDiameterMm / 2 + thicknessMm
   const tensionGapDeg = tensionActive ? tensionGapDegForStone(stoneDiameterMm, outerRadiusMm) : 0
 
@@ -413,7 +417,7 @@ export function CadDesignPage() {
           ? (settingType === 'bezel'
               ? buildBezelHeadGroup({ stoneDiameterMm, coverageDeg: bezelCoverage === 'half' ? 180 : 360 })
               : settingType === 'cluster'
-                ? buildClusterHeadGroup({ centerStoneDiameterMm: stoneDiameterMm, petalCount: clusterPetalCount, petalStoneDiameterMm: clusterPetalStoneMm })
+                ? buildClusterHeadGroup({ centerStoneDiameterMm: stoneDiameterMm, petalCount: clusterPetalCount, petalStoneDiameterMm: clusterPetalStoneMm, excludeIndices: excludedClusterIndices })
                 : settingType === 'illusion'
                   ? buildIllusionHeadGroup({ stoneDiameterMm })
                   : buildStoneHeadGroup({ stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm }))
@@ -512,7 +516,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -560,6 +564,11 @@ export function CadDesignPage() {
   if (haloCountSeen !== haloCount) {
     setHaloCountSeen(haloCount)
     setExcludedHaloIndices([])
+  }
+  const [clusterPetalCountSeen, setClusterPetalCountSeen] = useState(clusterPetalCount)
+  if (clusterPetalCountSeen !== clusterPetalCount) {
+    setClusterPetalCountSeen(clusterPetalCount)
+    setExcludedClusterIndices([])
   }
 
   // Weight & cost estimate — volume comes straight off the displayed
@@ -615,21 +624,28 @@ export function CadDesignPage() {
   // in the UI rather than modeled as its own independent choice).
   const estimatedMeleeCost = useMemo(() => {
     let total = 0
-    if (haloEligible) total += nearestDiamondPrice(caratFromRoundDiameterMm(haloStoneMm), diamondType) * haloCount * haloRingCount
-    if (includePave) total += nearestDiamondPrice(caratFromRoundDiameterMm(paveStoneMm), diamondType) * paveCount
+    // Counts here subtract individually-removed instances (excludeIndices
+    // only ever applies to the first halo ring, matching the model
+    // useMemo's own `ring === 0 ? excludedHaloIndices : undefined` logic
+    // above) — this melee pricing shipped before per-instance removal
+    // existed for pavé/halo, so it originally always priced the FULL
+    // configured count even after a stone was removed; fixed here rather
+    // than left as a known drift between the model and its own price tag.
+    if (haloEligible) total += nearestDiamondPrice(caratFromRoundDiameterMm(haloStoneMm), diamondType) * (haloCount * haloRingCount - excludedHaloIndices.length)
+    if (includePave) total += nearestDiamondPrice(caratFromRoundDiameterMm(paveStoneMm), diamondType) * (paveCount - excludedPaveIndices.length)
     if (sideStoneCount > 0 && stoneShape === 'round' && settingType === 'prong' && !tensionActive) {
       total += nearestDiamondPrice(sideStoneCaratWeight, diamondType) * sideStoneCount
     }
     if (stoneShape === 'round' && settingType === 'cluster') {
-      total += nearestDiamondPrice(caratFromRoundDiameterMm(clusterPetalStoneMm), diamondType) * clusterPetalCount
+      total += nearestDiamondPrice(caratFromRoundDiameterMm(clusterPetalStoneMm), diamondType) * (clusterPetalCount - excludedClusterIndices.length)
     }
     return total
     // eslint-disable-next-line react-hooks/exhaustive-deps -- same reasoning as estimatedStoneCost above: nearestDiamondPrice is a fresh closure every render, its real inputs (config, diamondType) are already listed below.
   }, [
-    config, diamondType, haloEligible, haloStoneMm, haloCount, haloRingCount,
-    includePave, paveStoneMm, paveCount,
+    config, diamondType, haloEligible, haloStoneMm, haloCount, haloRingCount, excludedHaloKey,
+    includePave, paveStoneMm, paveCount, excludedPaveKey,
     sideStoneCount, stoneShape, settingType, tensionActive, sideStoneCaratWeight,
-    clusterPetalStoneMm, clusterPetalCount,
+    clusterPetalStoneMm, clusterPetalCount, excludedClusterKey,
   ])
   const estimatedTotalCost = estimatedMetalCost + estimatedStoneCost + estimatedMeleeCost
 
@@ -832,6 +848,18 @@ export function CadDesignPage() {
                     onClick={() => setExcludedHaloIndices(prev => [...prev, selectedPart.instanceIndex!])}
                     className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
                     Remove this stone
+                  </button>
+                </div>
+              ) : canRemoveClusterInstance ? (
+                <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                  <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
+                  <span className="flex-1">
+                    Selected <strong>Cluster petal #{(selectedPart.instanceIndex ?? 0) + 1}</strong> — removes its prongs too.
+                  </span>
+                  <button type="button"
+                    onClick={() => setExcludedClusterIndices(prev => [...prev, selectedPart.instanceIndex!])}
+                    className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
+                    Remove this petal
                   </button>
                 </div>
               ) : (
@@ -1148,6 +1176,15 @@ export function CadDesignPage() {
                           <input type="number" min={0.8} max={5} step={0.1} value={clusterPetalStoneMm}
                             onChange={e => setClusterPetalStoneMm(Math.max(0.8, Number(e.target.value) || 0.8))} className={inputCls} />
                         </div>
+                        {excludedClusterIndices.length > 0 && (
+                          <div className="col-span-2 flex items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                            <span>{excludedClusterIndices.length} petal{excludedClusterIndices.length === 1 ? '' : 's'} removed individually.</span>
+                            <button type="button" onClick={() => setExcludedClusterIndices([])}
+                              className="shrink-0 rounded-lg border border-slate-300 px-2 py-1 font-semibold hover:bg-slate-50">
+                              Restore all
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
                     {stoneShape !== 'round' && (

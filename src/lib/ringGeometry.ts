@@ -776,6 +776,11 @@ export interface ClusterHeadParams {
    *  center stone's, a typical cluster proportion. */
   petalStoneDiameterMm?: number
   standHeightMm?: number
+  /** Per-instance removal (0..petalCount-1) — same `excludeIndices` +
+   *  `userData.instanceIndex` pattern already proven out for pavé/halo.
+   *  Removes a petal's prongs along with its stone (an orphaned prong
+   *  ring with no stone in it would look wrong), not just the stone. */
+  excludeIndices?: number[]
 }
 
 /** Cluster head: one shared flat plate underlies the whole rosette (instead
@@ -805,7 +810,7 @@ export function buildClusterHeadGroup(params: ClusterHeadParams): THREE.Group {
   plate.userData.partName = 'Cluster plate'
   group.add(plate)
 
-  const addStoneWithProngs = (cx: number, cz: number, radius: number, prongCount: number, stoneLabel: string, faceted: boolean) => {
+  const addStoneWithProngs = (cx: number, cz: number, radius: number, prongCount: number, stoneLabel: string, faceted: boolean, instanceIndex?: number) => {
     const prongDiameterMm = Math.max(0.5, radius * 0.28)
     const prongHeightMm = radius * 1.1
     for (let i = 0; i < prongCount; i++) {
@@ -817,6 +822,7 @@ export function buildClusterHeadGroup(params: ClusterHeadParams): THREE.Group {
         cz + Math.sin(angle) * (radius + prongDiameterMm / 2),
       )
       prong.userData.partName = 'Prong'
+      if (instanceIndex !== undefined) prong.userData.instanceIndex = instanceIndex
       group.add(prong)
     }
     // Real faceted geometry for the rosette's own center stone (the one
@@ -835,14 +841,17 @@ export function buildClusterHeadGroup(params: ClusterHeadParams): THREE.Group {
       stoneProxy.scale.y = 0.8
       stoneProxy.userData.isStone = true
       stoneProxy.userData.partName = stoneLabel
+      if (instanceIndex !== undefined) stoneProxy.userData.instanceIndex = instanceIndex
       group.add(stoneProxy)
     }
   }
 
   addStoneWithProngs(0, 0, centerRadius, 4, 'Center stone', true)
+  const excludeSet = new Set(params.excludeIndices ?? [])
   for (let i = 0; i < petalCount; i++) {
+    if (excludeSet.has(i)) continue
     const angle = (i / petalCount) * Math.PI * 2
-    addStoneWithProngs(Math.cos(angle) * orbitRadius, Math.sin(angle) * orbitRadius, petalRadius, 3, 'Cluster petal', false)
+    addStoneWithProngs(Math.cos(angle) * orbitRadius, Math.sin(angle) * orbitRadius, petalRadius, 3, 'Cluster petal', false, i)
   }
 
   const stand = new THREE.Mesh(new THREE.CylinderGeometry(plateRadius * 0.85, plateRadius * 0.55, standHeightMm, 24))
