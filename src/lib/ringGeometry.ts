@@ -1988,6 +1988,12 @@ export interface FlushSettingParams {
    *  removes the stone AND its own burnished collar (an orphaned collar
    *  ring with no stone in it would look wrong). */
   excludeIndices?: number[]
+  /** Per-instance diameter override (mm), same keying/convention as
+   *  `PaveRowParams.stoneDiameterOverridesMm` — only the one stone's own
+   *  sphere (and its own burnished collar, sized to match it) changes;
+   *  its seat POSITION still comes from the shared `stoneDiameterMm`'s
+   *  layout. */
+  stoneDiameterOverridesMm?: Record<number, number>
 }
 
 /** A row of stones sunk into the band's outer surface, each ringed by a
@@ -1995,13 +2001,12 @@ export interface FlushSettingParams {
  *  defining visual signature of a flush/gypsy setting (no prongs, no
  *  rails, just metal burnished over the stone's edge). */
 export function buildFlushSetting(params: FlushSettingParams, band: RingBandParams): THREE.Group {
-  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12, excludeIndices } = params
+  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12, excludeIndices, stoneDiameterOverridesMm } = params
   const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
   const stoneRadius = stoneDiameterMm / 2
   // Sunk much deeper than pavé's shallow sink (0.3×) or channel's near-flush
   // seating (0.1×) — only the crown/table sits near the band's own surface.
   const seatRadius = outerRadius - stoneRadius * 0.75
-  const rimTube = Math.max(0.25, stoneRadius * 0.18)
   const perSide = Math.max(1, Math.round(count / 2))
 
   const group = new THREE.Group()
@@ -2014,8 +2019,10 @@ export function buildFlushSetting(params: FlushSettingParams, band: RingBandPara
       const angleDeg = side * (gapDeg + t * Math.max(0, spreadDeg - gapDeg))
       const angle = (angleDeg * Math.PI) / 180
       const cos = Math.cos(angle), sin = Math.sin(angle)
+      const thisRadius = (stoneDiameterOverridesMm?.[thisIndex] ?? stoneDiameterMm) / 2
+      const rimTube = Math.max(0.25, thisRadius * 0.18)
 
-      const stone = new THREE.Mesh(new THREE.SphereGeometry(stoneRadius, 16, 12))
+      const stone = new THREE.Mesh(new THREE.SphereGeometry(thisRadius, 16, 12))
       stone.position.set(cos * seatRadius, 0, sin * seatRadius)
       stone.userData.isStone = true
       stone.userData.partName = 'Flush stone'
@@ -2025,8 +2032,10 @@ export function buildFlushSetting(params: FlushSettingParams, band: RingBandPara
       // The burnished collar — a small torus lying flat against the band's
       // outer surface (same angle, but at the band's actual outer radius
       // rather than the sunk stone's), ringing where the metal is pushed
-      // over the stone's edge.
-      const rim = new THREE.Mesh(new THREE.TorusGeometry(stoneRadius * 0.85, rimTube, 10, 24))
+      // over the stone's edge. Sized off the SAME per-instance radius as
+      // the stone it collars, so an override doesn't leave a mismatched
+      // collar behind.
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(thisRadius * 0.85, rimTube, 10, 24))
       rim.position.set(cos * outerRadius, 0, sin * outerRadius)
       rim.rotation.x = Math.PI / 2
       rim.userData.partName = 'Flush collar'
@@ -2117,6 +2126,11 @@ export interface ChannelSettingParams {
    *  removing a stone here doesn't orphan anything else, unlike flush's
    *  own collar or cluster's own petal prongs. */
   excludeIndices?: number[]
+  /** Per-instance diameter override (mm), same keying/convention as
+   *  `PaveRowParams.stoneDiameterOverridesMm` — only the one stone's own
+   *  sphere changes; the shared rail walls (which span the whole arc, not
+   *  per-stone) stay sized/positioned to the shared `stoneDiameterMm`. */
+  stoneDiameterOverridesMm?: Record<number, number>
 }
 
 /** Points along a circular arc (radius `r`, at axial height `y`) from
@@ -2139,7 +2153,7 @@ function arcPoints3(r: number, y: number, fromDeg: number, toDeg: number, segmen
  *  TorusGeometry's own arc/rotation parameters (easier to reason about
  *  correctly against this file's existing angle convention). */
 export function buildChannelSetting(params: ChannelSettingParams, band: RingBandParams): THREE.Group {
-  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12, excludeIndices } = params
+  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12, excludeIndices, stoneDiameterOverridesMm } = params
   const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
   const stoneRadius = stoneDiameterMm / 2
   const wallHeightMm = params.wallHeightMm ?? stoneRadius * 0.8
@@ -2157,7 +2171,8 @@ export function buildChannelSetting(params: ChannelSettingParams, band: RingBand
       const t = perSide === 1 ? 0 : i / (perSide - 1)
       const deg = side * (gapDeg + t * Math.max(0, spreadDeg - gapDeg))
       const rad = (deg * Math.PI) / 180
-      const stone = new THREE.Mesh(new THREE.SphereGeometry(stoneRadius, 16, 12))
+      const thisRadius = (stoneDiameterOverridesMm?.[thisIndex] ?? stoneDiameterMm) / 2
+      const stone = new THREE.Mesh(new THREE.SphereGeometry(thisRadius, 16, 12))
       stone.position.set(Math.cos(rad) * seatRadius, wallHeightMm * 0.3, Math.sin(rad) * seatRadius)
       stone.userData.isStone = true
       stone.userData.partName = 'Channel stone'
@@ -3157,6 +3172,11 @@ export interface BarSettingParams {
    *  removal would be a bigger, separate design decision than a plain
    *  "take this stone out" edit. */
   excludeIndices?: number[]
+  /** Per-instance diameter override (mm), same keying/convention as
+   *  `PaveRowParams.stoneDiameterOverridesMm` — only the one stone's own
+   *  sphere changes; the shared bar posts (positioned from every stone's
+   *  angle regardless of override) stay sized to `stoneDiameterMm`. */
+  stoneDiameterOverridesMm?: Record<number, number>
 }
 
 /** Stones at the SAME evenly-spaced angular positions pavé/channel/flush
@@ -3164,7 +3184,7 @@ export interface BarSettingParams {
  *  outer end) — built directly in the band's WORLD coordinates, same
  *  convention as those three. */
 export function buildBarSetting(params: BarSettingParams, band: RingBandParams): THREE.Group {
-  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12, excludeIndices } = params
+  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12, excludeIndices, stoneDiameterOverridesMm } = params
   const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
   const stoneRadius = stoneDiameterMm / 2
   const barThicknessMm = params.barThicknessMm ?? Math.max(0.4, stoneRadius * 0.35)
@@ -3187,7 +3207,8 @@ export function buildBarSetting(params: BarSettingParams, band: RingBandParams):
       sideAnglesDeg.push(angleDeg)
       if (excludeIndices?.includes(thisIndex)) continue
       const rad = (angleDeg * Math.PI) / 180
-      const stone = new THREE.Mesh(new THREE.SphereGeometry(stoneRadius, 16, 12))
+      const thisRadius = (stoneDiameterOverridesMm?.[thisIndex] ?? stoneDiameterMm) / 2
+      const stone = new THREE.Mesh(new THREE.SphereGeometry(thisRadius, 16, 12))
       stone.position.set(Math.cos(rad) * seatRadius, barHeightMm * 0.2, Math.sin(rad) * seatRadius)
       stone.userData.isStone = true
       stone.userData.partName = 'Bar stone'
@@ -3243,6 +3264,14 @@ export interface InvisibleSettingParams {
    *  visible gap where it sat (the row isn't re-packed to close the
    *  gap) — an honest "this one's missing", not a re-flowed layout. */
   excludeIndices?: number[]
+  /** Per-instance diameter override (mm), same keying/convention as
+   *  `PaveRowParams.stoneDiameterOverridesMm` — only the one stone's own
+   *  sphere changes; its seat POSITION still comes from the shared
+   *  `stoneDiameterMm`'s touching-spacing formula (`stepDeg` below). Worth
+   *  disclosing more than the other side-stone types: since this setting's
+   *  whole visual point is zero gaps, a much bigger override here will
+   *  visibly overlap its neighbors rather than just "look a bit odd." */
+  stoneDiameterOverridesMm?: Record<number, number>
 }
 
 /** Stones packed edge-to-edge (each adjacent pair's centers exactly one
@@ -3250,7 +3279,7 @@ export interface InvisibleSettingParams {
  *  `spreadDeg` — built directly in the band's WORLD coordinates, same
  *  convention as pavé/channel/flush/bar. */
 export function buildInvisibleSetting(params: InvisibleSettingParams, band: RingBandParams): THREE.Group {
-  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12, excludeIndices } = params
+  const { count, stoneDiameterMm, spreadDeg = 70, gapDeg = 12, excludeIndices, stoneDiameterOverridesMm } = params
   const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
   const stoneRadius = stoneDiameterMm / 2
   const seatRadius = outerRadius - stoneRadius * 0.1 // sit almost flush, like channel/bar
@@ -3268,7 +3297,8 @@ export function buildInvisibleSetting(params: InvisibleSettingParams, band: Ring
       if (Math.abs(angleDeg) > spreadDeg) break // ran out of room in the allotted arc — stop rather than overlap
       if (excludeIndices?.includes(thisIndex)) continue
       const rad = (angleDeg * Math.PI) / 180
-      const stone = new THREE.Mesh(new THREE.SphereGeometry(stoneRadius, 16, 12))
+      const thisRadius = (stoneDiameterOverridesMm?.[thisIndex] ?? stoneDiameterMm) / 2
+      const stone = new THREE.Mesh(new THREE.SphereGeometry(thisRadius, 16, 12))
       stone.position.set(Math.cos(rad) * seatRadius, 0, Math.sin(rad) * seatRadius)
       stone.userData.isStone = true
       stone.userData.partName = 'Invisible-set stone'

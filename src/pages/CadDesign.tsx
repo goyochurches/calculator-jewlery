@@ -675,13 +675,13 @@ export function CadDesignPage() {
     if (includePave) {
       const bandParams = { fingerSize, widthMm, thicknessMm, profile }
       const sideStones = paveSettingType === 'channel'
-        ? buildChannelSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices }, bandParams)
+        ? buildChannelSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices, stoneDiameterOverridesMm: paveStoneDiameterOverridesMm }, bandParams)
         : paveSettingType === 'flush'
-          ? buildFlushSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices }, bandParams)
+          ? buildFlushSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices, stoneDiameterOverridesMm: paveStoneDiameterOverridesMm }, bandParams)
           : paveSettingType === 'bar'
-            ? buildBarSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices }, bandParams)
+            ? buildBarSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices, stoneDiameterOverridesMm: paveStoneDiameterOverridesMm }, bandParams)
             : paveSettingType === 'invisible'
-              ? buildInvisibleSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices }, bandParams)
+              ? buildInvisibleSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices, stoneDiameterOverridesMm: paveStoneDiameterOverridesMm }, bandParams)
               : buildPaveRow({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices, stoneDiameterOverridesMm: paveStoneDiameterOverridesMm }, bandParams)
       group.add(sideStones)
     }
