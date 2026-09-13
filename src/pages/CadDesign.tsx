@@ -447,6 +447,9 @@ export function CadDesignPage() {
   // pattern round prongs already proved out with height+diameter.
   const [paveStoneDiameterOverridesMm, setPaveStoneDiameterOverridesMm] = useState<Record<number, number>>({})
   const [haloStoneDiameterOverridesMm, setHaloStoneDiameterOverridesMm] = useState<Record<number, number>>({})
+  // Same pattern, third and last repeated-stone part to get it — closes
+  // the near-term roadmap item "size editing for cluster petals".
+  const [petalStoneDiameterOverridesMm, setPetalStoneDiameterOverridesMm] = useState<Record<number, number>>({})
   // Selecting a part jumps to whichever tab actually controls it — bridges
   // "I clicked this" to "here's how to change it" even though the controls
   // are still per-feature (every prong, say) rather than per-instance yet.
@@ -570,7 +573,7 @@ export function CadDesignPage() {
           ? (settingType === 'bezel'
               ? buildBezelHeadGroup({ stoneDiameterMm, coverageDeg: bezelCoverage === 'half' ? 180 : 360 })
               : settingType === 'cluster'
-                ? buildClusterHeadGroup({ centerStoneDiameterMm: stoneDiameterMm, petalCount: clusterPetalCount, petalStoneDiameterMm: clusterPetalStoneMm, excludeIndices: excludedClusterIndices })
+                ? buildClusterHeadGroup({ centerStoneDiameterMm: stoneDiameterMm, petalCount: clusterPetalCount, petalStoneDiameterMm: clusterPetalStoneMm, excludeIndices: excludedClusterIndices, petalStoneDiameterOverridesMm })
                 : settingType === 'illusion'
                   ? buildIllusionHeadGroup({ stoneDiameterMm })
                   : buildStoneHeadGroup({ stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm }))
@@ -710,7 +713,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, logoSvgText, logoSizeMm, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, logoSvgText, logoSizeMm, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, petalStoneDiameterOverridesMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -800,6 +803,7 @@ export function CadDesignPage() {
   if (clusterPetalCountSeen !== clusterPetalCount) {
     setClusterPetalCountSeen(clusterPetalCount)
     setExcludedClusterIndices([])
+    setPetalStoneDiameterOverridesMm({})
   }
 
   // Weight & cost estimate — volume comes straight off the displayed
@@ -881,7 +885,14 @@ export function CadDesignPage() {
       total += nearestDiamondPrice(sideStoneCaratWeight, diamondType) * sideStoneCount
     }
     if (stoneShape === 'round' && settingType === 'cluster') {
-      total += nearestDiamondPrice(caratFromRoundDiameterMm(clusterPetalStoneMm), diamondType) * (clusterPetalCount - excludedClusterIndices.length)
+      // Priced stone-by-stone now too (same fix already applied to
+      // pavé/halo above), since a per-petal size override would otherwise
+      // silently be ignored by a flat count×size.
+      for (let i = 0; i < clusterPetalCount; i++) {
+        if (excludedClusterIndices.includes(i)) continue
+        const d = petalStoneDiameterOverridesMm[i] ?? clusterPetalStoneMm
+        total += nearestDiamondPrice(caratFromRoundDiameterMm(d), diamondType)
+      }
     }
     return total
     // eslint-disable-next-line react-hooks/exhaustive-deps -- same reasoning as estimatedStoneCost above: nearestDiamondPrice is a fresh closure every render, its real inputs (config, diamondType) are already listed below.
@@ -889,7 +900,7 @@ export function CadDesignPage() {
     config, diamondType, haloEligible, haloStoneMm, haloCount, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm,
     includePave, paveStoneMm, paveCount, excludedPaveKey, paveStoneDiameterOverridesMm,
     sideStoneCount, stoneShape, settingType, tensionActive, sideStoneCaratWeight,
-    clusterPetalStoneMm, clusterPetalCount, excludedClusterKey,
+    clusterPetalStoneMm, clusterPetalCount, excludedClusterKey, petalStoneDiameterOverridesMm,
   ])
   const estimatedLaborCost = includeRingLaborFee ? (config.ringLaborMap[ringLaborTierKey]?.fee ?? 0) : 0
   // Total stone count across the design — a REAL count (not a guess),
@@ -1155,16 +1166,35 @@ export function CadDesignPage() {
                   </div>
                 </div>
               ) : canRemoveClusterInstance ? (
-                <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
-                  <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
-                  <span className="flex-1">
-                    Selected <strong>Cluster petal #{(selectedPart.instanceIndex ?? 0) + 1}</strong> — removes its prongs too.
-                  </span>
-                  <button type="button"
-                    onClick={() => setExcludedClusterIndices(prev => [...prev, selectedPart.instanceIndex!])}
-                    className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
-                    Remove this petal
-                  </button>
+                <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                  <div className="flex items-center gap-2">
+                    <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
+                    <span className="flex-1">
+                      Selected <strong>Cluster petal #{(selectedPart.instanceIndex ?? 0) + 1}</strong> — removes its prongs too.
+                    </span>
+                    <button type="button"
+                      onClick={() => setExcludedClusterIndices(prev => [...prev, selectedPart.instanceIndex!])}
+                      className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
+                      Remove this petal
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-14 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-amber-600">Size</span>
+                    <input type="range" min={0.5} max={clusterPetalStoneMm * 2.5} step={0.05}
+                      value={petalStoneDiameterOverridesMm[selectedPart.instanceIndex ?? 0] ?? clusterPetalStoneMm}
+                      onChange={e => setPetalStoneDiameterOverridesMm(prev => ({ ...prev, [selectedPart.instanceIndex ?? 0]: Number(e.target.value) }))}
+                      className="flex-1" />
+                    <span className="w-14 shrink-0 text-right font-mono">
+                      {(petalStoneDiameterOverridesMm[selectedPart.instanceIndex ?? 0] ?? clusterPetalStoneMm).toFixed(2)}mm
+                    </span>
+                    {selectedPart.instanceIndex !== undefined && petalStoneDiameterOverridesMm[selectedPart.instanceIndex] !== undefined && (
+                      <button type="button"
+                        onClick={() => setPetalStoneDiameterOverridesMm(prev => { const next = { ...prev }; delete next[selectedPart.instanceIndex!]; return next })}
+                        className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
+                        Reset
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">

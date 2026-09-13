@@ -862,6 +862,13 @@ export interface ClusterHeadParams {
    *  Removes a petal's prongs along with its stone (an orphaned prong
    *  ring with no stone in it would look wrong), not just the stone. */
   excludeIndices?: number[]
+  /** Per-instance petal diameter override (mm), same keying/convention as
+   *  `HaloParams.stoneDiameterOverridesMm`/`PaveRowParams.stoneDiameterOverridesMm`
+   *  — only the one petal's own stone proxy changes size, its seat
+   *  POSITION still comes from the shared `petalStoneDiameterMm`'s orbit
+   *  radius (a much bigger override can slightly overlap its neighbors,
+   *  same disclosed simplification as those two). */
+  petalStoneDiameterOverridesMm?: Record<number, number>
 }
 
 /** Cluster head: one shared flat plate underlies the whole rosette (instead
@@ -891,7 +898,12 @@ export function buildClusterHeadGroup(params: ClusterHeadParams): THREE.Group {
   plate.userData.partName = 'Cluster plate'
   group.add(plate)
 
-  const addStoneWithProngs = (cx: number, cz: number, radius: number, prongCount: number, stoneLabel: string, faceted: boolean, instanceIndex?: number) => {
+  const addStoneWithProngs = (cx: number, cz: number, radius: number, prongCount: number, stoneLabel: string, faceted: boolean, instanceIndex?: number, stoneRadiusOverride?: number) => {
+    // The prong cage stays sized/positioned to the SHARED radius (its seat
+    // position, same disclosed simplification pavé/halo already use for
+    // their own per-instance size overrides) — only the visual stone
+    // proxy itself changes size when an override is given.
+    const stoneRadius = stoneRadiusOverride ?? radius
     const prongDiameterMm = Math.max(0.5, radius * 0.28)
     const prongHeightMm = radius * 1.1
     const prongAngles = polarArrayAngles(prongCount)
@@ -913,13 +925,13 @@ export function buildClusterHeadGroup(params: ClusterHeadParams): THREE.Group {
     // melee elsewhere in this file — too small to read as anything but a
     // tiny bead regardless.
     if (faceted) {
-      const stoneProxy = buildFacetedRoundStone({ diameterMm: radius * 2 })
+      const stoneProxy = buildFacetedRoundStone({ diameterMm: stoneRadius * 2 })
       stoneProxy.position.set(cx, plateThickness, cz)
       stoneProxy.traverse(obj => { if (obj instanceof THREE.Mesh) obj.userData.partName = stoneLabel })
       group.add(stoneProxy)
     } else {
-      const stoneProxy = new THREE.Mesh(new THREE.OctahedronGeometry(radius * 0.92))
-      stoneProxy.position.set(cx, plateThickness + radius * 0.5, cz)
+      const stoneProxy = new THREE.Mesh(new THREE.OctahedronGeometry(stoneRadius * 0.92))
+      stoneProxy.position.set(cx, plateThickness + stoneRadius * 0.5, cz)
       stoneProxy.scale.y = 0.8
       stoneProxy.userData.isStone = true
       stoneProxy.userData.partName = stoneLabel
@@ -934,7 +946,8 @@ export function buildClusterHeadGroup(params: ClusterHeadParams): THREE.Group {
   for (let i = 0; i < petalCount; i++) {
     if (excludeSet.has(i)) continue
     const angle = petalAngles[i]
-    addStoneWithProngs(Math.cos(angle) * orbitRadius, Math.sin(angle) * orbitRadius, petalRadius, 3, 'Cluster petal', false, i)
+    const overrideMm = params.petalStoneDiameterOverridesMm?.[i]
+    addStoneWithProngs(Math.cos(angle) * orbitRadius, Math.sin(angle) * orbitRadius, petalRadius, 3, 'Cluster petal', false, i, overrideMm !== undefined ? overrideMm / 2 : undefined)
   }
 
   const stand = new THREE.Mesh(new THREE.CylinderGeometry(plateRadius * 0.85, plateRadius * 0.55, standHeightMm, 24))
