@@ -17,7 +17,7 @@ import {
   buildFancyStoneHeadGroup, type FancyStoneShape,
   buildPaveRow, buildChannelSetting, buildFlushSetting, buildBarSetting, buildInvisibleSetting,
   buildTensionBandGeometry, buildTensionSetting, tensionGapDegForStone,
-  buildTaperedBandGeometry, buildTwistedBandGeometry, buildSplitShankGeometry, buildCathedralBandGeometry,
+  buildTaperedBandGeometry, buildTwistedBandGeometry, buildSplitShankGeometry, buildCathedralBandGeometry, buildBypassBandGeometry,
   buildIllusionHeadGroup,
   buildMilgrainEdges, buildRopeEdge, buildFluteRibs, buildGalleryWireGroup, buildBandTextGroup, estimateBandTextWidthMm,
   buildPatternMotifs, type PatternMotif,
@@ -115,7 +115,7 @@ export function CadDesignPage() {
   const [widthMm, setWidthMm] = useState(2.5)
   const [thicknessMm, setThicknessMm] = useState(1.8)
   const [profile, setProfile] = useState<BandProfile>('comfort')
-  const [shankStyle, setShankStyle] = useState<'plain' | 'tapered' | 'twisted' | 'split' | 'cathedral'>('plain')
+  const [shankStyle, setShankStyle] = useState<'plain' | 'tapered' | 'twisted' | 'split' | 'cathedral' | 'bypass'>('plain')
   const [splitStrandCount, setSplitStrandCount] = useState<2 | 3>(2)
   const [taperAmount, setTaperAmount] = useState(0.3)
   const [twists, setTwists] = useState(1)
@@ -507,6 +507,18 @@ export function CadDesignPage() {
       // Split shank returns one geometry PER STRAND (2 or 3), not a single
       // band — each becomes its own mesh, unlike every other shank style.
       const strands = buildSplitShankGeometry({ ...bandParamsBase, strandCount: splitStrandCount })
+      strands.forEach((geo, i) => {
+        const strand = new THREE.Mesh(geo)
+        strand.userData.partName = 'Shank strand'
+        strand.userData.instanceIndex = i
+        group.add(strand)
+      })
+    } else if (!tensionActive && shankStyle === 'bypass') {
+      // Same "one geometry per strand" shape as split shank, but the two
+      // strands genuinely cross (swap sides) rather than diverge-and-
+      // reconverge on the same sides — see buildBypassBandGeometry's own
+      // doc comment for how the crossing is made periodic/collision-free.
+      const strands = buildBypassBandGeometry(bandParamsBase)
       strands.forEach((geo, i) => {
         const strand = new THREE.Mesh(geo)
         strand.userData.partName = 'Shank strand'
@@ -917,7 +929,7 @@ export function CadDesignPage() {
           </div>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Parametric solitaire ring</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            Band (plain, tapered, twisted-ribbon, split-shank or cathedral), ring type (solitaire, three-stone,
+            Band (plain, tapered, twisted-ribbon, split-shank, cathedral or bypass/crossover), ring type (solitaire, three-stone,
             five-stone or signet — no stone),
             center stone (round — custom 3-8 prongs, bezel,
             cluster, tension or illusion — oval, cushion, princess, marquise,
@@ -1170,7 +1182,7 @@ export function CadDesignPage() {
                 <div>
                   <label className={labelCls}>Shank style</label>
                   <div className="grid grid-cols-3 gap-2">
-                    {(['plain', 'tapered', 'twisted', 'split', 'cathedral'] as const).map(s => (
+                    {(['plain', 'tapered', 'twisted', 'split', 'cathedral', 'bypass'] as const).map(s => (
                       <button key={s} type="button" onClick={() => setShankStyle(s)} disabled={tensionActive}
                         className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition disabled:cursor-not-allowed disabled:opacity-50 ${shankStyle === s ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
                         {s}
@@ -1225,6 +1237,14 @@ export function CadDesignPage() {
                       Matrix's own "Cathedral Ring Rail" — the band rises (radially thicker, like a Gothic arch) right
                       at the head, easing back to its normal thickness toward the back. Adds metal (and weight) —
                       unlike Taper, this doesn't just redistribute it.
+                    </p>
+                  )}
+                  {shankStyle === 'bypass' && !tensionActive && (
+                    <p className="mt-2 text-[11px] text-slate-400">
+                      A named Ring Builder TYPE (bypass/"toi et moi" crossover) — two strands genuinely swap sides
+                      (not just diverge and reconverge on the same side, like Split shank does) via a periodic
+                      offset with no seam at the back. Built as two round wire-like strands rather than the full
+                      band profile — an honest, scoped simplification, not the fully general case.
                     </p>
                   )}
                 </div>
