@@ -34,7 +34,7 @@ type StoneShape = 'round' | FancyStoneShape
 const STONE_SHAPE_LABELS: Record<StoneShape, string> = {
   round: 'Round', oval: 'Oval', cushion: 'Cushion', princess: 'Princess', marquise: 'Marquise', pear: 'Pear',
   emerald: 'Emerald', asscher: 'Asscher', radiant: 'Radiant',
-  hexagon: 'Hexagon', lozenge: 'Lozenge', trapezoid: 'Trapezoid', heart: 'Heart',
+  hexagon: 'Hexagon', lozenge: 'Lozenge', trapezoid: 'Trapezoid', heart: 'Heart', trillion: 'Trillion',
 }
 // Reasonable starting length×width (mm) per fancy shape, editable afterward.
 const FANCY_SHAPE_DEFAULTS: Record<FancyStoneShape, { lengthMm: number; widthMm: number }> = {
@@ -50,6 +50,7 @@ const FANCY_SHAPE_DEFAULTS: Record<FancyStoneShape, { lengthMm: number; widthMm:
   lozenge: { lengthMm: 9, widthMm: 5 },
   trapezoid: { lengthMm: 6, widthMm: 6 },
   heart: { lengthMm: 9, widthMm: 8 },
+  trillion: { lengthMm: 8, widthMm: 8 },
 }
 
 type Tab = 'band' | 'center' | 'side' | 'solid'
@@ -122,9 +123,10 @@ export function CadDesignPage() {
   const [fancyWidthMm, setFancyWidthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.widthMm)
   // Mirror transform (module: Transforms — Bend/Mirror/Polar Array/Taper/
   // Twist in Matrix's own toolbar). First concrete use: a pear's point can
-  // face either way around the band — pear, trapezoid and heart are the
-  // only supported fancy shapes NOT symmetric about their own length
-  // axis, so mirroring changes nothing for every other shape.
+  // face either way around the band — pear, trapezoid, heart and
+  // trillion are the only supported fancy shapes NOT symmetric about
+  // their own length axis, so mirroring changes nothing for every other
+  // shape.
   const [pointDirection, setPointDirection] = useState<'up' | 'down'>('up')
   const [settingType, setSettingType] = useState<SettingType>('prong')
   const [bezelCoverage, setBezelCoverage] = useState<'full' | 'half'>('full')
@@ -677,8 +679,9 @@ export function CadDesignPage() {
             five-stone or signet — no stone),
             center stone (round — custom 3-8 prongs, bezel,
             cluster, tension or illusion — oval, cushion, princess, marquise,
-            pear, emerald, asscher, radiant, hexagon, lozenge, trapezoid or
-            heart, with mirrorable point direction for pear/trapezoid/heart),
+            pear, emerald, asscher, radiant, hexagon, lozenge, trapezoid,
+            heart or trillion, with mirrorable point direction for pear/
+            trapezoid/heart/trillion),
             side stones (pavé, channel, flush, bar or invisible), optional milgrain, twisted-rope or flute edging, an optional
             matching band,
             and solid/export, grouped into tabs the
@@ -1115,7 +1118,7 @@ export function CadDesignPage() {
                       </div>
                     )}
 
-                    {(stoneShape === 'pear' || stoneShape === 'trapezoid' || stoneShape === 'heart') && (
+                    {(stoneShape === 'pear' || stoneShape === 'trapezoid' || stoneShape === 'heart' || stoneShape === 'trillion') && (
                       <div>
                         <label className={labelCls}>Point direction (Mirror)</label>
                         <div className="grid grid-cols-2 gap-2">
@@ -1148,7 +1151,7 @@ export function CadDesignPage() {
                         <p className="mt-1 text-xs text-slate-400">Any count from 3–8, evenly spaced — round is the only shape whose prongs aren't anchored to fixed landmark points, so it's the only one this can be fully custom for.</p>
                       </div>
                     )}
-                    {stoneShape !== 'round' && stoneShape !== 'hexagon' && stoneShape !== 'lozenge' && (
+                    {stoneShape !== 'round' && stoneShape !== 'hexagon' && stoneShape !== 'lozenge' && stoneShape !== 'trillion' && (
                       <div>
                         <label className={labelCls}>Prongs</label>
                         <div className="grid grid-cols-2 gap-2">
@@ -1161,9 +1164,9 @@ export function CadDesignPage() {
                         </div>
                       </div>
                     )}
-                    {(stoneShape === 'hexagon' || stoneShape === 'lozenge') && (
+                    {(stoneShape === 'hexagon' || stoneShape === 'lozenge' || stoneShape === 'trillion') && (
                       <p className="text-xs text-slate-400">
-                        Prongs: fixed at this shape's own {stoneShape === 'hexagon' ? '6 vertices (2 side tips + 4 corners)' : '4 vertices (2 tips + 2 sides)'} — there's no sensible 4-or-6 reduction that still reads as a {stoneShape}, so this shape skips that toggle.
+                        Prongs: fixed at this shape's own {stoneShape === 'hexagon' ? '6 vertices (2 side tips + 4 corners)' : stoneShape === 'lozenge' ? '4 vertices (2 tips + 2 sides)' : '3 vertices (one per rounded corner)'} — there's no sensible 4-or-6 reduction that still reads as a {stoneShape}, so this shape skips that toggle.
                       </p>
                     )}
 
