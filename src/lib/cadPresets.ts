@@ -55,6 +55,7 @@ export interface CadDesignParams {
   fluteCount?: number
   pointDirection?: string
   engraveText?: string
+  engraveBold?: boolean
   includeRingLaborFee?: boolean
   ringLaborTierKey?: string
   includeSetterFee?: boolean
@@ -63,6 +64,7 @@ export interface CadDesignParams {
   galleryWireCount?: number
   includeBandText?: boolean
   bandText?: string
+  bandTextBold?: boolean
   includePattern?: boolean
   patternMotif?: string
   includeSidePanels?: boolean

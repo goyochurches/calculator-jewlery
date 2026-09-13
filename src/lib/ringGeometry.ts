@@ -5,16 +5,21 @@ import { Font } from 'three/examples/jsm/loaders/FontLoader.js'
 import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js'
 import type { JewelryMetalOption } from '@/types'
 import engravingFontData from '@/assets/fonts/helvetiker_regular.typeface.json'
+import engravingFontBoldData from '@/assets/fonts/helvetiker_bold.typeface.json'
 
 // Module 11 (Text/Engraving) was blocked for a while — three.js's own npm
 // package ships FontLoader/TextGeometry's CODE but not any actual font
 // DATA (that lives only in the three.js GitHub repo's examples/fonts/,
-// not in node_modules). Bundling this one JSON file (imported as a
-// regular ES module, so it's part of the build, not a runtime fetch)
-// unblocks it. `Font`'s constructor is synchronous — no FontLoader.load()
-// async round-trip needed since the data is already in hand at import
-// time.
+// not in node_modules). Bundling these two JSON files (imported as
+// regular ES modules, so they're part of the build, not a runtime
+// fetch) unblocks it. `Font`'s constructor is synchronous — no
+// FontLoader.load() async round-trip needed since the data is already
+// in hand at import time. Bold is the SAME Helvetiker family's bold
+// weight (from the same three.js source the regular one came from),
+// not a different typeface — one real font choice (regular/bold), not
+// a full font picker (module 11's own remaining gap).
 const engravingFont = new Font(engravingFontData)
+const engravingFontBold = new Font(engravingFontBoldData)
 
 /** This bundled font (Helvetiker) covers Latin letters/digits/basic
  *  punctuation but NOT accented characters (no ñ/á/é/í/ó/ú/ü) — a real
@@ -23,10 +28,15 @@ const engravingFont = new Font(engravingFontData)
  *  inside Font.generateShapes). Degrades accented input to its closest
  *  plain-ASCII form (Unicode NFD decomposition + strip combining marks:
  *  "Niño" → "Nino") rather than failing outright; anything the font
- *  still doesn't have after that (emoji, other scripts) is dropped. */
-export function sanitizeForEngraving(text: string): string {
+ *  still doesn't have after that (emoji, other scripts) is dropped.
+ *  Checked against the SPECIFIC font variant being used, not always the
+ *  regular one — the bold variant is missing exactly one obscure symbol
+ *  (⁋) the regular one has, confirmed by diffing their two glyph sets
+ *  directly rather than assuming they match. */
+export function sanitizeForEngraving(text: string, bold = false): string {
+  const glyphs = bold ? engravingFontBoldData.glyphs : engravingFontData.glyphs
   const stripped = text.normalize('NFD').replace(/[̀-ͯ]/g, '')
-  return Array.from(stripped).filter(ch => ch === '\n' || ch in engravingFontData.glyphs).join('')
+  return Array.from(stripped).filter(ch => ch === '\n' || ch in glyphs).join('')
 }
 
 // ── Ring-size ↔ millimeters ──────────────────────────────────────────────────
@@ -763,6 +773,11 @@ export interface SignetTopParams {
   /** Text height, in mm — defaults to a third of the plate's own smaller
    *  half-dimension, small enough to comfortably fit inside it. */
   engraveSizeMm?: number
+  /** Use the bold Helvetiker variant instead of regular — Matrix's own
+   *  text tool exposes a font-weight choice; this app ships one real font
+   *  in two weights rather than a full font picker (see the font-loading
+   *  comment near `sanitizeForEngraving`). */
+  bold?: boolean
 }
 
 /** A flat (slightly beveled) plate on its own stand — no stone. Same local
@@ -789,11 +804,11 @@ export function buildSignetTopGroup(params: SignetTopParams): THREE.Group {
   top.userData.partName = 'Signet top'
   group.add(top)
 
-  const cleanText = params.engraveText ? sanitizeForEngraving(params.engraveText) : ''
+  const cleanText = params.engraveText ? sanitizeForEngraving(params.engraveText, params.bold) : ''
   if (cleanText.length > 0) {
     const engraveSizeMm = params.engraveSizeMm ?? Math.min(halfW, halfL) * 0.7
     const engraveDepthMm = heightMm * 0.15
-    const textShapes = engravingFont.generateShapes(cleanText, engraveSizeMm)
+    const textShapes = (params.bold ? engravingFontBold : engravingFont).generateShapes(cleanText, engraveSizeMm)
     const textGeometry = new THREE.ExtrudeGeometry(textShapes, { depth: engraveDepthMm, bevelEnabled: false })
     textGeometry.computeBoundingBox()
     const textBox = textGeometry.boundingBox!
@@ -2846,6 +2861,9 @@ export interface BandTextParams {
   text: string
   sizeMm?: number
   depthMm?: number
+  /** Use the bold Helvetiker variant instead of regular — see the same
+   *  field on `SignetTopParams`. */
+  bold?: boolean
 }
 
 /** Each character's own flat extruded shape gets bent around the band's
@@ -2871,11 +2889,11 @@ export function buildBandTextGroup(params: BandTextParams, band: RingBandParams)
   const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
   const sizeMm = params.sizeMm ?? band.widthMm * 0.4
   const depthMm = params.depthMm ?? band.thicknessMm * 0.12
-  const cleanText = sanitizeForEngraving(params.text)
+  const cleanText = sanitizeForEngraving(params.text, params.bold)
   const group = new THREE.Group()
   if (cleanText.length === 0) return group
 
-  const shapes = engravingFont.generateShapes(cleanText, sizeMm)
+  const shapes = (params.bold ? engravingFontBold : engravingFont).generateShapes(cleanText, sizeMm)
   const geometry = new THREE.ExtrudeGeometry(shapes, { depth: depthMm, bevelEnabled: false })
   geometry.computeBoundingBox()
   const box = geometry.boundingBox!
@@ -2901,10 +2919,10 @@ export function buildBandTextGroup(params: BandTextParams, band: RingBandParams)
  *  before the text wraps around more than the band's own circumference
  *  (visually overlapping itself) without building the full 3D geometry
  *  just to check. */
-export function estimateBandTextWidthMm(text: string, sizeMm: number): number {
-  const cleanText = sanitizeForEngraving(text)
+export function estimateBandTextWidthMm(text: string, sizeMm: number, bold = false): number {
+  const cleanText = sanitizeForEngraving(text, bold)
   if (cleanText.length === 0) return 0
-  const shapes = engravingFont.generateShapes(cleanText, sizeMm)
+  const shapes = (bold ? engravingFontBold : engravingFont).generateShapes(cleanText, sizeMm)
   let minX = Infinity, maxX = -Infinity
   for (const shape of shapes) {
     for (const pt of shape.getPoints()) { minX = Math.min(minX, pt.x); maxX = Math.max(maxX, pt.x) }

@@ -141,6 +141,12 @@ export function CadDesignPage() {
   // through sanitizeForEngraving only at BUILD time (in ringGeometry.ts)
   // — kept here for a live "here's what will actually render" preview.
   const [engraveText, setEngraveText] = useState('')
+  // Font weight for the signet's raised text — Matrix's own text tool
+  // exposes a weight choice; this app ships one real font in two weights
+  // (see the font-loading comment in ringGeometry.ts) rather than a full
+  // font picker. Independent from `bandTextBold` below since the two are
+  // separate features (flat-top engraving vs. band-wrapped text).
+  const [engraveBold, setEngraveBold] = useState(false)
   // Ring labor fee (module 17, Pricing Engine) — a real flat fee per tier,
   // read directly from the app's own `config.ringLaborTiers` (the SAME
   // tiers Quote Builder itself uses) rather than guessing tier names/
@@ -221,6 +227,9 @@ export function CadDesignPage() {
   // flat-plate-only engraving. Works on any ring, not just a signet.
   const [includeBandText, setIncludeBandText] = useState(false)
   const [bandText, setBandText] = useState('')
+  // Font weight for the band-wrapped text — independent of the signet's
+  // own `engraveBold` (see that field's comment).
+  const [bandTextBold, setBandTextBold] = useState(false)
   // Pattern Engine (Smart Pattern) — a repeated decorative motif around
   // the band, same placement mechanism as milgrain/flutes, different
   // motif shape (star/diamond/geometric).
@@ -288,10 +297,10 @@ export function CadDesignPage() {
     mergeSolid, includeMilgrain, includeRope,
     haloRingCount, sideStoneCount, sideStoneCaratWeight, sideSpreadDeg,
     includeMatchingBand, matchingBandWidthMm, splitStrandCount,
-    includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, matchingBandCount,
+    includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, matchingBandCount,
     includeRingLaborFee, ringLaborTierKey, includeSetterFee, setterTypeKey,
     includeFlutes, fluteCount, pointDirection, includeGalleryWire, galleryWireCount,
-    includeBandText, bandText, includePattern, patternMotif,
+    includeBandText, bandText, bandTextBold, includePattern, patternMotif,
     includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText,
   })
 
@@ -323,6 +332,7 @@ export function CadDesignPage() {
     setSignetWidthMm(p.signetWidthMm ?? 12)
     setSignetLengthMm(p.signetLengthMm ?? 14)
     setEngraveText(p.engraveText ?? '')
+    setEngraveBold(p.engraveBold ?? false)
     setIncludeRingLaborFee(p.includeRingLaborFee ?? false)
     setRingLaborTierKey(p.ringLaborTierKey ?? '')
     setIncludeSetterFee(p.includeSetterFee ?? false)
@@ -335,6 +345,7 @@ export function CadDesignPage() {
     setGalleryWireCount(p.galleryWireCount ?? 6)
     setIncludeBandText(p.includeBandText ?? false)
     setBandText(p.bandText ?? '')
+    setBandTextBold(p.bandTextBold ?? false)
     setIncludePattern(p.includePattern ?? false)
     setPatternMotif((p.patternMotif as PatternMotif) ?? 'star')
     setIncludeSidePanels(p.includeSidePanels ?? false)
@@ -544,10 +555,10 @@ export function CadDesignPage() {
     if (includeMilgrain) group.add(buildMilgrainEdges({}, bandParamsBase))
     if (includeRope) group.add(buildRopeEdge({}, bandParamsBase))
     if (includeFlutes) group.add(buildFluteRibs({ count: fluteCount }, bandParamsBase))
-    if (includeBandText && bandText.trim()) group.add(buildBandTextGroup({ text: bandText }, bandParamsBase))
+    if (includeBandText && bandText.trim()) group.add(buildBandTextGroup({ text: bandText, bold: bandTextBold }, bandParamsBase))
     if (includePattern) group.add(buildPatternMotifs({ motif: patternMotif }, bandParamsBase))
     if (includeSignetTop) {
-      const signetTop = buildSignetTopGroup({ shape: signetShape, widthMm: signetWidthMm, lengthMm: signetLengthMm, engraveText })
+      const signetTop = buildSignetTopGroup({ shape: signetShape, widthMm: signetWidthMm, lengthMm: signetLengthMm, engraveText, bold: engraveBold })
       attachHeadToBand(signetTop, bandParamsBase)
       group.add(signetTop)
     } else if (includeStone) {
@@ -699,7 +710,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, logoSvgText, logoSizeMm, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, logoSvgText, logoSizeMm, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -1340,9 +1351,17 @@ export function CadDesignPage() {
                   <div>
                     <input type="text" maxLength={20} value={bandText}
                       onChange={e => setBandText(e.target.value)} placeholder="e.g. FOREVER YOURS" className={inputCls} />
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      {([false, true] as const).map(b => (
+                        <button key={String(b)} type="button" onClick={() => setBandTextBold(b)}
+                          className={`rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition ${bandTextBold === b ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                          {b ? 'Bold' : 'Regular'}
+                        </button>
+                      ))}
+                    </div>
                     {(() => {
                       const sizeMm = widthMm * 0.4
-                      const widthNeeded = estimateBandTextWidthMm(bandText, sizeMm)
+                      const widthNeeded = estimateBandTextWidthMm(bandText, sizeMm, bandTextBold)
                       const circumference = 2 * Math.PI * outerRadiusMm
                       const tooLong = widthNeeded > circumference * 0.85
                       return (
@@ -1420,13 +1439,21 @@ export function CadDesignPage() {
                       <label className={labelCls}>Engraved initials (raised text)</label>
                       <input type="text" maxLength={6} value={engraveText}
                         onChange={e => setEngraveText(e.target.value)} placeholder="e.g. JD" className={inputCls} />
+                      <div className="mt-2 grid grid-cols-2 gap-2">
+                        {([false, true] as const).map(b => (
+                          <button key={String(b)} type="button" onClick={() => setEngraveBold(b)}
+                            className={`rounded-xl border px-2.5 py-1.5 text-xs font-semibold transition ${engraveBold === b ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                            {b ? 'Bold' : 'Regular'}
+                          </button>
+                        ))}
+                      </div>
                       <p className="mt-1 text-xs text-slate-400">
                         Matrix's own "Text on Curve"/"Text Objects" tools — raised only for now (not
                         debossed/carved), and scoped to this flat top face (wrapping text around the curved band
                         itself is a separate, harder future step). The bundled font doesn't have accented
                         characters (ñ/á/é/…) — they render as their plain letter instead
-                        {engraveText && sanitizeForEngraving(engraveText) !== engraveText
-                          ? ` (will render as "${sanitizeForEngraving(engraveText)}")`
+                        {engraveText && sanitizeForEngraving(engraveText, engraveBold) !== engraveText
+                          ? ` (will render as "${sanitizeForEngraving(engraveText, engraveBold)}")`
                           : ''}. Keep it short — long text isn't auto-scaled to fit the plate yet.
                       </p>
                     </div>
