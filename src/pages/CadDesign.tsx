@@ -21,6 +21,7 @@ import {
   buildIllusionHeadGroup,
   buildMilgrainEdges, buildRopeEdge, buildFluteRibs,
   unionMetalParts, extractStoneMeshes, checkWatertightness,
+  checkMinimumWallThickness, defaultProngDiameterMm, defaultGalleryTubeMm, RECOMMENDED_MIN_WALL_MM,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
 import { parseImportedCadFile } from '@/lib/cadImport'
@@ -170,6 +171,11 @@ export function CadDesignPage() {
   // concern. On-demand (a deliberate action, not continuous) since it's a
   // validation step, same as how Matrix itself exposes this.
   const [watertightResults, setWatertightResults] = useState<ReturnType<typeof checkWatertightness> | null>(null)
+  // Manufacturability check #2 — minimum wall/metal thickness (module 15).
+  // Deliberately parameter-based, not a mesh-distance scan (see
+  // checkMinimumWallThickness's own doc comment) — checks the actual
+  // numbers THIS design is using against a casting-safe minimum.
+  const [thicknessResults, setThicknessResults] = useState<ReturnType<typeof checkMinimumWallThickness> | null>(null)
   // Viewing an imported file (STL/OBJ/3MF) — the other half of the
   // original CAD ask, independent of the parametric generator below.
   // Non-null overrides the parametric model in the viewer/weight/export.
@@ -249,6 +255,22 @@ export function CadDesignPage() {
     setPresets(listCadPresets())
   }
 
+  // Builds the checklist for the wall-thickness check from THIS design's
+  // own current parameters — band always applies; prong/gallery only when
+  // that geometry is actually being built (round stone, prong setting).
+  const runThicknessCheck = () => {
+    const minSafeMm = RECOMMENDED_MIN_WALL_MM[metal]
+    const items: { label: string; thicknessMm: number; minSafeMm?: number }[] = [
+      { label: 'Band', thicknessMm, minSafeMm },
+    ]
+    if (includeStone && !includeSignetTop && stoneShape === 'round' && settingType === 'prong' && !tensionActive) {
+      const prongDiameterMm = defaultProngDiameterMm(stoneDiameterMm)
+      items.push({ label: 'Prong', thicknessMm: prongDiameterMm, minSafeMm })
+      items.push({ label: 'Gallery', thicknessMm: defaultGalleryTubeMm(prongDiameterMm) * 2, minSafeMm })
+    }
+    setThicknessResults(checkMinimumWallThickness(items))
+  }
+
   const handleImportFile = async (file: File) => {
     setImporting(true)
     setImportError(null)
@@ -308,6 +330,18 @@ export function CadDesignPage() {
   // setting (the faceted skirt already fills that same "make it look
   // bigger" visual role, and would overlap it).
   const haloEligible = includeHalo && stoneShape === 'round' && !tensionActive && settingType !== 'illusion'
+  // Plain-string keys for the model useMemo's deps array below, standing
+  // in for the excludedHaloIndices/excludedPaveIndices ARRAYS themselves —
+  // both are always replaced wholesale via setState, never mutated in
+  // place, so a joined key changes exactly when the real dependency does.
+  // React Compiler flags array-typed deps as "may be mutated later" once
+  // this component grew past some size/complexity threshold; this keeps
+  // the manual memoization it would otherwise decline to preserve —
+  // optimization-only, the useMemo's own correctness doesn't depend on
+  // this rewrite either way (the actual arrays are still what's read
+  // inside the memo body, unchanged).
+  const excludedHaloKey = excludedHaloIndices.join(',')
+  const excludedPaveKey = excludedPaveIndices.join(',')
   const outerRadiusMm = innerDiameterMm / 2 + thicknessMm
   const tensionGapDeg = tensionActive ? tensionGapDegForStone(stoneDiameterMm, outerRadiusMm) : 0
 
@@ -454,7 +488,18 @@ export function CadDesignPage() {
       }
     }
     return group
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
+    // excludedHaloKey/excludedPaveKey (joined-string stand-ins for the
+    // excludedHaloIndices/excludedPaveIndices ARRAYS, see where they're
+    // defined above) are what's actually listed below, not the arrays
+    // themselves — exhaustive-deps doesn't know they're derived from
+    // those two and asks for them directly, but listing the raw arrays
+    // instead makes React Compiler flag them as "may be mutated later"
+    // once this component grew past some size/complexity threshold
+    // (confirmed by testing both ways). The keys correctly track the
+    // real dependency (both arrays are always replaced wholesale via
+    // setState, never mutated in place), so this is intentional.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -490,6 +535,7 @@ export function CadDesignPage() {
   if (watertightForModel !== viewModel) {
     setWatertightForModel(viewModel)
     if (watertightResults !== null) setWatertightResults(null)
+    if (thicknessResults !== null) setThicknessResults(null)
   }
   const paveExclusionKey = `${paveCount}:${paveSettingType}`
   const [paveExclusionKeySeen, setPaveExclusionKeySeen] = useState(paveExclusionKey)
@@ -1249,6 +1295,36 @@ export function CadDesignPage() {
                           </p>
                           <ul className="mt-1 list-disc pl-4 text-slate-600">
                             {watertightResults.filter(r => !r.watertight).map((r, i) => <li key={i}>{r.partName}</li>)}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2">
+                    <span className="text-sm font-semibold text-slate-900">Check wall thickness</span>
+                    <button type="button" onClick={runThicknessCheck}
+                      className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold hover:bg-slate-50">
+                      Run check
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-400">
+                    Compares this design's own band (and, for a round prong setting, prong/gallery) thickness against
+                    a metal-dependent recommended minimum — silver wants a bit more thickness than platinum for the
+                    same durability, not one universal number.
+                  </p>
+                  {thicknessResults && (
+                    <div className="rounded-xl bg-white px-3 py-2 text-xs">
+                      {thicknessResults.every(r => r.ok) ? (
+                        <p className="font-semibold text-emerald-700">✓ All {thicknessResults.length} checked part{thicknessResults.length === 1 ? '' : 's'} meet the recommended minimum for {metal}.</p>
+                      ) : (
+                        <>
+                          <p className="font-semibold text-rose-700">
+                            {thicknessResults.filter(r => !r.ok).length} of {thicknessResults.length} parts are below the recommended minimum for {metal}:
+                          </p>
+                          <ul className="mt-1 list-disc pl-4 text-slate-600">
+                            {thicknessResults.filter(r => !r.ok).map((r, i) => (
+                              <li key={i}>{r.label}: {r.thicknessMm.toFixed(2)}mm (recommended ≥ {r.minSafeMm.toFixed(2)}mm)</li>
+                            ))}
                           </ul>
                         </>
                       )}

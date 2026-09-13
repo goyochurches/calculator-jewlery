@@ -427,6 +427,23 @@ export function defaultProngHeightMm(stoneDiameterMm: number): number {
   return stoneDiameterMm * 0.55
 }
 
+/** Every prong's default diameter (mm) for a given stone size — pulled
+ *  out the same way `defaultProngHeightMm` was, so the manufacturability
+ *  check below (`checkMinimumWallThickness`) can report the SAME value
+ *  `buildStoneHeadGroup` would actually build, without duplicating the
+ *  formula in two places. Floors at 0.8mm — thinner than that and a real
+ *  cast prong is fragile regardless of how small the stone is. */
+export function defaultProngDiameterMm(stoneDiameterMm: number): number {
+  return Math.max(0.8, stoneDiameterMm * 0.12)
+}
+
+/** The gallery ring's tube radius (mm) for a given prong diameter — same
+ *  pull-out reasoning as the two functions above, for the same
+ *  manufacturability-check reuse. Floors at 0.3mm. */
+export function defaultGalleryTubeMm(prongDiameterMm: number): number {
+  return Math.max(0.3, prongDiameterMm * 0.4)
+}
+
 export interface StoneHeadParams {
   /** Round-brilliant diameter, in mm (see roundDiameterMmFromCarat). */
   stoneDiameterMm: number
@@ -464,7 +481,7 @@ export interface StoneHeadParams {
 export function buildStoneHeadGroup(params: StoneHeadParams): THREE.Group {
   const {
     stoneDiameterMm, prongCount,
-    prongDiameterMm = Math.max(0.8, stoneDiameterMm * 0.12),
+    prongDiameterMm = defaultProngDiameterMm(stoneDiameterMm),
     prongHeightMm = defaultProngHeightMm(stoneDiameterMm),
     prongHeightOverridesMm,
     standHeightMm = stoneDiameterMm * 0.45,
@@ -474,7 +491,7 @@ export function buildStoneHeadGroup(params: StoneHeadParams): THREE.Group {
 
   // Gallery ring — a thin torus at the girdle line the prongs rise from and
   // the stand descends from.
-  const galleryTube = Math.max(0.3, prongDiameterMm * 0.4)
+  const galleryTube = defaultGalleryTubeMm(prongDiameterMm)
   const gallery = new THREE.Mesh(new THREE.TorusGeometry(stoneRadius, galleryTube, 12, 48))
   gallery.rotation.x = Math.PI / 2 // lie flat (torus defaults to standing in XY)
   gallery.userData.partName = 'Gallery'
@@ -965,6 +982,47 @@ export function checkWatertightness(object: THREE.Object3D, tolerance = 1e-3): W
     results.push({ partName: typeof obj.userData.partName === 'string' ? obj.userData.partName : 'Unnamed part', watertight })
   })
   return results
+}
+
+export interface ThicknessCheckResult {
+  label: string
+  thicknessMm: number
+  minSafeMm: number
+  ok: boolean
+}
+
+/** Manufacturability check #2 (module 15) — minimum wall/metal thickness.
+ *  Unlike `checkWatertightness` (a real mesh-topology analysis), this is
+ *  deliberately the simpler "one honest, scoped step" version: every
+ *  value checked here is already a KNOWN design parameter (band
+ *  thickness, prong diameter, gallery tube), not something that needs a
+ *  ray-cast/mesh-distance scan — that fuller version (checking arbitrary
+ *  mesh regions, not just named parameters) is real future scope, same
+ *  as how the watertightness check itself started narrow. `minSafeMm`
+ *  defaults to 0.8mm — a commonly cited casting-safe minimum for cast
+ *  gold/silver/platinum (thinner risks porosity or breakage during
+ *  casting/finishing), overridable per item since a few specific
+ *  features (e.g. a deliberately delicate milgrain bead) have their own
+ *  different safe minimum. */
+export function checkMinimumWallThickness(items: { label: string; thicknessMm: number; minSafeMm?: number }[]): ThicknessCheckResult[] {
+  return items.map(({ label, thicknessMm, minSafeMm = 0.8 }) => ({
+    label, thicknessMm, minSafeMm, ok: thicknessMm >= minSafeMm,
+  }))
+}
+
+/** Recommended minimum wall/metal thickness (mm) per metal, for
+ *  `checkMinimumWallThickness` — a genuinely metal-dependent number, not
+ *  one fixed floor: platinum is dense and durable enough to go thinner
+ *  safely, softer metals like silver are more prone to bending/wear at
+ *  the same thickness real gold or platinum would handle fine, so the
+ *  SAME 0.8mm band or prong that's safe in platinum is worth flagging in
+ *  silver. Standard jewelry-trade guidance, not a certified spec. */
+export const RECOMMENDED_MIN_WALL_MM: Record<JewelryMetalOption, number> = {
+  platinum: 0.6,
+  'gold-14k-white': 0.8, 'gold-14k-yellow': 0.8, 'gold-14k-rose': 0.8,
+  'gold-18k-white': 0.8, 'gold-18k-yellow': 0.8, 'gold-18k-rose': 0.8,
+  'gold-14k': 0.8, 'gold-18k': 0.8,
+  silver: 1.0,
 }
 
 /** Density (g/cm³) per metal — standard jewelry-industry reference values.
