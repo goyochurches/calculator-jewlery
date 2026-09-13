@@ -21,6 +21,7 @@ import {
   buildIllusionHeadGroup,
   buildMilgrainEdges, buildRopeEdge, buildFluteRibs, buildGalleryWireGroup, buildBandTextGroup, estimateBandTextWidthMm,
   buildPatternMotifs, type PatternMotif,
+  buildLogoGroup,
   unionMetalParts, extractStoneMeshes, checkWatertightness,
   checkMinimumWallThickness, defaultProngDiameterMm, defaultGalleryTubeMm, RECOMMENDED_MIN_WALL_MM,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
@@ -70,7 +71,7 @@ const PART_TAB: Record<string, Tab> = {
   'Invisible-set stone': 'side',
   'Side stone head': 'center', 'Shank strand': 'band', 'Signet top': 'center', 'Engraved text': 'center',
   'Milgrain bead': 'band', 'Rope strand': 'band', 'Flute rib': 'band', 'Gallery wire': 'center', 'Band text': 'band',
-  'Side panel': 'solid', 'Side panel text': 'solid', 'Pattern motif': 'band',
+  'Side panel': 'solid', 'Side panel text': 'solid', 'Pattern motif': 'band', 'Logo': 'solid',
   'Merged solid': 'solid', Imported: 'solid', 'Matching band': 'solid',
 }
 import { Download, RotateCw, Scale, MousePointerClick } from 'lucide-react'
@@ -226,6 +227,14 @@ export function CadDesignPage() {
   const [importError, setImportError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
   const [exportFormat, setExportFormat] = useState<'stl' | 'obj' | 'glb'>('stl')
+  // Logo/artwork import (module 21/12) — SVG only (it's already vector,
+  // unlike DXF/PNG which each need their own separate parser, not
+  // attempted here). Transient like the STL/OBJ import above, not part
+  // of a saved preset (an uploaded file doesn't round-trip through one).
+  const [logoSvgText, setLogoSvgText] = useState<string | null>(null)
+  const [logoFileName, setLogoFileName] = useState<string | null>(null)
+  const [logoSizeMm, setLogoSizeMm] = useState(8)
+  const [logoError, setLogoError] = useState<string | null>(null)
   // Content Manager (module 22) — save/load a full parameter set as a
   // named preset. Loaded fresh from localStorage each time the list is
   // opened (cheap, and keeps it correct if another tab just saved one).
@@ -294,6 +303,7 @@ export function CadDesignPage() {
     setSidePanelText(p.sidePanelText ?? '')
     setPointDirection((p.pointDirection as 'up' | 'down') ?? 'up')
     setImportedModel(null); setImportFileName(null) // a loaded preset is the parametric design, not an import
+    setLogoSvgText(null); setLogoFileName(null) // same reasoning — an uploaded logo doesn't round-trip through a preset
     setProngHeightOverridesMm({}) // per-instance overrides don't round-trip through a preset (indices may not line up)
     setProngDiameterOverridesMm({})
   }
@@ -342,6 +352,20 @@ export function CadDesignPage() {
       setImportError(err instanceof Error ? err.message : 'Could not read this file.')
     } finally {
       setImporting(false)
+    }
+  }
+
+  const handleImportLogo = async (file: File) => {
+    setLogoError(null)
+    try {
+      if (!file.name.toLowerCase().endsWith('.svg') && file.type !== 'image/svg+xml') {
+        throw new Error('Only SVG files are supported (DXF/PNG→vector import needs its own separate parser, not built yet).')
+      }
+      const text = await file.text()
+      setLogoSvgText(text)
+      setLogoFileName(file.name)
+    } catch (err) {
+      setLogoError(err instanceof Error ? err.message : 'Could not read this file.')
     }
   }
   // Grouped like Matrix's own toolbar groups (Tools/Ring-Rail, Gems, Solid/
@@ -557,6 +581,16 @@ export function CadDesignPage() {
         group.add(panel)
       }
     }
+
+    // Logo/artwork import — Matrix's own "Logo import" concept (modules
+    // 12 and 21). Fixed at angle 180° (directly opposite the main
+    // setting) — a sensible default "maker's mark" position, same
+    // reasoning Award Ring side panels' own ±90° placement already used.
+    if (logoSvgText) {
+      const logo = buildLogoGroup({ svgText: logoSvgText, sizeMm: logoSizeMm })
+      attachHeadToBand(logo, bandParamsBase, 180)
+      group.add(logo)
+    }
     if (includePave) {
       const bandParams = { fingerSize, widthMm, thicknessMm, profile }
       const sideStones = paveSettingType === 'channel'
@@ -598,7 +632,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, logoSvgText, logoSizeMm, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -795,7 +829,7 @@ export function CadDesignPage() {
             side stones (pavé, channel, flush, bar or invisible), optional milgrain, twisted-rope, flute edging,
             filigree gallery wire or a star/diamond/geometric Smart Pattern, an optional
             matching band, optional Award Ring side panels, raised text engraving on a signet's flat top or
-            wrapped around the band itself,
+            wrapped around the band itself, SVG logo/artwork import,
             and solid/export, grouped into tabs the
             way Matrix groups its own tools (Ring Rail, Gems, Milgrain, Parametric Boolean) instead of one long form.
             Click any part of the model in the viewer to select and identify it — click a single prong and you can
@@ -1717,6 +1751,38 @@ export function CadDesignPage() {
                   {importing && <p className="text-[11px] text-slate-400">Reading file…</p>}
                   {importError && (
                     <p className="rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700">{importError}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2 border-t border-slate-200 pt-3">
+                  <span className="text-sm font-semibold text-slate-900">Logo/artwork import</span>
+                  <p className="text-[11px] text-slate-400">
+                    Matrix's own "Logo import" — SVG only (it's already vector, unlike DXF/PNG which each need their
+                    own separate parser, not built yet). Placed as a raised relief directly opposite the main
+                    setting (angle 180°) — a maker's-mark-style position.
+                  </p>
+                  {logoSvgText ? (
+                    <div className="flex items-center justify-between gap-2 rounded-xl bg-white px-3 py-2 text-xs text-slate-600">
+                      <span className="truncate">Loaded: <strong>{logoFileName}</strong></span>
+                      <button type="button" onClick={() => { setLogoSvgText(null); setLogoFileName(null); setLogoError(null) }}
+                        className="shrink-0 rounded-lg border border-slate-300 px-2 py-1 text-[11px] font-semibold hover:bg-slate-50">
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <input type="file" accept=".svg,image/svg+xml"
+                      onChange={e => { const f = e.target.files?.[0]; if (f) handleImportLogo(f) }}
+                      className="block w-full text-xs text-slate-600" />
+                  )}
+                  {logoSvgText && (
+                    <div>
+                      <label className={labelCls}>Logo size (mm, larger dimension)</label>
+                      <input type="number" min={2} max={20} step={0.5} value={logoSizeMm}
+                        onChange={e => setLogoSizeMm(Math.max(2, Number(e.target.value) || 2))} className={inputCls} />
+                    </div>
+                  )}
+                  {logoError && (
+                    <p className="rounded-xl bg-rose-50 px-3 py-2 text-[11px] font-medium text-rose-700">{logoError}</p>
                   )}
                 </div>
               </div>

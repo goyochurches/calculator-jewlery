@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import { Brush, Evaluator, ADDITION } from 'three-bvh-csg'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { Font } from 'three/examples/jsm/loaders/FontLoader.js'
+import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js'
 import type { JewelryMetalOption } from '@/types'
 import engravingFontData from '@/assets/fonts/helvetiker_regular.typeface.json'
 
@@ -2832,6 +2833,94 @@ export function buildPatternMotifs(params: PatternParams, band: RingBandParams):
     motifMesh.userData.instanceIndex = i
     group.add(motifMesh)
   }
+  return group
+}
+
+// ── Logo import — Matrix's own "Logo import (SVG/DXF/PNG→vector)" ──────────
+// SVG only: it's ALREADY vector, so no raster-to-vector conversion step is
+// needed for this one format — unlike DXF/PNG, which the master list groups
+// alongside it and which each need their own separate parser (not attempted
+// here). Uses three.js's own `SVGLoader` (a mature, independently-
+// maintained parser, not this file's own novel geometry code — verified
+// differently from this file's own curve constructions: this function's
+// OWN contribution is the scale/center/extrude/flip pipeline below, using
+// the exact same bbox+translate+ExtrudeGeometry+computeVertexNormals
+// pattern already proven multiple times this session for engraved text).
+
+export interface LogoImportParams {
+  svgText: string
+  /** Target size (mm) for the logo's LARGER dimension; the other scales
+   *  proportionally. */
+  sizeMm?: number
+  depthMm?: number
+}
+
+/** Flips a non-indexed BufferGeometry's winding by swapping each
+ *  triangle's 2nd/3rd vertex (all attributes, not just position) —
+ *  `ExtrudeGeometry` never produces an index buffer, so this can't reuse
+ *  the index-swap trick `buildTensionBandGeometry`'s own caps use. Needed
+ *  here because flipping SVG's Y-down convention to this file's Y-up one
+ *  (`geometry.scale(1, -1, 1)`) is itself a reflection — verified (a
+ *  throwaway script): scaling one axis by −1 alone flips the mesh's own
+ *  signed volume, i.e. turns it inside-out (same failure mode caught on
+ *  `buildBandTextGroup`'s own bend earlier), and this winding-swap
+ *  restores it (confirmed via the same origin-invariance volume check,
+ *  now matching the UN-flipped sign again). */
+function flipWindingNonIndexed(geometry: THREE.BufferGeometry): void {
+  for (const key of Object.keys(geometry.attributes)) {
+    const attr = geometry.attributes[key]
+    const itemSize = attr.itemSize
+    const arr = attr.array
+    for (let i = 0; i < arr.length; i += itemSize * 3) {
+      for (let k = 0; k < itemSize; k++) {
+        const tmp = arr[i + itemSize + k]
+        arr[i + itemSize + k] = arr[i + 2 * itemSize + k]
+        arr[i + 2 * itemSize + k] = tmp
+      }
+    }
+    attr.needsUpdate = true
+  }
+}
+
+/** Parses an SVG file's text content into a raised 3D relief — same
+ *  local "+Y up" convention as every other head, so `attachHeadToBand`
+ *  positions it the same way (e.g. as a side panel, or standalone). Every
+ *  path/shape in the file becomes one extrusion; a malformed or empty SVG
+ *  (no paths) returns an empty Group rather than throwing. */
+export function buildLogoGroup(params: LogoImportParams): THREE.Group {
+  const sizeMm = params.sizeMm ?? 8
+  const depthMm = params.depthMm ?? 0.6
+  const group = new THREE.Group()
+
+  let shapes: THREE.Shape[] = []
+  try {
+    const data = new SVGLoader().parse(params.svgText)
+    for (const path of data.paths) shapes.push(...SVGLoader.createShapes(path))
+  } catch {
+    shapes = []
+  }
+  if (shapes.length === 0) return group
+
+  const geometry = new THREE.ExtrudeGeometry(shapes, { depth: depthMm, bevelEnabled: false })
+  geometry.computeBoundingBox()
+  const box0 = geometry.boundingBox!
+  const maxDim = Math.max(box0.max.x - box0.min.x, box0.max.y - box0.min.y, 1e-6)
+  const scale = sizeMm / maxDim
+  // Y is negated (SVG's own Y-down convention → this file's Y-up), which
+  // is a reflection and needs the compensating winding flip below to stay
+  // correctly oriented (outward normals) — see flipWindingNonIndexed's
+  // own doc comment for the verification.
+  geometry.scale(scale, -scale, 1)
+  flipWindingNonIndexed(geometry)
+  geometry.computeBoundingBox()
+  const box1 = geometry.boundingBox!
+  geometry.translate(-(box1.min.x + box1.max.x) / 2, -(box1.min.y + box1.max.y) / 2, 0)
+  geometry.rotateX(-Math.PI / 2) // lie flat, +Y up, matching every other head's own convention
+  geometry.computeVertexNormals()
+
+  const mesh = new THREE.Mesh(geometry)
+  mesh.userData.partName = 'Logo'
+  group.add(mesh)
   return group
 }
 
