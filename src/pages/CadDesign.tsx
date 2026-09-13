@@ -12,6 +12,7 @@ import type { JewelryMetalOption } from '@/types'
 import {
   buildRingBandGeometry, usSizeToDiameterMm, type BandProfile,
   buildStoneHeadGroup, buildBezelHeadGroup, buildClusterHeadGroup, buildHaloGroup, haloOrbitRadiusMm, attachHeadToBand, roundDiameterMmFromCarat, estimateFancyCaratWeight,
+  buildSignetTopGroup,
   defaultProngHeightMm,
   buildFancyStoneHeadGroup, type FancyStoneShape,
   buildPaveRow, buildChannelSetting, buildFlushSetting, buildBarSetting, buildInvisibleSetting,
@@ -55,7 +56,7 @@ const PART_TAB: Record<string, Tab> = {
   'Pavé stone': 'side', 'Channel stone': 'side', 'Channel rail': 'side',
   'Flush stone': 'side', 'Flush collar': 'side', 'Bar stone': 'side', 'Bar post': 'side',
   'Invisible-set stone': 'side',
-  'Side stone head': 'center', 'Shank strand': 'band',
+  'Side stone head': 'center', 'Shank strand': 'band', 'Signet top': 'center',
   'Milgrain bead': 'band', 'Rope strand': 'band',
   'Merged solid': 'solid', Imported: 'solid', 'Matching band': 'solid',
 }
@@ -100,6 +101,12 @@ export function CadDesignPage() {
   // band. 0 = solitaire (the only type this app had until now).
   const [sideStoneCount, setSideStoneCount] = useState<0 | 2 | 4>(0)
   const [sideStoneCaratWeight, setSideStoneCaratWeight] = useState(0.25)
+  // Signet ring — a named Ring Builder TYPE with NO gemstone at all: a
+  // wide flat top instead. Mutually exclusive with the center stone.
+  const [includeSignetTop, setIncludeSignetTop] = useState(false)
+  const [signetShape, setSignetShape] = useState<'oval' | 'cushion' | 'princess'>('oval')
+  const [signetWidthMm, setSignetWidthMm] = useState(12)
+  const [signetLengthMm, setSignetLengthMm] = useState(14)
   const [diamondType, setDiamondType] = useState<'natural' | 'lab-grown'>('natural')
   const [fancyLengthMm, setFancyLengthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.lengthMm)
   const [fancyWidthMm, setFancyWidthMm] = useState(FANCY_SHAPE_DEFAULTS.oval.widthMm)
@@ -161,6 +168,7 @@ export function CadDesignPage() {
     mergeSolid, includeMilgrain, includeRope,
     haloRingCount, sideStoneCount, sideStoneCaratWeight, sideSpreadDeg,
     includeMatchingBand, matchingBandWidthMm, splitStrandCount,
+    includeSignetTop, signetShape, signetWidthMm, signetLengthMm,
   })
 
   const applyPreset = (p: CadDesignParams) => {
@@ -186,6 +194,10 @@ export function CadDesignPage() {
     setIncludeMatchingBand(p.includeMatchingBand ?? false)
     setMatchingBandWidthMm(p.matchingBandWidthMm ?? 2)
     setSplitStrandCount((p.splitStrandCount as 2 | 3) ?? 2)
+    setIncludeSignetTop(p.includeSignetTop ?? false)
+    setSignetShape((p.signetShape as typeof signetShape) ?? 'oval')
+    setSignetWidthMm(p.signetWidthMm ?? 12)
+    setSignetLengthMm(p.signetLengthMm ?? 14)
     setImportedModel(null); setImportFileName(null) // a loaded preset is the parametric design, not an import
     setProngHeightOverridesMm({}) // per-instance overrides don't round-trip through a preset (indices may not line up)
   }
@@ -310,7 +322,11 @@ export function CadDesignPage() {
     }
     if (includeMilgrain) group.add(buildMilgrainEdges({}, bandParamsBase))
     if (includeRope) group.add(buildRopeEdge({}, bandParamsBase))
-    if (includeStone) {
+    if (includeSignetTop) {
+      const signetTop = buildSignetTopGroup({ shape: signetShape, widthMm: signetWidthMm, lengthMm: signetLengthMm })
+      attachHeadToBand(signetTop, bandParamsBase)
+      group.add(signetTop)
+    } else if (includeStone) {
       if (tensionActive) {
         const tension = buildTensionSetting({ stoneDiameterMm, gapDeg: tensionGapDeg }, bandParamsBase)
         group.add(tension)
@@ -401,7 +417,7 @@ export function CadDesignPage() {
       group.add(matchingBand)
     }
     return group
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -541,7 +557,8 @@ export function CadDesignPage() {
           </div>
           <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Parametric solitaire ring</h2>
           <p className="mt-2 max-w-2xl text-sm text-slate-300">
-            Band (plain, tapered, twisted-ribbon, split-shank or cathedral), ring type (solitaire, three-stone or five-stone),
+            Band (plain, tapered, twisted-ribbon, split-shank or cathedral), ring type (solitaire, three-stone,
+            five-stone or signet — no stone),
             center stone (round — prong, bezel,
             cluster, tension or illusion — oval, cushion, princess, marquise
             or pear),
@@ -807,11 +824,48 @@ export function CadDesignPage() {
             {activeTab === 'center' && (
               <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
                 <label className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-semibold text-slate-900">Center stone</span>
-                  <input type="checkbox" checked={includeStone} onChange={e => setIncludeStone(e.target.checked)}
+                  <span>
+                    <span className="text-sm font-semibold text-slate-900">Signet ring (no stone)</span>
+                    <p className="mt-0.5 text-[11px] text-slate-400">
+                      A named Ring Builder TYPE — a wide flat top instead of a gemstone. Mutually exclusive with the
+                      center stone below.
+                    </p>
+                  </span>
+                  <input type="checkbox" checked={includeSignetTop} onChange={e => setIncludeSignetTop(e.target.checked)}
                     className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
                 </label>
-                {includeStone && (
+                {includeSignetTop && (
+                  <div className="grid grid-cols-2 gap-3 border-t border-slate-200 pt-3">
+                    <div className="col-span-2">
+                      <label className={labelCls}>Top shape</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(['oval', 'cushion', 'princess'] as const).map(s => (
+                          <button key={s} type="button" onClick={() => setSignetShape(s)}
+                            className={`rounded-xl border px-2.5 py-2 text-xs font-semibold capitalize transition ${signetShape === s ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className={labelCls}>Width (mm)</label>
+                      <input type="number" min={6} max={25} step={0.5} value={signetWidthMm}
+                        onChange={e => setSignetWidthMm(Math.max(6, Number(e.target.value) || 6))} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>Length (mm)</label>
+                      <input type="number" min={6} max={25} step={0.5} value={signetLengthMm}
+                        onChange={e => setSignetLengthMm(Math.max(6, Number(e.target.value) || 6))} className={inputCls} />
+                    </div>
+                  </div>
+                )}
+                <label className="flex items-center justify-between gap-3 border-t border-slate-200 pt-3">
+                  <span className="text-sm font-semibold text-slate-900">Center stone</span>
+                  <input type="checkbox" checked={includeStone && !includeSignetTop} disabled={includeSignetTop}
+                    onChange={e => setIncludeStone(e.target.checked)}
+                    className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300 disabled:cursor-not-allowed disabled:opacity-50" />
+                </label>
+                {includeStone && !includeSignetTop && (
                   <>
                     <div>
                       <label className={labelCls}>Shape</label>

@@ -588,6 +588,57 @@ export function buildBezelHeadGroup(params: BezelHeadParams): THREE.Group {
   return group
 }
 
+// ── Signet ring top — a named Ring Builder TYPE (module 2) ─────────────────
+// A wide flat-top face with NO gemstone at all — the classic signet ring,
+// traditionally engraved with a crest or initials (engraving itself isn't
+// built yet — see the roadmap memory's Text/Engraving module). Reuses the
+// SAME footprint shapes buildStoneOutline already has (oval/cushion's
+// rounded-rect/princess's sharp rect all read naturally as signet top
+// shapes too) rather than inventing new outline code.
+
+export interface SignetTopParams {
+  shape: 'oval' | 'cushion' | 'princess'
+  widthMm: number
+  lengthMm: number
+  /** How far the flat top face sits above the band, in mm. */
+  heightMm?: number
+  standHeightMm?: number
+}
+
+/** A flat (slightly beveled) plate on its own stand — no stone. Same local
+ *  "+Y up" convention as every other head, so `attachHeadToBand` works
+ *  unchanged. */
+export function buildSignetTopGroup(params: SignetTopParams): THREE.Group {
+  const { shape, widthMm, lengthMm } = params
+  const halfW = widthMm / 2
+  const halfL = lengthMm / 2
+  const maxHalf = Math.max(halfW, halfL)
+  const heightMm = params.heightMm ?? maxHalf * 0.35
+  const standHeightMm = params.standHeightMm ?? maxHalf * 0.6
+
+  const group = new THREE.Group()
+  const outline = buildStoneOutline(shape, halfW, halfL)
+  const topShape2D = new THREE.Shape(outline)
+  const bevelSize = Math.min(halfW, halfL) * 0.08
+  const top = new THREE.Mesh(new THREE.ExtrudeGeometry(topShape2D, {
+    depth: heightMm * 0.7, bevelEnabled: true,
+    bevelThickness: heightMm * 0.3, bevelSize, bevelSegments: 4,
+  }))
+  top.rotation.x = -Math.PI / 2
+  top.userData.partName = 'Signet top'
+  group.add(top)
+
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(maxHalf * 0.85, maxHalf * 0.6, standHeightMm, 24))
+  stand.position.y = -standHeightMm / 2
+  stand.userData.partName = 'Stand'
+  group.add(stand)
+
+  group.traverse(obj => {
+    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
+  })
+  return group
+}
+
 // ── Cluster setting — several smaller stones grouped as one "flower" ───────
 // A third CENTER-stone setting type alongside prong/bezel — Matrix's own
 // named "cluster" setting: instead of a single larger stone, a tight

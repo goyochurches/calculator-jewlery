@@ -46,6 +46,10 @@ export interface CadDesignParams {
   includeMatchingBand?: boolean
   matchingBandWidthMm?: number
   splitStrandCount?: number
+  includeSignetTop?: boolean
+  signetShape?: string
+  signetWidthMm?: number
+  signetLengthMm?: number
 }
 
 export interface SavedCadPreset {
