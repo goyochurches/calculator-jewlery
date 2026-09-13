@@ -24,6 +24,7 @@ import {
   buildLogoGroup,
   unionMetalParts, extractStoneMeshes, checkWatertightness,
   checkMinimumWallThickness, defaultProngDiameterMm, defaultGalleryTubeMm, RECOMMENDED_MIN_WALL_MM,
+  checkProngClearance,
   scaleForCastingShrinkage, CASTING_SHRINKAGE_PERCENT,
   computeVolumeMm3, estimateWeightGrams, METAL_DENSITY_G_PER_CM3,
 } from '@/lib/ringGeometry'
@@ -233,6 +234,11 @@ export function CadDesignPage() {
   // checkMinimumWallThickness's own doc comment) — checks the actual
   // numbers THIS design is using against a casting-safe minimum.
   const [thicknessResults, setThicknessResults] = useState<ReturnType<typeof checkMinimumWallThickness> | null>(null)
+  // Manufacturability check #3 — min prong/stone clearance. Previously
+  // deferred (see the roadmap memory) since fixed prong-diameter defaults
+  // would almost never trigger it; revisited now that prong diameter is
+  // genuinely user-adjustable per instance.
+  const [clearanceResults, setClearanceResults] = useState<ReturnType<typeof checkProngClearance> | null>(null)
   // Viewing an imported file (STL/OBJ/3MF) — the other half of the
   // original CAD ask, independent of the parametric generator below.
   // Non-null overrides the parametric model in the viewer/weight/export.
@@ -362,6 +368,11 @@ export function CadDesignPage() {
       items.push({ label: 'Gallery', thicknessMm: defaultGalleryTubeMm(prongDiameterMm) * 2, minSafeMm })
     }
     setThicknessResults(checkMinimumWallThickness(items))
+  }
+
+  const runClearanceCheck = () => {
+    const prongDiameterMm = defaultProngDiameterMm(stoneDiameterMm)
+    setClearanceResults(checkProngClearance(stoneDiameterMm, prongCount, prongDiameterMm, prongDiameterOverridesMm))
   }
 
   const handleImportFile = async (file: File) => {
@@ -662,6 +673,18 @@ export function CadDesignPage() {
   // separate (see ringGeometry.ts). Beta: three-bvh-csg can throw on a
   // genuinely degenerate input, so this is wrapped and falls back to the
   // unmerged preview rather than breaking the page.
+  // React Compiler started flagging this memo as "could not preserve
+  // existing memoization" once the component's total complexity grew
+  // past some threshold (confirmed by stashing this change and re-
+  // linting the prior commit clean) — same class of optimization-only
+  // advisory already accepted/fixed elsewhere in this file (see the
+  // excludedHaloKey/excludedPaveKey/excludedClusterKey join-string fix),
+  // but THIS memo's own deps ([model, mergeSolid]) are already simple
+  // primitives/an object reference, not an array-typed dep that rewrite
+  // trick applies to — nothing to rewrite here. The manual useMemo's own
+  // correctness doesn't depend on the compiler's ADDITIONAL optimization
+  // pass either way.
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const { displayModel, mergeError } = useMemo(() => {
     if (!mergeSolid) return { displayModel: model, mergeError: null }
     try {
@@ -692,6 +715,7 @@ export function CadDesignPage() {
     setWatertightForModel(viewModel)
     if (watertightResults !== null) setWatertightResults(null)
     if (thicknessResults !== null) setThicknessResults(null)
+    if (clearanceResults !== null) setClearanceResults(null)
   }
   const paveExclusionKey = `${paveCount}:${paveSettingType}`
   const [paveExclusionKeySeen, setPaveExclusionKeySeen] = useState(paveExclusionKey)
@@ -1683,6 +1707,40 @@ export function CadDesignPage() {
                         </>
                       )}
                     </div>
+                  )}
+                  {stoneShape === 'round' && settingType === 'prong' && !tensionActive && (
+                    <>
+                      <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-2">
+                        <span className="text-sm font-semibold text-slate-900">Check prong spacing</span>
+                        <button type="button" onClick={runClearanceCheck}
+                          className="shrink-0 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold hover:bg-slate-50">
+                          Run check
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-slate-400">
+                        Checks that adjacent prongs don't physically overlap — mostly relevant if you've fattened an
+                        individual prong's diameter (per-instance edit) enough to collide with its neighbor; default
+                        sizes practically never trigger this.
+                      </p>
+                      {clearanceResults && (
+                        <div className="rounded-xl bg-white px-3 py-2 text-xs">
+                          {clearanceResults.every(r => r.ok) ? (
+                            <p className="font-semibold text-emerald-700">✓ No adjacent prongs overlap.</p>
+                          ) : (
+                            <>
+                              <p className="font-semibold text-rose-700">
+                                {clearanceResults.filter(r => !r.ok).length} adjacent prong pair{clearanceResults.filter(r => !r.ok).length === 1 ? '' : 's'} overlap:
+                              </p>
+                              <ul className="mt-1 list-disc pl-4 text-slate-600">
+                                {clearanceResults.filter(r => !r.ok).map((r, i) => (
+                                  <li key={i}>Prong #{r.betweenIndices[0] + 1} &amp; #{r.betweenIndices[1] + 1}: overlap by {Math.abs(r.gapMm).toFixed(2)}mm</li>
+                                ))}
+                              </ul>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 

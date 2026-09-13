@@ -1111,6 +1111,44 @@ export function checkMinimumWallThickness(items: { label: string; thicknessMm: n
   }))
 }
 
+export interface ProngClearanceResult {
+  betweenIndices: [number, number]
+  gapMm: number
+  ok: boolean
+}
+
+/** Manufacturability check #3 (module 15) — min prong/stone clearance.
+ *  Previously deferred: with prong diameter fixed at its own shared
+ *  default, it would almost never trigger in practice (see the roadmap
+ *  memory's earlier note). Revisited now that prong diameter is genuinely
+ *  user-adjustable per instance (`StoneHeadParams.prongDiameterOverridesMm`,
+ *  shipped in a later step than that original deferral) — a much fatter
+ *  override on one prong CAN now collide with its neighbor, a real thing
+ *  worth catching. Geometric, not a mesh-distance scan: prongs sit on a
+ *  circle of the SAME shared `prongDiameterMm`-derived orbit radius
+ *  `buildStoneHeadGroup` itself uses (per-instance diameter overrides only
+ *  change each prong's own size, not its orbit position — see that
+ *  param's own doc comment), so the chord length between adjacent evenly-
+ *  spaced prong centers (`2·orbitRadius·sin(π/count)`, the standard
+ *  regular-polygon chord formula) minus each pair's own half-diameters
+ *  gives the real gap directly, no mesh needed. */
+export function checkProngClearance(
+  stoneDiameterMm: number, prongCount: number, prongDiameterMm: number,
+  prongDiameterOverridesMm?: Record<number, number>,
+): ProngClearanceResult[] {
+  const orbitRadius = stoneDiameterMm / 2 + prongDiameterMm / 2
+  const chordLength = 2 * orbitRadius * Math.sin(Math.PI / prongCount)
+  const results: ProngClearanceResult[] = []
+  for (let i = 0; i < prongCount; i++) {
+    const j = (i + 1) % prongCount
+    const dI = prongDiameterOverridesMm?.[i] ?? prongDiameterMm
+    const dJ = prongDiameterOverridesMm?.[j] ?? prongDiameterMm
+    const gapMm = chordLength - (dI / 2 + dJ / 2)
+    results.push({ betweenIndices: [i, j], gapMm, ok: gapMm > 0 })
+  }
+  return results
+}
+
 /** Recommended minimum wall/metal thickness (mm) per metal, for
  *  `checkMinimumWallThickness` — a genuinely metal-dependent number, not
  *  one fixed floor: platinum is dense and durable enough to go thinner
