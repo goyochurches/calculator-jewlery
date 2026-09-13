@@ -136,6 +136,9 @@ export function CadDesignPage() {
   // engagement ring.
   const [includeMatchingBand, setIncludeMatchingBand] = useState(false)
   const [matchingBandWidthMm, setMatchingBandWidthMm] = useState(2)
+  // Multi-band (module 2 in the roadmap's master list) — more than one
+  // companion band stacked side by side, all sharing the toggle above.
+  const [matchingBandCount, setMatchingBandCount] = useState<1 | 2 | 3>(1)
   const [includeMilgrain, setIncludeMilgrain] = useState(false)
   const [includeRope, setIncludeRope] = useState(false)
   const [autoRotate, setAutoRotate] = useState(false)
@@ -168,7 +171,7 @@ export function CadDesignPage() {
     mergeSolid, includeMilgrain, includeRope,
     haloRingCount, sideStoneCount, sideStoneCaratWeight, sideSpreadDeg,
     includeMatchingBand, matchingBandWidthMm, splitStrandCount,
-    includeSignetTop, signetShape, signetWidthMm, signetLengthMm,
+    includeSignetTop, signetShape, signetWidthMm, signetLengthMm, matchingBandCount,
   })
 
   const applyPreset = (p: CadDesignParams) => {
@@ -198,6 +201,7 @@ export function CadDesignPage() {
     setSignetShape((p.signetShape as typeof signetShape) ?? 'oval')
     setSignetWidthMm(p.signetWidthMm ?? 12)
     setSignetLengthMm(p.signetLengthMm ?? 14)
+    setMatchingBandCount((p.matchingBandCount as 1 | 2 | 3) ?? 1)
     setImportedModel(null); setImportFileName(null) // a loaded preset is the parametric design, not an import
     setProngHeightOverridesMm({}) // per-instance overrides don't round-trip through a preset (indices may not line up)
   }
@@ -410,14 +414,20 @@ export function CadDesignPage() {
       // Sits right next to the main band, offset along the SAME axis the
       // band's own profile uses for its width (Y, in this local space) —
       // the real-world equivalent of a wedding band sitting flush against
-      // an engagement ring on the same finger.
-      const matchingBand = new THREE.Mesh(buildRingBandGeometry({ fingerSize, widthMm: matchingBandWidthMm, thicknessMm, profile }))
-      matchingBand.position.y = widthMm / 2 + matchingBandWidthMm / 2 + 0.3
-      matchingBand.userData.partName = 'Matching band'
-      group.add(matchingBand)
+      // an engagement ring on the same finger. More than one (module 2's
+      // "Multi-band") just stacks additional ones further out the same way.
+      let nextOffset = widthMm / 2 + matchingBandWidthMm / 2 + 0.3
+      for (let i = 0; i < matchingBandCount; i++) {
+        const matchingBand = new THREE.Mesh(buildRingBandGeometry({ fingerSize, widthMm: matchingBandWidthMm, thicknessMm, profile }))
+        matchingBand.position.y = nextOffset
+        matchingBand.userData.partName = 'Matching band'
+        matchingBand.userData.instanceIndex = i
+        group.add(matchingBand)
+        nextOffset += matchingBandWidthMm + 0.3
+      }
     }
     return group
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, clusterPetalCount, clusterPetalStoneMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloIndices, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveIndices, includeMatchingBand, matchingBandWidthMm, matchingBandCount])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -1164,20 +1174,34 @@ export function CadDesignPage() {
                 <div className="space-y-2 border-t border-slate-200 pt-3">
                   <label className="flex items-center justify-between gap-3">
                     <span>
-                      <span className="text-sm font-semibold text-slate-900">Matching band</span>
+                      <span className="text-sm font-semibold text-slate-900">Matching band{matchingBandCount > 1 ? 's (multi-band)' : ''}</span>
                       <p className="mt-0.5 text-[11px] text-slate-400">
-                        Matrix's own "Matching Band Rail" — a plain companion band, same size and metal, shown sitting
-                        right next to this design like a wedding band would.
+                        Matrix's own "Matching Band Rail" — plain companion band(s), same size and metal, shown
+                        sitting right next to this design like a wedding band would. More than one is the "Multi-band"
+                        ring type.
                       </p>
                     </span>
                     <input type="checkbox" checked={includeMatchingBand} onChange={e => setIncludeMatchingBand(e.target.checked)}
                       className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
                   </label>
                   {includeMatchingBand && (
-                    <div>
-                      <label className={labelCls}>Matching band width (mm)</label>
-                      <input type="number" min={1} max={6} step={0.1} value={matchingBandWidthMm}
-                        onChange={e => setMatchingBandWidthMm(Math.max(1, Number(e.target.value) || 1))} className={inputCls} />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className={labelCls}>Width (mm, each)</label>
+                        <input type="number" min={1} max={6} step={0.1} value={matchingBandWidthMm}
+                          onChange={e => setMatchingBandWidthMm(Math.max(1, Number(e.target.value) || 1))} className={inputCls} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Count</label>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {([1, 2, 3] as const).map(n => (
+                            <button key={n} type="button" onClick={() => setMatchingBandCount(n)}
+                              className={`rounded-xl border px-2 py-2 text-sm font-semibold transition ${matchingBandCount === n ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

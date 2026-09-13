@@ -50,6 +50,7 @@ export interface CadDesignParams {
   signetShape?: string
   signetWidthMm?: number
   signetLengthMm?: number
+  matchingBandCount?: number
 }
 
 export interface SavedCadPreset {
