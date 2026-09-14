@@ -28,6 +28,19 @@ function findMovableRoot(start: THREE.Object3D | null): THREE.Object3D | null {
   return null
 }
 
+/** Shows only the handles/planes relevant to how a movable part's drag is
+ *  actually interpreted downstream (see `onMove`'s own doc comment) —
+ *  'xz' for a part positioned by an angle around the band (X/Z + the XZ
+ *  plane), 'y' for one positioned by a plain linear offset along Y (the
+ *  matching band). Defaults to 'xz' if a movable root doesn't set its own
+ *  `userData.moveAxis`. */
+function applyMoveAxis(tc: TransformControls, moveAxis: unknown) {
+  const y = moveAxis === 'y'
+  tc.showX = !y
+  tc.showY = y
+  tc.showZ = !y
+}
+
 /** What clicking a part of the model in the viewer reports back — the
  *  human-readable `userData.partName` every ringGeometry.ts builder now
  *  tags its meshes with (e.g. "Prong", "Gallery", "Center stone"), plus
@@ -70,17 +83,23 @@ interface ModelViewer3DProps {
    *  a part; editing that specific part is a future step. */
   onSelectPart?: (part: SelectedPart | null) => void
   /** Called after dragging a movable part's own gizmo (see
-   *  `userData.isMovableRoot`/`movablePartName` in ringGeometry.ts) —
-   *  Matrix's Transform > Base "Move" tool, the first real drag-to-
-   *  reposition interaction in the viewer. Reports the part's own name
-   *  and its NEW angle (degrees) around the band, computed from the
-   *  dragged object's resulting X/Z world position — the same convention
-   *  `attachHeadToBand`'s own `angleDeg` parameter uses. Only the angular
-   *  component of a drag is meaningful (radial/vertical movement has no
-   *  parameter to persist it, so it snaps back on the next rebuild) —
-   *  this stays honest with the fact the whole model is regenerated from
-   *  parameters every render, not a free scene graph. */
-  onMoveAngle?: (partName: string, angleDeg: number) => void
+   *  `userData.isMovableRoot`/`movablePartName`/`moveAxis` — set by the
+   *  caller directly on whatever group/mesh should be draggable, not by
+   *  ringGeometry.ts itself, since "movable" is a per-USE decision, e.g.
+   *  the signet-top primitive is movable when reused as a side panel but
+   *  not as the main head) — Matrix's Transform > Base "Move" tool, the
+   *  first real drag-to-reposition interaction in the viewer. Reports the
+   *  part's own name and its resulting LOCAL position (relative to its
+   *  own parent, same as `Object3D.position`) — deliberately raw, not
+   *  pre-interpreted as an angle, since different movable parts map a
+   *  drag to different real parameters (an angle around the band for a
+   *  band-attached part, a plain offset for the matching band). The
+   *  caller decides how to read it. Only the axis/plane `moveAxis` (see
+   *  below) actually shows drag handles for is meaningful — any other
+   *  component has no parameter to persist it, so it snaps back on the
+   *  next rebuild. This stays honest with the fact the whole model is
+   *  regenerated from parameters every render, not a free scene graph. */
+  onMove?: (partName: string, position: { x: number; y: number; z: number }) => void
   /** 360° turntable — Matrix's own "Animation" module includes exactly
    *  this. Delegates to OrbitControls' own `autoRotate`, which keeps
    *  spinning alongside (not instead of) manual orbit-dragging. */
@@ -99,7 +118,7 @@ interface ModelViewer3DProps {
  * file's mesh, not just the parametric ring band.
  */
 export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>(function ModelViewer3D(
-  { object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className, onSelectPart, onMoveAngle, autoRotate = false, wireframe = false },
+  { object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className, onSelectPart, onMove, autoRotate = false, wireframe = false },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -116,8 +135,8 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
   // DOM listener every time the caller passes a new callback instance.
   const onSelectPartRef = useRef(onSelectPart)
   useEffect(() => { onSelectPartRef.current = onSelectPart }, [onSelectPart])
-  const onMoveAngleRef = useRef(onMoveAngle)
-  useEffect(() => { onMoveAngleRef.current = onMoveAngle }, [onMoveAngle])
+  const onMoveRef = useRef(onMove)
+  useEffect(() => { onMoveRef.current = onMove }, [onMove])
 
   // One-time scene/camera/renderer/controls setup, torn down on unmount.
   useEffect(() => {
@@ -147,14 +166,13 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
 
     // "Move" transform gizmo (Matrix's Transform > Base) — attached only to
     // whichever movable-root ancestor was last clicked (see handleClick
-    // below); detached (invisible) otherwise. Translate-only, and only the
-    // X/Z handles/planes are shown since every movable part here is
-    // positioned by an ANGLE around the band, not a free 3D offset — Y and
-    // the radial component of a drag are read but intentionally discarded
-    // (see onMoveAngle's own doc comment).
+    // below); detached (invisible) otherwise. Translate-only. Which
+    // handles/planes show up is set per-part in handleClick, from that
+    // part's own `userData.moveAxis` — a band-attached part (moved by
+    // ANGLE) shows X/Z + the XZ plane; a linearly-offset part (the
+    // matching band, moved along one axis) shows just that one axis.
     const transformControls = new TransformControls(camera, renderer.domElement)
     transformControls.setMode('translate')
-    transformControls.showY = false
     scene.add(transformControls.getHelper())
     transformControlsRef.current = transformControls
     transformControls.addEventListener('dragging-changed', (event) => {
@@ -173,8 +191,7 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
       const obj = transformControls.object
       const partName = obj?.userData.movablePartName
       if (obj && typeof partName === 'string') {
-        const angleDeg = (Math.atan2(obj.position.z, obj.position.x) * 180) / Math.PI
-        onMoveAngleRef.current?.(partName, angleDeg)
+        onMoveRef.current?.(partName, { x: obj.position.x, y: obj.position.y, z: obj.position.z })
       }
     })
 
@@ -254,8 +271,12 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
       // in which case the gizmo just disappears).
       const movableRoot = findMovableRoot(hit ?? null)
       const tc = transformControlsRef.current
-      if (movableRoot) tc?.attach(movableRoot)
-      else tc?.detach()
+      if (movableRoot && tc) {
+        applyMoveAxis(tc, movableRoot.userData.moveAxis)
+        tc.attach(movableRoot)
+      } else {
+        tc?.detach()
+      }
     }
     renderer.domElement.addEventListener('click', handleClick)
 
@@ -361,8 +382,12 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     // (e.g. changing logo size while the logo is still selected).
     const tc = transformControlsRef.current
     const newMovableRoot = rehit ? findMovableRoot(rehit) : null
-    if (newMovableRoot) tc?.attach(newMovableRoot)
-    else tc?.detach()
+    if (newMovableRoot && tc) {
+      applyMoveAxis(tc, newMovableRoot.userData.moveAxis)
+      tc.attach(newMovableRoot)
+    } else {
+      tc?.detach()
+    }
   }, [object])
 
   // Live-update material appearance without touching geometry.

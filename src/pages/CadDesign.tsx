@@ -214,6 +214,13 @@ export function CadDesignPage() {
   // Multi-band (module 2 in the roadmap's master list) — more than one
   // companion band stacked side by side, all sharing the toggle above.
   const [matchingBandCount, setMatchingBandCount] = useState<1 | 2 | 3>(1)
+  // Per-instance offset override (mm, along the band's own width axis) —
+  // same Record<number, override> pattern as the stone-size overrides,
+  // and the third movable part after the logo/side panels: drag a
+  // matching band's own gizmo in the 3D view to slide it closer/further
+  // out, independent of the others. Unlike those two, this is a plain
+  // linear offset, not an angle (see moveAxis: 'y' where it's built).
+  const [matchingBandOffsetOverridesMm, setMatchingBandOffsetOverridesMm] = useState<Record<number, number>>({})
   const [includeMilgrain, setIncludeMilgrain] = useState(false)
   const [includeRope, setIncludeRope] = useState(false)
   const [includeFlutes, setIncludeFlutes] = useState(false)
@@ -686,6 +693,7 @@ export function CadDesignPage() {
         // elsewhere in this file.
         panel.userData.isMovableRoot = true
         panel.userData.movablePartName = `Side panel ${idx + 1}`
+        panel.userData.moveAxis = 'xz' // positioned by an angle around the band
         attachHeadToBand(panel, bandParamsBase, angleDeg)
         group.add(panel)
       }
@@ -722,9 +730,16 @@ export function CadDesignPage() {
       let nextOffset = widthMm / 2 + matchingBandWidthMm / 2 + 0.3
       for (let i = 0; i < matchingBandCount; i++) {
         const matchingBand = new THREE.Mesh(buildRingBandGeometry({ fingerSize, widthMm: matchingBandWidthMm, thicknessMm, profile }))
-        matchingBand.position.y = nextOffset
+        // Per-instance drag override (see matchingBandOffsetOverridesMm's
+        // own comment) — the DEFAULT stacking offset is always computed
+        // the same way regardless of any override, same "seat stays put,
+        // only this one moves" convention the stone-size overrides use.
+        matchingBand.position.y = matchingBandOffsetOverridesMm[i] ?? nextOffset
         matchingBand.userData.partName = 'Matching band'
         matchingBand.userData.instanceIndex = i
+        matchingBand.userData.isMovableRoot = true
+        matchingBand.userData.movablePartName = `Matching band ${i + 1}`
+        matchingBand.userData.moveAxis = 'y' // a plain linear offset, not an angle
         group.add(matchingBand)
         nextOffset += matchingBandWidthMm + 0.3
       }
@@ -741,7 +756,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, sidePanelAngle0Deg, sidePanelAngle1Deg, logoSvgText, logoSizeMm, logoAngleDeg, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, petalStoneDiameterOverridesMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, sidePanelAngle0Deg, sidePanelAngle1Deg, logoSvgText, logoSizeMm, logoAngleDeg, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, petalStoneDiameterOverridesMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, matchingBandOffsetOverridesMm, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -832,6 +847,11 @@ export function CadDesignPage() {
     setClusterPetalCountSeen(clusterPetalCount)
     setExcludedClusterIndices([])
     setPetalStoneDiameterOverridesMm({})
+  }
+  const [matchingBandCountSeen, setMatchingBandCountSeen] = useState(matchingBandCount)
+  if (matchingBandCountSeen !== matchingBandCount) {
+    setMatchingBandCountSeen(matchingBandCount)
+    setMatchingBandOffsetOverridesMm({})
   }
 
   // Weight & cost estimate — volume comes straight off the displayed
@@ -1240,6 +1260,30 @@ export function CadDesignPage() {
                     view to reposition it (Matrix's "Move" tool), independently of the other panel, or use its own
                     slider on the Solid/Surface tab. Click empty space to deselect.
                   </span>
+                </div>
+              ) : selectedPart.name === 'Matching band' && selectedPart.instanceIndex !== undefined ? (
+                <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-800">
+                  <div className="flex items-center gap-2">
+                    <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Selected <strong>Matching band {selectedPart.instanceIndex + 1}</strong> — drag it in the 3D
+                      view along the band's width axis (Matrix's "Move" tool) to slide it closer or further out.
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-14 shrink-0 text-[11px] font-semibold uppercase tracking-wide text-amber-600">Offset</span>
+                    <input type="range" min={widthMm / 2 + matchingBandWidthMm / 2} max={widthMm / 2 + matchingBandWidthMm / 2 + 25} step={0.1}
+                      value={matchingBandOffsetOverridesMm[selectedPart.instanceIndex] ?? (widthMm / 2 + matchingBandWidthMm / 2 + 0.3 + selectedPart.instanceIndex * (matchingBandWidthMm + 0.3))}
+                      onChange={e => setMatchingBandOffsetOverridesMm(prev => ({ ...prev, [selectedPart.instanceIndex!]: Number(e.target.value) }))}
+                      className="flex-1" />
+                    {matchingBandOffsetOverridesMm[selectedPart.instanceIndex] !== undefined && (
+                      <button type="button"
+                        onClick={() => setMatchingBandOffsetOverridesMm(prev => { const next = { ...prev }; delete next[selectedPart.instanceIndex!]; return next })}
+                        className="shrink-0 rounded-lg border border-amber-300 px-2 py-1 text-[11px] font-semibold text-amber-800 hover:bg-amber-100">
+                        Reset
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
@@ -2368,10 +2412,24 @@ export function CadDesignPage() {
         <Card className="overflow-hidden rounded-[30px] border border-slate-200 shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
           <div className="relative">
             <ModelViewer3D ref={viewerRef} object={viewModel} color={METAL_COLORS[metal]} onSelectPart={handleSelectPart}
-              onMoveAngle={(partName, angleDeg) => {
+              onMove={(partName, pos) => {
+                // Band-attached parts are positioned by an ANGLE around the
+                // band — recover it the same way attachHeadToBand's own
+                // cos/sin position formula inverts (verified with a
+                // throwaway script when this first shipped for the logo).
+                const angleDeg = (Math.atan2(pos.z, pos.x) * 180) / Math.PI
                 if (partName === 'Logo') setLogoAngleDeg(angleDeg)
                 else if (partName === 'Side panel 1') setSidePanelAngle0Deg(angleDeg)
                 else if (partName === 'Side panel 2') setSidePanelAngle1Deg(angleDeg)
+                // The matching band is positioned by a plain linear offset
+                // along Y instead (see its own build code) — use the
+                // dragged Y directly, not an angle.
+                else if (partName.startsWith('Matching band ')) {
+                  const idx = Number(partName.slice('Matching band '.length)) - 1
+                  if (!Number.isNaN(idx)) {
+                    setMatchingBandOffsetOverridesMm(prev => ({ ...prev, [idx]: pos.y }))
+                  }
+                }
               }}
               autoRotate={autoRotate} wireframe={wireframe} className="h-[420px] w-full sm:h-[520px]" />
             <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2 text-xs text-white shadow-sm backdrop-blur">

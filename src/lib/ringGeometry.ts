@@ -3151,6 +3151,7 @@ export function buildLogoGroup(params: LogoImportParams): THREE.Group {
   // gizmo needs to attach here, not to the child mesh.
   group.userData.isMovableRoot = true
   group.userData.movablePartName = 'Logo'
+  group.userData.moveAxis = 'xz' // positioned by an angle around the band
   return group
 }
 
