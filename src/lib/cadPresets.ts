@@ -72,6 +72,8 @@ export interface CadDesignParams {
   sidePanelWidthMm?: number
   sidePanelLengthMm?: number
   sidePanelText?: string
+  sidePanelAngle0Deg?: number
+  sidePanelAngle1Deg?: number
 }
 
 export interface SavedCadPreset {

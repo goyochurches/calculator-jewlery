@@ -243,6 +243,14 @@ export function CadDesignPage() {
   const [sidePanelWidthMm, setSidePanelWidthMm] = useState(6)
   const [sidePanelLengthMm, setSidePanelLengthMm] = useState(8)
   const [sidePanelText, setSidePanelText] = useState('')
+  // Each panel's own position around the band, in degrees — was hardcoded
+  // to 90°/270° until now. Second use of the same real drag-to-move gizmo
+  // the logo just proved out (Matrix's Transform > Base "Move"), and
+  // literally independent per panel — like two separate objects in real
+  // Matrix, not a single mirrored offset — so dragging one doesn't move
+  // the other.
+  const [sidePanelAngle0Deg, setSidePanelAngle0Deg] = useState(90)
+  const [sidePanelAngle1Deg, setSidePanelAngle1Deg] = useState(270)
   const [autoRotate, setAutoRotate] = useState(false)
   const [wireframe, setWireframe] = useState(false)
   const viewerRef = useRef<ModelViewer3DHandle>(null)
@@ -310,7 +318,7 @@ export function CadDesignPage() {
     includeRingLaborFee, ringLaborTierKey, includeSetterFee, setterTypeKey,
     includeFlutes, fluteCount, pointDirection, includeGalleryWire, galleryWireCount,
     includeBandText, bandText, bandTextBold, includePattern, patternMotif,
-    includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText,
+    includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, sidePanelAngle0Deg, sidePanelAngle1Deg,
   })
 
   const applyPreset = (p: CadDesignParams) => {
@@ -362,6 +370,8 @@ export function CadDesignPage() {
     setSidePanelWidthMm(p.sidePanelWidthMm ?? 6)
     setSidePanelLengthMm(p.sidePanelLengthMm ?? 8)
     setSidePanelText(p.sidePanelText ?? '')
+    setSidePanelAngle0Deg(p.sidePanelAngle0Deg ?? 90)
+    setSidePanelAngle1Deg(p.sidePanelAngle1Deg ?? 270)
     setPointDirection((p.pointDirection as 'up' | 'down') ?? 'up')
     setImportedModel(null); setImportFileName(null) // a loaded preset is the parametric design, not an import
     setLogoSvgText(null); setLogoFileName(null) // same reasoning — an uploaded logo doesn't round-trip through a preset
@@ -660,13 +670,22 @@ export function CadDesignPage() {
     // construction (already independently verified) at two extra angular
     // positions instead of writing a new primitive.
     if (includeSidePanels) {
-      for (const [angleDeg, idx] of [[90, 0], [270, 1]] as const) {
+      for (const [angleDeg, idx] of [[sidePanelAngle0Deg, 0], [sidePanelAngle1Deg, 1]] as const) {
         const panel = buildSignetTopGroup({ shape: sidePanelShape, widthMm: sidePanelWidthMm, lengthMm: sidePanelLengthMm, engraveText: sidePanelText })
         panel.traverse(obj => {
           if (!(obj instanceof THREE.Mesh)) return
           obj.userData.partName = obj.userData.partName === 'Engraved text' ? 'Side panel text' : 'Side panel'
           obj.userData.instanceIndex = idx
         })
+        // Tagged for the drag-to-move gizmo here (not inside
+        // buildSignetTopGroup itself) since a signet TOP shouldn't be
+        // independently movable — only these two flanking-panel USES of
+        // the same primitive should be. Each panel gets its own
+        // movablePartName (idx-suffixed) so dragging one never touches
+        // the other, unlike the shared-state side-stone overrides
+        // elsewhere in this file.
+        panel.userData.isMovableRoot = true
+        panel.userData.movablePartName = `Side panel ${idx + 1}`
         attachHeadToBand(panel, bandParamsBase, angleDeg)
         group.add(panel)
       }
@@ -722,7 +741,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, logoSvgText, logoSizeMm, logoAngleDeg, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, petalStoneDiameterOverridesMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, sidePanelAngle0Deg, sidePanelAngle1Deg, logoSvgText, logoSizeMm, logoAngleDeg, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, petalStoneDiameterOverridesMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -1211,6 +1230,15 @@ export function CadDesignPage() {
                   <span>
                     Selected <strong>Logo</strong> — drag it in the 3D view to reposition it around the band (Matrix's
                     "Move" transform tool), or use the slider on the Production tab. Click empty space to deselect.
+                  </span>
+                </div>
+              ) : (selectedPart.name === 'Side panel' || selectedPart.name === 'Side panel text') ? (
+                <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Selected <strong>Side panel {(selectedPart.instanceIndex ?? 0) + 1}</strong> — drag it in the 3D
+                    view to reposition it (Matrix's "Move" tool), independently of the other panel, or use its own
+                    slider on the Solid/Surface tab. Click empty space to deselect.
                   </span>
                 </div>
               ) : (
@@ -1983,8 +2011,9 @@ export function CadDesignPage() {
                       <p className="mt-0.5 text-[11px] text-slate-400">
                         Matrix's own Award Ring Builder concept — flat panels flanking the main setting (a
                         championship ring's team/year plaques), generalized here as a plain add-on any ring can
-                        use. Two panels, mirrored left/right; reuses the same flat-plate/raised-text construction
-                        as the signet top.
+                        use. Two panels, each independently positioned (drag either one in the 3D view — Matrix's
+                        "Move" tool — or use its own slider below); reuses the same flat-plate/raised-text
+                        construction as the signet top.
                       </p>
                     </span>
                     <input type="checkbox" checked={includeSidePanels} onChange={e => setIncludeSidePanels(e.target.checked)}
@@ -2017,6 +2046,18 @@ export function CadDesignPage() {
                         <label className={labelCls}>Panel text (both panels)</label>
                         <input type="text" maxLength={6} value={sidePanelText}
                           onChange={e => setSidePanelText(e.target.value)} placeholder="e.g. 24" className={inputCls} />
+                      </div>
+                      <div>
+                        <label className={labelCls}>Panel 1 position (°)</label>
+                        <input type="range" min={-180} max={180} step={1} value={sidePanelAngle0Deg}
+                          onChange={e => setSidePanelAngle0Deg(Number(e.target.value))} className="w-full" />
+                        <p className="mt-1 text-[11px] text-slate-400">{sidePanelAngle0Deg}°</p>
+                      </div>
+                      <div>
+                        <label className={labelCls}>Panel 2 position (°)</label>
+                        <input type="range" min={-180} max={180} step={1} value={sidePanelAngle1Deg}
+                          onChange={e => setSidePanelAngle1Deg(Number(e.target.value))} className="w-full" />
+                        <p className="mt-1 text-[11px] text-slate-400">{sidePanelAngle1Deg}°</p>
                       </div>
                     </div>
                   )}
@@ -2327,7 +2368,11 @@ export function CadDesignPage() {
         <Card className="overflow-hidden rounded-[30px] border border-slate-200 shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
           <div className="relative">
             <ModelViewer3D ref={viewerRef} object={viewModel} color={METAL_COLORS[metal]} onSelectPart={handleSelectPart}
-              onMoveAngle={(partName, angleDeg) => { if (partName === 'Logo') setLogoAngleDeg(angleDeg) }}
+              onMoveAngle={(partName, angleDeg) => {
+                if (partName === 'Logo') setLogoAngleDeg(angleDeg)
+                else if (partName === 'Side panel 1') setSidePanelAngle0Deg(angleDeg)
+                else if (partName === 'Side panel 2') setSidePanelAngle1Deg(angleDeg)
+              }}
               autoRotate={autoRotate} wireframe={wireframe} className="h-[420px] w-full sm:h-[520px]" />
             <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2 text-xs text-white shadow-sm backdrop-blur">
               <MousePointerClick className="h-3.5 w-3.5 shrink-0 text-amber-300" />
