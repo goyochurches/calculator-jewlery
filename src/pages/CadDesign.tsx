@@ -40,6 +40,46 @@ const STONE_SHAPE_LABELS: Record<StoneShape, string> = {
   emerald: 'Emerald', asscher: 'Asscher', radiant: 'Radiant',
   hexagon: 'Hexagon', lozenge: 'Lozenge', trapezoid: 'Trapezoid', heart: 'Heart', trillion: 'Trillion',
 }
+// A visual outline per gem shape — a literal translation of Matrix's own
+// "Gem Loader" shape picker (a grid of actual shape ICONS, not a text
+// list — see the reference screenshot the user shared 2026-09-15).
+// emerald/asscher/radiant deliberately share the SAME cut-corner-rect
+// silhouette at slightly different proportions, matching
+// `cutCornerRectOutline`'s own disclosed simplification in
+// ringGeometry.ts: what really distinguishes those three in a real stone
+// is facet PATTERN, not outline — so their icons shouldn't invent a
+// silhouette difference the actual geometry doesn't have either.
+const SHAPE_ICON_PATH: Record<StoneShape, string> = {
+  round: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z',
+  oval: 'M12 4c4.5 0 8 3.5 8 8s-3.5 8-8 8-8-3.5-8-8 3.5-8 8-8Z',
+  cushion: 'M8 4h8a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4Z',
+  princess: 'M4.5 4.5h15v15h-15Z',
+  // A real vesica/lens construction (two arcs sharing the same sweep flag,
+  // meeting at sharp points top/bottom) rather than a smoothed diamond —
+  // needed to read as a pointed marquise instead of collapsing visually
+  // into the oval/lozenge icons.
+  marquise: 'M12 3A11 11 0 0 1 12 21A11 11 0 0 1 12 3Z',
+  pear: 'M12 3c1.6 2.4 8 5.4 8 11a8 8 0 0 1-16 0c0-5.6 6.4-8.6 8-11Z',
+  emerald: 'M8.5 4h7L20 8.5v7L15.5 20h-7L4 15.5v-7Z',
+  asscher: 'M9 4h6l5 5v6l-5 5H9l-5-5V9Z',
+  radiant: 'M7.5 4h9L21 9v6l-4.5 5h-9L3 15V9Z',
+  hexagon: 'M8 4h8l4 8-4 8H8l-4-8Z',
+  lozenge: 'M12 3 21 12 12 21 3 12Z',
+  trapezoid: 'M8 4h8l4 16H4Z',
+  heart: 'M12 20.5S4 14.8 4 8.9C4 5.9 6.4 4 9 4c1.4 0 2.6.7 3 1.6C12.4 4.7 13.6 4 15 4c2.6 0 5 1.9 5 4.9 0 5.9-8 11.6-8 11.6Z',
+  trillion: 'M12 3 21 19H3Z',
+}
+
+/** One shape's own icon, sized/stroked to sit inside a toolbar-style
+ *  button (see the shape-picker grid) — outline only, `currentColor`, so
+ *  it follows the button's own text color when selected vs. not. */
+function ShapeIcon({ shape, className }: { shape: StoneShape; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" className={className}>
+      <path d={SHAPE_ICON_PATH[shape]} />
+    </svg>
+  )
+}
 // Reasonable starting length×width (mm) per fancy shape, editable afterward.
 const FANCY_SHAPE_DEFAULTS: Record<FancyStoneShape, { lengthMm: number; widthMm: number }> = {
   oval: { lengthMm: 8, widthMm: 6 },
@@ -88,7 +128,7 @@ const PART_TAB: Record<string, Tab> = {
   'Side panel': 'surface', 'Side panel text': 'surface', 'Pattern motif': 'surface', 'Logo': 'surface',
   'Merged solid': 'surface', Imported: 'production', 'Matching band': 'surface',
 }
-import { Download, RotateCw, Scale, MousePointerClick } from 'lucide-react'
+import { Download, RotateCw, Scale, MousePointerClick, Circle, Gem, Layers, Factory } from 'lucide-react'
 
 // Approximate render colors per metal — cosmetic only, doesn't drive
 // pricing (that still comes from Master Tables / config.metalPriceMap
@@ -1082,15 +1122,20 @@ export function CadDesignPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-4 gap-1.5 rounded-2xl bg-slate-100 p-1">
+            {/* Toolbar-style tab strip — icon above a small label, denser
+                than a plain text-button row, following the same real
+                Matrix reference the user shared (icon-first, dense
+                groups) rather than this app's earlier plain pill tabs. */}
+            <div className="grid grid-cols-4 gap-1 rounded-2xl bg-slate-100 p-1">
               {([
-                ['ringrail', 'Ring Rail'],
-                ['gems', 'Gems'],
-                ['surface', 'Solid/Surface'],
-                ['production', 'Production'],
-              ] as const).map(([tab, label]) => (
+                ['ringrail', 'Ring Rail', Circle],
+                ['gems', 'Gems', Gem],
+                ['surface', 'Solid/Surface', Layers],
+                ['production', 'Production', Factory],
+              ] as const).map(([tab, label, Icon]) => (
                 <button key={tab} type="button" onClick={() => setActiveTab(tab)}
-                  className={`rounded-xl px-2 py-2 text-xs font-semibold transition ${activeTab === tab ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                  className={`flex flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-[10px] font-semibold transition ${activeTab === tab ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                  <Icon className="h-4 w-4" />
                   {label}
                 </button>
               ))}
@@ -1535,11 +1580,12 @@ export function CadDesignPage() {
                   <div className="grid grid-cols-2 gap-3 border-t border-slate-200 pt-3">
                     <div className="col-span-2">
                       <label className={labelCls}>Top shape</label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-3 gap-1.5">
                         {(['oval', 'cushion', 'princess'] as const).map(s => (
-                          <button key={s} type="button" onClick={() => setSignetShape(s)}
-                            className={`rounded-xl border px-2.5 py-2 text-xs font-semibold capitalize transition ${signetShape === s ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                            {s}
+                          <button key={s} type="button" onClick={() => setSignetShape(s)} title={STONE_SHAPE_LABELS[s]}
+                            className={`flex flex-col items-center gap-1 rounded-lg border px-1 py-1.5 capitalize transition ${signetShape === s ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                            <ShapeIcon shape={s} className="h-5 w-5" />
+                            <span className="text-[9px] font-semibold leading-none">{s}</span>
                           </button>
                         ))}
                       </div>
@@ -1588,11 +1634,12 @@ export function CadDesignPage() {
                   <>
                     <div>
                       <label className={labelCls}>Shape</label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-5 gap-1.5">
                         {(Object.keys(STONE_SHAPE_LABELS) as StoneShape[]).map(shape => (
-                          <button key={shape} type="button" onClick={() => selectStoneShape(shape)}
-                            className={`rounded-xl border px-2.5 py-2 text-xs font-semibold transition ${stoneShape === shape ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                            {STONE_SHAPE_LABELS[shape]}
+                          <button key={shape} type="button" onClick={() => selectStoneShape(shape)} title={STONE_SHAPE_LABELS[shape]}
+                            className={`flex flex-col items-center gap-1 rounded-lg border px-1 py-1.5 transition ${stoneShape === shape ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                            <ShapeIcon shape={shape} className="h-5 w-5" />
+                            <span className="text-[9px] font-semibold leading-none">{STONE_SHAPE_LABELS[shape]}</span>
                           </button>
                         ))}
                       </div>
@@ -2067,11 +2114,12 @@ export function CadDesignPage() {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="col-span-2">
                         <label className={labelCls}>Panel shape</label>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-3 gap-1.5">
                           {(['oval', 'cushion', 'princess'] as const).map(s => (
-                            <button key={s} type="button" onClick={() => setSidePanelShape(s)}
-                              className={`rounded-xl border px-2.5 py-2 text-xs font-semibold capitalize transition ${sidePanelShape === s ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                              {s}
+                            <button key={s} type="button" onClick={() => setSidePanelShape(s)} title={STONE_SHAPE_LABELS[s]}
+                              className={`flex flex-col items-center gap-1 rounded-lg border px-1 py-1.5 capitalize transition ${sidePanelShape === s ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                              <ShapeIcon shape={s} className="h-5 w-5" />
+                              <span className="text-[9px] font-semibold leading-none">{s}</span>
                             </button>
                           ))}
                         </div>
