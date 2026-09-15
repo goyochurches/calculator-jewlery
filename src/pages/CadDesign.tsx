@@ -1052,6 +1052,68 @@ export function CadDesignPage() {
     }
   }
 
+  // Command line (Rhino/Matrix's own "Command:" bar — see the CAD roadmap
+  // memory's 2026-09-15 note: the user pushed back on treating this as a
+  // deliberate divergence, so it's a REAL dispatcher onto this page's own
+  // actions, not decorative). Setting-type commands also turn the stone on
+  // and, for the round-only types, force the shape to round — otherwise
+  // typing "cluster" with the stone off (or on a fancy shape) would look
+  // like it silently did nothing, which defeats the point of a command
+  // line being a fast, confident way to act.
+  const [commandInput, setCommandInput] = useState('')
+  const [commandLog, setCommandLog] = useState<{ cmd: string; result: string }[]>([])
+  const runSettingCommand = (type: SettingType, roundOnly: boolean) => {
+    setIncludeStone(true)
+    setIncludeSignetTop(false)
+    if (roundOnly) setStoneShape('round')
+    setSettingType(type)
+    setActiveTab('gems')
+  }
+  const runSideStoneCommand = (type: typeof paveSettingType) => {
+    setIncludePave(true)
+    setPaveSettingType(type)
+    setActiveTab('gems')
+  }
+  const COMMAND_HELP = 'front · top · side · perspective · wireframe · turntable · ringrail · gems · surface · production · prong · bezel · cluster · tension · illusion · halo · pave · channel · flush · bar · invisible · milgrain · rope · flutes · pattern · mirror · plain · tapered · twisted · split · cathedral · bypass · export · help'
+  const runCommand = (raw: string) => {
+    const cmd = raw.trim().toLowerCase()
+    if (!cmd) return
+    let result = 'Unknown command.'
+    switch (cmd) {
+      case 'front': case 'top': case 'side': case 'perspective':
+        viewerRef.current?.setView(cmd); result = `View set to ${cmd}.`; break
+      case 'wireframe': setWireframe(v => !v); result = 'Wireframe toggled.'; break
+      case 'turntable': case 'rotate': setAutoRotate(v => !v); result = 'Turntable toggled.'; break
+      case 'ringrail': case 'ring rail': setActiveTab('ringrail'); result = 'Switched to Ring Rail.'; break
+      case 'gems': setActiveTab('gems'); result = 'Switched to Gems.'; break
+      case 'surface': case 'solid': case 'solid/surface': setActiveTab('surface'); result = 'Switched to Solid/Surface.'; break
+      case 'production': setActiveTab('production'); result = 'Switched to Production.'; break
+      case 'prong': runSettingCommand('prong', false); result = 'Setting: prong.'; break
+      case 'bezel': runSettingCommand('bezel', false); result = 'Setting: bezel.'; break
+      case 'cluster': runSettingCommand('cluster', true); result = 'Setting: cluster.'; break
+      case 'tension': runSettingCommand('tension', true); result = 'Setting: tension.'; break
+      case 'illusion': runSettingCommand('illusion', true); result = 'Setting: illusion.'; break
+      case 'halo': setIncludeHalo(true); setActiveTab('gems'); result = 'Halo enabled.'; break
+      case 'pave': case 'pavé': runSideStoneCommand('pave'); result = 'Side stones: pavé.'; break
+      case 'channel': runSideStoneCommand('channel'); result = 'Side stones: channel.'; break
+      case 'flush': runSideStoneCommand('flush'); result = 'Side stones: flush.'; break
+      case 'bar': runSideStoneCommand('bar'); result = 'Side stones: bar.'; break
+      case 'invisible': runSideStoneCommand('invisible'); result = 'Side stones: invisible.'; break
+      case 'milgrain': setIncludeMilgrain(true); setActiveTab('surface'); result = 'Milgrain enabled.'; break
+      case 'rope': setIncludeRope(true); setActiveTab('surface'); result = 'Rope enabled.'; break
+      case 'flute': case 'flutes': setIncludeFlutes(true); setActiveTab('surface'); result = 'Flutes enabled.'; break
+      case 'pattern': setIncludePattern(true); setActiveTab('surface'); result = 'Pattern enabled.'; break
+      case 'mirror': setPointDirection(d => d === 'up' ? 'down' : 'up'); result = 'Mirrored (point direction flipped).'; break
+      case 'plain': case 'tapered': case 'twisted': case 'split': case 'cathedral': case 'bypass':
+        setShankStyle(cmd); setActiveTab('ringrail'); result = `Shank style: ${cmd}.`; break
+      case 'export': downloadModel(); result = `Exported as ${exportFormat.toUpperCase()}.`; break
+      case 'help': case '?': result = COMMAND_HELP; break
+      default: result = `Unknown command "${cmd}". Type "help" for the list.`
+    }
+    setCommandLog(prev => [...prev.slice(-4), { cmd: raw, result }])
+    setCommandInput('')
+  }
+
   return (
     <div className="space-y-6">
       <Card className="overflow-hidden rounded-[30px] border-0 text-white shadow-[0_30px_80px_rgba(15,23,42,0.24)]" style={{ backgroundColor: 'var(--theme-primary)' }}>
@@ -2510,6 +2572,29 @@ export function CadDesignPage() {
                   {view}
                 </button>
               ))}
+            </div>
+          </div>
+          {/* Rhino/Matrix's own "Command:" bar — a real dispatcher onto
+              this page's own actions (see runCommand), not decorative.
+              Placed right under the viewport, same as the reference
+              screenshot. Type "help" for the full list. */}
+          <div className="border-t border-slate-800 bg-slate-950 px-3 py-2 font-mono text-xs text-slate-300">
+            {commandLog.length > 0 && (
+              <div className="mb-1.5 max-h-20 space-y-0.5 overflow-y-auto">
+                {commandLog.map((entry, i) => (
+                  <div key={i} className="truncate">
+                    <span className="text-emerald-400">&gt;</span> {entry.cmd}
+                    <span className="text-slate-500"> — {entry.result}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-1.5">
+              <span className="text-emerald-400">Command:</span>
+              <input type="text" value={commandInput} onChange={e => setCommandInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') runCommand(commandInput) }}
+                placeholder="type a command, e.g. prong, halo, front, export — or help"
+                className="flex-1 bg-transparent text-slate-100 placeholder:text-slate-600 focus:outline-none" />
             </div>
           </div>
         </Card>
