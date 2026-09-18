@@ -70,6 +70,44 @@ const SHAPE_ICON_PATH: Record<StoneShape, string> = {
   trillion: 'M12 3 21 19H3Z',
 }
 
+// Outline icons for the non-shape pickers (setting type, side-stone type,
+// shank style) — same icon-first toolbar treatment as ShapeIcon, drawn as
+// simple schematic glyphs of what each option builds (a circle inside
+// prongs, a ring wall around a stone, a row of touching stones, …), not
+// literal Matrix artwork (which isn't available to copy).
+const circlePath = (cx: number, cy: number, r: number) =>
+  `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0 ${r} ${r} 0 1 0-${2 * r} 0Z`
+const TOOL_ICON_PATH: Record<string, string> = {
+  // setting types
+  prong: `${circlePath(12, 12, 4)}M12 3v4M12 17v4M3 12h4M17 12h4`,
+  bezel: `${circlePath(12, 12, 8)}${circlePath(12, 12, 4.5)}`,
+  cluster: [circlePath(12, 12, 3), ...[0, 60, 120, 180, 240, 300].map(a =>
+    circlePath(12 + 7.5 * Math.cos((a * Math.PI) / 180), 12 + 7.5 * Math.sin((a * Math.PI) / 180), 2))].join(''),
+  tension: `M2 10h6v4H2ZM16 10h6v4h-6Z${circlePath(12, 12, 3)}`,
+  illusion: 'M12 3l3 6 6 3-6 3-3 6-3-6-6-3 6-3Z',
+  // side-stone types
+  pave: `${circlePath(5.5, 12, 2)}${circlePath(12, 12, 2)}${circlePath(18.5, 12, 2)}`,
+  channel: `M3 8h18M3 16h18${circlePath(7, 12, 2)}${circlePath(12, 12, 2)}${circlePath(17, 12, 2)}`,
+  flush: `M3 15h18${circlePath(7, 12, 2.5)}${circlePath(17, 12, 2.5)}`,
+  bar: `M6 6v12M12 6v12M18 6v12${circlePath(9, 12, 1.5)}${circlePath(15, 12, 1.5)}`,
+  invisible: `${circlePath(6, 12, 3)}${circlePath(12, 12, 3)}${circlePath(18, 12, 3)}`,
+  // shank styles
+  plain: `${circlePath(12, 12, 8)}${circlePath(12, 12, 5.5)}`,
+  tapered: 'M3 8l18 3v2L3 16Z',
+  twisted: 'M3 12c3-7 6-7 9 0s6 7 9 0',
+  split: 'M3 12h6l6-4h6M9 12l6 4h6',
+  cathedral: 'M3 19c0-9 6-13 9-13s9 4 9 13',
+  bypass: 'M3 8c6 0 12 8 18 8M3 16c6 0 12-8 18-8',
+}
+
+function ToolIcon({ name, className }: { name: string; className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" className={className}>
+      <path d={TOOL_ICON_PATH[name] ?? ''} />
+    </svg>
+  )
+}
+
 /** One shape's own icon, sized/stroked to sit inside a toolbar-style
  *  button (see the shape-picker grid) — outline only, `currentColor`, so
  *  it follows the button's own text color when selected vs. not. */
@@ -1443,9 +1481,10 @@ export function CadDesignPage() {
                   <label className={labelCls}>Shank style</label>
                   <div className="grid grid-cols-3 gap-2">
                     {(['plain', 'tapered', 'twisted', 'split', 'cathedral', 'bypass'] as const).map(s => (
-                      <button key={s} type="button" onClick={() => setShankStyle(s)} disabled={tensionActive}
-                        className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition disabled:cursor-not-allowed disabled:opacity-50 ${shankStyle === s ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                        {s}
+                      <button key={s} type="button" onClick={() => setShankStyle(s)} disabled={tensionActive} title={s}
+                        className={`flex flex-col items-center gap-1 rounded-lg border px-1 py-1.5 capitalize transition disabled:cursor-not-allowed disabled:opacity-50 ${shankStyle === s ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                        <ToolIcon name={s} className="h-5 w-5" />
+                        <span className="text-[9px] font-semibold leading-none">{s}</span>
                       </button>
                     ))}
                   </div>
@@ -1731,9 +1770,10 @@ export function CadDesignPage() {
                         <label className={labelCls}>Setting type</label>
                         <div className="grid grid-cols-3 gap-2">
                           {(['prong', 'bezel', 'cluster', 'tension', 'illusion'] as const).map(t => (
-                            <button key={t} type="button" onClick={() => setSettingType(t)}
-                              className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${settingType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                              {t}
+                            <button key={t} type="button" onClick={() => setSettingType(t)} title={t}
+                              className={`flex flex-col items-center gap-1 rounded-lg border px-1 py-1.5 capitalize transition ${settingType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                              <ToolIcon name={t} className="h-5 w-5" />
+                              <span className="text-[9px] font-semibold leading-none">{t}</span>
                             </button>
                           ))}
                         </div>
@@ -1954,9 +1994,10 @@ export function CadDesignPage() {
                       <label className={labelCls}>Setting</label>
                       <div className="grid grid-cols-3 gap-2">
                         {([['pave', 'Pavé'], ['channel', 'Channel'], ['flush', 'Flush'], ['bar', 'Bar'], ['invisible', 'Invisible']] as const).map(([t, label]) => (
-                          <button key={t} type="button" onClick={() => setPaveSettingType(t)}
-                            className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${paveSettingType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                            {label}
+                          <button key={t} type="button" onClick={() => setPaveSettingType(t)} title={label}
+                            className={`flex flex-col items-center gap-1 rounded-lg border px-1 py-1.5 transition ${paveSettingType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                            <ToolIcon name={t} className="h-5 w-5" />
+                            <span className="text-[9px] font-semibold leading-none">{label}</span>
                           </button>
                         ))}
                       </div>
