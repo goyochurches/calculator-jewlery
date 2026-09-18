@@ -5,13 +5,14 @@ import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { Card, CardContent } from '@/components/ui/card'
 import { ProfileEditor } from '@/components/ProfileEditor'
+import { PlanShapePicker } from '@/components/PlanShapePicker'
 import { ModelViewer3D, type SelectedPart, type ModelViewer3DHandle, type CameraView } from '@/components/ModelViewer3D'
 import { FINGER_SIZE_OPTIONS, METAL_GROUPS } from '@/hooks/useQuoteBuilder'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import type { JewelryMetalOption } from '@/types'
 import {
-  buildRingBandGeometry, usSizeToDiameterMm, type BandProfile, type CustomBandProfile, BAND_PROFILE_PRESETS,
+  buildRingBandGeometry, usSizeToDiameterMm, type BandProfile, type CustomBandProfile, BAND_PROFILE_PRESETS, type PlanShape, ROUND_PLAN_SHAPE, applyPlanShape,
   buildStoneHeadGroup, buildBezelHeadGroup, buildClusterHeadGroup, buildHaloGroup, haloOrbitRadiusMm, attachHeadToBand, roundDiameterMmFromCarat, caratFromRoundDiameterMm, estimateFancyCaratWeight,
   buildSignetTopGroup, sanitizeForEngraving,
   defaultProngHeightMm,
@@ -215,6 +216,8 @@ export function CadDesignPage() {
   const [thicknessMm, setThicknessMm] = useState(1.8)
   const [profile, setProfile] = useState<BandProfile>('comfort')
   // Free-form cross-section (profile === 'custom'), edited in ProfileEditor.
+  // Ring plan-view shape (round/oval/square…) — applied to the whole model.
+  const [planShape, setPlanShape] = useState<PlanShape>(ROUND_PLAN_SHAPE)
   const [customProfile, setCustomProfile] = useState<CustomBandProfile>(BAND_PROFILE_PRESETS['half-round'].profile)
   const [shankStyle, setShankStyle] = useState<'plain' | 'tapered' | 'twisted' | 'split' | 'cathedral' | 'bypass'>('plain')
   const [splitStrandCount, setSplitStrandCount] = useState<2 | 3>(2)
@@ -437,6 +440,7 @@ export function CadDesignPage() {
     includeStone, stoneShape, caratWeight, diamondType, fancyLengthMm, fancyWidthMm,
     settingType, bezelCoverage, prongCount, clusterPetalCount, clusterPetalStoneMm,
     includeHalo, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm,
+    planAspect: planShape.aspect, planSquareness: planShape.squareness,
     mergeSolid, includeMilgrain, includeRope,
     haloRingCount, sideStoneCount, sideStoneCaratWeight, sideSpreadDeg,
     includeMatchingBand, matchingBandWidthMm, splitStrandCount,
@@ -459,6 +463,7 @@ export function CadDesignPage() {
     setIncludeHalo(p.includeHalo); setHaloCount(p.haloCount); setHaloStoneMm(p.haloStoneMm)
     setIncludePave(p.includePave); setPaveSettingType(p.paveSettingType as typeof paveSettingType)
     setPaveCount(p.paveCount); setPaveStoneMm(p.paveStoneMm)
+    setPlanShape({ aspect: p.planAspect ?? 1, squareness: p.planSquareness ?? 2 })
     setMergeSolid(p.mergeSolid); setIncludeMilgrain(p.includeMilgrain); setIncludeRope(p.includeRope)
     // Added after the first preset version shipped — fall back to the same
     // defaults the state itself starts with, so an OLDER saved preset
@@ -604,6 +609,8 @@ export function CadDesignPage() {
   }
 
   const innerDiameterMm = usSizeToDiameterMm(fingerSize)
+  const planAspect = planShape.aspect
+  const planSquareness = planShape.squareness
   const stoneDiameterMm = roundDiameterMmFromCarat(caratWeight)
   // The one part this app currently lets you edit AS the specific clicked
   // instance, rather than as "every part of this type" — proves out the
@@ -863,6 +870,7 @@ export function CadDesignPage() {
         nextOffset += matchingBandWidthMm + 0.3
       }
     }
+    applyPlanShape(group, { aspect: planAspect, squareness: planSquareness }, innerDiameterMm / 2 + thicknessMm / 2)
     return group
     // excludedHaloKey/excludedPaveKey (joined-string stand-ins for the
     // excludedHaloIndices/excludedPaveIndices ARRAYS, see where they're
@@ -875,7 +883,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, customProfile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, sidePanelAngle0Deg, sidePanelAngle1Deg, logoSvgText, logoSizeMm, logoAngleDeg, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, petalStoneDiameterOverridesMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, matchingBandOffsetOverridesMm, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, customProfile, planAspect, planSquareness, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, sidePanelAngle0Deg, sidePanelAngle1Deg, logoSvgText, logoSizeMm, logoAngleDeg, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, petalStoneDiameterOverridesMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, matchingBandOffsetOverridesMm, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -1536,6 +1544,11 @@ export function CadDesignPage() {
                       <ProfileEditor profile={customProfile} onChange={setCustomProfile} widthMm={widthMm} thicknessMm={thicknessMm} />
                     </div>
                   )}
+                </div>
+
+                <div>
+                  <label className={labelCls}>Ring shape (plan view)</label>
+                  <PlanShapePicker shape={planShape} onChange={setPlanShape} />
                 </div>
 
                 <div>

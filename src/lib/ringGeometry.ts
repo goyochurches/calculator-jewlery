@@ -3398,3 +3398,76 @@ export function buildInvisibleSetting(params: InvisibleSettingParams, band: Ring
   })
   return group
 }
+
+// ── Plan-view ring shape (Matrix's Ring Rail idea) ───────────────────────────
+// Real rings aren't always circular seen down the finger axis: oval, square,
+// cushion/"euro" shanks. Modeled as a superellipse |x/a|^n + |z/b|^n = 1
+// (a = 1 along the head axis, b = aspect across it, n = squareness: 2 is an
+// ellipse, larger tends to a rounded square), normalized so the MEAN radius
+// stays 1 — the ring keeps roughly the same finger size (circumference), it
+// just changes shape. Applied to the whole assembled model (band, head,
+// stones, accessories) as a smooth radial offset, so everything stays seated.
+
+export interface PlanShape {
+  /** Depth across the finger ÷ width along the head axis (1 = symmetric). */
+  aspect: number
+  /** Superellipse exponent: 2 = ellipse/circle, ~4-8 = rounded square. */
+  squareness: number
+}
+export const ROUND_PLAN_SHAPE: PlanShape = { aspect: 1, squareness: 2 }
+export const PLAN_SHAPE_PRESETS: Record<string, { label: string; shape: PlanShape }> = {
+  round: { label: 'Round', shape: ROUND_PLAN_SHAPE },
+  oval: { label: 'Oval', shape: { aspect: 0.82, squareness: 2 } },
+  'oval-wide': { label: 'Oval wide', shape: { aspect: 1.22, squareness: 2 } },
+  cushion: { label: 'Cushion', shape: { aspect: 1, squareness: 3.2 } },
+  square: { label: 'Square', shape: { aspect: 1, squareness: 5 } },
+  rect: { label: 'Rectangular', shape: { aspect: 0.8, squareness: 4 } },
+}
+export const isRoundPlanShape = (s: PlanShape) => Math.abs(s.aspect - 1) < 1e-6 && Math.abs(s.squareness - 2) < 1e-6
+
+/** Radius factor (mean = 1) of the plan shape at angle θ (0 = head axis). */
+export function makePlanShapeRadius(shape: PlanShape): (theta: number) => number {
+  const n = Math.max(2, shape.squareness), b = Math.max(0.3, shape.aspect)
+  const raw = (t: number) => Math.pow(Math.pow(Math.abs(Math.cos(t)), n) + Math.pow(Math.abs(Math.sin(t) / b), n), -1 / n)
+  const N = 360
+  let sum = 0
+  for (let i = 0; i < N; i++) sum += raw((i / N) * Math.PI * 2)
+  const mean = sum / N
+  return t => raw(t) / mean
+}
+
+/** Bends every mesh under `root` (assembled model group, identity transform)
+ *  so the ring follows `shape`: each vertex is pushed radially (in the XZ
+ *  plane) by `midRadiusMm × (factor(θ) − 1)`. Works in world space but
+ *  writes back into each mesh's LOCAL geometry, so part transforms (and the
+ *  drag-gizmo's angle math) stay untouched. A continuous map, so closed
+ *  meshes stay closed. Geometries are cloned first (they may be shared). */
+export function applyPlanShape(root: THREE.Object3D, shape: PlanShape, midRadiusMm: number): void {
+  if (isRoundPlanShape(shape)) return
+  const factor = makePlanShapeRadius(shape)
+  root.updateMatrixWorld(true)
+  const v = new THREE.Vector3()
+  root.traverse(obj => {
+    if (!(obj instanceof THREE.Mesh)) return
+    const geometry = obj.geometry.clone()
+    const pos = geometry.attributes.position
+    const world = obj.matrixWorld
+    const inverse = world.clone().invert()
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(world)
+      const r = Math.hypot(v.x, v.z)
+      if (r > 1e-9) {
+        const delta = midRadiusMm * (factor(Math.atan2(v.z, v.x)) - 1)
+        v.x += (v.x / r) * delta
+        v.z += (v.z / r) * delta
+      }
+      v.applyMatrix4(inverse)
+      pos.setXYZ(i, v.x, v.y, v.z)
+    }
+    pos.needsUpdate = true
+    geometry.computeVertexNormals()
+    geometry.computeBoundingBox()
+    geometry.computeBoundingSphere()
+    obj.geometry = geometry
+  })
+}

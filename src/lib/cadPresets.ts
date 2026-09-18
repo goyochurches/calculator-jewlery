@@ -35,6 +35,8 @@ export interface CadDesignParams {
   paveSettingType: string
   paveCount: number
   paveStoneMm: number
+  planAspect?: number
+  planSquareness?: number
   mergeSolid: boolean
   includeMilgrain: boolean
   includeRope: boolean
