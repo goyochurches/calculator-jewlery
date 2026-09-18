@@ -51,7 +51,65 @@ export function usSizeToDiameterMm(size: number): number {
 
 // ── Ring band (shank) geometry ───────────────────────────────────────────────
 
-export type BandProfile = 'flat' | 'comfort'
+export type BandProfile = 'flat' | 'comfort' | 'custom'
+
+/** Free-form band cross-section (Matrix's Profile / Ring Rail idea): two
+ *  height curves over the band's width — `outer` is the outside face,
+ *  `inner` the finger-side face — each sampled at CUSTOM_PROFILE_SAMPLES
+ *  evenly spaced points from one edge (v = −½) to the other (v = +½).
+ *  Heights are normalized 0..1 across the band thickness (0 = the ring's
+ *  inner radius, 1 = full thickness), so the same profile scales with any
+ *  width/thickness. Because it's TWO graphs over the width joined by two
+ *  side walls, any values the user drags them to still give a valid,
+ *  non-self-intersecting loop — the builder only enforces outer ≥ inner +
+ *  a minimum wall. `smooth` = Catmull-Rom curves through the points;
+ *  otherwise straight segments (crisp bevels/steps/grooves). */
+export interface CustomBandProfile {
+  outer: number[]
+  inner: number[]
+  smooth: boolean
+}
+export const CUSTOM_PROFILE_SAMPLES = 9
+const CUSTOM_PROFILE_MIN_WALL = 0.05
+
+const profileFromFn = (outer: (t: number) => number, inner: (t: number) => number, smooth: boolean): CustomBandProfile => {
+  // t = 2v ∈ [−1, 1]
+  const ts = Array.from({ length: CUSTOM_PROFILE_SAMPLES }, (_, i) => -1 + (2 * i) / (CUSTOM_PROFILE_SAMPLES - 1))
+  return { outer: ts.map(outer), inner: ts.map(inner), smooth }
+}
+const dome = (t: number, edge: number) => edge + (1 - edge) * Math.sqrt(Math.max(0, 1 - t * t))
+
+/** Classic ring-shank cross-sections, all expressible as CustomBandProfile
+ *  so they're editable after picking. (Plain flat/comfort stay as their own
+ *  analytic profiles above.) */
+export const BAND_PROFILE_PRESETS: Record<string, { label: string; profile: CustomBandProfile }> = {
+  'half-round': { label: 'Half round (D)', profile: profileFromFn(t => dome(t, 0.12), () => 0, true) },
+  court: { label: 'Court', profile: profileFromFn(t => dome(t, 0.5), t => 0.22 * t * t, true) },
+  'knife-edge': { label: 'Knife edge', profile: profileFromFn(t => 1 - 0.85 * Math.abs(t), () => 0, false) },
+  concave: { label: 'Concave', profile: profileFromFn(t => 0.5 + 0.5 * t * t, () => 0, true) },
+  bevelled: { label: 'Bevelled', profile: { outer: [0.55, 0.8, 1, 1, 1, 1, 1, 0.8, 0.55], inner: Array(9).fill(0), smooth: false } },
+  grooved: { label: 'Grooved', profile: { outer: [1, 1, 1, 0.55, 0.55, 0.55, 1, 1, 1], inner: Array(9).fill(0), smooth: false } },
+  stepped: { label: 'Stepped', profile: { outer: [0.55, 0.55, 0.55, 1, 1, 1, 0.55, 0.55, 0.55], inner: Array(9).fill(0), smooth: false } },
+}
+
+/** Samples one control curve of a CustomBandProfile: the raw points for
+ *  straight profiles, or a uniform Catmull-Rom spline (4 subdivisions per
+ *  span) for smooth ones. Exported so the profile editor draws exactly
+ *  the curve the 3D band is built from. */
+export function sampleProfileCurve(h: number[], smooth: boolean): number[] {
+  if (!smooth) return h
+  const out: number[] = []
+  const n = h.length
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = h[Math.max(0, i - 1)], p1 = h[i], p2 = h[i + 1], p3 = h[Math.min(n - 1, i + 2)]
+    for (let k = 0; k < 4; k++) {
+      const t = k / 4, t2 = t * t, t3 = t2 * t
+      out.push(0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3))
+    }
+  }
+  out.push(h[n - 1])
+  return out
+}
 
 export interface RingBandParams {
   /** US ring size (e.g. 6.5) — drives the inner diameter. */
@@ -65,6 +123,8 @@ export interface RingBandParams {
    *  rounded (domed) outer face, flat inner face — the classic
    *  "comfort-fit" shank profile. */
   profile: BandProfile
+  /** The free-form cross-section, used when `profile === 'custom'`. */
+  customProfile?: CustomBandProfile
   /** Points sampled along the revolution (higher = smoother circle). */
   radialSegments?: number
   /** Points sampled along the comfort-fit arc (ignored for 'flat'). */
@@ -90,7 +150,27 @@ export function buildBandProfile(params: RingBandParams): THREE.Vector2[] {
   const halfWidth = widthMm / 2
   const closeLoop = (pts: THREE.Vector2[]): THREE.Vector2[] => [...pts, pts[0].clone()]
 
-  if (profile === 'flat') {
+  if (profile === 'custom' && params.customProfile) {
+    const cp = params.customProfile
+    const clamp01 = (x: number) => Math.min(1, Math.max(0, Number.isFinite(x) ? x : 0))
+    const inner = cp.inner.map(clamp01)
+    const outer = cp.outer.map((o, i) => Math.min(1, Math.max(clamp01(o), inner[i] + CUSTOM_PROFILE_MIN_WALL)))
+    const innerS = sampleProfileCurve(inner, cp.smooth), outerS = sampleProfileCurve(outer, cp.smooth)
+    const m = innerS.length
+    const pts: THREE.Vector2[] = []
+    // Same traversal order as the flat rectangle: inner face edge→edge,
+    // then back along the outer face (keeps outward-facing normals).
+    for (let i = 0; i < m; i++) {
+      pts.push(new THREE.Vector2(innerRadius + innerS[i] * thicknessMm, (-0.5 + i / (m - 1)) * widthMm))
+    }
+    for (let i = m - 1; i >= 0; i--) {
+      const o = Math.max(outerS[i], innerS[i] + CUSTOM_PROFILE_MIN_WALL)
+      pts.push(new THREE.Vector2(innerRadius + Math.min(1, o) * thicknessMm, (-0.5 + i / (m - 1)) * widthMm))
+    }
+    return closeLoop(pts)
+  }
+
+  if (profile === 'flat' || profile === 'custom') {
     // Plain rectangle, traced once around: inner-bottom → inner-top →
     // outer-top → outer-bottom → back to inner-bottom (closeLoop).
     return closeLoop([

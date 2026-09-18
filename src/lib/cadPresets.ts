@@ -11,6 +11,8 @@ export interface CadDesignParams {
   widthMm: number
   thicknessMm: number
   profile: string
+  /** Free-form cross-section (used when profile === 'custom'). */
+  customProfile?: { outer: number[]; inner: number[]; smooth: boolean }
   shankStyle: string
   taperAmount: number
   twists: number

@@ -1,16 +1,17 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js'
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { Card, CardContent } from '@/components/ui/card'
+import { ProfileEditor } from '@/components/ProfileEditor'
 import { ModelViewer3D, type SelectedPart, type ModelViewer3DHandle, type CameraView } from '@/components/ModelViewer3D'
 import { FINGER_SIZE_OPTIONS, METAL_GROUPS } from '@/hooks/useQuoteBuilder'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import type { JewelryMetalOption } from '@/types'
 import {
-  buildRingBandGeometry, usSizeToDiameterMm, type BandProfile,
+  buildRingBandGeometry, usSizeToDiameterMm, type BandProfile, type CustomBandProfile, BAND_PROFILE_PRESETS,
   buildStoneHeadGroup, buildBezelHeadGroup, buildClusterHeadGroup, buildHaloGroup, haloOrbitRadiusMm, attachHeadToBand, roundDiameterMmFromCarat, caratFromRoundDiameterMm, estimateFancyCaratWeight,
   buildSignetTopGroup, sanitizeForEngraving,
   defaultProngHeightMm,
@@ -111,6 +112,7 @@ const TOOL_ICON_PATH: Record<string, string> = {
   // band profile (cross-section)
   flat: 'M5 7h14v10H5Z',
   comfort: 'M5 8c2-2 12-2 14 0v8c-2 2-12 2-14 0Z',
+  custom: 'M5 16c0-6 4-9 7-9s7 3 7 9M5 16h14M8 12l1 2M12 9v3M16 12l-1 2',
   // bezel coverage
   full: `${circlePath(12, 12, 8)}${circlePath(12, 12, 5)}`,
   half: 'M4 16a8 8 0 0 1 16 0M4 16h16M7 16a5 5 0 0 1 10 0',
@@ -185,7 +187,7 @@ const PART_TAB: Record<string, Tab> = {
   'Side panel': 'surface', 'Side panel text': 'surface', 'Pattern motif': 'surface', 'Logo': 'surface',
   'Merged solid': 'surface', Imported: 'production', 'Matching band': 'surface',
 }
-import { Download, RotateCw, Scale, MousePointerClick, Circle, Gem, Layers, Factory, Camera, Sparkles } from 'lucide-react'
+import { Download, RotateCw, Scale, MousePointerClick, Circle, Gem, Layers, Factory, Camera, Sparkles, Maximize2, Minimize2 } from 'lucide-react'
 
 // Approximate render colors per metal — cosmetic only, doesn't drive
 // pricing (that still comes from Master Tables / config.metalPriceMap
@@ -212,6 +214,8 @@ export function CadDesignPage() {
   const [widthMm, setWidthMm] = useState(2.5)
   const [thicknessMm, setThicknessMm] = useState(1.8)
   const [profile, setProfile] = useState<BandProfile>('comfort')
+  // Free-form cross-section (profile === 'custom'), edited in ProfileEditor.
+  const [customProfile, setCustomProfile] = useState<CustomBandProfile>(BAND_PROFILE_PRESETS['half-round'].profile)
   const [shankStyle, setShankStyle] = useState<'plain' | 'tapered' | 'twisted' | 'split' | 'cathedral' | 'bypass'>('plain')
   const [splitStrandCount, setSplitStrandCount] = useState<2 | 3>(2)
   const [taperAmount, setTaperAmount] = useState(0.3)
@@ -360,6 +364,21 @@ export function CadDesignPage() {
   // Render mode (Matrix's "Render"): photoreal presentation look — see
   // ModelViewer3D's renderMode prop.
   const [renderMode, setRenderMode] = useState(false)
+  // Full-screen work mode: covers the app sidebar/header (fixed overlay) and
+  // asks the browser for real fullscreen too. Esc / the browser's own exit
+  // both drop back out — synced through the fullscreenchange listener.
+  const [fullscreen, setFullscreen] = useState(false)
+  useEffect(() => {
+    const onChange = () => { if (!document.fullscreenElement) setFullscreen(false) }
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+  const toggleFullscreen = () => {
+    const next = !fullscreen
+    setFullscreen(next)
+    if (next) document.documentElement.requestFullscreen?.().catch(() => { /* overlay still works without browser fullscreen */ })
+    else if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {})
+  }
   const viewerRef = useRef<ModelViewer3DHandle>(null)
   // Manufacturability check — Matrix's own "prepare for production"
   // concern. On-demand (a deliberate action, not continuous) since it's a
@@ -414,7 +433,7 @@ export function CadDesignPage() {
   const [presetMessage, setPresetMessage] = useState<string | null>(null)
 
   const currentParams = (): CadDesignParams => ({
-    fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, metal,
+    fingerSize, widthMm, thicknessMm, profile, customProfile, shankStyle, taperAmount, twists, metal,
     includeStone, stoneShape, caratWeight, diamondType, fancyLengthMm, fancyWidthMm,
     settingType, bezelCoverage, prongCount, clusterPetalCount, clusterPetalStoneMm,
     includeHalo, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm,
@@ -430,7 +449,7 @@ export function CadDesignPage() {
 
   const applyPreset = (p: CadDesignParams) => {
     setFingerSize(p.fingerSize); setWidthMm(p.widthMm); setThicknessMm(p.thicknessMm)
-    setProfile(p.profile as BandProfile); setShankStyle(p.shankStyle as typeof shankStyle)
+    setProfile(p.profile as BandProfile); setCustomProfile(p.customProfile ?? BAND_PROFILE_PRESETS['half-round'].profile); setShankStyle(p.shankStyle as typeof shankStyle)
     setTaperAmount(p.taperAmount); setTwists(p.twists); setMetal(p.metal as JewelryMetalOption)
     setIncludeStone(p.includeStone); setStoneShape(p.stoneShape as StoneShape); setCaratWeight(p.caratWeight)
     setDiamondType(p.diamondType as typeof diamondType)
@@ -643,7 +662,7 @@ export function CadDesignPage() {
   // param actually changes, not every render.
   const model = useMemo(() => {
     const group = new THREE.Group()
-    const bandParamsBase = { fingerSize, widthMm, thicknessMm, profile }
+    const bandParamsBase = { fingerSize, widthMm, thicknessMm, profile, customProfile }
     if (!tensionActive && shankStyle === 'split') {
       // Split shank returns one geometry PER STRAND (2 or 3), not a single
       // band — each becomes its own mesh, unlike every other shank style.
@@ -809,7 +828,7 @@ export function CadDesignPage() {
       group.add(logo)
     }
     if (includePave) {
-      const bandParams = { fingerSize, widthMm, thicknessMm, profile }
+      const bandParams = { fingerSize, widthMm, thicknessMm, profile, customProfile }
       const sideStones = paveSettingType === 'channel'
         ? buildChannelSetting({ count: paveCount, stoneDiameterMm: paveStoneMm, spreadDeg: sideSpreadDeg, excludeIndices: excludedPaveIndices, stoneDiameterOverridesMm: paveStoneDiameterOverridesMm }, bandParams)
         : paveSettingType === 'flush'
@@ -829,7 +848,7 @@ export function CadDesignPage() {
       // "Multi-band") just stacks additional ones further out the same way.
       let nextOffset = widthMm / 2 + matchingBandWidthMm / 2 + 0.3
       for (let i = 0; i < matchingBandCount; i++) {
-        const matchingBand = new THREE.Mesh(buildRingBandGeometry({ fingerSize, widthMm: matchingBandWidthMm, thicknessMm, profile }))
+        const matchingBand = new THREE.Mesh(buildRingBandGeometry({ fingerSize, widthMm: matchingBandWidthMm, thicknessMm, profile, customProfile }))
         // Per-instance drag override (see matchingBandOffsetOverridesMm's
         // own comment) — the DEFAULT stacking offset is always computed
         // the same way regardless of any override, same "seat stays put,
@@ -856,7 +875,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, sidePanelAngle0Deg, sidePanelAngle1Deg, logoSvgText, logoSizeMm, logoAngleDeg, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, petalStoneDiameterOverridesMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, matchingBandOffsetOverridesMm, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, customProfile, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, sidePanelAngle0Deg, sidePanelAngle1Deg, logoSvgText, logoSizeMm, logoAngleDeg, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, petalStoneDiameterOverridesMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, matchingBandOffsetOverridesMm, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -1144,7 +1163,7 @@ export function CadDesignPage() {
     setPaveSettingType(type)
     setActiveTab('gems')
   }
-  const COMMAND_HELP = 'front · top · side · perspective · wireframe · render · turntable · ringrail · gems · surface · production · prong · bezel · cluster · tension · illusion · halo · pave · channel · flush · bar · invisible · milgrain · rope · flutes · pattern · mirror · plain · tapered · twisted · split · cathedral · bypass · export · help'
+  const COMMAND_HELP = 'front · top · side · perspective · wireframe · render · fullscreen · turntable · ringrail · gems · surface · production · prong · bezel · cluster · tension · illusion · halo · pave · channel · flush · bar · invisible · milgrain · rope · flutes · pattern · mirror · plain · tapered · twisted · split · cathedral · bypass · export · help'
   const runCommand = (raw: string) => {
     const cmd = raw.trim().toLowerCase()
     if (!cmd) return
@@ -1153,6 +1172,7 @@ export function CadDesignPage() {
       case 'front': case 'top': case 'side': case 'perspective':
         viewerRef.current?.setView(cmd); result = `View set to ${cmd}.`; break
       case 'wireframe': setWireframe(v => !v); result = 'Wireframe toggled.'; break
+      case 'fullscreen': case 'full': toggleFullscreen(); result = 'Full screen toggled.'; break
       case 'render': setRenderMode(v => !v); result = 'Render mode toggled.'; break
       case 'turntable': case 'rotate': setAutoRotate(v => !v); result = 'Turntable toggled.'; break
       case 'ringrail': case 'ring rail': setActiveTab('ringrail'); result = 'Switched to Ring Rail.'; break
@@ -1186,7 +1206,8 @@ export function CadDesignPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className={fullscreen ? 'fixed inset-0 z-[200] space-y-3 overflow-y-auto bg-slate-100 p-3' : 'space-y-6'}>
+      {!fullscreen && (
       <Card className="overflow-hidden rounded-[30px] border-0 text-white shadow-[0_30px_80px_rgba(15,23,42,0.24)]" style={{ backgroundColor: 'var(--theme-primary)' }}>
         <CardContent className="relative p-6 sm:p-8">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-amber-300">
@@ -1218,9 +1239,10 @@ export function CadDesignPage() {
           </p>
         </CardContent>
       </Card>
+      )}
 
-      <section className="grid gap-4 lg:grid-cols-[1fr_1.3fr]">
-        <Card className="rounded-[30px] border border-white/80 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+      <section className={fullscreen ? 'grid gap-3 lg:h-[calc(100vh-1.5rem)] lg:grid-cols-[minmax(340px,440px)_1fr]' : 'grid gap-4 lg:grid-cols-[1fr_1.3fr]'}>
+        <Card className={`rounded-[30px] border border-white/80 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.08)] ${fullscreen ? 'lg:h-full lg:overflow-y-auto' : ''}`}>
           <CardContent className="space-y-5 p-6 sm:p-7">
             <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
               <span className="text-sm font-semibold text-slate-900">Presets</span>
@@ -1500,15 +1522,20 @@ export function CadDesignPage() {
 
                 <div>
                   <label className={labelCls}>Profile</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(['flat', 'comfort'] as const).map(p => (
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['flat', 'comfort', 'custom'] as const).map(p => (
                       <button key={p} type="button" onClick={() => setProfile(p)}
                         className={`flex flex-col items-center gap-1 rounded-lg border px-1 py-1.5 transition ${profile === p ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
                         <ToolIcon name={p} className="h-5 w-5" />
-                        <span className="text-[9px] font-semibold leading-none">{p === 'flat' ? 'Flat band' : 'Comfort fit'}</span>
+                        <span className="text-[9px] font-semibold leading-none">{p === 'flat' ? 'Flat band' : p === 'comfort' ? 'Comfort fit' : 'Free-form'}</span>
                       </button>
                     ))}
                   </div>
+                  {profile === 'custom' && (
+                    <div className="mt-2">
+                      <ProfileEditor profile={customProfile} onChange={setCustomProfile} widthMm={widthMm} thicknessMm={thicknessMm} />
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -2619,7 +2646,7 @@ export function CadDesignPage() {
                   }
                 }
               }}
-              autoRotate={autoRotate} wireframe={wireframe} renderMode={renderMode} className="h-[420px] w-full sm:h-[520px]" />
+              autoRotate={autoRotate} wireframe={wireframe} renderMode={renderMode} className={fullscreen ? 'h-[calc(100vh-8rem)] min-h-[360px] w-full' : 'h-[420px] w-full sm:h-[520px]'} />
             <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2 text-xs text-white shadow-sm backdrop-blur">
               <MousePointerClick className="h-3.5 w-3.5 shrink-0 text-amber-300" />
               {selectedPart ? (
@@ -2634,6 +2661,10 @@ export function CadDesignPage() {
               )}
             </div>
             <div className="absolute right-3 top-3 flex items-center gap-1.5">
+              <button type="button" onClick={toggleFullscreen}
+                className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold shadow-sm backdrop-blur transition ${fullscreen ? 'bg-amber-400 text-slate-900' : 'bg-slate-900/80 text-white hover:bg-slate-900'}`}>
+                {fullscreen ? <Minimize2 className="h-3.5 w-3.5 shrink-0" /> : <Maximize2 className="h-3.5 w-3.5 shrink-0" />} {fullscreen ? 'Exit' : 'Full screen'}
+              </button>
               {renderMode && (
                 <button type="button" onClick={saveRenderImage}
                   className="flex items-center gap-1.5 rounded-xl bg-slate-900/80 px-3 py-2 text-xs font-semibold text-white shadow-sm backdrop-blur transition hover:bg-slate-900">
