@@ -51,6 +51,7 @@ export function usSizeToDiameterMm(size: number): number {
 
 // ── Ring band (shank) geometry ───────────────────────────────────────────────
 
+// LATHE_TO_HEAD_AXIS: LatheGeometry puts phi=0 on +Z, but the head/stones sit on +X (attachHeadToBand's angle-0 convention) — rotate so features defined at phi=0 land on the head.
 export type BandProfile = 'flat' | 'comfort' | 'custom'
 
 /** Free-form band cross-section (Matrix's Profile / Ring Rail idea): two
@@ -282,6 +283,7 @@ export function buildTaperedBandGeometry(params: TaperedBandParams): THREE.Buffe
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
   geometry.setIndex(indices)
   geometry.computeVertexNormals()
+  geometry.rotateY(Math.PI / 2) // see LATHE_TO_HEAD_AXIS note
   return geometry
 }
 
@@ -433,6 +435,7 @@ export function buildSplitShankGeometry(params: SplitShankParams): THREE.BufferG
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
     geometry.setIndex(indices)
     geometry.computeVertexNormals()
+    geometry.rotateY(Math.PI / 2) // see LATHE_TO_HEAD_AXIS note
     return geometry
   })
 }
@@ -497,6 +500,7 @@ export function buildCathedralBandGeometry(params: CathedralBandParams): THREE.B
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
   geometry.setIndex(indices)
   geometry.computeVertexNormals()
+  geometry.rotateY(Math.PI / 2) // see LATHE_TO_HEAD_AXIS note
   return geometry
 }
 
@@ -2356,6 +2360,7 @@ export function buildTensionBandGeometry(params: RingBandParams, gapDeg: number)
   }
   const merged = mergeGeometries([lathe, makeCap(phiStart, false), makeCap(phiStart + phiLength, true)])
   merged.computeVertexNormals()
+  merged.rotateY(Math.PI / 2) // see LATHE_TO_HEAD_AXIS note
   return merged
 }
 
