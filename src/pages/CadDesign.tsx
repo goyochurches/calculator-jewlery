@@ -12,7 +12,7 @@ import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import type { JewelryMetalOption } from '@/types'
 import {
-  buildRingBandGeometry, usSizeToDiameterMm, type BandProfile, type CustomBandProfile, BAND_PROFILE_PRESETS, type PlanShape, ROUND_PLAN_SHAPE, applyPlanShape,
+  buildRingBandGeometry, usSizeToDiameterMm, type BandProfile, type CustomBandProfile, BAND_PROFILE_PRESETS, type PlanShape, ROUND_PLAN_SHAPE, applyPlanShape, buildVariableProfileBandGeometry,
   buildStoneHeadGroup, buildBezelHeadGroup, buildClusterHeadGroup, buildHaloGroup, haloOrbitRadiusMm, attachHeadToBand, roundDiameterMmFromCarat, caratFromRoundDiameterMm, estimateFancyCaratWeight,
   buildSignetTopGroup, sanitizeForEngraving,
   defaultProngHeightMm,
@@ -218,6 +218,10 @@ export function CadDesignPage() {
   // Free-form cross-section (profile === 'custom'), edited in ProfileEditor.
   // Ring plan-view shape (round/oval/square…) — applied to the whole model.
   const [planShape, setPlanShape] = useState<PlanShape>(ROUND_PLAN_SHAPE)
+  // Profile Placer: a DIFFERENT free-form profile at the back of the ring,
+  // blended from the head profile (plain shank + custom profile only).
+  const [backProfileOn, setBackProfileOn] = useState(false)
+  const [backProfile, setBackProfile] = useState<CustomBandProfile>(BAND_PROFILE_PRESETS.court.profile)
   const [customProfile, setCustomProfile] = useState<CustomBandProfile>(BAND_PROFILE_PRESETS['half-round'].profile)
   const [shankStyle, setShankStyle] = useState<'plain' | 'tapered' | 'twisted' | 'split' | 'cathedral' | 'bypass'>('plain')
   const [splitStrandCount, setSplitStrandCount] = useState<2 | 3>(2)
@@ -702,7 +706,9 @@ export function CadDesignPage() {
               ? buildTwistedBandGeometry({ ...bandParamsBase, twists })
               : shankStyle === 'cathedral'
                 ? buildCathedralBandGeometry(bandParamsBase)
-                : buildRingBandGeometry(bandParamsBase),
+                : profile === 'custom' && backProfileOn
+                  ? buildVariableProfileBandGeometry(bandParamsBase, backProfile)
+                  : buildRingBandGeometry(bandParamsBase),
       )
       band.userData.partName = 'Band'
       group.add(band)
@@ -883,7 +889,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, customProfile, planAspect, planSquareness, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, sidePanelAngle0Deg, sidePanelAngle1Deg, logoSvgText, logoSizeMm, logoAngleDeg, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, petalStoneDiameterOverridesMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, matchingBandOffsetOverridesMm, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, customProfile, backProfileOn, backProfile, planAspect, planSquareness, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, sidePanelAngle0Deg, sidePanelAngle1Deg, logoSvgText, logoSizeMm, logoAngleDeg, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, petalStoneDiameterOverridesMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, matchingBandOffsetOverridesMm, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -1541,7 +1547,20 @@ export function CadDesignPage() {
                   </div>
                   {profile === 'custom' && (
                     <div className="mt-2">
+                      <p className="mb-1 text-[11px] font-semibold text-slate-500">{backProfileOn ? 'At the head (setting)' : 'Cross-section'}</p>
                       <ProfileEditor profile={customProfile} onChange={setCustomProfile} widthMm={widthMm} thicknessMm={thicknessMm} />
+                      <label className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                        <span className="text-xs font-semibold text-slate-700">Different profile at the back
+                          <span className="block text-[10px] font-normal text-slate-400">Matrix's Profile Placer — flows smoothly from the head profile to this one. Plain shank only.</span>
+                        </span>
+                        <input type="checkbox" checked={backProfileOn} onChange={e => setBackProfileOn(e.target.checked)} className="h-5 w-5 shrink-0 rounded border-slate-300" />
+                      </label>
+                      {backProfileOn && (
+                        <div className="mt-2">
+                          <p className="mb-1 text-[11px] font-semibold text-slate-500">At the back (opposite the setting)</p>
+                          <ProfileEditor profile={backProfile} onChange={setBackProfile} widthMm={widthMm} thicknessMm={thicknessMm} />
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

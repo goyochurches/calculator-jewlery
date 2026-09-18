@@ -3476,3 +3476,51 @@ export function applyPlanShape(root: THREE.Object3D, shape: PlanShape, midRadius
     obj.geometry = geometry
   })
 }
+
+// ── Profile that changes along the ring (Matrix's Profile Placer) ────────────
+
+/** Blend two free-form profiles: w=0 → `a`, w=1 → `b`. Uses `a.smooth`
+ *  for the result so every ring of the band has the same point count. */
+export function blendCustomProfiles(a: CustomBandProfile, b: CustomBandProfile, w: number): CustomBandProfile {
+  const mix = (x: number[], y: number[]) => x.map((v, i) => v + ((y[i] ?? v) - v) * w)
+  return { outer: mix(a.outer, b.outer), inner: mix(a.inner, b.inner), smooth: a.smooth }
+}
+
+/** Band whose cross-section is `params.customProfile` at the head (+X) and
+ *  `backProfile` at the back (−X), blended smoothly (cosine) between — e.g.
+ *  a chunky knife-edge at the setting flowing into a slim half-round
+ *  behind the finger. Same ring-by-ring construction as the tapered band
+ *  (per-ring profile, lathe index pattern), rotated onto the head axis. */
+export function buildVariableProfileBandGeometry(params: RingBandParams, backProfile: CustomBandProfile): THREE.BufferGeometry {
+  const head = params.customProfile
+  if (params.profile !== 'custom' || !head) return buildRingBandGeometry(params)
+  const radialSegments = params.radialSegments ?? 128
+  const positions: number[] = []
+  const indices: number[] = []
+  const rings: THREE.Vector2[][] = []
+  for (let i = 0; i <= radialSegments; i++) {
+    const phi = (i / radialSegments) * Math.PI * 2
+    const w = (1 - Math.cos(phi)) / 2 // lathe phi=0 → head (before the rotateY below)
+    rings.push(buildBandProfile({ ...params, customProfile: blendCustomProfiles(head, backProfile, w) }))
+  }
+  const pointsPerRing = rings[0].length
+  for (let i = 0; i <= radialSegments; i++) {
+    const phi = (i / radialSegments) * Math.PI * 2
+    const sin = Math.sin(phi), cos = Math.cos(phi)
+    for (const p of rings[i]) positions.push(p.x * sin, p.y, p.x * cos)
+  }
+  for (let i = 0; i < radialSegments; i++) {
+    for (let j = 0; j < pointsPerRing - 1; j++) {
+      const base = j + i * pointsPerRing
+      const a = base, b = base + pointsPerRing, c = base + pointsPerRing + 1, d = base + 1
+      indices.push(a, b, d)
+      indices.push(c, d, b)
+    }
+  }
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  geometry.computeVertexNormals()
+  geometry.rotateY(Math.PI / 2) // see LATHE_TO_HEAD_AXIS note
+  return geometry
+}
