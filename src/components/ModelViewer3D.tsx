@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 
 /** Named camera views — Matrix's own 3D Viewer module ("Front / Back /
@@ -10,6 +11,9 @@ export type CameraView = 'front' | 'top' | 'side' | 'perspective'
 
 export interface ModelViewer3DHandle {
   setView: (view: CameraView) => void
+  /** Renders one frame and returns it as a PNG data URL (for "Save image"
+   *  in Render mode). Null if the viewer isn't mounted yet. */
+  snapshot: () => string | null
 }
 
 /** Walks up from a clicked mesh to the nearest ancestor tagged
@@ -108,6 +112,12 @@ interface ModelViewer3DProps {
    *  alongside Shaded/Realistic/Metal/Gemstone/Transparent/X-ray; this is
    *  the first of those beyond the default shaded look. */
   wireframe?: boolean
+  /** Photoreal presentation mode (Matrix's own "Render"): image-based
+   *  lighting from a studio environment map, ACES tone mapping, real
+   *  refraction/transmission on gems, clear-coated metal, soft contact
+   *  shadows on a ground plane and a studio gradient backdrop — instead
+   *  of the flat 3-point-light working view used while designing. */
+  renderMode?: boolean
 }
 
 /**
@@ -118,13 +128,18 @@ interface ModelViewer3DProps {
  * file's mesh, not just the parametric ring band.
  */
 export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>(function ModelViewer3D(
-  { object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className, onSelectPart, onMove, autoRotate = false, wireframe = false },
+  { object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className, onSelectPart, onMove, autoRotate = false, wireframe = false, renderMode = false },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null)
   const displayedRef = useRef<THREE.Object3D | null>(null)
   const materialRef = useRef<THREE.MeshStandardMaterial | null>(null)
-  const stoneMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null)
+  const stoneMaterialRef = useRef<THREE.MeshPhysicalMaterial | null>(null)
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
+  const keyLightRef = useRef<THREE.DirectionalLight | null>(null)
+  const envTextureRef = useRef<THREE.Texture | null>(null)
+  const groundRef = useRef<THREE.Mesh | null>(null)
+  const backdropRef = useRef<THREE.Texture | null>(null)
   const highlightMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
@@ -154,6 +169,33 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     container.appendChild(renderer.domElement)
+    rendererRef.current = renderer
+
+    // Studio environment (image-based lighting) — built once, only ASSIGNED
+    // to scene.environment while renderMode is on (see the renderMode
+    // effect), so the working view keeps its cheap flat lighting.
+    const pmrem = new THREE.PMREMGenerator(renderer)
+    envTextureRef.current = pmrem.fromScene(new RoomEnvironment(), 0.03).texture
+    pmrem.dispose()
+    // Soft radial studio backdrop for Render mode.
+    const bg = document.createElement('canvas')
+    bg.width = 256; bg.height = 256
+    const bgCtx = bg.getContext('2d')
+    if (bgCtx) {
+      const grad = bgCtx.createRadialGradient(128, 110, 10, 128, 128, 190)
+      grad.addColorStop(0, '#f4f5f8'); grad.addColorStop(0.55, '#b9bec9'); grad.addColorStop(1, '#4a505c')
+      bgCtx.fillStyle = grad; bgCtx.fillRect(0, 0, 256, 256)
+    }
+    const backdrop = new THREE.CanvasTexture(bg)
+    backdrop.colorSpace = THREE.SRGBColorSpace
+    backdropRef.current = backdrop
+    // Invisible ground that only catches the ring's shadow.
+    const ground = new THREE.Mesh(new THREE.CircleGeometry(60, 48), new THREE.ShadowMaterial({ opacity: 0.28 }))
+    ground.rotation.x = -Math.PI / 2
+    ground.receiveShadow = true
+    ground.visible = false
+    scene.add(ground)
+    groundRef.current = ground
 
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
@@ -200,6 +242,11 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     scene.add(new THREE.AmbientLight(0xffffff, 0.35))
     const key = new THREE.DirectionalLight(0xffffff, 1.4)
     key.position.set(40, 60, 40)
+    key.shadow.mapSize.set(2048, 2048)
+    key.shadow.camera.left = -30; key.shadow.camera.right = 30
+    key.shadow.camera.top = 30; key.shadow.camera.bottom = -30
+    key.shadow.bias = -0.0005
+    keyLightRef.current = key
     scene.add(key)
     const fill = new THREE.DirectionalLight(0xffffff, 0.6)
     fill.position.set(-40, 20, -20)
@@ -212,7 +259,7 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     materialRef.current = material
     // Fixed gem look — icy, glassy, low metalness — independent of the
     // selected metal color.
-    const stoneMaterial = new THREE.MeshStandardMaterial({
+    const stoneMaterial = new THREE.MeshPhysicalMaterial({
       color: '#eaf6ff', metalness: 0.05, roughness: 0.05, transparent: true, opacity: 0.85,
     })
     stoneMaterialRef.current = stoneMaterial
@@ -306,6 +353,11 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
       renderer.domElement.removeEventListener('click', handleClick)
       transformControls.dispose()
       controls.dispose()
+      envTextureRef.current?.dispose()
+      backdropRef.current?.dispose()
+      ground.geometry.dispose()
+      ;(ground.material as THREE.Material).dispose()
+      rendererRef.current = null
       material.dispose()
       stoneMaterial.dispose()
       highlightMaterial.dispose()
@@ -357,6 +409,7 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
       object.traverse(obj => {
         if (!(obj instanceof THREE.Mesh)) return
         obj.material = obj.userData.isStone ? stoneMaterial : material
+        obj.castShadow = true
         meshes.push(obj)
       })
       scene.add(object)
@@ -412,6 +465,12 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
   // persistent prop) since clicking "Front" is a one-off move, not a
   // state the viewer holds — the user can freely orbit away from it after.
   useImperativeHandle(ref, () => ({
+    snapshot: () => {
+      const renderer = rendererRef.current, scene = sceneRef.current, camera = cameraRef.current
+      if (!renderer || !scene || !camera) return null
+      renderer.render(scene, camera)
+      return renderer.domElement.toDataURL('image/png')
+    },
     setView: (view: CameraView) => {
       const camera = cameraRef.current
       const controls = controlsRef.current
@@ -439,6 +498,48 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     if (material) material.wireframe = wireframe
     if (stoneMaterial) stoneMaterial.wireframe = wireframe
   }, [wireframe])
+
+  // Render mode: swap the flat working look for a presentation look.
+  // Working view keeps scene.environment null + cheap lights; Render mode
+  // turns on image-based lighting, ACES tone mapping, shadows, refraction
+  // on gems and a clear-coated metal, and drops a shadow-catching ground
+  // under the ring. Re-runs when the displayed object changes so the
+  // ground follows the model's lowest point.
+  useEffect(() => {
+    const renderer = rendererRef.current, scene = sceneRef.current
+    const material = materialRef.current, stone = stoneMaterialRef.current
+    const key = keyLightRef.current, ground = groundRef.current
+    if (!renderer || !scene || !material || !stone || !key || !ground) return
+    renderer.shadowMap.enabled = renderMode
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    renderer.toneMapping = renderMode ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping
+    renderer.toneMappingExposure = 1.05
+    scene.environment = renderMode ? envTextureRef.current : null
+    scene.background = renderMode ? backdropRef.current : new THREE.Color('#0f172a')
+    key.castShadow = renderMode
+    material.envMapIntensity = renderMode ? 1.15 : 1
+    material.roughness = renderMode ? 0.16 : 0.28
+    // Refraction: diamond-like IOR, transmissive, thin — replaces the
+    // working view's flat translucent look.
+    stone.transmission = renderMode ? 1 : 0
+    stone.ior = renderMode ? 2.4 : 1.5
+    stone.thickness = renderMode ? 2.5 : 0
+    stone.roughness = renderMode ? 0 : 0.05
+    stone.opacity = renderMode ? 1 : 0.85
+    stone.transparent = !renderMode
+    stone.envMapIntensity = renderMode ? 4 : 1
+    stone.dispersion = renderMode ? 0.5 : 0 // fire (rainbow splitting)
+    stone.clearcoat = renderMode ? 1 : 0
+    stone.specularIntensity = renderMode ? 1 : 0.5
+    stone.color.set(renderMode ? '#ffffff' : '#eaf6ff')
+    stone.needsUpdate = true
+    material.needsUpdate = true
+    ground.visible = renderMode
+    if (renderMode && object) {
+      const box = new THREE.Box3().setFromObject(object)
+      ground.position.y = box.min.y - 0.02
+    }
+  }, [renderMode, object])
 
   return <div ref={containerRef} className={className} />
 })

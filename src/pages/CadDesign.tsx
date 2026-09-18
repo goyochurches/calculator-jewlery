@@ -185,7 +185,7 @@ const PART_TAB: Record<string, Tab> = {
   'Side panel': 'surface', 'Side panel text': 'surface', 'Pattern motif': 'surface', 'Logo': 'surface',
   'Merged solid': 'surface', Imported: 'production', 'Matching band': 'surface',
 }
-import { Download, RotateCw, Scale, MousePointerClick, Circle, Gem, Layers, Factory } from 'lucide-react'
+import { Download, RotateCw, Scale, MousePointerClick, Circle, Gem, Layers, Factory, Camera, Sparkles } from 'lucide-react'
 
 // Approximate render colors per metal — cosmetic only, doesn't drive
 // pricing (that still comes from Master Tables / config.metalPriceMap
@@ -357,6 +357,9 @@ export function CadDesignPage() {
   const [sidePanelAngle1Deg, setSidePanelAngle1Deg] = useState(270)
   const [autoRotate, setAutoRotate] = useState(false)
   const [wireframe, setWireframe] = useState(false)
+  // Render mode (Matrix's "Render"): photoreal presentation look — see
+  // ModelViewer3D's renderMode prop.
+  const [renderMode, setRenderMode] = useState(false)
   const viewerRef = useRef<ModelViewer3DHandle>(null)
   // Manufacturability check — Matrix's own "prepare for production"
   // concern. On-demand (a deliberate action, not continuous) since it's a
@@ -1084,6 +1087,16 @@ export function CadDesignPage() {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
+  const saveRenderImage = () => {
+    const url = viewerRef.current?.snapshot()
+    if (!url) return
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${baseFilename()}-render.png`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
   const downloadModel = () => {
     const name = baseFilename()
     const exportObject = compensateShrinkage ? scaleForCastingShrinkage(viewModel, metal) : viewModel
@@ -1131,7 +1144,7 @@ export function CadDesignPage() {
     setPaveSettingType(type)
     setActiveTab('gems')
   }
-  const COMMAND_HELP = 'front · top · side · perspective · wireframe · turntable · ringrail · gems · surface · production · prong · bezel · cluster · tension · illusion · halo · pave · channel · flush · bar · invisible · milgrain · rope · flutes · pattern · mirror · plain · tapered · twisted · split · cathedral · bypass · export · help'
+  const COMMAND_HELP = 'front · top · side · perspective · wireframe · render · turntable · ringrail · gems · surface · production · prong · bezel · cluster · tension · illusion · halo · pave · channel · flush · bar · invisible · milgrain · rope · flutes · pattern · mirror · plain · tapered · twisted · split · cathedral · bypass · export · help'
   const runCommand = (raw: string) => {
     const cmd = raw.trim().toLowerCase()
     if (!cmd) return
@@ -1140,6 +1153,7 @@ export function CadDesignPage() {
       case 'front': case 'top': case 'side': case 'perspective':
         viewerRef.current?.setView(cmd); result = `View set to ${cmd}.`; break
       case 'wireframe': setWireframe(v => !v); result = 'Wireframe toggled.'; break
+      case 'render': setRenderMode(v => !v); result = 'Render mode toggled.'; break
       case 'turntable': case 'rotate': setAutoRotate(v => !v); result = 'Turntable toggled.'; break
       case 'ringrail': case 'ring rail': setActiveTab('ringrail'); result = 'Switched to Ring Rail.'; break
       case 'gems': setActiveTab('gems'); result = 'Switched to Gems.'; break
@@ -2605,7 +2619,7 @@ export function CadDesignPage() {
                   }
                 }
               }}
-              autoRotate={autoRotate} wireframe={wireframe} className="h-[420px] w-full sm:h-[520px]" />
+              autoRotate={autoRotate} wireframe={wireframe} renderMode={renderMode} className="h-[420px] w-full sm:h-[520px]" />
             <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2 text-xs text-white shadow-sm backdrop-blur">
               <MousePointerClick className="h-3.5 w-3.5 shrink-0 text-amber-300" />
               {selectedPart ? (
@@ -2620,6 +2634,16 @@ export function CadDesignPage() {
               )}
             </div>
             <div className="absolute right-3 top-3 flex items-center gap-1.5">
+              {renderMode && (
+                <button type="button" onClick={saveRenderImage}
+                  className="flex items-center gap-1.5 rounded-xl bg-slate-900/80 px-3 py-2 text-xs font-semibold text-white shadow-sm backdrop-blur transition hover:bg-slate-900">
+                  <Camera className="h-3.5 w-3.5 shrink-0" /> Save image
+                </button>
+              )}
+              <button type="button" onClick={() => setRenderMode(v => !v)}
+                className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold shadow-sm backdrop-blur transition ${renderMode ? 'bg-amber-400 text-slate-900' : 'bg-slate-900/80 text-white hover:bg-slate-900'}`}>
+                <Sparkles className="h-3.5 w-3.5 shrink-0" /> Render
+              </button>
               <button type="button" onClick={() => setWireframe(v => !v)}
                 className={`rounded-xl px-3 py-2 text-xs font-semibold shadow-sm backdrop-blur transition ${wireframe ? 'bg-amber-400 text-slate-900' : 'bg-slate-900/80 text-white hover:bg-slate-900'}`}>
                 Wireframe
