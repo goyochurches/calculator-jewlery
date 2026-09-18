@@ -98,6 +98,25 @@ const TOOL_ICON_PATH: Record<string, string> = {
   split: 'M3 12h6l6-4h6M9 12l6 4h6',
   cathedral: 'M3 19c0-9 6-13 9-13s9 4 9 13',
   bypass: 'M3 8c6 0 12 8 18 8M3 16c6 0 12-8 18-8',
+  // pattern motifs
+  star: `M${[...Array(10).keys()].map(i => {
+    const r = i % 2 === 0 ? 9 : 4, a = (i * Math.PI) / 5 - Math.PI / 2
+    return `${(12 + r * Math.cos(a)).toFixed(2)} ${(12 + r * Math.sin(a)).toFixed(2)}`
+  }).join('L')}Z`,
+  diamond: 'M12 3l7 9-7 9-7-9Z',
+  geometric: 'M4 4h16v16H4ZM4 4l16 16M20 4 4 20',
+  leaf: 'M12 3c5 4 6 10 0 18C6 13 7 7 12 3ZM12 8v13',
+  flower: [circlePath(12, 12, 2), ...[0, 72, 144, 216, 288].map(a =>
+    circlePath(12 + 6 * Math.cos(((a - 90) * Math.PI) / 180), 12 + 6 * Math.sin(((a - 90) * Math.PI) / 180), 3))].join(''),
+  // band profile (cross-section)
+  flat: 'M5 7h14v10H5Z',
+  comfort: 'M5 8c2-2 12-2 14 0v8c-2 2-12 2-14 0Z',
+  // bezel coverage
+  full: `${circlePath(12, 12, 8)}${circlePath(12, 12, 5)}`,
+  half: 'M4 16a8 8 0 0 1 16 0M4 16h16M7 16a5 5 0 0 1 10 0',
+  // diamond origin
+  natural: 'M6 4h12l3 5-9 11L3 9ZM3 9h18',
+  'lab-grown': 'M9 3h6M10 3v6l-5 10h14L14 9V3M8 15h8',
 }
 
 function ToolIcon({ name, className }: { name: string; className?: string }) {
@@ -1470,8 +1489,9 @@ export function CadDesignPage() {
                   <div className="grid grid-cols-2 gap-2">
                     {(['flat', 'comfort'] as const).map(p => (
                       <button key={p} type="button" onClick={() => setProfile(p)}
-                        className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${profile === p ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                        {p === 'flat' ? 'Flat band' : 'Comfort fit'}
+                        className={`flex flex-col items-center gap-1 rounded-lg border px-1 py-1.5 transition ${profile === p ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                        <ToolIcon name={p} className="h-5 w-5" />
+                        <span className="text-[9px] font-semibold leading-none">{p === 'flat' ? 'Flat band' : 'Comfort fit'}</span>
                       </button>
                     ))}
                   </div>
@@ -1655,8 +1675,9 @@ export function CadDesignPage() {
                   <div className="grid grid-cols-3 gap-2">
                     {(['star', 'diamond', 'geometric', 'leaf', 'flower'] as const).map(m => (
                       <button key={m} type="button" onClick={() => setPatternMotif(m)}
-                        className={`rounded-xl border px-2.5 py-2 text-xs font-semibold capitalize transition ${patternMotif === m ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                        {m}
+                        className={`flex flex-col items-center gap-1 rounded-lg border px-1 py-1.5 capitalize transition ${patternMotif === m ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                        <ToolIcon name={m} className="h-5 w-5" />
+                        <span className="text-[9px] font-semibold leading-none">{m}</span>
                       </button>
                     ))}
                   </div>
@@ -1759,8 +1780,9 @@ export function CadDesignPage() {
                       <div className="grid grid-cols-2 gap-2">
                         {(['natural', 'lab-grown'] as const).map(t => (
                           <button key={t} type="button" onClick={() => setDiamondType(t)}
-                            className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${diamondType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                            {t === 'lab-grown' ? 'Lab-grown' : 'Natural'}
+                            className={`flex flex-col items-center gap-1 rounded-lg border px-1 py-1.5 transition ${diamondType === t ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                            <ToolIcon name={t} className="h-5 w-5" />
+                            <span className="text-[9px] font-semibold leading-none">{t === 'lab-grown' ? 'Lab-grown' : 'Natural'}</span>
                           </button>
                         ))}
                       </div>
@@ -1811,8 +1833,9 @@ export function CadDesignPage() {
                         <div className="grid grid-cols-2 gap-2">
                           {(['full', 'half'] as const).map(c => (
                             <button key={c} type="button" onClick={() => setBezelCoverage(c)}
-                              className={`rounded-xl border px-3 py-2 text-sm font-semibold capitalize transition ${bezelCoverage === c ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
-                              {c === 'half' ? 'Half bezel' : 'Full bezel'}
+                              className={`flex flex-col items-center gap-1 rounded-lg border px-1 py-1.5 transition ${bezelCoverage === c ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                              <ToolIcon name={c} className="h-5 w-5" />
+                              <span className="text-[9px] font-semibold leading-none">{c === 'half' ? 'Half bezel' : 'Full bezel'}</span>
                             </button>
                           ))}
                         </div>
