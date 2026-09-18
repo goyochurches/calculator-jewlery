@@ -4,6 +4,7 @@ import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js'
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { Card, CardContent } from '@/components/ui/card'
+import { EMPTY_HISTORY, recordSnapshot, stepHistory as stepHistoryState, canUndoHistory, canRedoHistory, type HistoryState } from '@/lib/historyStack'
 import { ProfileEditor } from '@/components/ProfileEditor'
 import { PlanShapePicker } from '@/components/PlanShapePicker'
 import { ModelViewer3D, type SelectedPart, type ModelViewer3DHandle, type CameraView } from '@/components/ModelViewer3D'
@@ -188,7 +189,7 @@ const PART_TAB: Record<string, Tab> = {
   'Side panel': 'surface', 'Side panel text': 'surface', 'Pattern motif': 'surface', 'Logo': 'surface',
   'Merged solid': 'surface', Imported: 'production', 'Matching band': 'surface',
 }
-import { Download, RotateCw, Scale, MousePointerClick, Circle, Gem, Layers, Factory, Camera, Sparkles, Maximize2, Minimize2 } from 'lucide-react'
+import { Download, RotateCw, Scale, MousePointerClick, Circle, Gem, Layers, Factory, Camera, Sparkles, Maximize2, Minimize2, Undo2, Redo2 } from 'lucide-react'
 
 // Approximate render colors per metal — cosmetic only, doesn't drive
 // pricing (that still comes from Master Tables / config.metalPriceMap
@@ -445,6 +446,7 @@ export function CadDesignPage() {
     settingType, bezelCoverage, prongCount, clusterPetalCount, clusterPetalStoneMm,
     includeHalo, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm,
     planAspect: planShape.aspect, planSquareness: planShape.squareness,
+    backProfileOn, backProfile,
     mergeSolid, includeMilgrain, includeRope,
     haloRingCount, sideStoneCount, sideStoneCaratWeight, sideSpreadDeg,
     includeMatchingBand, matchingBandWidthMm, splitStrandCount,
@@ -455,7 +457,10 @@ export function CadDesignPage() {
     includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, sidePanelAngle0Deg, sidePanelAngle1Deg,
   })
 
-  const applyPreset = (p: CadDesignParams) => {
+  // Pure parameter setters — shared by preset loading AND undo/redo. Undo
+  // must NOT clear an imported file / logo / per-instance overrides the way
+  // loading a preset does (see applyPreset below).
+  const applyParams = (p: CadDesignParams) => {
     setFingerSize(p.fingerSize); setWidthMm(p.widthMm); setThicknessMm(p.thicknessMm)
     setProfile(p.profile as BandProfile); setCustomProfile(p.customProfile ?? BAND_PROFILE_PRESETS['half-round'].profile); setShankStyle(p.shankStyle as typeof shankStyle)
     setTaperAmount(p.taperAmount); setTwists(p.twists); setMetal(p.metal as JewelryMetalOption)
@@ -468,6 +473,7 @@ export function CadDesignPage() {
     setIncludePave(p.includePave); setPaveSettingType(p.paveSettingType as typeof paveSettingType)
     setPaveCount(p.paveCount); setPaveStoneMm(p.paveStoneMm)
     setPlanShape({ aspect: p.planAspect ?? 1, squareness: p.planSquareness ?? 2 })
+    setBackProfileOn(p.backProfileOn ?? false); setBackProfile(p.backProfile ?? BAND_PROFILE_PRESETS.court.profile)
     setMergeSolid(p.mergeSolid); setIncludeMilgrain(p.includeMilgrain); setIncludeRope(p.includeRope)
     // Added after the first preset version shipped — fall back to the same
     // defaults the state itself starts with, so an OLDER saved preset
@@ -508,6 +514,9 @@ export function CadDesignPage() {
     setSidePanelAngle0Deg(p.sidePanelAngle0Deg ?? 90)
     setSidePanelAngle1Deg(p.sidePanelAngle1Deg ?? 270)
     setPointDirection((p.pointDirection as 'up' | 'down') ?? 'up')
+  }
+  const applyPreset = (p: CadDesignParams) => {
+    applyParams(p)
     setImportedModel(null); setImportFileName(null) // a loaded preset is the parametric design, not an import
     setLogoSvgText(null); setLogoFileName(null) // same reasoning — an uploaded logo doesn't round-trip through a preset
     setProngHeightOverridesMm({}) // per-instance overrides don't round-trip through a preset (indices may not line up)
@@ -1120,6 +1129,44 @@ export function CadDesignPage() {
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
   }
+  // Undo / redo (Ctrl+Z, Ctrl+Y / Ctrl+Shift+Z) over the whole parameter
+  // set: every change to the design's parameters is snapshotted (debounced,
+  // so dragging a slider is ONE step, not hundreds). Not covered, and
+  // disclosed: things that aren't part of the saved parameter set —
+  // imported files, the uploaded logo, and per-instance overrides.
+  const [history, setHistory] = useState<HistoryState>(EMPTY_HISTORY)
+  const skipRecordRef = useRef(false)
+  const paramsKey = JSON.stringify(currentParams())
+  useEffect(() => {
+    if (skipRecordRef.current) { skipRecordRef.current = false; return }
+    const timer = setTimeout(() => {
+      setHistory(h => recordSnapshot(h, paramsKey))
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [paramsKey])
+  const stepHistory = (dir: -1 | 1) => {
+    const { history: next, snapshot } = stepHistoryState(history, paramsKey, dir)
+    setHistory(next)
+    if (snapshot === null) return false
+    if (snapshot !== paramsKey) skipRecordRef.current = true
+    applyParams(JSON.parse(snapshot) as CadDesignParams)
+    return true
+  }
+  const canUndo = canUndoHistory(history, paramsKey)
+  const canRedo = canRedoHistory(history)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey)) return
+      const el = e.target as HTMLElement | null
+      const typing = el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && ['text', 'number', 'search'].includes((el as HTMLInputElement).type)))
+      if (typing) return
+      const k = e.key.toLowerCase()
+      if (k === 'z' && !e.shiftKey) { e.preventDefault(); stepHistory(-1) }
+      else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); stepHistory(1) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  })
   const saveRenderImage = () => {
     const url = viewerRef.current?.snapshot()
     if (!url) return
@@ -1177,7 +1224,7 @@ export function CadDesignPage() {
     setPaveSettingType(type)
     setActiveTab('gems')
   }
-  const COMMAND_HELP = 'front · top · side · perspective · wireframe · render · fullscreen · turntable · ringrail · gems · surface · production · prong · bezel · cluster · tension · illusion · halo · pave · channel · flush · bar · invisible · milgrain · rope · flutes · pattern · mirror · plain · tapered · twisted · split · cathedral · bypass · export · help'
+  const COMMAND_HELP = 'front · top · side · perspective · undo · redo · wireframe · render · fullscreen · turntable · ringrail · gems · surface · production · prong · bezel · cluster · tension · illusion · halo · pave · channel · flush · bar · invisible · milgrain · rope · flutes · pattern · mirror · plain · tapered · twisted · split · cathedral · bypass · export · help'
   const runCommand = (raw: string) => {
     const cmd = raw.trim().toLowerCase()
     if (!cmd) return
@@ -1187,6 +1234,8 @@ export function CadDesignPage() {
         viewerRef.current?.setView(cmd); result = `View set to ${cmd}.`; break
       case 'wireframe': setWireframe(v => !v); result = 'Wireframe toggled.'; break
       case 'fullscreen': case 'full': toggleFullscreen(); result = 'Full screen toggled.'; break
+      case 'undo': result = stepHistory(-1) ? 'Undone.' : 'Nothing to undo.'; break
+      case 'redo': result = stepHistory(1) ? 'Redone.' : 'Nothing to redo.'; break
       case 'render': setRenderMode(v => !v); result = 'Render mode toggled.'; break
       case 'turntable': case 'rotate': setAutoRotate(v => !v); result = 'Turntable toggled.'; break
       case 'ringrail': case 'ring rail': setActiveTab('ringrail'); result = 'Switched to Ring Rail.'; break
@@ -2693,6 +2742,14 @@ export function CadDesignPage() {
               )}
             </div>
             <div className="absolute right-3 top-3 flex items-center gap-1.5">
+              <button type="button" onClick={() => stepHistory(-1)} disabled={!canUndo} title="Undo (Ctrl+Z)"
+                className="rounded-xl bg-slate-900/80 px-2.5 py-2 text-white shadow-sm backdrop-blur transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-40">
+                <Undo2 className="h-3.5 w-3.5" />
+              </button>
+              <button type="button" onClick={() => stepHistory(1)} disabled={!canRedo} title="Redo (Ctrl+Y)"
+                className="rounded-xl bg-slate-900/80 px-2.5 py-2 text-white shadow-sm backdrop-blur transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-40">
+                <Redo2 className="h-3.5 w-3.5" />
+              </button>
               <button type="button" onClick={toggleFullscreen}
                 className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold shadow-sm backdrop-blur transition ${fullscreen ? 'bg-amber-400 text-slate-900' : 'bg-slate-900/80 text-white hover:bg-slate-900'}`}>
                 {fullscreen ? <Minimize2 className="h-3.5 w-3.5 shrink-0" /> : <Maximize2 className="h-3.5 w-3.5 shrink-0" />} {fullscreen ? 'Exit' : 'Full screen'}
