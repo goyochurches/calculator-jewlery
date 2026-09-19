@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import {
   newModelObject, profileError, sampleProfile,
-  type ModelObject, type ModelOp, type ModelPlane, type Point2, type ProfileKind,
+  type ModelObject, type ModelMode, type ModelOp, type ModelPlane, type Point2, type ProfileKind,
 } from '@/lib/modeling'
 
 interface ModelingPanelProps {
@@ -143,7 +143,7 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
               className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${o.id === selectedId ? 'border-slate-900 bg-white' : 'border-slate-200 bg-white/60'}`}>
               <span className="min-w-0 truncate">
                 <strong className="font-semibold text-slate-800">{o.name}</strong>
-                <span className="ml-1.5 text-slate-400">{o.op}</span>
+                <span className="ml-1.5 text-slate-400">{o.op}{o.mode === 'subtract' ? ' · cutter' : ''}</span>
                 {err && <span className="ml-1.5 text-rose-600">· {err}</span>}
               </span>
               <button type="button" title="Delete" onClick={e => { e.stopPropagation(); onChange(objects.filter(x => x.id !== o.id)); if (o.id === selectedId) onSelect(null) }}
@@ -173,6 +173,16 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
               <option value="top">Top (XZ)</option>
               <option value="right">Right (ZY)</option>
             </select>
+          </div>
+          <div className="col-span-2">
+            <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Mode</label>
+            <select className={numInput} value={selected.mode ?? 'add'} onChange={e => update(selected.id, { mode: e.target.value as ModelMode })}>
+              <option value="add">Add — part of the ring's metal</option>
+              <option value="subtract">Subtract — cutter (Boolean difference)</option>
+            </select>
+            {selected.mode === 'subtract' && (
+              <p className="mt-1 text-[10px] text-amber-600">Shown as a red ghost while designing; it removes its volume from the metal (beta boolean — the ring is merged into one solid).</p>
+            )}
           </div>
           {selected.op === 'extrude' && (
             <div className="col-span-2">

@@ -6,7 +6,7 @@ import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { Card, CardContent } from '@/components/ui/card'
 import { EMPTY_HISTORY, recordSnapshot, stepHistory as stepHistoryState, canUndoHistory, canRedoHistory, type HistoryState } from '@/lib/historyStack'
 import { ModelingPanel } from '@/components/ModelingPanel'
-import { buildModelObjects, type ModelObject } from '@/lib/modeling'
+import { buildModelObjects, buildCutterMeshes, type ModelObject } from '@/lib/modeling'
 import { ProfileEditor } from '@/components/ProfileEditor'
 import { PlanShapePicker } from '@/components/PlanShapePicker'
 import { GEM_LOOKS, DIAMOND_LOOK } from '@/lib/gemLooks'
@@ -918,6 +918,9 @@ export function CadDesignPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fingerSize, widthMm, thicknessMm, profile, customProfile, modelObjects, backProfileOn, backProfile, planAspect, planSquareness, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, sidePanelAngle0Deg, sidePanelAngle1Deg, logoSvgText, logoSizeMm, logoAngleDeg, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, petalStoneDiameterOverridesMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, matchingBandOffsetOverridesMm, pointDirection])
 
+  // Boolean cutters (modeled objects in Subtract mode) are consumed by the
+  // union pass, so having any forces it even if "Merge" is off.
+  const cutterMeshes = useMemo(() => buildCutterMeshes(modelObjects), [modelObjects])
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
   // separate (see ringGeometry.ts). Beta: three-bvh-csg can throw on a
@@ -936,9 +939,9 @@ export function CadDesignPage() {
   // pass either way.
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const { displayModel, mergeError } = useMemo(() => {
-    if (!mergeSolid) return { displayModel: model, mergeError: null }
+    if (!mergeSolid && cutterMeshes.length === 0) return { displayModel: model, mergeError: null }
     try {
-      const unioned = unionMetalParts(model)
+      const unioned = unionMetalParts(model, cutterMeshes)
       if (!unioned) return { displayModel: model, mergeError: null }
       const merged = new THREE.Group()
       const solid = new THREE.Mesh(unioned)
@@ -949,7 +952,7 @@ export function CadDesignPage() {
     } catch (err) {
       return { displayModel: model, mergeError: err instanceof Error ? err.message : 'Boolean union failed on this geometry.' }
     }
-  }, [model, mergeSolid])
+  }, [model, mergeSolid, cutterMeshes])
 
   // Ring Re-Sizer — Matrix's own named tool, scoped here to an IMPORTED
   // file (the parametric design already has its own real fingerSize
@@ -976,6 +979,21 @@ export function CadDesignPage() {
     wrapper.updateMatrixWorld(true)
     return wrapper
   }, [importedModel, displayModel, resizeEnabled, resizeScaleFactor])
+
+  // Viewer-only: the cut result plus a red ghost of each cutter so it can be
+  // seen and placed. Exports, volume and pricing use displayModel (no ghosts).
+  const viewerObject = useMemo(() => {
+    if (cutterMeshes.length === 0) return viewModel
+    const wrapper = new THREE.Group()
+    wrapper.add(viewModel)
+    for (const cutter of cutterMeshes) {
+      const ghost = new THREE.Mesh(cutter.geometry.clone())
+      ghost.userData = { ...cutter.userData, isCutterGhost: true }
+      wrapper.add(ghost)
+    }
+    return wrapper
+  }, [viewModel, cutterMeshes])
+
 
   // Three "reset some state when a dependency changes" cases, all using
   // React's own recommended pattern (adjust state DURING render by
@@ -2579,7 +2597,7 @@ export function CadDesignPage() {
                 From the actual displayed volume × {METAL_DENSITY_G_PER_CM3[metal]} g/cm³ for {JEWELRY_METAL_OPTIONS[metal].label},
                 at the same $/g the rest of the app prices from. {importedModel
                   ? "Assumes the whole imported file is one solid piece of this metal — this app can't tell a gem or a different material apart from the metal in a file it didn't build."
-                  : mergeSolid && !mergeError
+                  : (mergeSolid || cutterMeshes.length > 0) && !mergeError
                     ? 'Metal only, gems excluded. Merged into one solid, so this is exact (no more overlap double-counting).'
                     : 'Metal only, gems excluded. Band+head overlap slightly (not merged), so this reads a little high rather than low.'}
               </p>
@@ -2740,7 +2758,7 @@ export function CadDesignPage() {
 
         <Card className="overflow-hidden rounded-[30px] border border-slate-200 shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
           <div className="relative">
-            <ModelViewer3D ref={viewerRef} object={viewModel} color={METAL_COLORS[metal]} onSelectPart={handleSelectPart}
+            <ModelViewer3D ref={viewerRef} object={viewerObject} color={METAL_COLORS[metal]} onSelectPart={handleSelectPart}
               onMove={(partName, pos) => {
                 // Band-attached parts are positioned by an ANGLE around the
                 // band — recover it the same way attachHeadToBand's own

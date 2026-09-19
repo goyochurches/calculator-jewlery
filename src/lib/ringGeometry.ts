@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Brush, Evaluator, ADDITION } from 'three-bvh-csg'
+import { Brush, Evaluator, ADDITION, SUBTRACTION } from 'three-bvh-csg'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { Font } from 'three/examples/jsm/loaders/FontLoader.js'
 import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js'
@@ -2160,7 +2160,7 @@ function worldBakedGeometry(mesh: THREE.Mesh): THREE.BufferGeometry {
  *  Returns null if there's nothing to union. Can throw on a genuinely
  *  degenerate input (e.g. a self-intersecting profile) — callers should
  *  treat this as a beta operation and catch accordingly, per the roadmap. */
-export function unionMetalParts(object: THREE.Object3D): THREE.BufferGeometry | null {
+export function unionMetalParts(object: THREE.Object3D, cutters: THREE.Mesh[] = []): THREE.BufferGeometry | null {
   object.updateMatrixWorld(true)
   const metalMeshes: THREE.Mesh[] = []
   object.traverse(obj => {
@@ -2175,6 +2175,14 @@ export function unionMetalParts(object: THREE.Object3D): THREE.BufferGeometry | 
     const next = new Brush(worldBakedGeometry(metalMeshes[i]))
     next.updateMatrixWorld(true)
     acc = evaluator.evaluate(acc, next, ADDITION)
+  }
+  // Cutters (Matrix's "Cutters" group / Rhino BooleanDifference): each
+  // one is subtracted from the finished metal solid.
+  for (const cutter of cutters) {
+    cutter.updateMatrixWorld(true)
+    const brush = new Brush(worldBakedGeometry(cutter))
+    brush.updateMatrixWorld(true)
+    acc = evaluator.evaluate(acc, brush, SUBTRACTION)
   }
   return acc.geometry
 }

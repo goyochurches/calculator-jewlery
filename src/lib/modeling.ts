@@ -10,6 +10,8 @@ import * as THREE from 'three'
 export type ProfileKind = 'polyline' | 'spline' | 'rectangle' | 'circle'
 export type ModelPlane = 'front' | 'top' | 'right'
 export type ModelOp = 'extrude' | 'revolve'
+/** 'add' = part of the ring's metal; 'subtract' = a cutter removed from it. */
+export type ModelMode = 'add' | 'subtract'
 
 export interface Point2 { x: number; y: number }
 
@@ -31,6 +33,8 @@ export interface ModelObject {
   offsetMm: { x: number; y: number; z: number }
   /** Extrude distance along the plane normal, mm (ignored by revolve). */
   heightMm: number
+  /** Defaults to 'add'. */
+  mode?: ModelMode
 }
 
 const CIRCLE_SEGMENTS = 48
@@ -136,11 +140,13 @@ export function buildModelObjectGeometry(obj: ModelObject): { geometry: THREE.Bu
   return { geometry }
 }
 
-/** The model group's meshes for all valid, visible objects. Invalid objects
- *  are skipped here (the panel shows their error). */
-export function buildModelObjects(objects: ModelObject[]): THREE.Mesh[] {
+/** Meshes for the valid objects whose mode is `mode` (instanceIndex is the
+ *  object's index in the FULL list, so selection maps back to it). Invalid
+ *  objects are skipped here (the panel shows their error). */
+function meshesForMode(objects: ModelObject[], mode: ModelMode): THREE.Mesh[] {
   const meshes: THREE.Mesh[] = []
   objects.forEach((obj, index) => {
+    if ((obj.mode ?? 'add') !== mode) return
     const result = buildModelObjectGeometry(obj)
     if ('error' in result) return
     const mesh = new THREE.Mesh(result.geometry)
@@ -150,6 +156,11 @@ export function buildModelObjects(objects: ModelObject[]): THREE.Mesh[] {
   })
   return meshes
 }
+
+/** Solids that become part of the ring's metal. */
+export const buildModelObjects = (objects: ModelObject[]) => meshesForMode(objects, 'add')
+/** Cutters: subtracted from the metal by the boolean pass. */
+export const buildCutterMeshes = (objects: ModelObject[]) => meshesForMode(objects, 'subtract')
 
 export function newModelObject(profile: ModelProfile, op: ModelOp, index: number): ModelObject {
   return {
