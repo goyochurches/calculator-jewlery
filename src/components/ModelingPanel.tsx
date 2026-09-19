@@ -36,7 +36,7 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
   const [tool, setTool] = useState<ProfileKind | null>(null)
   const [draft, setDraft] = useState<Point2[]>([])
   // For a Sweep object: which of its two sketches the canvas edits.
-  const [editTarget, setEditTarget] = useState<'profile' | 'rail'>('profile')
+  const [editTarget, setEditTarget] = useState<'profile' | 'rail' | 'top'>('profile')
   const svgRef = useRef<SVGSVGElement>(null)
   const drag = useRef<number | null>(null)
   const selected = objects.find(o => o.id === selectedId) ?? null
@@ -67,9 +67,14 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
   }
 
   const editingRail = selected?.op === 'sweep' && editTarget === 'rail' && !!selected.rail
+  const editingTop = selected?.op === 'loft' && editTarget === 'top' && !!selected.topProfile
   const moveHandle = (index: number, clientX: number, clientY: number) => {
     if (!selected) return
     const pt = pointerMm(clientX, clientY)
+    if (editingTop && selected.topProfile) {
+      update(selected.id, { topProfile: { ...selected.topProfile, points: selected.topProfile.points.map((p, i) => (i === index ? pt : p)) } })
+      return
+    }
     if (editingRail && selected.rail) {
       update(selected.id, { rail: { ...selected.rail, points: selected.rail.points.map((p, i) => (i === index ? pt : p)) } })
       return
@@ -79,7 +84,7 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
   }
 
   const outline = selected ? sampleProfile(selected.profile) : []
-  const selectedError = selected ? (profileError(selected.profile, selected.op) ?? (selected.op === 'sweep' ? railError(selected) : null)) : null
+  const selectedError = selected ? (profileError(selected.profile, selected.op) ?? (selected.op === 'sweep' ? railError(selected) : selected.op === 'loft' && selected.topProfile ? profileError(selected.topProfile, 'loft') : null)) : null
   const numInput = 'w-full rounded-lg border border-slate-200 px-2 py-1 text-xs'
 
   return (
@@ -115,7 +120,10 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
         {selected && editingRail && selected.rail && (
           <path d={pathOf(sampleRail2D(selected.rail), false)} fill="none" stroke="#0f766e" strokeWidth={2} />
         )}
-        {selected && !editingRail && outline.length > 0 && (
+        {selected && selected.op === 'loft' && selected.topProfile && (
+          <path d={pathOf(sampleProfile(selected.topProfile), true)} fill="#bfdbfe" fillOpacity={editingTop ? 0.7 : 0.35} stroke="#1d4ed8" strokeWidth={editingTop ? 1.8 : 1} strokeDasharray={editingTop ? undefined : '4 3'} />
+        )}
+        {selected && !editingRail && !editingTop && outline.length > 0 && (
           <path d={pathOf(outline, true)} fill={selectedError ? '#fecaca' : '#fde68a'} fillOpacity={0.7} stroke={selectedError ? '#dc2626' : '#b45309'} strokeWidth={1.5} />
         )}
         {tool && draft.length > 0 && (() => {
@@ -123,7 +131,7 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
           const shown = draft.length >= 2 && (tool === 'rectangle' || tool === 'circle') ? sampleProfile(prof) : draft
           return <path d={pathOf(shown, shown.length >= 3)} fill="none" stroke="#0f172a" strokeDasharray="4 3" strokeWidth={1.5} />
         })()}
-        {(tool ? draft : editingRail ? selected?.rail?.points ?? [] : selected?.profile.points ?? []).map((p, i) => (
+        {(tool ? draft : editingRail ? selected?.rail?.points ?? [] : editingTop ? selected?.topProfile?.points ?? [] : selected?.profile.points ?? []).map((p, i) => (
           <circle key={i} cx={toPx(p.x)} cy={toPx(-p.y)} r={5} fill="#fff" stroke="#0f172a" strokeWidth={2}
             className={!tool ? 'cursor-move' : ''}
             onPointerDown={e => { if (tool) return; e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); drag.current = i }}
@@ -141,6 +149,9 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
           <button type="button" disabled={!!profileError(draftProfile, 'extrude')} onClick={() => { create('sweep'); setEditTarget('rail') }}
             title="Sweeps this shape along a rail curve you then shape (Rhino's Sweep 1 Rail)."
             className="flex-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Sweep</button>
+          <button type="button" disabled={!!profileError(draftProfile, 'extrude')} onClick={() => { create('loft'); setEditTarget('top') }}
+            title="Lofts this base shape to a second shape (starts as a 60% taper) that you then reshape."
+            className="flex-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Loft</button>
           <button type="button" onClick={() => setDraft([])}
             className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600">Clear</button>
         </div>
@@ -176,11 +187,12 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
             <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Operation</label>
             <select className={numInput} value={selected.op} onChange={e => {
               const op = e.target.value as ModelOp
-              update(selected.id, op === 'sweep' && !selected.rail ? { op, rail: newModelObject(selected.profile, 'sweep', 0).rail } : { op })
+              update(selected.id, op === 'sweep' && !selected.rail ? { op, rail: newModelObject(selected.profile, 'sweep', 0).rail } : op === 'loft' && !selected.topProfile ? { op, topProfile: newModelObject(selected.profile, 'loft', 0).topProfile, twistDeg: 0 } : { op })
             }}>
               <option value="extrude">Extrude</option>
               <option value="revolve">Revolve</option>
               <option value="sweep">Sweep along rail</option>
+              <option value="loft">Loft (2 sections)</option>
             </select>
           </div>
           <div>
@@ -241,7 +253,23 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
               <p className="text-[10px] text-slate-500">The profile keeps facing along the rail. It must fit inside the rail's tightest bend.</p>
             </div>
           )}
-          {selected.op === 'extrude' && (
+          {selected.op === 'loft' && selected.topProfile && (
+            <div className="col-span-2 space-y-2 rounded-xl border border-blue-200 bg-blue-50/50 p-2.5">
+              <div className="grid grid-cols-2 gap-1.5">
+                {([['profile', 'Edit base'], ['top', 'Edit top']] as const).map(([t, label]) => (
+                  <button key={t} type="button" onClick={() => setEditTarget(t)}
+                    className={`rounded-lg border px-2 py-1.5 text-[11px] font-semibold ${editTarget === t ? 'border-blue-700 bg-blue-700 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>{label}</button>
+                ))}
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Twist ({(selected.twistDeg ?? 0).toFixed(0)}°)</label>
+                <input type="range" min={-180} max={180} step={5} value={selected.twistDeg ?? 0} className="w-full"
+                  onChange={e => update(selected.id, { twistDeg: Number(e.target.value) })} />
+              </div>
+              <p className="text-[10px] text-slate-500">Base = amber, top = blue. The two shapes are matched by arc length, so keep their outlines roughly similar to avoid a pinched loft.</p>
+            </div>
+          )}
+          {(selected.op === 'extrude' || selected.op === 'loft') && (
             <div className="col-span-2">
               <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Height ({selected.heightMm.toFixed(1)} mm)</label>
               <input type="range" min={0.2} max={20} step={0.1} value={selected.heightMm} className="w-full"

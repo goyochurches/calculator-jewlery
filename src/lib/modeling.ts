@@ -10,7 +10,7 @@ import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.j
 
 export type ProfileKind = 'polyline' | 'spline' | 'rectangle' | 'circle'
 export type ModelPlane = 'front' | 'top' | 'right'
-export type ModelOp = 'extrude' | 'revolve' | 'sweep'
+export type ModelOp = 'extrude' | 'revolve' | 'sweep' | 'loft'
 /** 'add' = part of the ring's metal; 'subtract' = a cutter removed from it. */
 export type ModelMode = 'add' | 'subtract'
 
@@ -40,6 +40,11 @@ export interface ModelObject {
    *  its own construction plane (points in that plane's 2D mm coordinates).
    *  `closed` makes it a loop (a ring/torus-like sweep). */
   rail?: { points: Point2[]; plane: ModelPlane; closed: boolean }
+  /** Loft only: the second section, at `heightMm` along the plane normal
+   *  from `profile` (the base). Sections are matched by arc length. */
+  topProfile?: ModelProfile
+  /** Loft only: rotates the top section about its centre (degrees). */
+  twistDeg?: number
 }
 
 const CIRCLE_SEGMENTS = 48
@@ -123,6 +128,85 @@ function planePoint(plane: ModelPlane, p: Point2): THREE.Vector3 {
 }
 
 const SWEEP_MAX_RINGS = 400
+const LOFT_SAMPLES = 128
+
+/** Scales a profile about its own centre (used for a loft's default top). */
+export function scaleProfile(profile: ModelProfile, k: number): ModelProfile {
+  const pts = profile.points
+  if (pts.length === 0) return profile
+  let c: Point2
+  if (profile.kind === 'circle') c = pts[0]
+  else if (profile.kind === 'rectangle') c = { x: (pts[0].x + (pts[1]?.x ?? pts[0].x)) / 2, y: (pts[0].y + (pts[1]?.y ?? pts[0].y)) / 2 }
+  else c = { x: pts.reduce((a, p) => a + p.x, 0) / pts.length, y: pts.reduce((a, p) => a + p.y, 0) / pts.length }
+  const sc = (p: Point2) => ({ x: c.x + (p.x - c.x) * k, y: c.y + (p.y - c.y) * k })
+  return { ...profile, points: profile.kind === 'circle' ? [pts[0], sc(pts[1] ?? pts[0])] : pts.map(sc) }
+}
+
+/** Resamples a closed polygon to `n` points evenly by arc length, starting
+ *  at its point of largest x (so two sections start at matching sides) and
+ *  wound counter-clockwise, so rings of two sections correspond. */
+function resampleClosed(pts: THREE.Vector2[], n: number, twistRad = 0): THREE.Vector2[] {
+  let poly = pts.map(p => p.clone())
+  const centroid = poly.reduce((a, p) => a.add(p), new THREE.Vector2()).divideScalar(poly.length)
+  if (twistRad) poly = poly.map(p => p.clone().sub(centroid).rotateAround(new THREE.Vector2(), twistRad).add(centroid))
+  if (signedArea(poly) < 0) poly.reverse()
+  // Start at the vertex with the largest angle-0 extent (rightmost, then lowest).
+  let start = 0
+  for (let i = 1; i < poly.length; i++) if (poly[i].x > poly[start].x + 1e-9 || (Math.abs(poly[i].x - poly[start].x) <= 1e-9 && poly[i].y < poly[start].y)) start = i
+  poly = [...poly.slice(start), ...poly.slice(0, start)]
+  const lengths: number[] = []
+  let total = 0
+  for (let i = 0; i < poly.length; i++) { const l = poly[i].distanceTo(poly[(i + 1) % poly.length]); lengths.push(l); total += l }
+  const out: THREE.Vector2[] = []
+  let edge = 0, acc = 0
+  for (let k = 0; k < n; k++) {
+    const target = (k / n) * total
+    while (edge < poly.length - 1 && acc + lengths[edge] < target) { acc += lengths[edge]; edge++ }
+    const t = lengths[edge] > 0 ? (target - acc) / lengths[edge] : 0
+    out.push(poly[edge].clone().lerp(poly[(edge + 1) % poly.length], t))
+  }
+  return out
+}
+
+/** Loft between a base and a top section (Rhino Loft with 2 sections):
+ *  straight ruled surface between arc-length-matched rings, flat caps. */
+function buildLoftGeometry(base: THREE.Vector2[], top: THREE.Vector2[], height: number, twistDeg: number): THREE.BufferGeometry {
+  const a = resampleClosed(base, LOFT_SAMPLES), b = resampleClosed(top, LOFT_SAMPLES, (twistDeg * Math.PI) / 180)
+  const n = LOFT_SAMPLES
+  const positions: number[] = []
+  for (const q of a) positions.push(q.x, q.y, 0)
+  for (const q of b) positions.push(q.x, q.y, height)
+  const sides: number[] = []
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n
+    sides.push(i, j, n + j, i, n + j, n + i)
+  }
+  // Caps: triangulate each section; try both windings against the sides.
+  const capA = THREE.ShapeUtils.triangulateShape(a.map(q => q.clone()), [])
+  const capB = THREE.ShapeUtils.triangulateShape(b.map(q => q.clone()), [])
+  const capsX: number[] = [], capsY: number[] = []
+  for (const [x, y, z] of capA) { capsX.push(x, z, y); capsY.push(x, y, z) }
+  for (const [x, y, z] of capB) { capsX.push(n + x, n + y, n + z); capsY.push(n + x, n + z, n + y) }
+  const signedVolume = (idx: number[]) => {
+    const p = new THREE.Vector3(), q = new THREE.Vector3(), r = new THREE.Vector3()
+    let v = 0
+    for (let k = 0; k < idx.length; k += 3) {
+      p.fromArray(positions, idx[k] * 3); q.fromArray(positions, idx[k + 1] * 3); r.fromArray(positions, idx[k + 2] * 3)
+      v += p.dot(q.clone().cross(r)) / 6
+    }
+    return v
+  }
+  const withX = [...sides, ...capsX], withY = [...sides, ...capsY]
+  let indices = Math.abs(signedVolume(withX)) >= Math.abs(signedVolume(withY)) ? withX : withY
+  if (signedVolume(indices) < 0) {
+    indices = indices.slice()
+    for (let k = 0; k < indices.length; k += 3) { const t = indices[k + 1]; indices[k + 1] = indices[k + 2]; indices[k + 2] = t }
+  }
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.setIndex(indices)
+  return geometry
+}
 
 /** Validation for a sweep's rail (and its fit with the profile), or null. */
 export function railError(obj: ModelObject): string | null {
@@ -242,6 +326,17 @@ export function buildModelObjectGeometry(obj: ModelObject): { geometry: THREE.Bu
   if (error) return { error }
   let pts = clean(sampleProfile(obj.profile))
   let geometry: THREE.BufferGeometry
+  if (obj.op === 'loft') {
+    const top = obj.topProfile
+    if (!top) return { error: 'Loft needs a top section.' }
+    const topError = profileError(top, 'loft')
+    if (topError) return { error: `Top section: ${topError}` }
+    if (!(obj.heightMm > 0)) return { error: 'Loft height must be greater than 0.' }
+    geometry = buildLoftGeometry(pts, clean(sampleProfile(top)), obj.heightMm, obj.twistDeg ?? 0)
+    orientToPlane(geometry, obj.plane)
+    geometry.translate(obj.offsetMm.x, obj.offsetMm.y, obj.offsetMm.z)
+    return { geometry: toCreasedNormals(geometry, Math.PI / 5) }
+  }
   if (obj.op === 'sweep') {
     const rError = railError(obj)
     if (rError) return { error: rError }
@@ -291,9 +386,11 @@ export const buildCutterMeshes = (objects: ModelObject[]) => meshesForMode(objec
 export function newModelObject(profile: ModelProfile, op: ModelOp, index: number): ModelObject {
   return {
     id: `m${Date.now().toString(36)}${index}`,
-    name: `${op === 'extrude' ? 'Extrusion' : op === 'revolve' ? 'Revolution' : 'Sweep'} ${index + 1}`,
+    name: `${op === 'extrude' ? 'Extrusion' : op === 'revolve' ? 'Revolution' : op === 'loft' ? 'Loft' : 'Sweep'} ${index + 1}`,
     op, profile, plane: 'front', offsetMm: { x: 0, y: 0, z: 0 }, heightMm: 3,
     // Sweeps start with a gentle example rail on the Top plane to edit.
+    // Lofts start as a taper to 60% so the result is visibly not a prism.
+    ...(op === 'loft' ? { topProfile: scaleProfile(profile, 0.6), twistDeg: 0 } : {}),
     ...(op === 'sweep' ? { rail: { plane: 'top' as ModelPlane, closed: false, points: [{ x: -8, y: 0 }, { x: 0, y: 4 }, { x: 8, y: 0 }] } } : {}),
   }
 }
