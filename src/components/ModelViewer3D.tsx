@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
+import { DIAMOND_LOOK } from '@/lib/gemLooks'
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react'
 
@@ -123,6 +124,9 @@ interface ModelViewer3DProps {
    *  reflections between parts, soft shadows from area lights, accumulating
    *  samples so the image sharpens over time. Needs a capable GPU. */
   pathTrace?: boolean
+  /** Gem look in Render / Ray-trace modes: body color + refractive index.
+   *  Default = colorless diamond. Applies to every stone in the model. */
+  gem?: { color: string; ior: number }
   /** Reports the accumulated sample count while path tracing. */
   onPathTraceSamples?: (samples: number) => void
 }
@@ -135,7 +139,7 @@ interface ModelViewer3DProps {
  * file's mesh, not just the parametric ring band.
  */
 export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>(function ModelViewer3D(
-  { object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className, onSelectPart, onMove, autoRotate = false, wireframe = false, renderMode = false, pathTrace = false, onPathTraceSamples },
+  { object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className, onSelectPart, onMove, autoRotate = false, wireframe = false, renderMode = false, pathTrace = false, onPathTraceSamples, gem = DIAMOND_LOOK },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -555,8 +559,11 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     // Refraction: diamond-like IOR, transmissive, thin — replaces the
     // working view's flat translucent look.
     stone.transmission = renderMode ? 1 : 0
-    stone.ior = renderMode ? 2.4 : 1.5
-    stone.thickness = renderMode ? 2.5 : 0
+    stone.ior = renderMode ? gem.ior : 1.5
+    stone.thickness = renderMode ? 1.6 : 0
+    // Colored gems absorb along the light path (Beer-Lambert-style).
+    stone.attenuationColor.set(gem.color)
+    stone.attenuationDistance = gem.color.toLowerCase() === '#ffffff' ? Infinity : 6
     stone.roughness = renderMode ? 0 : 0.05
     stone.opacity = renderMode ? 1 : 0.85
     stone.transparent = !renderMode
@@ -564,7 +571,7 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     stone.dispersion = renderMode ? 0.5 : 0 // fire (rainbow splitting)
     stone.clearcoat = renderMode ? 1 : 0
     stone.specularIntensity = renderMode ? 1 : 0.5
-    stone.color.set(renderMode ? '#ffffff' : '#eaf6ff')
+    stone.color.set(renderMode ? gem.color : '#eaf6ff')
     stone.needsUpdate = true
     material.needsUpdate = true
     ground.visible = renderMode
@@ -572,7 +579,7 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
       const box = new THREE.Box3().setFromObject(object)
       ground.position.y = box.min.y - 0.02
     }
-  }, [renderMode, object, pathTrace])
+  }, [renderMode, object, pathTrace, gem])
 
   // Path tracing (three-gpu-pathtracer, loaded on demand so it isn't part of
   // the main bundle). Builds a studio environment with softboxes, swaps in a
@@ -619,8 +626,8 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
       renderer.toneMappingExposure = 1.0
       // Physically based materials.
       material.metalness = 1; material.roughness = 0.14
-      stone.transmission = 1; stone.ior = 2.417; stone.thickness = 0; stone.roughness = 0
-      stone.transparent = false; stone.opacity = 1; stone.color.set('#ffffff')
+      stone.transmission = 1; stone.ior = gem.ior; stone.thickness = 0; stone.roughness = 0
+      stone.transparent = false; stone.opacity = 1; stone.color.set(gem.color)
       stone.needsUpdate = true; material.needsUpdate = true
       if (object) pathGround.position.y = new THREE.Box3().setFromObject(object).min.y - 0.02
       pathGround.visible = true
@@ -650,7 +657,7 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
       if (helper) helper.visible = true
       pathGround.visible = false
     }
-  }, [pathTrace, renderMode, object])
+  }, [pathTrace, renderMode, object, gem])
 
   return <div ref={containerRef} className={className} />
 })

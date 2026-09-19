@@ -9,6 +9,7 @@ import { ModelingPanel } from '@/components/ModelingPanel'
 import { buildModelObjects, type ModelObject } from '@/lib/modeling'
 import { ProfileEditor } from '@/components/ProfileEditor'
 import { PlanShapePicker } from '@/components/PlanShapePicker'
+import { GEM_LOOKS, DIAMOND_LOOK } from '@/lib/gemLooks'
 import { ModelViewer3D, type SelectedPart, type ModelViewer3DHandle, type CameraView } from '@/components/ModelViewer3D'
 import { FINGER_SIZE_OPTIONS, METAL_GROUPS } from '@/hooks/useQuoteBuilder'
 import { useQuoteConfig } from '@/hooks/useQuoteConfig'
@@ -380,6 +381,7 @@ export function CadDesignPage() {
   const [renderMode, setRenderMode] = useState(false)
   // Physically based path tracing on top of Render mode (ray-traced look).
   const [pathTrace, setPathTrace] = useState(false)
+  const [gemLookKey, setGemLookKey] = useState('diamond')
   // The live sample counter updates ~10x/s; it lives in its own tiny
   // component (see PathSamplesBadge) so it doesn't re-render this whole page.
   const samplesSetterRef = useRef<((n: number) => void) | null>(null)
@@ -2758,7 +2760,7 @@ export function CadDesignPage() {
                   }
                 }
               }}
-              autoRotate={autoRotate} wireframe={wireframe} renderMode={renderMode} pathTrace={pathTrace && renderMode} onPathTraceSamples={n => samplesSetterRef.current?.(n)} className={fullscreen ? 'h-[calc(100vh-8rem)] min-h-[360px] w-full' : 'h-[420px] w-full sm:h-[520px]'} />
+              autoRotate={autoRotate} wireframe={wireframe} renderMode={renderMode} pathTrace={pathTrace && renderMode} gem={GEM_LOOKS[gemLookKey] ?? DIAMOND_LOOK} onPathTraceSamples={n => samplesSetterRef.current?.(n)} className={fullscreen ? 'h-[calc(100vh-8rem)] min-h-[360px] w-full' : 'h-[420px] w-full sm:h-[520px]'} />
             <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2 text-xs text-white shadow-sm backdrop-blur">
               <MousePointerClick className="h-3.5 w-3.5 shrink-0 text-amber-300" />
               {selectedPart ? (
@@ -2812,6 +2814,15 @@ export function CadDesignPage() {
                 <RotateCw className={`h-3.5 w-3.5 shrink-0 ${autoRotate ? 'animate-spin' : ''}`} /> Turntable
               </button>
             </div>
+            {renderMode && (
+              <div className="absolute bottom-3 right-3 flex items-center gap-1 rounded-xl bg-slate-900/80 px-2 py-1.5 backdrop-blur">
+                {Object.entries(GEM_LOOKS).map(([key, g]) => (
+                  <button key={key} type="button" title={`${g.label} (IOR ${g.ior})`} onClick={() => setGemLookKey(key)}
+                    className={`h-5 w-5 rounded-full border-2 transition ${gemLookKey === key ? 'border-amber-300 scale-110' : 'border-white/30'}`}
+                    style={{ background: key === 'diamond' ? 'linear-gradient(135deg,#fff,#cfe6ff)' : g.color }} />
+                ))}
+              </div>
+            )}
             <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
               {(['front', 'top', 'side', 'perspective'] as const satisfies readonly CameraView[]).map(view => (
                 <button key={view} type="button" onClick={() => viewerRef.current?.setView(view)}
