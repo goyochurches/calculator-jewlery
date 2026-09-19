@@ -5,6 +5,8 @@ import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { Card, CardContent } from '@/components/ui/card'
 import { EMPTY_HISTORY, recordSnapshot, stepHistory as stepHistoryState, canUndoHistory, canRedoHistory, type HistoryState } from '@/lib/historyStack'
+import { ModelingPanel } from '@/components/ModelingPanel'
+import { buildModelObjects, type ModelObject } from '@/lib/modeling'
 import { ProfileEditor } from '@/components/ProfileEditor'
 import { PlanShapePicker } from '@/components/PlanShapePicker'
 import { ModelViewer3D, type SelectedPart, type ModelViewer3DHandle, type CameraView } from '@/components/ModelViewer3D'
@@ -170,7 +172,7 @@ const FANCY_SHAPE_DEFAULTS: Record<FancyStoneShape, { lengthMm: number; widthMm:
 // — manufacturability checks, pricing, export — Matrix doesn't have a
 // single named toolbar group for this, it's spread across separate
 // dialogs there).
-type Tab = 'ringrail' | 'gems' | 'surface' | 'production'
+type Tab = 'ringrail' | 'gems' | 'surface' | 'model' | 'production'
 
 // Which tab's controls actually shape a given clicked part — every
 // `userData.partName` any ringGeometry.ts builder sets should have an
@@ -187,9 +189,10 @@ const PART_TAB: Record<string, Tab> = {
   'Side stone head': 'gems', 'Shank strand': 'ringrail', 'Signet top': 'gems', 'Engraved text': 'gems',
   'Milgrain bead': 'surface', 'Rope strand': 'surface', 'Flute rib': 'surface', 'Gallery wire': 'gems', 'Band text': 'surface',
   'Side panel': 'surface', 'Side panel text': 'surface', 'Pattern motif': 'surface', 'Logo': 'surface',
+  'Modeled solid': 'model',
   'Merged solid': 'surface', Imported: 'production', 'Matching band': 'surface',
 }
-import { Download, RotateCw, Scale, MousePointerClick, Circle, Gem, Layers, Factory, Camera, Sparkles, Maximize2, Minimize2, Undo2, Redo2 } from 'lucide-react'
+import { Download, RotateCw, Scale, MousePointerClick, Circle, Gem, Layers, Factory, Camera, Sparkles, Maximize2, Minimize2, Undo2, Redo2, PenTool } from 'lucide-react'
 
 // Approximate render colors per metal — cosmetic only, doesn't drive
 // pricing (that still comes from Master Tables / config.metalPriceMap
@@ -218,6 +221,9 @@ export function CadDesignPage() {
   const [profile, setProfile] = useState<BandProfile>('comfort')
   // Free-form cross-section (profile === 'custom'), edited in ProfileEditor.
   // Ring plan-view shape (round/oval/square…) — applied to the whole model.
+  // Rhino-style modeled solids (Curve → Extrude/Revolve) — see lib/modeling.ts.
+  const [modelObjects, setModelObjects] = useState<ModelObject[]>([])
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null)
   const [planShape, setPlanShape] = useState<PlanShape>(ROUND_PLAN_SHAPE)
   // Profile Placer: a DIFFERENT free-form profile at the back of the ring,
   // blended from the head profile (plain shank + custom profile only).
@@ -446,7 +452,7 @@ export function CadDesignPage() {
     settingType, bezelCoverage, prongCount, clusterPetalCount, clusterPetalStoneMm,
     includeHalo, haloCount, haloStoneMm, includePave, paveSettingType, paveCount, paveStoneMm,
     planAspect: planShape.aspect, planSquareness: planShape.squareness,
-    backProfileOn, backProfile,
+    backProfileOn, backProfile, modelObjects,
     mergeSolid, includeMilgrain, includeRope,
     haloRingCount, sideStoneCount, sideStoneCaratWeight, sideSpreadDeg,
     includeMatchingBand, matchingBandWidthMm, splitStrandCount,
@@ -473,6 +479,7 @@ export function CadDesignPage() {
     setIncludePave(p.includePave); setPaveSettingType(p.paveSettingType as typeof paveSettingType)
     setPaveCount(p.paveCount); setPaveStoneMm(p.paveStoneMm)
     setPlanShape({ aspect: p.planAspect ?? 1, squareness: p.planSquareness ?? 2 })
+    setModelObjects(p.modelObjects ?? [])
     setBackProfileOn(p.backProfileOn ?? false); setBackProfile(p.backProfile ?? BAND_PROFILE_PRESETS.court.profile)
     setMergeSolid(p.mergeSolid); setIncludeMilgrain(p.includeMilgrain); setIncludeRope(p.includeRope)
     // Added after the first preset version shipped — fall back to the same
@@ -618,6 +625,7 @@ export function CadDesignPage() {
   // are still per-feature (every prong, say) rather than per-instance yet.
   const handleSelectPart = (part: SelectedPart | null) => {
     setSelectedPart(part)
+    if (part?.name === 'Modeled solid' && part.instanceIndex !== undefined) setSelectedModelId(modelObjects[part.instanceIndex]?.id ?? null)
     if (part && PART_TAB[part.name]) setActiveTab(PART_TAB[part.name])
   }
 
@@ -886,6 +894,9 @@ export function CadDesignPage() {
       }
     }
     applyPlanShape(group, { aspect: planAspect, squareness: planSquareness }, innerDiameterMm / 2 + thicknessMm / 2)
+    // Modeled solids are placed in world space by the user, so they are added
+    // AFTER the ring's plan-shape bend (they don't follow it).
+    for (const mesh of buildModelObjects(modelObjects)) group.add(mesh)
     return group
     // excludedHaloKey/excludedPaveKey (joined-string stand-ins for the
     // excludedHaloIndices/excludedPaveIndices ARRAYS, see where they're
@@ -898,7 +909,7 @@ export function CadDesignPage() {
     // real dependency (both arrays are always replaced wholesale via
     // setState, never mutated in place), so this is intentional.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fingerSize, widthMm, thicknessMm, profile, customProfile, backProfileOn, backProfile, planAspect, planSquareness, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, sidePanelAngle0Deg, sidePanelAngle1Deg, logoSvgText, logoSizeMm, logoAngleDeg, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, petalStoneDiameterOverridesMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, matchingBandOffsetOverridesMm, pointDirection])
+  }, [fingerSize, widthMm, thicknessMm, profile, customProfile, modelObjects, backProfileOn, backProfile, planAspect, planSquareness, shankStyle, taperAmount, twists, splitStrandCount, includeMilgrain, includeRope, includeFlutes, fluteCount, includeGalleryWire, galleryWireCount, includeBandText, bandText, bandTextBold, includePattern, patternMotif, includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, sidePanelAngle0Deg, sidePanelAngle1Deg, logoSvgText, logoSizeMm, logoAngleDeg, includeSignetTop, signetShape, signetWidthMm, signetLengthMm, engraveText, engraveBold, includeStone, stoneShape, settingType, bezelCoverage, stoneDiameterMm, prongCount, prongHeightOverridesMm, prongDiameterOverridesMm, clusterPetalCount, clusterPetalStoneMm, excludedClusterKey, petalStoneDiameterOverridesMm, tensionActive, tensionGapDeg, fancyLengthMm, fancyWidthMm, haloEligible, haloCount, haloStoneMm, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm, sideStoneCount, sideStoneCaratWeight, innerDiameterMm, includePave, paveSettingType, paveCount, paveStoneMm, sideSpreadDeg, excludedPaveKey, paveStoneDiameterOverridesMm, includeMatchingBand, matchingBandWidthMm, matchingBandCount, matchingBandOffsetOverridesMm, pointDirection])
 
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
@@ -1224,7 +1235,7 @@ export function CadDesignPage() {
     setPaveSettingType(type)
     setActiveTab('gems')
   }
-  const COMMAND_HELP = 'front · top · side · perspective · undo · redo · wireframe · render · fullscreen · turntable · ringrail · gems · surface · production · prong · bezel · cluster · tension · illusion · halo · pave · channel · flush · bar · invisible · milgrain · rope · flutes · pattern · mirror · plain · tapered · twisted · split · cathedral · bypass · export · help'
+  const COMMAND_HELP = 'front · top · side · perspective · undo · redo · wireframe · render · fullscreen · turntable · ringrail · gems · surface · model · production · prong · bezel · cluster · tension · illusion · halo · pave · channel · flush · bar · invisible · milgrain · rope · flutes · pattern · mirror · plain · tapered · twisted · split · cathedral · bypass · export · help'
   const runCommand = (raw: string) => {
     const cmd = raw.trim().toLowerCase()
     if (!cmd) return
@@ -1242,6 +1253,7 @@ export function CadDesignPage() {
       case 'gems': setActiveTab('gems'); result = 'Switched to Gems.'; break
       case 'surface': case 'solid': case 'solid/surface': setActiveTab('surface'); result = 'Switched to Solid/Surface.'; break
       case 'production': setActiveTab('production'); result = 'Switched to Production.'; break
+      case 'model': case 'curve': setActiveTab('model'); result = 'Switched to Curve/Solid.'; break
       case 'prong': runSettingCommand('prong', false); result = 'Setting: prong.'; break
       case 'bezel': runSettingCommand('bezel', false); result = 'Setting: bezel.'; break
       case 'cluster': runSettingCommand('cluster', true); result = 'Setting: cluster.'; break
@@ -1344,11 +1356,12 @@ export function CadDesignPage() {
                 than a plain text-button row, following the same real
                 Matrix reference the user shared (icon-first, dense
                 groups) rather than this app's earlier plain pill tabs. */}
-            <div className="grid grid-cols-4 gap-1 rounded-2xl bg-slate-100 p-1">
+            <div className="grid grid-cols-5 gap-1 rounded-2xl bg-slate-100 p-1">
               {([
                 ['ringrail', 'Ring Rail', Circle],
                 ['gems', 'Gems', Gem],
                 ['surface', 'Solid/Surface', Layers],
+                ['model', 'Curve/Solid', PenTool],
                 ['production', 'Production', Factory],
               ] as const).map(([tab, label, Icon]) => (
                 <button key={tab} type="button" onClick={() => setActiveTab(tab)}
@@ -1506,6 +1519,14 @@ export function CadDesignPage() {
                       </button>
                     )}
                   </div>
+                </div>
+              ) : selectedPart.name === 'Modeled solid' ? (
+                <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  <MousePointerClick className="h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    Selected <strong>{modelObjects[selectedPart.instanceIndex ?? 0]?.name ?? 'Modeled solid'}</strong> — edit its
+                    sketch, height and position in the Curve/Solid tab. Click empty space to deselect.
+                  </span>
                 </div>
               ) : selectedPart.name === 'Logo' ? (
                 <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
@@ -2403,6 +2424,10 @@ export function CadDesignPage() {
                   )}
                 </div>
               </div>
+            )}
+
+            {activeTab === 'model' && (
+              <ModelingPanel objects={modelObjects} onChange={setModelObjects} selectedId={selectedModelId} onSelect={setSelectedModelId} />
             )}
 
             {activeTab === 'production' && (

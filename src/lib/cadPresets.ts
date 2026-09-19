@@ -14,6 +14,7 @@ export interface CadDesignParams {
   /** Free-form cross-section (used when profile === 'custom'). */
   customProfile?: { outer: number[]; inner: number[]; smooth: boolean }
   backProfileOn?: boolean
+  modelObjects?: import('./modeling').ModelObject[]
   backProfile?: { outer: number[]; inner: number[]; smooth: boolean }
   shankStyle: string
   taperAmount: number
