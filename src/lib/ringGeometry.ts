@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { Brush, Evaluator, ADDITION, SUBTRACTION } from 'three-bvh-csg'
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { mergeGeometries, toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { Font } from 'three/examples/jsm/loaders/FontLoader.js'
 import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js'
 import type { JewelryMetalOption } from '@/types'
@@ -52,6 +52,11 @@ export function usSizeToDiameterMm(size: number): number {
 // ── Ring band (shank) geometry ───────────────────────────────────────────────
 
 // LATHE_TO_HEAD_AXIS: LatheGeometry puts phi=0 on +Z, but the head/stones sit on +X (attachHeadToBand's angle-0 convention) — rotate so features defined at phi=0 land on the head.
+/** Faces meeting at more than this angle keep a hard edge (crisp profile
+ *  corners) instead of being smoothed into a milky highlight; gentler
+ *  curves (comfort arcs, revolve steps) stay smooth. */
+export const CREASE_ANGLE = Math.PI / 5
+
 export type BandProfile = 'flat' | 'comfort' | 'custom'
 
 /** Free-form band cross-section (Matrix's Profile / Ring Rail idea): two
@@ -230,7 +235,7 @@ export function buildRingBandGeometry(params: RingBandParams): THREE.BufferGeome
   const profile = buildBandProfile(params)
   const geometry = new THREE.LatheGeometry(profile, params.radialSegments ?? 96)
   geometry.computeVertexNormals()
-  return geometry
+  return toCreasedNormals(geometry, CREASE_ANGLE)
 }
 
 // ── Tapered shank — a real Ring Builder feature (module 2 in the roadmap's
@@ -289,7 +294,7 @@ export function buildTaperedBandGeometry(params: TaperedBandParams): THREE.Buffe
   geometry.setIndex(indices)
   geometry.computeVertexNormals()
   geometry.rotateY(Math.PI / 2) // see LATHE_TO_HEAD_AXIS note
-  return geometry
+  return toCreasedNormals(geometry, CREASE_ANGLE)
 }
 
 // ── Twisted band — Matrix's own "Twist" transform, applied to the shank ────
@@ -363,7 +368,7 @@ export function buildTwistedBandGeometry(params: TwistedBandParams): THREE.Buffe
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
   geometry.setIndex(indices)
   geometry.computeVertexNormals()
-  return geometry
+  return toCreasedNormals(geometry, CREASE_ANGLE)
 }
 
 // ── Split shank — a named Ring Builder TYPE (module 2) ─────────────────────
@@ -506,7 +511,7 @@ export function buildCathedralBandGeometry(params: CathedralBandParams): THREE.B
   geometry.setIndex(indices)
   geometry.computeVertexNormals()
   geometry.rotateY(Math.PI / 2) // see LATHE_TO_HEAD_AXIS note
-  return geometry
+  return toCreasedNormals(geometry, CREASE_ANGLE)
 }
 
 // ── Bypass ring (toi et moi crossover) — a named Ring Builder TYPE ─────────
@@ -3535,5 +3540,5 @@ export function buildVariableProfileBandGeometry(params: RingBandParams, backPro
   geometry.setIndex(indices)
   geometry.computeVertexNormals()
   geometry.rotateY(Math.PI / 2) // see LATHE_TO_HEAD_AXIS note
-  return geometry
+  return toCreasedNormals(geometry, CREASE_ANGLE)
 }

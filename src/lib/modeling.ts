@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 // Rhino-style general modeling core (first slice): draw a curve on a
 // construction plane, then turn it into a solid with Extrude or Revolve.
@@ -248,8 +249,7 @@ export function buildModelObjectGeometry(obj: ModelObject): { geometry: THREE.Bu
     // solid is NOT rotated onto the profile's plane.
     geometry = buildSweepGeometry(pts, obj.rail!)
     geometry.translate(obj.offsetMm.x, obj.offsetMm.y, obj.offsetMm.z)
-    geometry.computeVertexNormals()
-    return { geometry }
+    return { geometry: toCreasedNormals(geometry, Math.PI / 5) }
   }
   if (obj.op === 'extrude') {
     if (!(obj.heightMm > 0)) return { error: 'Extrude height must be greater than 0.' }
@@ -263,8 +263,7 @@ export function buildModelObjectGeometry(obj: ModelObject): { geometry: THREE.Bu
   }
   orientToPlane(geometry, obj.plane)
   geometry.translate(obj.offsetMm.x, obj.offsetMm.y, obj.offsetMm.z)
-  geometry.computeVertexNormals()
-  return { geometry }
+  return { geometry: toCreasedNormals(geometry, Math.PI / 5) }
 }
 
 /** Meshes for the valid objects whose mode is `mode` (instanceIndex is the
