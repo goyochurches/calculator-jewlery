@@ -1,5 +1,5 @@
 import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
-import { sizeKeyDisplay, type QuoteConfig } from '@/hooks/useQuoteConfig'
+import { roundMeleePriceValue, sizeKeyDisplay, unpackRoundSizeKey, type QuoteConfig } from '@/hooks/useQuoteConfig'
 import { JEWELRY_TYPE_OPTIONS } from '@/hooks/useQuoteBuilder'
 import type { QuoteEmkayStone, StockItem, StockStone } from '@/types'
 
@@ -23,8 +23,19 @@ export interface StoneCostSplit {
 export function stoneCostSplit(stone: StockStone, config: QuoteConfig): StoneCostSplit {
   const carats = stone.carats ?? 0
   const fancyRow = stone.shape ? config.fancyMeleePriceFor(stone.shape, stone.sizeKey) : undefined
-  const pricePerCarat = fancyRow?.pricePerCarat ?? config.diamondSizeFor(stone.stoneType, stone.sizeKey)?.basePrice ?? 0
-  const ctPerStone = fancyRow?.ctPerStone ?? config.diamondSizeFor(stone.stoneType, stone.sizeKey)?.ctPerStone ?? 0
+  // Lab-grown Round prices from the round melee sheet, with growth/clarity
+  // packed into sizeKey ("2::HPHT::VVS") — same branch as the builder's
+  // sizePricingFor.
+  let roundPrice: { pricePerCarat: number; ctPerStone: number } | undefined
+  if (!fancyRow && stone.stoneType === 'lab-grown' && stone.shape === 'Round' && config.roundMeleePrices.length > 0) {
+    const { sizeKey: baseKey, growth, clarity } = unpackRoundSizeKey(stone.sizeKey)
+    const roundRow = baseKey ? config.roundMeleePriceFor(baseKey) : undefined
+    if (roundRow && growth && clarity) {
+      roundPrice = { pricePerCarat: roundMeleePriceValue(roundRow, growth, clarity), ctPerStone: roundRow.ctPerStone }
+    }
+  }
+  const pricePerCarat = fancyRow?.pricePerCarat ?? roundPrice?.pricePerCarat ?? config.diamondSizeFor(stone.stoneType, stone.sizeKey)?.basePrice ?? 0
+  const ctPerStone = fancyRow?.ctPerStone ?? roundPrice?.ctPerStone ?? config.diamondSizeFor(stone.stoneType, stone.sizeKey)?.ctPerStone ?? 0
 
   const cost = stone.manualPrice != null ? stone.manualPrice : carats * pricePerCarat
   const count = ctPerStone > 0 ? Math.max(1, Math.round(carats / ctPerStone)) : 1
