@@ -118,6 +118,13 @@ interface ModelViewer3DProps {
    *  shadows on a ground plane and a studio gradient backdrop — instead
    *  of the flat 3-point-light working view used while designing. */
   renderMode?: boolean
+  /** Physically based PATH TRACING on top of Render mode (three-gpu-pathtracer):
+   *  real refraction inside gems (IOR 2.42, many internal bounces), true
+   *  reflections between parts, soft shadows from area lights, accumulating
+   *  samples so the image sharpens over time. Needs a capable GPU. */
+  pathTrace?: boolean
+  /** Reports the accumulated sample count while path tracing. */
+  onPathTraceSamples?: (samples: number) => void
 }
 
 /**
@@ -128,7 +135,7 @@ interface ModelViewer3DProps {
  * file's mesh, not just the parametric ring band.
  */
 export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>(function ModelViewer3D(
-  { object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className, onSelectPart, onMove, autoRotate = false, wireframe = false, renderMode = false },
+  { object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className, onSelectPart, onMove, autoRotate = false, wireframe = false, renderMode = false, pathTrace = false, onPathTraceSamples },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -139,6 +146,11 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
   const keyLightRef = useRef<THREE.DirectionalLight | null>(null)
   const envTextureRef = useRef<THREE.Texture | null>(null)
   const groundRef = useRef<THREE.Mesh | null>(null)
+  const pathGroundRef = useRef<THREE.Mesh | null>(null)
+  // Set only while the path tracer owns rendering (after its scene is built).
+  const pathTracerRef = useRef<{ renderSample: () => void; updateCamera: () => void; samples: number; dispose: () => void } | null>(null)
+  const onPathSamplesRef = useRef(onPathTraceSamples)
+  useEffect(() => { onPathSamplesRef.current = onPathTraceSamples }, [onPathTraceSamples])
   const backdropRef = useRef<THREE.Texture | null>(null)
   const highlightMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
@@ -196,6 +208,12 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     ground.visible = false
     scene.add(ground)
     groundRef.current = ground
+    // Real (matte) floor for the path tracer, which can't use ShadowMaterial.
+    const pathGround = new THREE.Mesh(new THREE.CircleGeometry(90, 64), new THREE.MeshStandardMaterial({ color: '#e7e9ee', roughness: 0.45, metalness: 0 }))
+    pathGround.rotation.x = -Math.PI / 2
+    pathGround.visible = false
+    scene.add(pathGround)
+    pathGroundRef.current = pathGround
 
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.enableDamping = true
@@ -339,10 +357,18 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     resizeObserver.observe(container)
 
     let running = true
+    let pathFrames = 0
+    controls.addEventListener('change', () => { pathTracerRef.current?.updateCamera() })
     const animate = () => {
       if (!running) return
       controls.update()
-      renderer.render(scene, camera)
+      const pt = pathTracerRef.current
+      if (pt) {
+        pt.renderSample()
+        if (++pathFrames % 6 === 0) onPathSamplesRef.current?.(Math.floor(pt.samples))
+      } else {
+        renderer.render(scene, camera)
+      }
       requestAnimationFrame(animate)
     }
     animate()
@@ -356,6 +382,10 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
       envTextureRef.current?.dispose()
       backdropRef.current?.dispose()
       ground.geometry.dispose()
+      pathGround.geometry.dispose()
+      ;(pathGround.material as THREE.Material).dispose()
+      pathTracerRef.current?.dispose()
+      pathTracerRef.current = null
       ;(ground.material as THREE.Material).dispose()
       rendererRef.current = null
       material.dispose()
@@ -468,7 +498,9 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     snapshot: () => {
       const renderer = rendererRef.current, scene = sceneRef.current, camera = cameraRef.current
       if (!renderer || !scene || !camera) return null
-      renderer.render(scene, camera)
+      // The canvas is only readable right after drawing, so draw first.
+      if (pathTracerRef.current) pathTracerRef.current.renderSample()
+      else renderer.render(scene, camera)
       return renderer.domElement.toDataURL('image/png')
     },
     setView: (view: CameraView) => {
@@ -510,6 +542,7 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     const material = materialRef.current, stone = stoneMaterialRef.current
     const key = keyLightRef.current, ground = groundRef.current
     if (!renderer || !scene || !material || !stone || !key || !ground) return
+    if (pathTrace && renderMode) return // the path-tracing effect below owns the scene
     renderer.shadowMap.enabled = renderMode
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     renderer.toneMapping = renderMode ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping
@@ -539,7 +572,85 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
       const box = new THREE.Box3().setFromObject(object)
       ground.position.y = box.min.y - 0.02
     }
-  }, [renderMode, object])
+  }, [renderMode, object, pathTrace])
+
+  // Path tracing (three-gpu-pathtracer, loaded on demand so it isn't part of
+  // the main bundle). Builds a studio environment with softboxes, swaps in a
+  // real floor and physically based gem/metal settings, then accumulates
+  // samples every frame. Rebuilds (debounced) when the model changes.
+  useEffect(() => {
+    if (!(pathTrace && renderMode)) return
+    const renderer = rendererRef.current, scene = sceneRef.current, camera = cameraRef.current
+    const material = materialRef.current, stone = stoneMaterialRef.current
+    const pathGround = pathGroundRef.current
+    if (!renderer || !scene || !camera || !material || !stone || !pathGround) return
+    let cancelled = false
+    let tracer: { dispose: () => void } | null = null
+    const disposables: { dispose: () => void }[] = []
+    const lights: THREE.Object3D[] = []
+    scene.traverse(o => { if (o instanceof THREE.Light) lights.push(o) })
+    const helper = transformControlsRef.current?.getHelper()
+    const timer = setTimeout(async () => {
+      const mod = await import('three-gpu-pathtracer')
+      if (cancelled) return
+      // Studio: dim ambient dome + big softboxes (key, fill, rim, top strip).
+      const env = new mod.ProceduralEquirectTexture(512, 256)
+      env.generationCallback = (polar, _uv, _coord, target) => {
+        const y = Math.cos(polar.phi), x = Math.sin(polar.phi) * Math.sin(polar.theta), z = Math.sin(polar.phi) * Math.cos(polar.theta)
+        let v = y < 0 ? 0.04 : 0.28 + 0.35 * y
+        if (x * 0.5 + y * 0.75 + z * 0.45 > 0.93) v = 14
+        else if (-x * 0.7 + y * 0.4 + z * 0.2 > 0.92) v = 5
+        else if (y * 0.3 - z * 0.95 > 0.94) v = 9
+        else if (y > 0.985) v = 6
+        target.setRGB(v, v, v * 1.03)
+      }
+      env.update()
+      const backdrop = new mod.GradientEquirectTexture()
+      backdrop.topColor.set('#f4f5f8'); backdrop.bottomColor.set('#a3aab6')
+      backdrop.update()
+      disposables.push(env, backdrop)
+      scene.environment = env
+      scene.background = backdrop
+      lights.forEach(l => { l.visible = false })
+      if (helper) helper.visible = false
+      transformControlsRef.current?.detach()
+      if (groundRef.current) groundRef.current.visible = false
+      renderer.toneMapping = THREE.ACESFilmicToneMapping
+      renderer.toneMappingExposure = 1.0
+      // Physically based materials.
+      material.metalness = 1; material.roughness = 0.14
+      stone.transmission = 1; stone.ior = 2.417; stone.thickness = 0; stone.roughness = 0
+      stone.transparent = false; stone.opacity = 1; stone.color.set('#ffffff')
+      stone.needsUpdate = true; material.needsUpdate = true
+      if (object) pathGround.position.y = new THREE.Box3().setFromObject(object).min.y - 0.02
+      pathGround.visible = true
+      const pt = new mod.WebGLPathTracer(renderer)
+      pt.bounces = 12
+      pt.transmissiveBounces = 16
+      pt.filterGlossyFactor = 0.4
+      pt.dynamicLowRes = true
+      pt.lowResScale = 0.3
+      pt.renderDelay = 60
+      pt.minSamples = 2
+      tracer = pt
+      try {
+        pt.setScene(scene, camera)
+        pathTracerRef.current = pt as unknown as NonNullable<typeof pathTracerRef.current>
+      } catch (err) {
+        console.error('Path tracer could not build the scene', err)
+      }
+    }, 400)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+      pathTracerRef.current = null
+      tracer?.dispose()
+      disposables.forEach(d => d.dispose())
+      lights.forEach(l => { l.visible = true })
+      if (helper) helper.visible = true
+      pathGround.visible = false
+    }
+  }, [pathTrace, renderMode, object])
 
   return <div ref={containerRef} className={className} />
 })
