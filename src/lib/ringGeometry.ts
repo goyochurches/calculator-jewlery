@@ -168,17 +168,22 @@ export function buildBandProfile(params: RingBandParams): THREE.Vector2[] {
       const o = Math.max(outerS[i], innerS[i] + CUSTOM_PROFILE_MIN_WALL)
       pts.push(new THREE.Vector2(innerRadius + Math.min(1, o) * thicknessMm, (-0.5 + i / (m - 1)) * widthMm))
     }
-    return closeLoop(pts)
+    // pts runs inner edge→edge then back along the outer face = clockwise;
+    // Lathe needs counter-clockwise (see the flat profile) — reverse it.
+    return closeLoop(pts.reverse())
   }
 
   if (profile === 'flat' || profile === 'custom') {
-    // Plain rectangle, traced once around: inner-bottom → inner-top →
-    // outer-top → outer-bottom → back to inner-bottom (closeLoop).
+    // Plain rectangle, traced once around COUNTER-CLOCKWISE in (radius, axial)
+    // with axial up: inner-bottom → outer-bottom → outer-top → inner-top →
+    // back to inner-bottom (closeLoop). THREE.LatheGeometry faces outward
+    // for this winding (measured: clockwise gave a NEGATIVE signed volume,
+    // i.e. an inside-out band).
     return closeLoop([
       new THREE.Vector2(innerRadius, -halfWidth),
-      new THREE.Vector2(innerRadius, halfWidth),
-      new THREE.Vector2(outerRadius, halfWidth),
       new THREE.Vector2(outerRadius, -halfWidth),
+      new THREE.Vector2(outerRadius, halfWidth),
+      new THREE.Vector2(innerRadius, halfWidth),
     ])
   }
 
