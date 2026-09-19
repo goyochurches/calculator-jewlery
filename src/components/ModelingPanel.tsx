@@ -167,7 +167,7 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
               className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${o.id === selectedId ? 'border-slate-900 bg-white' : 'border-slate-200 bg-white/60'}`}>
               <span className="min-w-0 truncate">
                 <strong className="font-semibold text-slate-800">{o.name}</strong>
-                <span className="ml-1.5 text-slate-400">{o.op}{o.mode === 'subtract' ? ' · cutter' : ''}</span>
+                <span className="ml-1.5 text-slate-400">{o.op}{o.mode === 'subtract' ? ' · subtract' : o.mode === 'intersect' ? ' · intersect' : ''}{o.targetId && !objects.some(t => t.id === o.targetId) ? ' · target deleted' : ''}</span>
                 {err && <span className="ml-1.5 text-rose-600">· {err}</span>}
               </span>
               <button type="button" title="Delete" onClick={e => { e.stopPropagation(); onChange(objects.filter(x => x.id !== o.id)); if (o.id === selectedId) onSelect(null) }}
@@ -208,9 +208,22 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
             <select className={numInput} value={selected.mode ?? 'add'} onChange={e => update(selected.id, { mode: e.target.value as ModelMode })}>
               <option value="add">Add — part of the ring's metal</option>
               <option value="subtract">Subtract — cutter (Boolean difference)</option>
+              <option value="intersect">Intersect — keep only the overlap</option>
             </select>
-            {selected.mode === 'subtract' && (
-              <p className="mt-1 text-[10px] text-amber-600">Shown as a red ghost while designing; it removes its volume from the metal (beta boolean — the ring is merged into one solid).</p>
+            {(selected.mode ?? 'add') !== 'add' && (
+              <div className="mt-2 space-y-1">
+                <label className="block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Applies to</label>
+                <select className={numInput} value={selected.targetId ?? ''} onChange={e => update(selected.id, { targetId: e.target.value || undefined })}>
+                  <option value="">Everything (ring + all added solids)</option>
+                  {objects.filter(o => o.id !== selected.id && (o.mode ?? 'add') === 'add').map(o => (
+                    <option key={o.id} value={o.id}>Only: {o.name}</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-amber-600">
+                  {selected.mode === 'intersect' ? 'Green' : 'Red'} ghost while designing.
+                  {selected.targetId ? ' Applied to that one solid before it joins the design.' : ' Whole-design boolean (beta) — the ring is merged into one solid.'}
+                </p>
+              </div>
             )}
           </div>
           {selected.op === 'sweep' && selected.rail && (

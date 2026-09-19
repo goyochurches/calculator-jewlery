@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { Brush, Evaluator, SUBTRACTION, INTERSECTION } from 'three-bvh-csg'
 import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 // Rhino-style general modeling core (first slice): draw a curve on a
@@ -11,8 +12,9 @@ import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.j
 export type ProfileKind = 'polyline' | 'spline' | 'rectangle' | 'circle'
 export type ModelPlane = 'front' | 'top' | 'right'
 export type ModelOp = 'extrude' | 'revolve' | 'sweep' | 'loft'
-/** 'add' = part of the ring's metal; 'subtract' = a cutter removed from it. */
-export type ModelMode = 'add' | 'subtract'
+/** 'add' = part of the ring's metal; 'subtract' = a cutter removed from it;
+ *  'intersect' = keep only where the object overlaps. */
+export type ModelMode = 'add' | 'subtract' | 'intersect'
 
 export interface Point2 { x: number; y: number }
 
@@ -36,6 +38,9 @@ export interface ModelObject {
   heightMm: number
   /** Defaults to 'add'. */
   mode?: ModelMode
+  /** For subtract / intersect: id of ONE 'add' object to apply to instead of
+   *  the whole design (ring + every added solid). */
+  targetId?: string
   /** Sweep only: the smooth rail curve the profile travels along, drawn on
    *  its own construction plane (points in that plane's 2D mm coordinates).
    *  `closed` makes it a loop (a ring/torus-like sweep). */
@@ -361,27 +366,78 @@ export function buildModelObjectGeometry(obj: ModelObject): { geometry: THREE.Bu
   return { geometry: toCreasedNormals(geometry, Math.PI / 5) }
 }
 
-/** Meshes for the valid objects whose mode is `mode` (instanceIndex is the
- *  object's index in the FULL list, so selection maps back to it). Invalid
- *  objects are skipped here (the panel shows their error). */
-function meshesForMode(objects: ModelObject[], mode: ModelMode): THREE.Mesh[] {
+const cutOp = (mode: ModelMode) => (mode === 'intersect' ? INTERSECTION : SUBTRACTION)
+
+/** Boolean of two geometries with three-bvh-csg (positions + normals only —
+ *  swept/lofted solids carry no UVs). */
+function csg(a: THREE.BufferGeometry, b: THREE.BufferGeometry, mode: ModelMode): THREE.BufferGeometry {
+  const evaluator = new Evaluator()
+  evaluator.attributes = ['position', 'normal']
+  const A = new Brush(a), B = new Brush(b)
+  A.updateMatrixWorld(true); B.updateMatrixWorld(true)
+  return evaluator.evaluate(A, B, cutOp(mode)).geometry
+}
+
+const isCutMode = (o: ModelObject) => (o.mode ?? 'add') !== 'add'
+
+function meshOf(geometry: THREE.BufferGeometry, index: number): THREE.Mesh {
+  const mesh = new THREE.Mesh(geometry)
+  mesh.userData.partName = 'Modeled solid'
+  mesh.userData.instanceIndex = index
+  return mesh
+}
+
+/** Solids that become part of the ring's metal. Cutters that target one of
+ *  them specifically are applied here, in list order, before the solid
+ *  joins the design. */
+export function buildModelObjects(objects: ModelObject[]): THREE.Mesh[] {
   const meshes: THREE.Mesh[] = []
   objects.forEach((obj, index) => {
-    if ((obj.mode ?? 'add') !== mode) return
-    const result = buildModelObjectGeometry(obj)
-    if ('error' in result) return
-    const mesh = new THREE.Mesh(result.geometry)
-    mesh.userData.partName = 'Modeled solid'
-    mesh.userData.instanceIndex = index
+    if (isCutMode(obj)) return
+    const built = buildModelObjectGeometry(obj)
+    if ('error' in built) return
+    let geometry = built.geometry
+    for (const cutter of objects) {
+      if (!isCutMode(cutter) || cutter.targetId !== obj.id) continue
+      const cb = buildModelObjectGeometry(cutter)
+      if ('error' in cb) continue
+      geometry = csg(geometry, cb.geometry, cutter.mode ?? 'subtract')
+    }
+    meshes.push(meshOf(geometry, index))
+  })
+  return meshes
+}
+
+/** Cutters for the whole-design boolean pass (no specific target), in list
+ *  order. userData.cutMode says subtract vs. intersect. */
+export function buildCutterMeshes(objects: ModelObject[]): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = []
+  objects.forEach((obj, index) => {
+    // A cutter aimed at one object never touches the whole design — even if
+    // that object was deleted (then it simply does nothing).
+    if (!isCutMode(obj) || obj.targetId) return
+    const built = buildModelObjectGeometry(obj)
+    if ('error' in built) return
+    const mesh = meshOf(built.geometry, index)
+    mesh.userData.cutMode = obj.mode
     meshes.push(mesh)
   })
   return meshes
 }
 
-/** Solids that become part of the ring's metal. */
-export const buildModelObjects = (objects: ModelObject[]) => meshesForMode(objects, 'add')
-/** Cutters: subtracted from the metal by the boolean pass. */
-export const buildCutterMeshes = (objects: ModelObject[]) => meshesForMode(objects, 'subtract')
+/** Every valid cutter (global or targeted) as a ghost for the viewer. */
+export function buildGhostMeshes(objects: ModelObject[]): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = []
+  objects.forEach((obj, index) => {
+    if (!isCutMode(obj)) return
+    const built = buildModelObjectGeometry(obj)
+    if ('error' in built) return
+    const mesh = meshOf(built.geometry, index)
+    mesh.userData.cutMode = obj.mode
+    meshes.push(mesh)
+  })
+  return meshes
+}
 
 export function newModelObject(profile: ModelProfile, op: ModelOp, index: number): ModelObject {
   return {

@@ -6,7 +6,7 @@ import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { Card, CardContent } from '@/components/ui/card'
 import { EMPTY_HISTORY, recordSnapshot, stepHistory as stepHistoryState, canUndoHistory, canRedoHistory, type HistoryState } from '@/lib/historyStack'
 import { ModelingPanel } from '@/components/ModelingPanel'
-import { buildModelObjects, buildCutterMeshes, type ModelObject } from '@/lib/modeling'
+import { buildModelObjects, buildCutterMeshes, buildGhostMeshes, type ModelObject } from '@/lib/modeling'
 import { ProfileEditor } from '@/components/ProfileEditor'
 import { PlanShapePicker } from '@/components/PlanShapePicker'
 import { GEM_LOOKS, DIAMOND_LOOK } from '@/lib/gemLooks'
@@ -921,6 +921,8 @@ export function CadDesignPage() {
   // Boolean cutters (modeled objects in Subtract mode) are consumed by the
   // union pass, so having any forces it even if "Merge" is off.
   const cutterMeshes = useMemo(() => buildCutterMeshes(modelObjects), [modelObjects])
+  // Ghosts show EVERY cutter (also the ones aimed at one specific object).
+  const ghostMeshes = useMemo(() => buildGhostMeshes(modelObjects), [modelObjects])
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
   // separate (see ringGeometry.ts). Beta: three-bvh-csg can throw on a
@@ -983,16 +985,16 @@ export function CadDesignPage() {
   // Viewer-only: the cut result plus a red ghost of each cutter so it can be
   // seen and placed. Exports, volume and pricing use displayModel (no ghosts).
   const viewerObject = useMemo(() => {
-    if (cutterMeshes.length === 0) return viewModel
+    if (ghostMeshes.length === 0) return viewModel
     const wrapper = new THREE.Group()
     wrapper.add(viewModel)
-    for (const cutter of cutterMeshes) {
+    for (const cutter of ghostMeshes) {
       const ghost = new THREE.Mesh(cutter.geometry.clone())
       ghost.userData = { ...cutter.userData, isCutterGhost: true }
       wrapper.add(ghost)
     }
     return wrapper
-  }, [viewModel, cutterMeshes])
+  }, [viewModel, ghostMeshes])
 
 
   // Three "reset some state when a dependency changes" cases, all using

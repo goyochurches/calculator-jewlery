@@ -158,6 +158,7 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
   const backdropRef = useRef<THREE.Texture | null>(null)
   const highlightMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null)
   const ghostMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null)
+  const ghostIntersectMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const controlsRef = useRef<OrbitControls | null>(null)
@@ -298,6 +299,10 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     // Render / Ray-trace, where only the cut result matters.
     const ghostMaterial = new THREE.MeshStandardMaterial({ color: '#ef4444', transparent: true, opacity: 0.4, depthWrite: false, metalness: 0, roughness: 0.6 })
     ghostMaterialRef.current = ghostMaterial
+    // Green ghost for Intersect cutters (keep-only-the-overlap).
+    const ghostIntersectMaterial = ghostMaterial.clone()
+    ghostIntersectMaterial.color.set('#22c55e')
+    ghostIntersectMaterialRef.current = ghostIntersectMaterial
 
     // Click-to-select: raycast from the click point through the camera,
     // find the first tagged part it hits, and toggle its material to the
@@ -322,7 +327,7 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
 
       const prev = selectedMeshRef.current
       if (prev) {
-        prev.material = prev.userData.isCutterGhost ? (ghostMaterialRef.current ?? metalMat) : prev.userData.isStone ? stoneMat : metalMat
+        prev.material = prev.userData.isCutterGhost ? ((prev.userData.cutMode === 'intersect' ? ghostIntersectMaterialRef.current : ghostMaterialRef.current) ?? metalMat) : prev.userData.isStone ? stoneMat : metalMat
         selectedMeshRef.current = null
       }
 
@@ -402,6 +407,7 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
       stoneMaterial.dispose()
       highlightMaterial.dispose()
       ghostMaterial.dispose()
+      ghostIntersectMaterial.dispose()
       renderer.dispose()
       container.removeChild(renderer.domElement)
       sceneRef.current = null
@@ -449,7 +455,7 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     if (object) {
       object.traverse(obj => {
         if (!(obj instanceof THREE.Mesh)) return
-        obj.material = obj.userData.isCutterGhost ? (ghostMaterialRef.current ?? material) : obj.userData.isStone ? stoneMaterial : material
+        obj.material = obj.userData.isCutterGhost ? ((obj.userData.cutMode === 'intersect' ? ghostIntersectMaterialRef.current : ghostMaterialRef.current) ?? material) : obj.userData.isStone ? stoneMaterial : material
         obj.castShadow = true
         meshes.push(obj)
       })

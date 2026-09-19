@@ -1,5 +1,5 @@
 import * as THREE from 'three'
-import { Brush, Evaluator, ADDITION, SUBTRACTION } from 'three-bvh-csg'
+import { Brush, Evaluator, ADDITION, SUBTRACTION, INTERSECTION } from 'three-bvh-csg'
 import { mergeGeometries, toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { Font } from 'three/examples/jsm/loaders/FontLoader.js'
 import { SVGLoader } from 'three/examples/jsm/loaders/SVGLoader.js'
@@ -2174,6 +2174,9 @@ export function unionMetalParts(object: THREE.Object3D, cutters: THREE.Mesh[] = 
   if (metalMeshes.length === 0) return null
 
   const evaluator = new Evaluator()
+  // Positions + normals only: swept/lofted modeled solids have no UVs and
+  // nothing here is textured.
+  evaluator.attributes = ['position', 'normal']
   let acc = new Brush(worldBakedGeometry(metalMeshes[0]))
   acc.updateMatrixWorld(true)
   for (let i = 1; i < metalMeshes.length; i++) {
@@ -2181,13 +2184,14 @@ export function unionMetalParts(object: THREE.Object3D, cutters: THREE.Mesh[] = 
     next.updateMatrixWorld(true)
     acc = evaluator.evaluate(acc, next, ADDITION)
   }
-  // Cutters (Matrix's "Cutters" group / Rhino BooleanDifference): each
-  // one is subtracted from the finished metal solid.
+  // Cutters (Matrix's "Cutters" group / Rhino BooleanDifference and
+  // BooleanIntersection): applied in list order to the finished metal solid —
+  // subtract removes the cutter's volume, intersect keeps only the overlap.
   for (const cutter of cutters) {
     cutter.updateMatrixWorld(true)
     const brush = new Brush(worldBakedGeometry(cutter))
     brush.updateMatrixWorld(true)
-    acc = evaluator.evaluate(acc, brush, SUBTRACTION)
+    acc = evaluator.evaluate(acc, brush, cutter.userData.cutMode === 'intersect' ? INTERSECTION : SUBTRACTION)
   }
   return acc.geometry
 }
