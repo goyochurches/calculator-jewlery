@@ -3,7 +3,7 @@ import { DIAMOND_TYPE_OPTIONS, JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import { useAuth } from '@/context/AuthContext'
 import {
   useQuoteConfig, normalizeSizeKey,
-  packRoundSizeKey, unpackRoundSizeKey, roundMeleePriceValue,
+  packRoundSizeKey, unpackRoundSizeKey, roundMeleePriceValue, sizeKeyDisplay,
 } from '@/hooks/useQuoteConfig'
 import { METAL_GROUPS } from '@/hooks/useQuoteBuilder'
 import { computeRnBreakdown, type RnStoneType } from '@/lib/rnPricing'
@@ -2489,21 +2489,36 @@ export function StockBuilderPage() {
                   items.map(s => {
                     const b = stoneBreakdownByUid[s.uid]
                     const cost = b ? b.cost : 0
-                    if (cost <= 0) return null
+                    const labor = b ? b.labor : 0
                     const count = Math.round(parseNum(s.amount))
+                    // Skip only truly empty rows; a stone with a count/size but
+                    // no price still shows (flagged) so it can't silently vanish.
+                    if (cost <= 0 && labor <= 0 && count <= 0 && !s.sizeKey) return null
                     const typeLabel = s.stoneTypeChosen ? (s.stoneType === 'lab-grown' ? 'lab' : 'natural') : ''
                     const carats = parseNum(s.carats)
                     const label = [
                       count > 1 ? count : null,
                       s.shape || null,
                       typeLabel || null,
-                      s.sizeKey || null,
+                      s.sizeKey ? sizeKeyDisplay(s.sizeKey) : null,
                       carats > 0 ? `${carats}ct` : null,
-                    ].filter(Boolean).join(' ')
+                    ].filter(Boolean).join(' · ')
                     return (
-                      <div key={s.uid} className="flex items-center justify-between gap-3">
-                        <span className="truncate text-slate-600">{label || 'Stone'}</span>
-                        <strong className="shrink-0 tabular-nums text-slate-900">${cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                      <div key={s.uid}>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="truncate text-slate-600">{label || 'Stone'}</span>
+                          {cost > 0 ? (
+                            <strong className="shrink-0 tabular-nums text-slate-900">${cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
+                          ) : (
+                            <strong className="shrink-0 text-xs font-semibold text-amber-600">not priced</strong>
+                          )}
+                        </div>
+                        {labor > 0 && (
+                          <div className="flex items-center justify-between gap-3 pl-3 text-xs text-slate-400">
+                            <span>setting {count > 0 ? `${count} × ` : ''}${(count > 0 ? labor / count : labor).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                            <span className="tabular-nums">${labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        )}
                       </div>
                     )
                   })

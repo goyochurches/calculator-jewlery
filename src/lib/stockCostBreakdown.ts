@@ -1,5 +1,5 @@
 import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
-import type { QuoteConfig } from '@/hooks/useQuoteConfig'
+import { sizeKeyDisplay, type QuoteConfig } from '@/hooks/useQuoteConfig'
 import { JEWELRY_TYPE_OPTIONS } from '@/hooks/useQuoteBuilder'
 import type { QuoteEmkayStone, StockItem, StockStone } from '@/types'
 
@@ -41,7 +41,7 @@ export function stoneLineLabel(stone: StockStone, count: number): string {
     count > 1 ? String(count) : null,
     stone.shape || null,
     typeLabel,
-    stone.sizeKey || null,
+    stone.sizeKey ? sizeKeyDisplay(stone.sizeKey) : null,
     carats > 0 ? `${carats}ct` : null,
   ].filter(Boolean).join(' ')
 }
@@ -136,7 +136,8 @@ export function formatStockItemText(item: StockItem, config: QuoteConfig): strin
     const specForLabel = stoneSpecLine(s)
     const roleLabel = s.role.charAt(0) + s.role.slice(1).toLowerCase()
     const stoneLabel = `${roleLabel}: ${stoneLineLabel(s, count) || 'Stone'}`
-    if (cost > 0) lines.push(`${stoneLabel}${specForLabel ? ` (${specForLabel})` : ''} — ${money(cost)}`)
+    const settingNote = labor > 0 ? `, setting ${money(labor)}` : ''
+    lines.push(`${stoneLabel}${specForLabel ? ` (${specForLabel})` : ''} — ${cost > 0 ? money(cost) : 'not priced'}${settingNote}`)
     if (s.comments) stoneComments.push(`${stoneLabel} — ${s.comments}`)
   }
 

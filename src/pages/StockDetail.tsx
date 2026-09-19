@@ -280,17 +280,22 @@ export default function StockDetailPage() {
               </>
             )}
 
-            {(stoneLines.some(l => l.cost > 0) || emkayLines.some(l => l.cost > 0)) && (
+            {(stoneLines.length > 0 || emkayLines.some(l => l.cost > 0)) && (
               <>
                 <CostGroupLabel>Stones</CostGroupLabel>
                 <div className="-mx-2.5">
-                  {stoneLines.filter(l => l.cost > 0).map((l, i) => {
+                  {stoneLines.map((l, i) => {
                     const roleLabel = l.stone.role.charAt(0) + l.stone.role.slice(1).toLowerCase()
+                    const setting = l.labor > 0
+                      ? `setting $${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                      : ''
                     return (
                       <CostRow key={`s${i}`} icon={Gem} tint="bg-sky-50 text-sky-600"
                         label={`${roleLabel}: ${stoneLineLabel(l.stone, l.count) || 'Stone'}`}
-                        sub={stoneSpecLine(l.stone)}
-                        value={`$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                        sub={[stoneSpecLine(l.stone), setting].filter(Boolean).join(' · ')}
+                        value={l.cost > 0
+                          ? `$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                          : 'Not priced'} />
                     )
                   })}
                   {emkayLines.filter(l => l.cost > 0).map((l, i) => (

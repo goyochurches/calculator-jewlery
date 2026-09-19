@@ -56,6 +56,13 @@ export function unpackRoundSizeKey(packed: string): { sizeKey: string; growth: R
   return { sizeKey: packed, growth: '', clarity: '' }
 }
 
+/** Human size text for a (possibly packed) size key: "0.9mm HPHT VVS". */
+export function sizeKeyDisplay(sizeKey: string): string {
+  const { sizeKey: base, growth, clarity } = unpackRoundSizeKey(sizeKey)
+  const size = /^[\d.]+$/.test(base) ? `${base}mm` : base
+  return [size, growth, clarity].filter(Boolean).join(' ')
+}
+
 /** Picks the one of a round-melee row's 4 prices matching a growth/clarity pair. */
 export function roundMeleePriceValue(row: RoundMeleePrice, growth: RoundGrowthMethod, clarity: RoundClarityTier): number {
   if (growth === 'HPHT') return clarity === 'VVS' ? row.hphtVvsPrice : row.hphtVsPrice
