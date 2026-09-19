@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import {
-  newModelObject, profileError, sampleProfile,
+  newModelObject, profileError, railError, sampleProfile, sampleRail2D,
   type ModelObject, type ModelMode, type ModelOp, type ModelPlane, type Point2, type ProfileKind,
 } from '@/lib/modeling'
 
@@ -35,6 +35,8 @@ const pathOf = (pts: { x: number; y: number }[], close: boolean) =>
 export function ModelingPanel({ objects, onChange, selectedId, onSelect }: ModelingPanelProps) {
   const [tool, setTool] = useState<ProfileKind | null>(null)
   const [draft, setDraft] = useState<Point2[]>([])
+  // For a Sweep object: which of its two sketches the canvas edits.
+  const [editTarget, setEditTarget] = useState<'profile' | 'rail'>('profile')
   const svgRef = useRef<SVGSVGElement>(null)
   const drag = useRef<number | null>(null)
   const selected = objects.find(o => o.id === selectedId) ?? null
@@ -64,15 +66,20 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
     setDraft([]); setTool(null)
   }
 
+  const editingRail = selected?.op === 'sweep' && editTarget === 'rail' && !!selected.rail
   const moveHandle = (index: number, clientX: number, clientY: number) => {
     if (!selected) return
     const pt = pointerMm(clientX, clientY)
+    if (editingRail && selected.rail) {
+      update(selected.id, { rail: { ...selected.rail, points: selected.rail.points.map((p, i) => (i === index ? pt : p)) } })
+      return
+    }
     const points = selected.profile.points.map((p, i) => (i === index ? pt : p))
     update(selected.id, { profile: { ...selected.profile, points } })
   }
 
   const outline = selected ? sampleProfile(selected.profile) : []
-  const selectedError = selected ? profileError(selected.profile, selected.op) : null
+  const selectedError = selected ? (profileError(selected.profile, selected.op) ?? (selected.op === 'sweep' ? railError(selected) : null)) : null
   const numInput = 'w-full rounded-lg border border-slate-200 px-2 py-1 text-xs'
 
   return (
@@ -105,7 +112,10 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
             <line y1={toPx(mm)} y2={toPx(mm)} x1={0} x2={SIZE} stroke={mm === 0 ? '#94a3b8' : mm % 5 === 0 ? '#cbd5e1' : '#eef2f7'} strokeWidth={mm === 0 ? 1.2 : 1} />
           </g>
         ))}
-        {selected && outline.length > 0 && (
+        {selected && editingRail && selected.rail && (
+          <path d={pathOf(sampleRail2D(selected.rail), false)} fill="none" stroke="#0f766e" strokeWidth={2} />
+        )}
+        {selected && !editingRail && outline.length > 0 && (
           <path d={pathOf(outline, true)} fill={selectedError ? '#fecaca' : '#fde68a'} fillOpacity={0.7} stroke={selectedError ? '#dc2626' : '#b45309'} strokeWidth={1.5} />
         )}
         {tool && draft.length > 0 && (() => {
@@ -113,7 +123,7 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
           const shown = draft.length >= 2 && (tool === 'rectangle' || tool === 'circle') ? sampleProfile(prof) : draft
           return <path d={pathOf(shown, shown.length >= 3)} fill="none" stroke="#0f172a" strokeDasharray="4 3" strokeWidth={1.5} />
         })()}
-        {(tool ? draft : selected?.profile.points ?? []).map((p, i) => (
+        {(tool ? draft : editingRail ? selected?.rail?.points ?? [] : selected?.profile.points ?? []).map((p, i) => (
           <circle key={i} cx={toPx(p.x)} cy={toPx(-p.y)} r={5} fill="#fff" stroke="#0f172a" strokeWidth={2}
             className={!tool ? 'cursor-move' : ''}
             onPointerDown={e => { if (tool) return; e.stopPropagation(); e.currentTarget.setPointerCapture(e.pointerId); drag.current = i }}
@@ -128,6 +138,9 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
           <button type="button" disabled={!!profileError(draftProfile, 'revolve')} onClick={() => create('revolve')}
             title="Revolves around the vertical axis (x = 0); the whole shape must be on its right side."
             className="flex-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Revolve</button>
+          <button type="button" disabled={!!profileError(draftProfile, 'extrude')} onClick={() => { create('sweep'); setEditTarget('rail') }}
+            title="Sweeps this shape along a rail curve you then shape (Rhino's Sweep 1 Rail)."
+            className="flex-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Sweep</button>
           <button type="button" onClick={() => setDraft([])}
             className="rounded-xl border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600">Clear</button>
         </div>
@@ -139,7 +152,7 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
         {objects.map(o => {
           const err = profileError(o.profile, o.op)
           return (
-            <div key={o.id} onClick={() => { onSelect(o.id); setTool(null); setDraft([]) }}
+            <div key={o.id} onClick={() => { onSelect(o.id); setTool(null); setDraft([]); setEditTarget('profile') }}
               className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${o.id === selectedId ? 'border-slate-900 bg-white' : 'border-slate-200 bg-white/60'}`}>
               <span className="min-w-0 truncate">
                 <strong className="font-semibold text-slate-800">{o.name}</strong>
@@ -161,9 +174,13 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
           </div>
           <div>
             <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Operation</label>
-            <select className={numInput} value={selected.op} onChange={e => update(selected.id, { op: e.target.value as ModelOp })}>
+            <select className={numInput} value={selected.op} onChange={e => {
+              const op = e.target.value as ModelOp
+              update(selected.id, op === 'sweep' && !selected.rail ? { op, rail: newModelObject(selected.profile, 'sweep', 0).rail } : { op })
+            }}>
               <option value="extrude">Extrude</option>
               <option value="revolve">Revolve</option>
+              <option value="sweep">Sweep along rail</option>
             </select>
           </div>
           <div>
@@ -184,6 +201,46 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
               <p className="mt-1 text-[10px] text-amber-600">Shown as a red ghost while designing; it removes its volume from the metal (beta boolean — the ring is merged into one solid).</p>
             )}
           </div>
+          {selected.op === 'sweep' && selected.rail && (
+            <div className="col-span-2 space-y-2 rounded-xl border border-teal-200 bg-teal-50/50 p-2.5">
+              <div className="grid grid-cols-2 gap-1.5">
+                {(['profile', 'rail'] as const).map(t => (
+                  <button key={t} type="button" onClick={() => setEditTarget(t)}
+                    className={`rounded-lg border px-2 py-1.5 text-[11px] font-semibold ${editTarget === t ? 'border-teal-700 bg-teal-700 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>
+                    Edit {t}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Rail plane</label>
+                  <select className={numInput} value={selected.rail.plane}
+                    onChange={e => update(selected.id, { rail: { ...selected.rail!, plane: e.target.value as ModelPlane } })}>
+                    <option value="top">Top (XZ)</option>
+                    <option value="front">Front (XY)</option>
+                    <option value="right">Right (ZY)</option>
+                  </select>
+                </div>
+                <label className="mt-5 flex items-center gap-2 text-xs font-semibold text-slate-600">
+                  <input type="checkbox" checked={selected.rail.closed} className="h-4 w-4 rounded border-slate-300"
+                    onChange={e => update(selected.id, { rail: { ...selected.rail!, closed: e.target.checked } })} />
+                  Closed loop
+                </label>
+              </div>
+              <div className="flex gap-2">
+                <button type="button" className="flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-600"
+                  onClick={() => {
+                    const pts = selected.rail!.points
+                    const last = pts[pts.length - 1], prev = pts[pts.length - 2] ?? { x: last.x - 4, y: last.y }
+                    update(selected.id, { rail: { ...selected.rail!, points: [...pts, { x: last.x + (last.x - prev.x), y: last.y + (last.y - prev.y) }] } })
+                  }}>Add rail point</button>
+                <button type="button" disabled={selected.rail.points.length <= 2}
+                  className="flex-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-[11px] font-semibold text-slate-600 disabled:opacity-40"
+                  onClick={() => update(selected.id, { rail: { ...selected.rail!, points: selected.rail!.points.slice(0, -1) } })}>Remove last</button>
+              </div>
+              <p className="text-[10px] text-slate-500">The profile keeps facing along the rail. It must fit inside the rail's tightest bend.</p>
+            </div>
+          )}
           {selected.op === 'extrude' && (
             <div className="col-span-2">
               <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Height ({selected.heightMm.toFixed(1)} mm)</label>
