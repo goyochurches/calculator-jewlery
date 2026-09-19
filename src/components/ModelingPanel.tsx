@@ -296,6 +296,79 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
                 onChange={e => update(selected.id, { offsetMm: { ...selected.offsetMm, [axis]: Number(e.target.value) || 0 } })} />
             </div>
           ))}
+          <div className="col-span-2 space-y-2 rounded-xl border border-violet-200 bg-violet-50/40 p-2.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Transform (Rhino: Rotate · Scale · Mirror · Array)</span>
+            {(['x', 'y', 'z'] as const).map(axis => {
+              const rot = selected.rotationDeg ?? { x: 0, y: 0, z: 0 }
+              return (
+                <div key={axis}>
+                  <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Rotate {axis.toUpperCase()} ({rot[axis].toFixed(0)}°)</label>
+                  <input type="range" min={-180} max={180} step={5} value={rot[axis]} className="w-full"
+                    onChange={e => update(selected.id, { rotationDeg: { ...rot, [axis]: Number(e.target.value) } })} />
+                </div>
+              )
+            })}
+            <div>
+              <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Scale ({(selected.scale ?? 1).toFixed(2)}×, about its own origin)</label>
+              <input type="range" min={0.2} max={3} step={0.05} value={selected.scale ?? 1} className="w-full"
+                onChange={e => update(selected.id, { scale: Number(e.target.value) })} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Mirror copy across</label>
+                <select className={numInput} value={selected.mirror ?? ''} onChange={e => update(selected.id, { mirror: (e.target.value || undefined) as ModelObject['mirror'] })}>
+                  <option value="">None</option>
+                  <option value="x">YZ plane (flip X)</option>
+                  <option value="y">XZ plane (flip Y)</option>
+                  <option value="z">XY plane (flip Z)</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Array</label>
+                <select className={numInput} value={selected.array?.kind ?? ''} onChange={e => {
+                  const kind = e.target.value
+                  update(selected.id, { array: kind === 'linear' ? { kind: 'linear', count: 3, step: { x: 5, y: 0, z: 0 } } : kind === 'polar' ? { kind: 'polar', count: 6, axis: 'y', totalDeg: 360 } : undefined })
+                }}>
+                  <option value="">None</option>
+                  <option value="linear">Linear</option>
+                  <option value="polar">Polar (around an axis)</option>
+                </select>
+              </div>
+            </div>
+            {selected.array && (
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Copies</label>
+                  <input type="number" min={2} max={100} step={1} className={numInput} value={selected.array.count}
+                    onChange={e => update(selected.id, { array: { ...selected.array!, count: Math.max(2, Math.min(100, Math.round(Number(e.target.value) || 2))) } as ModelObject['array'] })} />
+                </div>
+                {selected.array.kind === 'linear' ? (['x', 'y', 'z'] as const).map(axis => (
+                  <div key={axis}>
+                    <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Step {axis.toUpperCase()} (mm)</label>
+                    <input type="number" step={0.5} className={numInput} value={selected.array!.kind === 'linear' ? selected.array!.step[axis] : 0}
+                      onChange={e => { const arr = selected.array!; if (arr.kind === 'linear') update(selected.id, { array: { ...arr, step: { ...arr.step, [axis]: Number(e.target.value) || 0 } } }) }} />
+                  </div>
+                )) : (
+                  <>
+                    <div>
+                      <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Axis</label>
+                      <select className={numInput} value={selected.array.axis} onChange={e => { const arr = selected.array!; if (arr.kind === 'polar') update(selected.id, { array: { ...arr, axis: e.target.value as 'x' | 'y' | 'z' } }) }}>
+                        <option value="y">Y (ring axis)</option>
+                        <option value="x">X</option>
+                        <option value="z">Z</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Total °</label>
+                      <input type="number" min={10} max={360} step={10} className={numInput} value={selected.array.totalDeg}
+                        onChange={e => { const arr = selected.array!; if (arr.kind === 'polar') update(selected.id, { array: { ...arr, totalDeg: Math.max(10, Math.min(360, Number(e.target.value) || 360)) } }) }} />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            <p className="text-[10px] text-slate-500">Mirror and polar arrays use the world origin (the ring's centre). Copies that touch are merged into one solid.</p>
+          </div>
           <p className="col-span-2 text-[10px] text-slate-400">
             Drag the round handles on the sketch to reshape it. Revolve turns the shape around the vertical axis (x = 0)
             in the sketch, full 360°. The ring's own axis is Y; the head sits on +X.

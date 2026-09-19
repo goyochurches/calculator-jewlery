@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import { Brush, Evaluator, SUBTRACTION, INTERSECTION } from 'three-bvh-csg'
-import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { Brush, Evaluator, ADDITION, SUBTRACTION, INTERSECTION } from 'three-bvh-csg'
+import { toCreasedNormals, mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 
 // Rhino-style general modeling core (first slice): draw a curve on a
 // construction plane, then turn it into a solid with Extrude or Revolve.
@@ -41,6 +41,18 @@ export interface ModelObject {
   /** For subtract / intersect: id of ONE 'add' object to apply to instead of
    *  the whole design (ring + every added solid). */
   targetId?: string
+  /** Rotation about the object's own origin (its offset point), degrees. */
+  rotationDeg?: { x: number; y: number; z: number }
+  /** Uniform scale about the object's own origin. */
+  scale?: number
+  /** Adds a mirrored COPY across the world plane through the origin whose
+   *  normal is this axis (Rhino Mirror). */
+  mirror?: 'x' | 'y' | 'z'
+  /** Repeats the object: linear = `count` copies `step` mm apart; polar =
+   *  `count` copies around a world axis through the origin, spread over
+   *  `totalDeg` (360 = a full ring of evenly spaced copies). */
+  array?: { kind: 'linear'; count: number; step: { x: number; y: number; z: number } }
+    | { kind: 'polar'; count: number; axis: 'x' | 'y' | 'z'; totalDeg: number }
   /** Sweep only: the smooth rail curve the profile travels along, drawn on
    *  its own construction plane (points in that plane's 2D mm coordinates).
    *  `closed` makes it a loop (a ring/torus-like sweep). */
@@ -319,6 +331,104 @@ function buildSweepGeometry(profilePts: THREE.Vector2[], rail: NonNullable<Model
 /** Rotates a geometry built in the XY sketch plane (normal +Z) onto the
  *  chosen construction plane: front = XY, top = XZ (normal +Y), right = ZY
  *  (normal +X). */
+const MAX_ARRAY_COPIES = 200
+
+/** Reverses triangle winding on a non-indexed geometry (position + normal),
+ *  needed after a reflection turns the mesh inside out. */
+function flipTriangles(g: THREE.BufferGeometry): void {
+  for (const key of Object.keys(g.attributes)) {
+    const attr = g.attributes[key], n = attr.itemSize, arr = attr.array as Float32Array
+    for (let i = 0; i < arr.length; i += n * 3) {
+      for (let k = 0; k < n; k++) { const t = arr[i + n + k]; arr[i + n + k] = arr[i + 2 * n + k]; arr[i + 2 * n + k] = t }
+    }
+    attr.needsUpdate = true
+  }
+}
+
+const AXIS_INDEX = { x: 0, y: 1, z: 2 } as const
+
+/** Places copies of `g` (already positioned) per the object's transform
+ *  settings: rotate/scale about its origin, optional mirrored copy, then the
+ *  array. Copies that touch or overlap are unioned into one solid so the
+ *  result stays a valid closed mesh for the boolean passes. */
+function applyObjectTransforms(g: THREE.BufferGeometry, obj: ModelObject): THREE.BufferGeometry {
+  let base = g
+  const rot = obj.rotationDeg, sc = obj.scale ?? 1
+  if ((rot && (rot.x || rot.y || rot.z)) || sc !== 1) {
+    const o = obj.offsetMm
+    const m = new THREE.Matrix4().makeTranslation(o.x, o.y, o.z)
+      .multiply(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(
+        THREE.MathUtils.degToRad(rot?.x ?? 0), THREE.MathUtils.degToRad(rot?.y ?? 0), THREE.MathUtils.degToRad(rot?.z ?? 0))))
+      .multiply(new THREE.Matrix4().makeScale(sc, sc, sc))
+      .multiply(new THREE.Matrix4().makeTranslation(-o.x, -o.y, -o.z))
+    base = base.clone().applyMatrix4(m)
+  }
+  const copies: THREE.BufferGeometry[] = [base]
+  if (obj.mirror) {
+    const flip = [1, 1, 1]; flip[AXIS_INDEX[obj.mirror]] = -1
+    const mirrored = base.clone().applyMatrix4(new THREE.Matrix4().makeScale(flip[0], flip[1], flip[2]))
+    flipTriangles(mirrored)
+    copies.push(mirrored)
+  }
+  const arr = obj.array
+  let instances = copies
+  if (arr && arr.count > 1) {
+    const count = Math.min(Math.floor(arr.count), Math.floor(MAX_ARRAY_COPIES / copies.length))
+    instances = []
+    for (const c of copies) {
+      for (let k = 0; k < count; k++) {
+        if (k === 0) { instances.push(c); continue }
+        const m = new THREE.Matrix4()
+        if (arr.kind === 'linear') m.makeTranslation(arr.step.x * k, arr.step.y * k, arr.step.z * k)
+        else {
+          const step = arr.totalDeg >= 360 - 1e-6 ? arr.totalDeg / count : arr.totalDeg / (count - 1)
+          const a = THREE.MathUtils.degToRad(step * k)
+          if (arr.axis === 'x') m.makeRotationX(a); else if (arr.axis === 'y') m.makeRotationY(a); else m.makeRotationZ(a)
+        }
+        instances.push(c.clone().applyMatrix4(m))
+      }
+    }
+  }
+  if (instances.length === 1) return instances[0]
+  return combineInstances(instances)
+}
+
+/** Unions copies whose bounding boxes touch (via CSG); merges the rest as
+ *  separate islands. */
+function combineInstances(geoms: THREE.BufferGeometry[]): THREE.BufferGeometry {
+  const box = (g: THREE.BufferGeometry) => { g.computeBoundingBox(); return g.boundingBox!.clone() }
+  let islands = geoms.map(g => ({ g, b: box(g) }))
+  const evaluator = new Evaluator()
+  evaluator.attributes = ['position', 'normal']
+  let merged = true
+  while (merged) {
+    merged = false
+    outer: for (let i = 0; i < islands.length; i++) {
+      for (let j = i + 1; j < islands.length; j++) {
+        if (!islands[i].b.intersectsBox(islands[j].b)) continue
+        const A = new Brush(islands[i].g), B = new Brush(islands[j].g)
+        A.updateMatrixWorld(true); B.updateMatrixWorld(true)
+        const u = evaluator.evaluate(A, B, ADDITION).geometry
+        islands = islands.filter((_, k) => k !== i && k !== j)
+        islands.push({ g: u, b: box(u) })
+        merged = true
+        break outer
+      }
+    }
+  }
+  const parts = islands.map(x => (x.g.index ? x.g.toNonIndexed() : x.g))
+  for (const p of parts) for (const key of Object.keys(p.attributes)) if (key !== 'position' && key !== 'normal') p.deleteAttribute(key)
+  return parts.length === 1 ? parts[0] : mergeGeometries(parts, false)
+}
+
+/** Builds the solid for an object with its rotate / scale / mirror / array
+ *  settings applied. Returns an error string if the profile isn't valid. */
+export function buildModelObjectGeometry(obj: ModelObject): { geometry: THREE.BufferGeometry } | { error: string } {
+  const built = buildBaseGeometry(obj)
+  if ('error' in built) return built
+  return { geometry: applyObjectTransforms(built.geometry, obj) }
+}
+
 function orientToPlane(g: THREE.BufferGeometry, plane: ModelPlane) {
   if (plane === 'top') g.rotateX(-Math.PI / 2)
   else if (plane === 'right') g.rotateY(Math.PI / 2)
@@ -326,7 +436,7 @@ function orientToPlane(g: THREE.BufferGeometry, plane: ModelPlane) {
 
 /** Builds the solid for an object, positioned in world space. Returns an
  *  error string instead of geometry if the profile isn't valid. */
-export function buildModelObjectGeometry(obj: ModelObject): { geometry: THREE.BufferGeometry } | { error: string } {
+function buildBaseGeometry(obj: ModelObject): { geometry: THREE.BufferGeometry } | { error: string } {
   const error = profileError(obj.profile, obj.op)
   if (error) return { error }
   let pts = clean(sampleProfile(obj.profile))
