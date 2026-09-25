@@ -62,6 +62,12 @@ export interface ModelObject {
   topProfile?: ModelProfile
   /** Loft only: rotates the top section about its centre (degrees). */
   twistDeg?: number
+  /** Matrix's Taper and Twist (the two remaining tools of its Transform
+   *  group), along the object's own `axis`: across that axis the solid is
+   *  scaled from 1× at its start to `endScale` at its end, and rotated
+   *  about it by `twistDeg` over the same span. Applied to the object
+   *  itself, so a Mirror/Array copies the deformed shape. */
+  deform?: { axis: 'x' | 'y' | 'z'; endScale: number; twistDeg: number }
   /** Matrix's Flow along Curve, with the ring rail as the target curve:
    *  the solid is built FLAT (x = distance along the band, y = across its
    *  width, z = height above its surface) and then wrapped around the
@@ -346,6 +352,10 @@ function buildSweepGeometry(profilePts: THREE.Vector2[], rail: NonNullable<Model
  *  (normal +X). */
 const MAX_ARRAY_COPIES = 200
 
+/** Twist arc a single triangle may span, radians — same chord argument as
+ *  `FLOW_SEGMENT_RAD`, and the taper reuses it as "1/20th of the span". */
+const DEFORM_SEGMENT_RAD = 0.06
+
 /** Fallback band radius when none is passed (a plain US 7 shank) — every
  *  real caller passes the live one. */
 export const DEFAULT_BAND_RADIUS_MM = 9
@@ -371,7 +381,7 @@ const AXIS_INDEX = { x: 0, y: 1, z: 2 } as const
  *  array. Copies that touch or overlap are unioned into one solid so the
  *  result stays a valid closed mesh for the boolean passes. */
 function applyObjectTransforms(g: THREE.BufferGeometry, obj: ModelObject): THREE.BufferGeometry {
-  let base = g
+  let base = obj.deform ? applyDeform(g, obj.deform) : g
   const rot = obj.rotationDeg, sc = obj.scale ?? 1
   if ((rot && (rot.x || rot.y || rot.z)) || sc !== 1) {
     const o = obj.offsetMm
@@ -440,9 +450,10 @@ function combineInstances(geoms: THREE.BufferGeometry[]): THREE.BufferGeometry {
   return parts.length === 1 ? parts[0] : mergeGeometries(parts, false)
 }
 
-/** Splits triangles until no EDGE spans more than `maxDx` along x, so the
- *  wrap below follows the band's curve instead of cutting across it as a
- *  straight chord.
+/** Splits triangles until no EDGE spans more than `maxDelta` along the
+ *  given axis, so a deformation that varies along that axis (the wrap
+ *  below, Taper, Twist) follows its real curve instead of cutting across
+ *  it as a straight chord.
  *
  *  Red-green refinement: an edge is split at the midpoint of the SAME two
  *  endpoint positions whichever of the two triangles sharing it is being
@@ -450,18 +461,19 @@ function combineInstances(geoms: THREE.BufferGeometry[]): THREE.BufferGeometry {
  *  so both sides always agree and this cannot open a T-junction crack. The
  *  mesh stays exactly as watertight as it came in, which the boolean
  *  passes depend on. Only the edges that actually need it are split (a flat
- *  10 × 3 × 1 mm slab: ~1k triangles, where splitting every triangle into
- *  four regardless would reach ~12k to get the same arc).
+ *  10 × 3 × 1 mm slab wrapped on a US-7 shank: ~2k triangles, where
+ *  splitting every triangle into four regardless would reach ~12k for the
+ *  same arc).
  *
  *  Only position and normal are carried over — the boolean passes and the
  *  viewer's materials use nothing else either. */
-function subdivideForFlow(g: THREE.BufferGeometry, maxDx: number): THREE.BufferGeometry {
+function subdivideAlongAxis(g: THREE.BufferGeometry, axis: 0 | 1 | 2, maxDelta: number): THREE.BufferGeometry {
   const geom = g.index ? g.toNonIndexed() : g.clone()
   for (const key of Object.keys(geom.attributes)) if (key !== 'position' && key !== 'normal') geom.deleteAttribute(key)
   const keys = Object.keys(geom.attributes)
   const sizes = keys.map(k => geom.attributes[k].itemSize)
   const stride = sizes.reduce((a, b) => a + b, 0)
-  const xOffset = sizes.slice(0, keys.indexOf('position')).reduce((a, b) => a + b, 0)
+  const axisOffset = sizes.slice(0, keys.indexOf('position')).reduce((a, b) => a + b, 0) + axis
   const count = geom.attributes.position.count
 
   // One packed vertex per entry; every 3 entries are a triangle.
@@ -472,7 +484,7 @@ function subdivideForFlow(g: THREE.BufferGeometry, maxDx: number): THREE.BufferG
     verts.push(v)
   }
   const mid = (u: number[], v: number[]) => u.map((x, i) => (x + v[i]) / 2)
-  const tooLong = (u: number[], v: number[]) => Math.abs(u[xOffset] - v[xOffset]) > maxDx
+  const tooLong = (u: number[], v: number[]) => Math.abs(u[axisOffset] - v[axisOffset]) > maxDelta
 
   for (;;) {
     const next: number[][] = []
@@ -508,6 +520,83 @@ function subdivideForFlow(g: THREE.BufferGeometry, maxDx: number): THREE.BufferG
   return out
 }
 
+/** Matrix's Taper + Twist, along the object's own `axis` and measured over
+ *  its own bounding box: at a fraction t of the way along the axis the
+ *  cross-section is scaled by f(t) = 1 + (endScale − 1)·t and rotated about
+ *  the axis by twistDeg·t, both about the axis line through the bounding
+ *  box's centre.
+ *
+ *  Same two guarantees the wrap below documents, for the same reasons:
+ *  1. Continuous, and applied after subdividing so the deformed mesh
+ *     follows the real taper/twist — a closed mesh stays closed.
+ *  2. The local Jacobian's determinant is f(t)², so as long as f stays
+ *     positive (the UI keeps endScale ≥ 0.05) the winding, and with it the
+ *     signed volume's sign, is preserved — no inside-out solid.
+ *  Normals get the exact inverse-transpose of that Jacobian rather than
+ *  being recomputed, so the solid's crisp creases survive (the twist's own
+ *  shear term matters here: ignoring it visibly mis-shades a twisted
+ *  solid's end faces).
+ *
+ *  Measured on a throwaway script, same as the wrap below: a 4 × 10 × 4 mm
+ *  box tapered to 0.5× stays watertight and lands on 93.333 mm³ — the
+ *  analytic ∫ of its own tapering section, to 0.000%. A 180° twist keeps
+ *  it watertight too, within 0.5% of the untwisted volume (the remainder
+ *  is the faceting: the mesh is refined ALONG the twist axis, not across
+ *  the section, so a hard twist's silhouette — not its shading, which uses
+ *  the analytic normals — stays as coarse as the profile was drawn). */
+function applyDeform(g: THREE.BufferGeometry, deform: NonNullable<ModelObject['deform']>): THREE.BufferGeometry {
+  const axis = AXIS_INDEX[deform.axis]
+  const twist = THREE.MathUtils.degToRad(deform.twistDeg)
+  const endScale = Math.max(0.05, deform.endScale)
+  if (Math.abs(twist) < 1e-9 && Math.abs(endScale - 1) < 1e-9) return g
+  g.computeBoundingBox()
+  const box = g.boundingBox!
+  const min = box.min.getComponent(axis), span = box.max.getComponent(axis) - min
+  if (!(span > 1e-9)) return g
+  // Fineness: the twist's own arc, or — for a pure taper — 20 slices.
+  const maxDelta = Math.abs(twist) > 1e-9 ? (span * DEFORM_SEGMENT_RAD) / Math.abs(twist) : span / 20
+  const geometry = subdivideAlongAxis(g, axis, maxDelta)
+  const pos = geometry.attributes.position, nrm = geometry.attributes.normal as THREE.BufferAttribute | undefined
+  // Axis u, and the two cross-section axes v, w (a right-handed frame).
+  const v = (axis + 1) % 3, w = (axis + 2) % 3
+  const centre = box.getCenter(new THREE.Vector3())
+  const cv = centre.getComponent(v), cw = centre.getComponent(w)
+  const jacobian = new THREE.Matrix3(), normal = new THREE.Vector3()
+  const p = new THREE.Vector3(), out = new THREE.Vector3()
+  for (let i = 0; i < pos.count; i++) {
+    p.fromBufferAttribute(pos, i)
+    const t = (p.getComponent(axis) - min) / span
+    const f = 1 + (endScale - 1) * t, phi = twist * t
+    const cos = Math.cos(phi), sin = Math.sin(phi)
+    const a = p.getComponent(v) - cv, b = p.getComponent(w) - cw
+    out.copy(p)
+    out.setComponent(v, cv + f * (a * cos - b * sin))
+    out.setComponent(w, cw + f * (a * sin + b * cos))
+    if (nrm) {
+      const df = (endScale - 1) / span, dphi = twist / span
+      const col = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()]
+      col[v].setComponent(v, f * cos); col[v].setComponent(w, f * sin)
+      col[w].setComponent(v, -f * sin); col[w].setComponent(w, f * cos)
+      col[axis].setComponent(axis, 1)
+      col[axis].setComponent(v, df * (a * cos - b * sin) + f * dphi * (-a * sin - b * cos))
+      col[axis].setComponent(w, df * (a * sin + b * cos) + f * dphi * (a * cos - b * sin))
+      jacobian.set(
+        col[0].x, col[1].x, col[2].x,
+        col[0].y, col[1].y, col[2].y,
+        col[0].z, col[1].z, col[2].z,
+      )
+      normal.fromBufferAttribute(nrm, i).applyMatrix3(jacobian.invert().transpose()).normalize()
+      nrm.setXYZ(i, normal.x, normal.y, normal.z)
+    }
+    pos.setXYZ(i, out.x, out.y, out.z)
+  }
+  pos.needsUpdate = true
+  if (nrm) nrm.needsUpdate = true
+  geometry.computeBoundingBox()
+  geometry.computeBoundingSphere()
+  return geometry
+}
+
 /** Matrix's Flow along Curve, with the ring rail as the target curve: maps
  *  the flat solid's (x, y, z) to (θ = angle − x / R, band axis, r = R + z).
  *
@@ -535,7 +624,7 @@ function subdivideForFlow(g: THREE.BufferGeometry, maxDx: number): THREE.BufferG
  *  to the material above the neutral radius, i.e. the wrap is metrically
  *  right, not just visually plausible. */
 function flowAroundBand(g: THREE.BufferGeometry, radiusMm: number, angleDeg: number): THREE.BufferGeometry {
-  const geometry = subdivideForFlow(g, radiusMm * FLOW_SEGMENT_RAD)
+  const geometry = subdivideAlongAxis(g, 0, radiusMm * FLOW_SEGMENT_RAD)
   const pos = geometry.attributes.position, nrm = geometry.attributes.normal as THREE.BufferAttribute | undefined
   const angle = THREE.MathUtils.degToRad(angleDeg)
   for (let i = 0; i < pos.count; i++) {

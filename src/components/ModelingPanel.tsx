@@ -87,6 +87,7 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect, bandRad
 
   const outline = selected ? sampleProfile(selected.profile) : []
   const flow = selected?.flow ? flowArcMm(selected, bandRadiusMm) : null
+  const deform = selected?.deform ?? { axis: 'y' as const, endScale: 1, twistDeg: 0 }
   const selectedError = selected ? (profileError(selected.profile, selected.op) ?? (selected.op === 'sweep' ? railError(selected) : selected.op === 'loft' && selected.topProfile ? profileError(selected.topProfile, 'loft') : null)) : null
   const numInput = 'w-full rounded-lg border border-slate-200 px-2 py-1 text-xs'
 
@@ -170,7 +171,7 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect, bandRad
               className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${o.id === selectedId ? 'border-slate-900 bg-white' : 'border-slate-200 bg-white/60'}`}>
               <span className="min-w-0 truncate">
                 <strong className="font-semibold text-slate-800">{o.name}</strong>
-                <span className="ml-1.5 text-slate-400">{o.op}{o.flow ? ' · flow' : ''}{o.mode === 'subtract' ? ' · subtract' : o.mode === 'intersect' ? ' · intersect' : ''}{o.targetId && !objects.some(t => t.id === o.targetId) ? ' · target deleted' : ''}</span>
+                <span className="ml-1.5 text-slate-400">{o.op}{o.deform && (o.deform.endScale !== 1 || o.deform.twistDeg !== 0) ? ' · deformed' : ''}{o.flow ? ' · flow' : ''}{o.mode === 'subtract' ? ' · subtract' : o.mode === 'intersect' ? ' · intersect' : ''}{o.targetId && !objects.some(t => t.id === o.targetId) ? ' · target deleted' : ''}</span>
                 {err && <span className="ml-1.5 text-rose-600">· {err}</span>}
               </span>
               <button type="button" title="Delete" onClick={e => { e.stopPropagation(); onChange(objects.filter(x => x.id !== o.id)); if (o.id === selectedId) onSelect(null) }}
@@ -300,7 +301,7 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect, bandRad
             </div>
           ))}
           <div className="col-span-2 space-y-2 rounded-xl border border-violet-200 bg-violet-50/40 p-2.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Transform (Rhino: Rotate · Scale · Mirror · Array)</span>
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-violet-700">Transform (Matrix: Rotate · Scale · Taper · Twist · Mirror · Array · Flow)</span>
             {(['x', 'y', 'z'] as const).map(axis => {
               const rot = selected.rotationDeg ?? { x: 0, y: 0, z: 0 }
               return (
@@ -315,6 +316,31 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect, bandRad
               <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Scale ({(selected.scale ?? 1).toFixed(2)}×, about its own origin)</label>
               <input type="range" min={0.2} max={3} step={0.05} value={selected.scale ?? 1} className="w-full"
                 onChange={e => update(selected.id, { scale: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2 rounded-lg border border-violet-200 bg-white/70 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] font-semibold text-slate-700">Taper &amp; Twist</span>
+                <select className="rounded-lg border border-slate-200 px-1.5 py-0.5 text-[10px]" value={deform.axis}
+                  onChange={e => update(selected.id, { deform: { ...deform, axis: e.target.value as 'x' | 'y' | 'z' } })}>
+                  <option value="x">along X</option>
+                  <option value="y">along Y</option>
+                  <option value="z">along Z</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Taper (end is {deform.endScale.toFixed(2)}× the start)</label>
+                <input type="range" min={0.05} max={3} step={0.05} value={deform.endScale} className="w-full"
+                  onChange={e => update(selected.id, { deform: { ...deform, endScale: Number(e.target.value) } })} />
+              </div>
+              <div>
+                <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Twist ({deform.twistDeg.toFixed(0)}° over its length)</label>
+                <input type="range" min={-360} max={360} step={5} value={deform.twistDeg} className="w-full"
+                  onChange={e => update(selected.id, { deform: { ...deform, twistDeg: Number(e.target.value) } })} />
+              </div>
+              <p className="text-[10px] text-slate-500">
+                Measured across the solid's own extent on that axis, about its centre line — and applied BEFORE
+                Mirror/Array/Flow, so every copy carries the same taper and twist.
+              </p>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
