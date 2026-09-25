@@ -902,8 +902,9 @@ export function CadDesignPage() {
     }
     applyPlanShape(group, { aspect: planAspect, squareness: planSquareness }, innerDiameterMm / 2 + thicknessMm / 2)
     // Modeled solids are placed in world space by the user, so they are added
-    // AFTER the ring's plan-shape bend (they don't follow it).
-    for (const mesh of buildModelObjects(modelObjects)) group.add(mesh)
+    // AFTER the ring's plan-shape bend (they don't follow it — including a
+    // Flowed one, which wraps onto the ROUND rail of the same radius).
+    for (const mesh of buildModelObjects(modelObjects, outerRadiusMm)) group.add(mesh)
     return group
     // excludedHaloKey/excludedPaveKey (joined-string stand-ins for the
     // excludedHaloIndices/excludedPaveIndices ARRAYS, see where they're
@@ -920,9 +921,9 @@ export function CadDesignPage() {
 
   // Boolean cutters (modeled objects in Subtract mode) are consumed by the
   // union pass, so having any forces it even if "Merge" is off.
-  const cutterMeshes = useMemo(() => buildCutterMeshes(modelObjects), [modelObjects])
+  const cutterMeshes = useMemo(() => buildCutterMeshes(modelObjects, outerRadiusMm), [modelObjects, outerRadiusMm])
   // Ghosts show EVERY cutter (also the ones aimed at one specific object).
-  const ghostMeshes = useMemo(() => buildGhostMeshes(modelObjects), [modelObjects])
+  const ghostMeshes = useMemo(() => buildGhostMeshes(modelObjects, outerRadiusMm), [modelObjects, outerRadiusMm])
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
   // separate (see ringGeometry.ts). Beta: three-bvh-csg can throw on a
@@ -2455,7 +2456,8 @@ export function CadDesignPage() {
             )}
 
             {activeTab === 'model' && (
-              <ModelingPanel objects={modelObjects} onChange={setModelObjects} selectedId={selectedModelId} onSelect={setSelectedModelId} />
+              <ModelingPanel objects={modelObjects} onChange={setModelObjects} selectedId={selectedModelId} onSelect={setSelectedModelId}
+                bandRadiusMm={outerRadiusMm} />
             )}
 
             {activeTab === 'production' && (

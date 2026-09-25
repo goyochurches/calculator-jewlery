@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import {
-  newModelObject, profileError, railError, sampleProfile, sampleRail2D,
+  flowArcMm, newModelObject, profileError, railError, sampleProfile, sampleRail2D,
   type ModelObject, type ModelMode, type ModelOp, type ModelPlane, type Point2, type ProfileKind,
 } from '@/lib/modeling'
 
@@ -10,6 +10,8 @@ interface ModelingPanelProps {
   onChange: (next: ModelObject[]) => void
   selectedId: string | null
   onSelect: (id: string | null) => void
+  /** The band's outer radius, mm — the rail Flow wraps objects onto. */
+  bandRadiusMm: number
 }
 
 const SIZE = 300
@@ -32,7 +34,7 @@ const pathOf = (pts: { x: number; y: number }[], close: boolean) =>
  *  a construction plane, then Extrude or Revolve it into a solid. Objects
  *  stay editable — drag a handle or change the height and the 3D solid is
  *  rebuilt. */
-export function ModelingPanel({ objects, onChange, selectedId, onSelect }: ModelingPanelProps) {
+export function ModelingPanel({ objects, onChange, selectedId, onSelect, bandRadiusMm }: ModelingPanelProps) {
   const [tool, setTool] = useState<ProfileKind | null>(null)
   const [draft, setDraft] = useState<Point2[]>([])
   // For a Sweep object: which of its two sketches the canvas edits.
@@ -84,6 +86,7 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
   }
 
   const outline = selected ? sampleProfile(selected.profile) : []
+  const flow = selected?.flow ? flowArcMm(selected, bandRadiusMm) : null
   const selectedError = selected ? (profileError(selected.profile, selected.op) ?? (selected.op === 'sweep' ? railError(selected) : selected.op === 'loft' && selected.topProfile ? profileError(selected.topProfile, 'loft') : null)) : null
   const numInput = 'w-full rounded-lg border border-slate-200 px-2 py-1 text-xs'
 
@@ -167,7 +170,7 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
               className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${o.id === selectedId ? 'border-slate-900 bg-white' : 'border-slate-200 bg-white/60'}`}>
               <span className="min-w-0 truncate">
                 <strong className="font-semibold text-slate-800">{o.name}</strong>
-                <span className="ml-1.5 text-slate-400">{o.op}{o.mode === 'subtract' ? ' · subtract' : o.mode === 'intersect' ? ' · intersect' : ''}{o.targetId && !objects.some(t => t.id === o.targetId) ? ' · target deleted' : ''}</span>
+                <span className="ml-1.5 text-slate-400">{o.op}{o.flow ? ' · flow' : ''}{o.mode === 'subtract' ? ' · subtract' : o.mode === 'intersect' ? ' · intersect' : ''}{o.targetId && !objects.some(t => t.id === o.targetId) ? ' · target deleted' : ''}</span>
                 {err && <span className="ml-1.5 text-rose-600">· {err}</span>}
               </span>
               <button type="button" title="Delete" onClick={e => { e.stopPropagation(); onChange(objects.filter(x => x.id !== o.id)); if (o.id === selectedId) onSelect(null) }}
@@ -368,6 +371,43 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect }: Model
               </div>
             )}
             <p className="text-[10px] text-slate-500">Mirror and polar arrays use the world origin (the ring's centre). Copies that touch are merged into one solid.</p>
+            <div className="space-y-2 rounded-lg border border-violet-200 bg-white/70 p-2">
+              <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-700">
+                <input type="checkbox" className="h-4 w-4 rounded border-slate-300" checked={!!selected.flow}
+                  onChange={e => update(selected.id, { flow: e.target.checked ? { angleDeg: 0 } : undefined })} />
+                Flow along the band (Matrix's Flow along Curve)
+              </label>
+              {selected.flow ? (
+                <>
+                  <div>
+                    <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Position around the band ({selected.flow.angleDeg.toFixed(0)}° — 0° = under the head)</label>
+                    <input type="range" min={-180} max={180} step={1} value={selected.flow.angleDeg} className="w-full"
+                      onChange={e => update(selected.id, { flow: { angleDeg: Number(e.target.value) } })} />
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    The shape is built flat and then wrapped onto the shank: sketch X runs along the band, sketch Y
+                    across its width, and the extrusion (Offset Z) is height above the surface — so Offset Z = 0 sits
+                    right on it. Draw on the Front (XY) plane. A linear array along X before the wrap becomes a
+                    repeating pattern around the ring.
+                  </p>
+                  {flow && (
+                    <p className={`text-[10px] ${flow.arcMm > flow.circumferenceMm ? 'text-rose-600' : 'text-slate-500'}`}>
+                      Wrapped at {bandRadiusMm.toFixed(2)} mm radius — {flow.arcMm.toFixed(1)} mm of the band's
+                      {' '}{flow.circumferenceMm.toFixed(1)} mm circumference
+                      {flow.arcMm > flow.circumferenceMm ? ' — too long, it wraps past itself and overlaps.' : '.'}
+                    </p>
+                  )}
+                  {flow && flow.belowMm >= bandRadiusMm && (
+                    <p className="text-[10px] text-rose-600">
+                      It reaches {flow.belowMm.toFixed(1)} mm below the surface — past the finger's own axis, so the
+                      wrap would fold through the centre. Raise its Offset Z.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-[10px] text-slate-500">Off: the solid stays exactly where you placed it in space.</p>
+              )}
+            </div>
           </div>
           <p className="col-span-2 text-[10px] text-slate-400">
             Drag the round handles on the sketch to reshape it. Revolve turns the shape around the vertical axis (x = 0)

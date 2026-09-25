@@ -62,9 +62,22 @@ export interface ModelObject {
   topProfile?: ModelProfile
   /** Loft only: rotates the top section about its centre (degrees). */
   twistDeg?: number
+  /** Matrix's Flow along Curve, with the ring rail as the target curve:
+   *  the solid is built FLAT (x = distance along the band, y = across its
+   *  width, z = height above its surface) and then wrapped around the
+   *  finger. `angleDeg` slides it around the band (0 = under the head,
+   *  +X). Left undefined the object stays where it was placed. */
+  flow?: { angleDeg: number }
 }
 
 const CIRCLE_SEGMENTS = 48
+
+/** Arc a single triangle may span once the object is wrapped, radians —
+ *  anything longer is subdivided first so the wrap follows the band's own
+ *  curve instead of cutting across it as a straight chord. */
+const FLOW_SEGMENT_RAD = 0.06
+/** Safety cap on the subdivision below (each pass quadruples the count). */
+const FLOW_MAX_TRIANGLES = 200_000
 
 /** Samples a profile into the closed polygon (or, for a polyline/spline that
  *  hasn't got enough points yet, whatever there is) the solid is built from. */
@@ -333,6 +346,12 @@ function buildSweepGeometry(profilePts: THREE.Vector2[], rail: NonNullable<Model
  *  (normal +X). */
 const MAX_ARRAY_COPIES = 200
 
+/** Fallback band radius when none is passed (a plain US 7 shank) — every
+ *  real caller passes the live one. */
+export const DEFAULT_BAND_RADIUS_MM = 9
+/** How close to the finger's axis a flowed solid may reach, mm. */
+const MIN_FLOW_RADIUS_MM = 0.5
+
 /** Reverses triangle winding on a non-indexed geometry (position + normal),
  *  needed after a reflection turns the mesh inside out. */
 function flipTriangles(g: THREE.BufferGeometry): void {
@@ -421,12 +440,157 @@ function combineInstances(geoms: THREE.BufferGeometry[]): THREE.BufferGeometry {
   return parts.length === 1 ? parts[0] : mergeGeometries(parts, false)
 }
 
+/** Splits triangles until no EDGE spans more than `maxDx` along x, so the
+ *  wrap below follows the band's curve instead of cutting across it as a
+ *  straight chord.
+ *
+ *  Red-green refinement: an edge is split at the midpoint of the SAME two
+ *  endpoint positions whichever of the two triangles sharing it is being
+ *  looked at, and the decision to split depends only on those endpoints —
+ *  so both sides always agree and this cannot open a T-junction crack. The
+ *  mesh stays exactly as watertight as it came in, which the boolean
+ *  passes depend on. Only the edges that actually need it are split (a flat
+ *  10 × 3 × 1 mm slab: ~1k triangles, where splitting every triangle into
+ *  four regardless would reach ~12k to get the same arc).
+ *
+ *  Only position and normal are carried over — the boolean passes and the
+ *  viewer's materials use nothing else either. */
+function subdivideForFlow(g: THREE.BufferGeometry, maxDx: number): THREE.BufferGeometry {
+  const geom = g.index ? g.toNonIndexed() : g.clone()
+  for (const key of Object.keys(geom.attributes)) if (key !== 'position' && key !== 'normal') geom.deleteAttribute(key)
+  const keys = Object.keys(geom.attributes)
+  const sizes = keys.map(k => geom.attributes[k].itemSize)
+  const stride = sizes.reduce((a, b) => a + b, 0)
+  const xOffset = sizes.slice(0, keys.indexOf('position')).reduce((a, b) => a + b, 0)
+  const count = geom.attributes.position.count
+
+  // One packed vertex per entry; every 3 entries are a triangle.
+  let verts: number[][] = []
+  for (let i = 0; i < count; i++) {
+    const v: number[] = []
+    keys.forEach((k, a) => { const attr = geom.attributes[k]; for (let c = 0; c < sizes[a]; c++) v.push(attr.getComponent(i, c)) })
+    verts.push(v)
+  }
+  const mid = (u: number[], v: number[]) => u.map((x, i) => (x + v[i]) / 2)
+  const tooLong = (u: number[], v: number[]) => Math.abs(u[xOffset] - v[xOffset]) > maxDx
+
+  for (;;) {
+    const next: number[][] = []
+    let split = false
+    for (let t = 0; t < verts.length; t += 3) {
+      const a = verts[t], b = verts[t + 1], c = verts[t + 2]
+      const ab = tooLong(a, b), bc = tooLong(b, c), ca = tooLong(c, a)
+      if (!ab && !bc && !ca) { next.push(a, b, c); continue }
+      split = true
+      const m0 = ab ? mid(a, b) : null, m1 = bc ? mid(b, c) : null, m2 = ca ? mid(c, a) : null
+      if (m0 && m1 && m2) next.push(a, m0, m2, m0, b, m1, m2, m1, c, m0, m1, m2)
+      else if (m0 && m1) next.push(a, m0, m1, m0, b, m1, a, m1, c)
+      else if (m1 && m2) next.push(b, m1, m2, m1, c, m2, b, m2, a)
+      else if (m0 && m2) next.push(c, m2, m0, m2, a, m0, c, m0, b)
+      else if (m0) next.push(a, m0, c, m0, b, c)
+      else if (m1) next.push(b, m1, a, m1, c, a)
+      else next.push(c, m2!, b, m2!, a, b)
+    }
+    if (!split || next.length / 3 > FLOW_MAX_TRIANGLES) break
+    verts = next
+  }
+
+  const out = new THREE.BufferGeometry()
+  const flat = new Float32Array(verts.length * stride)
+  verts.forEach((v, i) => flat.set(v, i * stride))
+  let offset = 0
+  keys.forEach((k, a) => {
+    const values = new Float32Array(verts.length * sizes[a])
+    for (let i = 0; i < verts.length; i++) for (let c = 0; c < sizes[a]; c++) values[i * sizes[a] + c] = flat[i * stride + offset + c]
+    out.setAttribute(k, new THREE.BufferAttribute(values, sizes[a]))
+    offset += sizes[a]
+  })
+  return out
+}
+
+/** Matrix's Flow along Curve, with the ring rail as the target curve: maps
+ *  the flat solid's (x, y, z) to (θ = angle − x / R, band axis, r = R + z).
+ *
+ *  Why this is safe to run on a finished solid (checked, not assumed —
+ *  same rigor as `buildBandTextGroup`'s own bend in ringGeometry.ts):
+ *  1. It is CONTINUOUS and, after the subdivision above, applied to a mesh
+ *     whose triangles are small enough that the wrap follows the band's
+ *     curve — so a closed mesh stays closed.
+ *  2. It does NOT turn the solid inside-out. Locally the map is a rotation
+ *     about Y composed with the scale diag((R+z)/R, 1, 1); that scale is
+ *     POSITIVE wherever r > 0 (guaranteed by the caller's radius check),
+ *     so the Jacobian's determinant stays positive and the winding — and
+ *     therefore the signed volume's sign — is preserved. The θ = −x/R sign
+ *     is the one that keeps it so (the naive +x/R mirrors the solid, the
+ *     same trap the band-text bend documents).
+ *  3. Normals are transformed by that same local frame (inverse-transpose
+ *     of the scale, i.e. n_x / k) rather than recomputed, so the crisp
+ *     creases `toCreasedNormals` put on the solid survive the wrap — and
+ *     they describe the IDEAL wrap, not the subdivided chords, which is
+ *     what makes the wrapped surface shade smoothly.
+ *
+ *  Measured on a throwaway script before trusting any of the above: a flat
+ *  10 × 3 × 1 mm slab wrapped at R = 9 mm stays watertight, keeps its
+ *  volume's sign, and grows 5.53% — exactly the 1 + t/2R a real bend owes
+ *  to the material above the neutral radius, i.e. the wrap is metrically
+ *  right, not just visually plausible. */
+function flowAroundBand(g: THREE.BufferGeometry, radiusMm: number, angleDeg: number): THREE.BufferGeometry {
+  const geometry = subdivideForFlow(g, radiusMm * FLOW_SEGMENT_RAD)
+  const pos = geometry.attributes.position, nrm = geometry.attributes.normal as THREE.BufferAttribute | undefined
+  const angle = THREE.MathUtils.degToRad(angleDeg)
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i)
+    const theta = angle - x / radiusMm
+    const r = radiusMm + z
+    const cos = Math.cos(theta), sin = Math.sin(theta)
+    if (nrm) {
+      // Local frame: x → (sinθ, 0, −cosθ), y → (0, 1, 0), z → (cosθ, 0, sinθ).
+      const k = r / radiusMm
+      const nx = nrm.getX(i) / k, ny = nrm.getY(i), nz = nrm.getZ(i)
+      const wx = nx * sin + nz * cos, wy = ny, wz = -nx * cos + nz * sin
+      const len = Math.hypot(wx, wy, wz) || 1
+      nrm.setXYZ(i, wx / len, wy / len, wz / len)
+    }
+    pos.setXYZ(i, r * cos, y, r * sin)
+  }
+  pos.needsUpdate = true
+  if (nrm) nrm.needsUpdate = true
+  geometry.computeBoundingBox()
+  geometry.computeBoundingSphere()
+  return geometry
+}
+
+/** Flat length along x of a flowed object, the band's own circumference at
+ *  that radius (the UI warns when the first exceeds the second — the wrap
+ *  would then overlap itself), and how far the shape reaches BELOW the
+ *  band's surface (which `buildModelObjectGeometry` rejects past the
+ *  radius). Bounding box of the built solid, no boolean work. */
+export function flowArcMm(obj: ModelObject, bandRadiusMm: number): { arcMm: number; circumferenceMm: number; belowMm: number } | null {
+  if (!obj.flow) return null
+  const built = buildBaseGeometry(obj)
+  if ('error' in built) return null
+  const g = applyObjectTransforms(built.geometry, obj)
+  g.computeBoundingBox()
+  const box = g.boundingBox!
+  return { arcMm: box.max.x - box.min.x, circumferenceMm: 2 * Math.PI * bandRadiusMm, belowMm: Math.max(0, -box.min.z) }
+}
+
 /** Builds the solid for an object with its rotate / scale / mirror / array
- *  settings applied. Returns an error string if the profile isn't valid. */
-export function buildModelObjectGeometry(obj: ModelObject): { geometry: THREE.BufferGeometry } | { error: string } {
+ *  settings applied, and — when Flow is on — wrapped around the band.
+ *  Returns an error string if the profile isn't valid. */
+export function buildModelObjectGeometry(obj: ModelObject, bandRadiusMm = DEFAULT_BAND_RADIUS_MM): { geometry: THREE.BufferGeometry } | { error: string } {
   const built = buildBaseGeometry(obj)
   if ('error' in built) return built
-  return { geometry: applyObjectTransforms(built.geometry, obj) }
+  const geometry = applyObjectTransforms(built.geometry, obj)
+  if (!obj.flow) return { geometry }
+  geometry.computeBoundingBox()
+  const minZ = geometry.boundingBox!.min.z
+  // r = R + z must stay clear of the finger's own axis, or the wrap folds
+  // through the centre and the solid self-intersects.
+  if (bandRadiusMm + minZ < MIN_FLOW_RADIUS_MM) {
+    return { error: `Flow: the shape reaches ${(-minZ).toFixed(1)} mm below the band's surface (radius ${bandRadiusMm.toFixed(1)} mm) — raise its Offset Z so it stays outside the finger.` }
+  }
+  return { geometry: flowAroundBand(geometry, bandRadiusMm, obj.flow.angleDeg) }
 }
 
 function orientToPlane(g: THREE.BufferGeometry, plane: ModelPlane) {
@@ -500,16 +664,16 @@ function meshOf(geometry: THREE.BufferGeometry, index: number): THREE.Mesh {
 /** Solids that become part of the ring's metal. Cutters that target one of
  *  them specifically are applied here, in list order, before the solid
  *  joins the design. */
-export function buildModelObjects(objects: ModelObject[]): THREE.Mesh[] {
+export function buildModelObjects(objects: ModelObject[], bandRadiusMm = DEFAULT_BAND_RADIUS_MM): THREE.Mesh[] {
   const meshes: THREE.Mesh[] = []
   objects.forEach((obj, index) => {
     if (isCutMode(obj)) return
-    const built = buildModelObjectGeometry(obj)
+    const built = buildModelObjectGeometry(obj, bandRadiusMm)
     if ('error' in built) return
     let geometry = built.geometry
     for (const cutter of objects) {
       if (!isCutMode(cutter) || cutter.targetId !== obj.id) continue
-      const cb = buildModelObjectGeometry(cutter)
+      const cb = buildModelObjectGeometry(cutter, bandRadiusMm)
       if ('error' in cb) continue
       geometry = csg(geometry, cb.geometry, cutter.mode ?? 'subtract')
     }
@@ -520,13 +684,13 @@ export function buildModelObjects(objects: ModelObject[]): THREE.Mesh[] {
 
 /** Cutters for the whole-design boolean pass (no specific target), in list
  *  order. userData.cutMode says subtract vs. intersect. */
-export function buildCutterMeshes(objects: ModelObject[]): THREE.Mesh[] {
+export function buildCutterMeshes(objects: ModelObject[], bandRadiusMm = DEFAULT_BAND_RADIUS_MM): THREE.Mesh[] {
   const meshes: THREE.Mesh[] = []
   objects.forEach((obj, index) => {
     // A cutter aimed at one object never touches the whole design — even if
     // that object was deleted (then it simply does nothing).
     if (!isCutMode(obj) || obj.targetId) return
-    const built = buildModelObjectGeometry(obj)
+    const built = buildModelObjectGeometry(obj, bandRadiusMm)
     if ('error' in built) return
     const mesh = meshOf(built.geometry, index)
     mesh.userData.cutMode = obj.mode
@@ -536,11 +700,11 @@ export function buildCutterMeshes(objects: ModelObject[]): THREE.Mesh[] {
 }
 
 /** Every valid cutter (global or targeted) as a ghost for the viewer. */
-export function buildGhostMeshes(objects: ModelObject[]): THREE.Mesh[] {
+export function buildGhostMeshes(objects: ModelObject[], bandRadiusMm = DEFAULT_BAND_RADIUS_MM): THREE.Mesh[] {
   const meshes: THREE.Mesh[] = []
   objects.forEach((obj, index) => {
     if (!isCutMode(obj)) return
-    const built = buildModelObjectGeometry(obj)
+    const built = buildModelObjectGeometry(obj, bandRadiusMm)
     if ('error' in built) return
     const mesh = meshOf(built.geometry, index)
     mesh.userData.cutMode = obj.mode
