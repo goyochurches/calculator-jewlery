@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { Brush, Evaluator, ADDITION, SUBTRACTION, INTERSECTION } from 'three-bvh-csg'
 import { toCreasedNormals, mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
+import { buildFacetedRoundStone } from './ringGeometry'
 
 // Rhino-style general modeling core (first slice): draw a curve on a
 // construction plane, then turn it into a solid with Extrude or Revolve.
@@ -62,6 +63,10 @@ export interface ModelObject {
   topProfile?: ModelProfile
   /** Loft only: rotates the top section about its centre (degrees). */
   twistDeg?: number
+  /** Matrix's "Gems on Curve": melee set evenly along this object's rail
+   *  (sweep or pipe). They are real gems — they show as gems, they get
+   *  their own seat cut, and they are priced with the rest of the melee. */
+  gems?: { count: number; diameterMm: number }
   /** Pipe only (Rhino/Matrix Pipe): a round tube along `rail`, tapering
    *  from `startRadiusMm` at its beginning to `endRadiusMm` at its end —
    *  wire, filigree and gallery work, where the section is always a circle
@@ -372,6 +377,8 @@ function buildSweepGeometry(profilePts: THREE.Vector2[], rail: NonNullable<Model
  *  chosen construction plane: front = XY, top = XZ (normal +Y), right = ZY
  *  (normal +X). */
 const MAX_ARRAY_COPIES = 200
+/** Cap on stones set along one curve — the same order as the pavé row's. */
+const MAX_RAIL_GEMS = 120
 
 /** Twist arc a single triangle may span, radians — same chord argument as
  *  `FLOW_SEGMENT_RAD`, and the taper reuses it as "1/20th of the span". */
@@ -841,6 +848,49 @@ function pipeRailPoints(profile: ModelProfile): Point2[] {
   if (profile.kind === 'polyline' || profile.kind === 'spline') return profile.points
   const sampled = sampleProfile(profile)
   return sampled.length >= 3 ? sampled.map(q => ({ x: q.x, y: q.y })) : profile.points
+}
+
+/** Matrix's "Gems on Curve": the object's melee, placed evenly along its
+ *  rail with each stone's girdle sitting ON the curve (lifted by the
+ *  pipe's own radius where there is one, so a stone set on wire rests on
+ *  the wire rather than inside it) and its table facing outwards, away
+ *  from the finger — the same "outwards" the seat cutters read, so a gem
+ *  placed here gets its seat cut for free.
+ *
+ *  Returned as stone-tagged meshes: the boolean union skips them, the gem
+ *  material picks them up, and `extractStoneMeshes` keeps them separate
+ *  from the metal, exactly like every other gem in the model. */
+export function buildRailGemMeshes(objects: ModelObject[]): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = []
+  objects.forEach((obj, index) => {
+    const gems = obj.gems
+    if (!gems || gems.count < 1 || !(gems.diameterMm > 0) || !obj.rail || obj.rail.points.length < 2) return
+    if (obj.op !== 'sweep' && obj.op !== 'pipe') return
+    const curve = railCurve(obj.rail)
+    const lift = obj.op === 'pipe' && obj.pipe ? (obj.pipe.startRadiusMm + obj.pipe.endRadiusMm) / 2 : 0
+    const count = Math.min(Math.floor(gems.count), MAX_RAIL_GEMS)
+    const stone = buildFacetedRoundStone({ diameterMm: gems.diameterMm })
+    for (let i = 0; i < count; i++) {
+      const t = obj.rail.closed ? i / count : count === 1 ? 0.5 : i / (count - 1)
+      const point = curve.getPointAt(t).add(new THREE.Vector3(obj.offsetMm.x, obj.offsetMm.y, obj.offsetMm.z))
+      // Outwards = radially away from the ring's own axis (Y). A point
+      // sitting exactly on that axis has no radial direction, so fall
+      // back to +X, the side the head is on.
+      const radial = new THREE.Vector3(point.x, 0, point.z)
+      const up = radial.lengthSq() > 1e-12 ? radial.normalize() : new THREE.Vector3(1, 0, 0)
+      for (const child of stone.children) {
+        if (!(child instanceof THREE.Mesh)) continue
+        const mesh = new THREE.Mesh(child.geometry.clone())
+        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), up)
+        mesh.position.copy(point).addScaledVector(up, lift)
+        mesh.userData.isStone = true
+        mesh.userData.partName = 'Curve gem'
+        mesh.userData.instanceIndex = index
+        meshes.push(mesh)
+      }
+    }
+  })
+  return meshes
 }
 
 export function newModelObject(profile: ModelProfile, op: ModelOp, index: number): ModelObject {

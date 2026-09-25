@@ -90,6 +90,7 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect, bandRad
   const flow = selected?.flow ? flowArcMm(selected, bandRadiusMm) : null
   const deform = selected?.deform ?? { axis: 'y' as const, endScale: 1, twistDeg: 0 }
   const pipe = selected?.pipe ?? null
+  const gems = selected?.gems ?? null
   const selectedError = selected ? (profileError(selected.profile, selected.op) ?? (selected.op === 'sweep' || selected.op === 'pipe' ? railError(selected) : selected.op === 'loft' && selected.topProfile ? profileError(selected.topProfile, 'loft') : null)) : null
   const numInput = 'w-full rounded-lg border border-slate-200 px-2 py-1 text-xs'
 
@@ -176,7 +177,7 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect, bandRad
               className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-xs ${o.id === selectedId ? 'border-slate-900 bg-white' : 'border-slate-200 bg-white/60'}`}>
               <span className="min-w-0 truncate">
                 <strong className="font-semibold text-slate-800">{o.name}</strong>
-                <span className="ml-1.5 text-slate-400">{o.op}{o.deform && (o.deform.endScale !== 1 || o.deform.twistDeg !== 0) ? ' · deformed' : ''}{o.flow ? ' · flow' : ''}{o.mode === 'subtract' ? ' · subtract' : o.mode === 'intersect' ? ' · intersect' : ''}{o.targetId && !objects.some(t => t.id === o.targetId) ? ' · target deleted' : ''}</span>
+                <span className="ml-1.5 text-slate-400">{o.op}{o.deform && (o.deform.endScale !== 1 || o.deform.twistDeg !== 0) ? ' · deformed' : ''}{o.gems ? ` · ${o.gems.count} gems` : ''}{o.flow ? ' · flow' : ''}{o.mode === 'subtract' ? ' · subtract' : o.mode === 'intersect' ? ' · intersect' : ''}{o.targetId && !objects.some(t => t.id === o.targetId) ? ' · target deleted' : ''}</span>
                 {err && <span className="ml-1.5 text-rose-600">· {err}</span>}
               </span>
               <button type="button" title="Delete" onClick={e => { e.stopPropagation(); onChange(objects.filter(x => x.id !== o.id)); if (o.id === selectedId) onSelect(null) }}
@@ -255,6 +256,35 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect, bandRad
                 The curve you drew is the pipe itself — drag its handles to reshape it. Set both radii the same for
                 plain wire, or different for a tapered one. Closed loops make a ring of wire.
               </p>
+            </div>
+          )}
+          {(selected.op === 'sweep' || selected.op === 'pipe') && selected.rail && (
+            <div className="col-span-2 space-y-2 rounded-xl border border-sky-200 bg-sky-50/50 p-2.5">
+              <label className="flex items-center gap-2 text-[11px] font-semibold text-slate-700">
+                <input type="checkbox" className="h-4 w-4 rounded border-slate-300" checked={!!selected.gems}
+                  onChange={e => update(selected.id, { gems: e.target.checked ? { count: 5, diameterMm: 1.2 } : undefined })} />
+                Gems along this curve (Matrix's Gems on Curve)
+              </label>
+              {gems && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Stones</label>
+                      <input type="number" min={1} max={120} step={1} className={numInput} value={gems.count}
+                        onChange={e => update(selected.id, { gems: { ...gems, count: Math.max(1, Math.min(120, Math.round(Number(e.target.value) || 1))) } })} />
+                    </div>
+                    <div>
+                      <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Ø (mm)</label>
+                      <input type="number" min={0.8} max={4} step={0.1} className={numInput} value={gems.diameterMm}
+                        onChange={e => update(selected.id, { gems: { ...gems, diameterMm: Math.max(0.5, Math.min(6, Number(e.target.value) || 1)) } })} />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-500">
+                    Set evenly along the curve, table facing outwards, girdle resting on it. They count as real gems:
+                    priced with the rest of the melee, and "Cut the stone seats" cuts their seats too.
+                  </p>
+                </>
+              )}
             </div>
           )}
           {(selected.op === 'sweep' || selected.op === 'pipe') && selected.rail && (

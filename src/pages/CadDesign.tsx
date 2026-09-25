@@ -6,7 +6,7 @@ import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { Card, CardContent } from '@/components/ui/card'
 import { EMPTY_HISTORY, recordSnapshot, stepHistory as stepHistoryState, canUndoHistory, canRedoHistory, type HistoryState } from '@/lib/historyStack'
 import { ModelingPanel } from '@/components/ModelingPanel'
-import { buildModelObjects, buildCutterMeshes, buildGhostMeshes, type ModelObject } from '@/lib/modeling'
+import { buildModelObjects, buildCutterMeshes, buildGhostMeshes, buildRailGemMeshes, type ModelObject } from '@/lib/modeling'
 import { ProfileEditor } from '@/components/ProfileEditor'
 import { PlanShapePicker } from '@/components/PlanShapePicker'
 import { GEM_LOOKS, DIAMOND_LOOK } from '@/lib/gemLooks'
@@ -918,6 +918,9 @@ export function CadDesignPage() {
     // AFTER the ring's plan-shape bend (they don't follow it — including a
     // Flowed one, which wraps onto the ROUND rail of the same radius).
     for (const mesh of buildModelObjects(modelObjects, outerRadiusMm)) group.add(mesh)
+    // Gems set along a modeled curve (Matrix's Gems on Curve) — real gems,
+    // so they go in alongside the solids, not merged into the metal.
+    for (const gem of buildRailGemMeshes(modelObjects)) group.add(gem)
     return group
     // excludedHaloKey/excludedPaveKey (joined-string stand-ins for the
     // excludedHaloIndices/excludedPaveIndices ARRAYS, see where they're
@@ -1132,6 +1135,12 @@ export function CadDesignPage() {
     if (sideStoneCount > 0 && stoneShape === 'round' && settingType === 'prong' && !tensionActive) {
       total += nearestDiamondPrice(sideStoneCaratWeight, diamondType) * sideStoneCount
     }
+    // Gems set along a modeled curve — same melee pricing as everything
+    // else here, by their own diameter.
+    for (const obj of modelObjects) {
+      if (!obj.gems) continue
+      total += nearestDiamondPrice(caratFromRoundDiameterMm(obj.gems.diameterMm), diamondType) * obj.gems.count
+    }
     if (stoneShape === 'round' && settingType === 'cluster') {
       // Priced stone-by-stone now too (same fix already applied to
       // pavé/halo above), since a per-petal size override would otherwise
@@ -1148,7 +1157,7 @@ export function CadDesignPage() {
     config, diamondType, haloEligible, haloStoneMm, haloCount, haloRingCount, excludedHaloKey, haloStoneDiameterOverridesMm,
     includePave, paveStoneMm, paveCount, excludedPaveKey, paveStoneDiameterOverridesMm,
     sideStoneCount, stoneShape, settingType, tensionActive, sideStoneCaratWeight,
-    clusterPetalStoneMm, clusterPetalCount, excludedClusterKey, petalStoneDiameterOverridesMm,
+    clusterPetalStoneMm, clusterPetalCount, excludedClusterKey, petalStoneDiameterOverridesMm, modelObjects,
   ])
   const estimatedLaborCost = includeRingLaborFee ? (config.ringLaborMap[ringLaborTierKey]?.fee ?? 0) : 0
   // Total stone count across the design — a REAL count (not a guess),
@@ -1160,9 +1169,10 @@ export function CadDesignPage() {
     if (includePave) count += Math.max(0, paveCount - excludedPaveIndices.length)
     if (sideStoneCount > 0 && stoneShape === 'round' && settingType === 'prong' && !tensionActive) count += sideStoneCount
     if (stoneShape === 'round' && settingType === 'cluster') count += Math.max(0, clusterPetalCount - excludedClusterIndices.length)
+    for (const obj of modelObjects) if (obj.gems) count += obj.gems.count
     return count
     // eslint-disable-next-line react-hooks/exhaustive-deps -- same reasoning as estimatedMeleeCost above: excludedHaloKey/excludedPaveKey/excludedClusterKey (joined-string stand-ins) are what's actually listed, not the arrays themselves — see where they're defined for why.
-  }, [includeStone, includeSignetTop, haloEligible, haloCount, haloRingCount, excludedHaloKey, includePave, paveCount, excludedPaveKey, sideStoneCount, stoneShape, settingType, tensionActive, clusterPetalCount, excludedClusterKey])
+  }, [includeStone, includeSignetTop, haloEligible, haloCount, haloRingCount, excludedHaloKey, includePave, paveCount, excludedPaveKey, sideStoneCount, stoneShape, settingType, tensionActive, clusterPetalCount, excludedClusterKey, modelObjects])
   const setterQuantity = setterQuantityOverride ?? totalStoneCount
   const estimatedSetterFee = includeSetterFee ? (config.setterMap[setterTypeKey]?.fee ?? 0) * setterQuantity : 0
   const estimatedTotalCost = estimatedMetalCost + estimatedStoneCost + estimatedMeleeCost + estimatedLaborCost + estimatedSetterFee
