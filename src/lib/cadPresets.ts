@@ -81,6 +81,7 @@ export interface CadDesignParams {
   sidePanelText?: string
   sidePanelAngle0Deg?: number
   sidePanelAngle1Deg?: number
+  cutStoneSeats?: boolean
 }
 
 export interface SavedCadPreset {

@@ -28,7 +28,7 @@ import {
   buildMilgrainEdges, buildRopeEdge, buildFluteRibs, buildGalleryWireGroup, buildBandTextGroup, estimateBandTextWidthMm,
   buildPatternMotifs, type PatternMotif,
   buildLogoGroup,
-  unionMetalParts, extractStoneMeshes, checkWatertightness,
+  unionMetalParts, extractStoneMeshes, checkWatertightness, buildStoneSeatCutters,
   checkMinimumWallThickness, defaultProngDiameterMm, defaultGalleryTubeMm, RECOMMENDED_MIN_WALL_MM,
   checkProngClearance,
   scaleForCastingShrinkage, CASTING_SHRINKAGE_PERCENT,
@@ -321,6 +321,10 @@ export function CadDesignPage() {
   // around) — a named Ring Builder type in the master list.
   const [sideSpreadDeg, setSideSpreadDeg] = useState(70)
   const [mergeSolid, setMergeSolid] = useState(false)
+  // Matrix's Cutters, generated from the gems already in the model — see
+  // buildStoneSeatCutters. Off by default: it's a boolean pass per stone,
+  // so a pavé-heavy design takes a moment.
+  const [cutStoneSeats, setCutStoneSeats] = useState(false)
   // Matching Jewelry (module 14) — Matrix's own "Matching Band Rail": a
   // plain companion band, same finger size and metal, shown sitting right
   // next to the main design like a wedding band would sit against this
@@ -468,6 +472,7 @@ export function CadDesignPage() {
     includeFlutes, fluteCount, pointDirection, includeGalleryWire, galleryWireCount,
     includeBandText, bandText, bandTextBold, includePattern, patternMotif,
     includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, sidePanelAngle0Deg, sidePanelAngle1Deg,
+    cutStoneSeats,
   })
 
   // Pure parameter setters — shared by preset loading AND undo/redo. Undo
@@ -528,6 +533,7 @@ export function CadDesignPage() {
     setSidePanelAngle0Deg(p.sidePanelAngle0Deg ?? 90)
     setSidePanelAngle1Deg(p.sidePanelAngle1Deg ?? 270)
     setPointDirection((p.pointDirection as 'up' | 'down') ?? 'up')
+    setCutStoneSeats(p.cutStoneSeats ?? false)
   }
   const applyPreset = (p: CadDesignParams) => {
     applyParams(p)
@@ -924,6 +930,9 @@ export function CadDesignPage() {
   const cutterMeshes = useMemo(() => buildCutterMeshes(modelObjects, outerRadiusMm), [modelObjects, outerRadiusMm])
   // Ghosts show EVERY cutter (also the ones aimed at one specific object).
   const ghostMeshes = useMemo(() => buildGhostMeshes(modelObjects, outerRadiusMm), [modelObjects, outerRadiusMm])
+  // Stone seats (Matrix's Cutters): read off the gems in the finished
+  // model, so every setting type is covered without knowing about them.
+  const seatCutters = useMemo(() => (cutStoneSeats ? buildStoneSeatCutters(model) : []), [cutStoneSeats, model])
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
   // separate (see ringGeometry.ts). Beta: three-bvh-csg can throw on a
@@ -942,9 +951,9 @@ export function CadDesignPage() {
   // pass either way.
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const { displayModel, mergeError } = useMemo(() => {
-    if (!mergeSolid && cutterMeshes.length === 0) return { displayModel: model, mergeError: null }
+    if (!mergeSolid && cutterMeshes.length === 0 && seatCutters.length === 0) return { displayModel: model, mergeError: null }
     try {
-      const unioned = unionMetalParts(model, cutterMeshes)
+      const unioned = unionMetalParts(model, [...cutterMeshes, ...seatCutters])
       if (!unioned) return { displayModel: model, mergeError: null }
       const merged = new THREE.Group()
       const solid = new THREE.Mesh(unioned)
@@ -955,7 +964,7 @@ export function CadDesignPage() {
     } catch (err) {
       return { displayModel: model, mergeError: err instanceof Error ? err.message : 'Boolean union failed on this geometry.' }
     }
-  }, [model, mergeSolid, cutterMeshes])
+  }, [model, mergeSolid, cutterMeshes, seatCutters])
 
   // Ring Re-Sizer — Matrix's own named tool, scoped here to an IMPORTED
   // file (the parametric design already has its own real fingerSize
@@ -2264,6 +2273,21 @@ export function CadDesignPage() {
                 )}
 
                 <div className="space-y-2 border-t border-slate-200 pt-3">
+                  <label className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold text-slate-900">Cut the stone seats</span>
+                    <input type="checkbox" checked={cutStoneSeats} onChange={e => setCutStoneSeats(e.target.checked)}
+                      className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300" />
+                  </label>
+                  <p className="text-[11px] text-slate-400">
+                    Matrix's "Cutters", built automatically from the gems in this design: a bearing at each girdle and a
+                    hole down through the pavilion, so the stones genuinely drop in and light reaches them from below —
+                    prong tips and bezel rims are left standing above the girdle, which is what holds the stone. It
+                    forces the merge pass, and the metal it removes comes off the weight and the cost below.
+                    {seatCutters.length > 0 && ` Cutting ${seatCutters.length} ${seatCutters.length === 1 ? 'seat' : 'seats'}.`}
+                  </p>
+                </div>
+
+                <div className="space-y-2 border-t border-slate-200 pt-3">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-sm font-semibold text-slate-900">Check model</span>
                     <button type="button" onClick={() => setWatertightResults(checkWatertightness(viewModel))}
@@ -2601,7 +2625,7 @@ export function CadDesignPage() {
                 From the actual displayed volume × {METAL_DENSITY_G_PER_CM3[metal]} g/cm³ for {JEWELRY_METAL_OPTIONS[metal].label},
                 at the same $/g the rest of the app prices from. {importedModel
                   ? "Assumes the whole imported file is one solid piece of this metal — this app can't tell a gem or a different material apart from the metal in a file it didn't build."
-                  : (mergeSolid || cutterMeshes.length > 0) && !mergeError
+                  : (mergeSolid || cutterMeshes.length > 0 || seatCutters.length > 0) && !mergeError
                     ? 'Metal only, gems excluded. Merged into one solid, so this is exact (no more overlap double-counting).'
                     : 'Metal only, gems excluded. Band+head overlap slightly (not merged), so this reads a little high rather than low.'}
               </p>

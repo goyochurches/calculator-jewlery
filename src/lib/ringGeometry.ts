@@ -2214,6 +2214,162 @@ export function extractStoneMeshes(object: THREE.Object3D): THREE.Mesh[] {
   return stones
 }
 
+// ── Stone seats (Matrix's "Cutters") ─────────────────────────────────
+// Every setting built above holds its gem on top of solid metal: nothing
+// has actually been HOLLOWED OUT underneath it. A real piece is cut — a
+// bearing at the girdle and a hole through the pavilion — so the stone
+// drops in, light reaches it from below, and the metal (and its cost)
+// drops accordingly. Matrix does exactly this with its Cutters group; this
+// is the same operation, generated automatically from the gems that are
+// already in the model rather than placed one by one.
+//
+// Deliberately generic: it reads the STONES THEMSELVES (any mesh flagged
+// `isStone`, whatever built it — center stone, pavé, halo, cluster petals,
+// channel, side heads, and anything added later), so no setting type needs
+// to know about this and none can be forgotten.
+
+export interface StoneSeatOptions {
+  /** Extra radius over the girdle so the stone isn't a press fit, mm. */
+  clearanceMm?: number
+  /** How far the bearing rises ABOVE the girdle, mm — kept small on
+   *  purpose: prong tips and bezel rims live above the girdle and must
+   *  survive the cut, which is exactly what holds the stone in. */
+  seatMm?: number
+  /** How far past the culet the hole carries on, to be sure it pierces
+   *  the metal underneath instead of leaving a blind pocket, mm. */
+  throughMm?: number
+}
+
+/** Eigenvector of the smallest eigenvalue of a symmetric 3×3 matrix, by
+ *  cyclic Jacobi rotations (converges in a handful of sweeps at this size).
+ *  Used to find a gem's own axis from its vertices — the direction it is
+ *  THINNEST in, which for every cut in this file (and every real cut: a
+ *  stone is always shallower than it is wide) is table→culet. */
+function smallestEigenvector(m: THREE.Matrix3): THREE.Vector3 {
+  const a = m.elements.slice() // column-major 3×3, symmetric
+  const v = [1, 0, 0, 0, 1, 0, 0, 0, 1]
+  const at = (i: number, j: number) => a[i * 3 + j]
+  for (let sweep = 0; sweep < 12; sweep++) {
+    let off = 0
+    for (const [p, q] of [[0, 1], [0, 2], [1, 2]]) off += at(p, q) ** 2
+    if (off < 1e-18) break
+    for (const [p, q] of [[0, 1], [0, 2], [1, 2]]) {
+      const apq = at(p, q)
+      if (Math.abs(apq) < 1e-15) continue
+      const theta = (at(q, q) - at(p, p)) / (2 * apq)
+      const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1))
+      const c = 1 / Math.sqrt(t * t + 1), s = t * c
+      for (let k = 0; k < 3; k++) {
+        const akp = at(k, p), akq = at(k, q)
+        a[k * 3 + p] = c * akp - s * akq
+        a[k * 3 + q] = s * akp + c * akq
+      }
+      for (let k = 0; k < 3; k++) {
+        const apk = at(p, k), aqk = at(q, k)
+        a[p * 3 + k] = c * apk - s * aqk
+        a[q * 3 + k] = s * apk + c * aqk
+      }
+      for (let k = 0; k < 3; k++) {
+        const vkp = v[k * 3 + p], vkq = v[k * 3 + q]
+        v[k * 3 + p] = c * vkp - s * vkq
+        v[k * 3 + q] = s * vkp + c * vkq
+      }
+    }
+  }
+  let best = 0
+  for (let i = 1; i < 3; i++) if (at(i, i) < at(best, best)) best = i
+  return new THREE.Vector3(v[best], v[3 + best], v[6 + best]).normalize()
+}
+
+/** One stone's seat cutter: a bearing cylinder at the girdle, a cone down
+ *  the pavilion, and a narrow shaft carrying on past the culet so the hole
+ *  genuinely pierces whatever metal sits underneath.
+ *
+ *  Measured off the gem's OWN geometry rather than the parameters that
+ *  built it: its axis (above), its girdle (the height along that axis
+ *  where its cross-section is widest — true for every cut here, brilliant
+ *  or step) and its culet. That's what keeps this working for a fancy
+ *  shape, an overridden per-instance diameter, or any setting added later
+ *  without touching this code. */
+function buildStoneSeatCutter(geometry: THREE.BufferGeometry, opts: Required<StoneSeatOptions>): THREE.Mesh | null {
+  const pos = geometry.attributes.position
+  if (pos.count < 4) return null
+  const centroid = new THREE.Vector3()
+  const p = new THREE.Vector3()
+  for (let i = 0; i < pos.count; i++) centroid.add(p.fromBufferAttribute(pos, i))
+  centroid.divideScalar(pos.count)
+
+  const cov = [0, 0, 0, 0, 0, 0, 0, 0, 0]
+  for (let i = 0; i < pos.count; i++) {
+    p.fromBufferAttribute(pos, i).sub(centroid)
+    const c = [p.x, p.y, p.z]
+    for (let r = 0; r < 3; r++) for (let s = 0; s < 3; s++) cov[r * 3 + s] += c[r] * c[s]
+  }
+  const axis = smallestEigenvector(new THREE.Matrix3().fromArray(cov.map(x => x / pos.count)))
+  // Table side = away from the finger's centre (the ring's own origin), so
+  // the cut always runs inwards, never out through the stone's face.
+  if (axis.dot(centroid) < 0) axis.negate()
+
+  // Height along the axis vs. distance from it, for every vertex.
+  const BINS = 48
+  let minA = Infinity, maxA = -Infinity
+  const heights: number[] = [], radii: number[] = []
+  for (let i = 0; i < pos.count; i++) {
+    p.fromBufferAttribute(pos, i).sub(centroid)
+    const a = p.dot(axis)
+    heights.push(a); radii.push(p.addScaledVector(axis, -a).length())
+    minA = Math.min(minA, a); maxA = Math.max(maxA, a)
+  }
+  const span = maxA - minA
+  if (!(span > 1e-6)) return null
+  const widest = new Array<number>(BINS).fill(0)
+  for (let i = 0; i < heights.length; i++) {
+    const bin = Math.min(BINS - 1, Math.floor(((heights[i] - minA) / span) * BINS))
+    widest[bin] = Math.max(widest[bin], radii[i])
+  }
+  let girdleBin = 0
+  for (let b = 1; b < BINS; b++) if (widest[b] > widest[girdleBin]) girdleBin = b
+  const girdleA = minA + ((girdleBin + 0.5) / BINS) * span
+  const girdleR = widest[girdleBin]
+  if (!(girdleR > 1e-6)) return null
+
+  const r = girdleR + opts.clearanceMm
+  const top = girdleA + opts.seatMm
+  const bottom = minA - opts.throughMm
+  const shaftR = Math.max(girdleR * 0.22, 0.12)
+  // Lathe profile, culet end first, each point (distance from axis, height).
+  // Starting and ending on the axis (x = 0) is what caps the solid.
+  const profile = [
+    new THREE.Vector2(0, bottom),
+    new THREE.Vector2(shaftR, bottom),
+    new THREE.Vector2(shaftR, minA),
+    new THREE.Vector2(r, girdleA),
+    new THREE.Vector2(r, top),
+    new THREE.Vector2(0, top),
+  ]
+  const cutter = new THREE.LatheGeometry(profile, 48)
+  // Orient the lathe's own +Y axis onto the stone's axis, then sit it on
+  // the stone's centroid (heights above are measured from there).
+  const mesh = new THREE.Mesh(cutter)
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis)
+  mesh.position.copy(centroid)
+  mesh.userData.partName = 'Stone seat'
+  mesh.userData.cutMode = 'subtract'
+  return mesh
+}
+
+/** A seat cutter for every gem in `object`, ready to hand to
+ *  `unionMetalParts` as cutters. */
+export function buildStoneSeatCutters(object: THREE.Object3D, options: StoneSeatOptions = {}): THREE.Mesh[] {
+  const opts = { clearanceMm: options.clearanceMm ?? 0.05, seatMm: options.seatMm ?? 0.15, throughMm: options.throughMm ?? 2 }
+  const cutters: THREE.Mesh[] = []
+  for (const stone of extractStoneMeshes(object)) {
+    const cutter = buildStoneSeatCutter(stone.geometry, opts)
+    if (cutter) cutters.push(cutter)
+  }
+  return cutters
+}
+
 // ── Channel setting ───────────────────────────────────────────────────────────
 // Alternative to pavé for side stones — the stones sit flush between two
 // raised metal rails running along the shank, instead of resting on top
