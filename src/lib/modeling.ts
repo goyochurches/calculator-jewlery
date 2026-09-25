@@ -11,7 +11,7 @@ import { toCreasedNormals, mergeGeometries } from 'three/examples/jsm/utils/Buff
 
 export type ProfileKind = 'polyline' | 'spline' | 'rectangle' | 'circle'
 export type ModelPlane = 'front' | 'top' | 'right'
-export type ModelOp = 'extrude' | 'revolve' | 'sweep' | 'loft'
+export type ModelOp = 'extrude' | 'revolve' | 'sweep' | 'loft' | 'pipe'
 /** 'add' = part of the ring's metal; 'subtract' = a cutter removed from it;
  *  'intersect' = keep only where the object overlaps. */
 export type ModelMode = 'add' | 'subtract' | 'intersect'
@@ -62,6 +62,11 @@ export interface ModelObject {
   topProfile?: ModelProfile
   /** Loft only: rotates the top section about its centre (degrees). */
   twistDeg?: number
+  /** Pipe only (Rhino/Matrix Pipe): a round tube along `rail`, tapering
+   *  from `startRadiusMm` at its beginning to `endRadiusMm` at its end —
+   *  wire, filigree and gallery work, where the section is always a circle
+   *  and what matters is the gauge, not a drawn profile. */
+  pipe?: { startRadiusMm: number; endRadiusMm: number }
   /** Matrix's Taper and Twist (the two remaining tools of its Transform
    *  group), along the object's own `axis`: across that axis the solid is
    *  scaled from 1× at its start to `endScale` at its end, and rotated
@@ -147,6 +152,9 @@ function clean(pts: THREE.Vector2[]): THREE.Vector2[] {
 
 /** Validation message for a profile as a CLOSED solid outline, or null. */
 export function profileError(profile: ModelProfile, op: ModelOp): string | null {
+  // A pipe has no drawn profile at all — its section is a circle of the
+  // given gauge, and the curve the user drew is its RAIL (see railError).
+  if (op === 'pipe') return null
   const pts = clean(sampleProfile(profile))
   if (pts.length < 3) return 'Needs at least 3 points (or a rectangle/circle) to form a closed shape.'
   if (Math.abs(signedArea(pts)) < 1e-6) return 'The shape has no area.'
@@ -244,15 +252,24 @@ function buildLoftGeometry(base: THREE.Vector2[], top: THREE.Vector2[], height: 
   return geometry
 }
 
-/** Validation for a sweep's rail (and its fit with the profile), or null. */
+/** Validation for a sweep's or pipe's rail (and its fit with the section),
+ *  or null. */
 export function railError(obj: ModelObject): string | null {
   const rail = obj.rail
   if (!rail || rail.points.length < 2) return 'The rail needs at least 2 points.'
   if (rail.closed && rail.points.length < 3) return 'A closed rail needs at least 3 points.'
-  const pts = clean(sampleProfile(obj.profile))
-  if (pts.length < 3) return null // profile error reported separately
-  const centroid = pts.reduce((a, q) => a.add(q), new THREE.Vector2()).divideScalar(pts.length)
-  const reach = Math.max(...pts.map(q => q.distanceTo(centroid)))
+  let reach: number
+  if (obj.op === 'pipe') {
+    const pipe = obj.pipe
+    if (!pipe) return 'The pipe has no gauge.'
+    if (!(pipe.startRadiusMm > 0) || !(pipe.endRadiusMm > 0)) return 'The pipe\u2019s radius must be greater than 0.'
+    reach = Math.max(pipe.startRadiusMm, pipe.endRadiusMm)
+  } else {
+    const pts = clean(sampleProfile(obj.profile))
+    if (pts.length < 3) return null // profile error reported separately
+    const centroid = pts.reduce((a, q) => a.add(q), new THREE.Vector2()).divideScalar(pts.length)
+    reach = Math.max(...pts.map(q => q.distanceTo(centroid)))
+  }
   const curve = railCurve(rail)
   // Tightest bend radius along the rail vs the profile's reach: if the
   // profile is bigger than the bend radius the swept solid folds onto itself.
@@ -265,7 +282,7 @@ export function railError(obj: ModelObject): string | null {
     const angle = Math.acos(Math.min(1, Math.max(-1, t0.dot(t1))))
     if (angle > 1e-6) minRadius = Math.min(minRadius, ds / angle)
   }
-  if (minRadius < reach * 1.05) return `The profile (reach ${reach.toFixed(1)} mm) is too big for the rail's tightest bend (radius ${minRadius.toFixed(1)} mm) — make the profile smaller or the rail gentler.`
+  if (minRadius < reach * 1.05) return `The ${obj.op === 'pipe' ? 'pipe' : 'profile'} (reach ${reach.toFixed(1)} mm) is too big for the rail's tightest bend (radius ${minRadius.toFixed(1)} mm) — make it thinner or the rail gentler.`
   return null
 }
 
@@ -285,7 +302,7 @@ function railCurve(rail: NonNullable<ModelObject['rail']>): THREE.CatmullRomCurv
  *  perpendicular to the rail with parallel-transport frames) travels along
  *  the rail; open rails get flat end caps. Winding is fixed up by checking
  *  the signed volume so faces always point outward. */
-function buildSweepGeometry(profilePts: THREE.Vector2[], rail: NonNullable<ModelObject['rail']>): THREE.BufferGeometry {
+function buildSweepGeometry(profilePts: THREE.Vector2[], rail: NonNullable<ModelObject['rail']>, radiusAt?: (t: number) => number): THREE.BufferGeometry {
   const curve = railCurve(rail)
   const closed = rail.closed
   const segments = Math.min(SWEEP_MAX_RINGS, Math.max(64, rail.points.length * 32))
@@ -296,9 +313,13 @@ function buildSweepGeometry(profilePts: THREE.Vector2[], rail: NonNullable<Model
   const m = local.length
   const positions: number[] = []
   for (let i = 0; i < ringCount; i++) {
-    const c = curve.getPointAt(i / segments)
+    const t = i / segments
+    const c = curve.getPointAt(t)
     const nrm = frames.normals[i], bin = frames.binormals[i]
-    for (const q of local) positions.push(c.x + nrm.x * q.x + bin.x * q.y, c.y + nrm.y * q.x + bin.y * q.y, c.z + nrm.z * q.x + bin.z * q.y)
+    // A pipe's section is the same circle at every ring, scaled to the
+    // gauge at that point along the rail; a sweep keeps its drawn profile.
+    const k = radiusAt ? radiusAt(closed ? t : Math.min(1, t)) : 1
+    for (const q of local) positions.push(c.x + nrm.x * q.x * k + bin.x * q.y * k, c.y + nrm.y * q.x * k + bin.y * q.y * k, c.z + nrm.z * q.x * k + bin.z * q.y * k)
   }
   const indices: number[] = []
   const lastRing = closed ? ringCount : ringCount - 1
@@ -705,14 +726,25 @@ function buildBaseGeometry(obj: ModelObject): { geometry: THREE.BufferGeometry }
     geometry.translate(obj.offsetMm.x, obj.offsetMm.y, obj.offsetMm.z)
     return { geometry: toCreasedNormals(geometry, Math.PI / 5) }
   }
-  if (obj.op === 'sweep') {
+  if (obj.op === 'sweep' || obj.op === 'pipe') {
     const rError = railError(obj)
     if (rError) return { error: rError }
     // The rail is already in world orientation (planePoint), so the swept
     // solid is NOT rotated onto the profile's plane.
-    geometry = buildSweepGeometry(pts, obj.rail!)
+    if (obj.op === 'pipe') {
+      const { startRadiusMm: r0, endRadiusMm: r1 } = obj.pipe!
+      const unitCircle = Array.from({ length: CIRCLE_SEGMENTS }, (_, i) => {
+        const a = (i / CIRCLE_SEGMENTS) * Math.PI * 2
+        return new THREE.Vector2(Math.cos(a), Math.sin(a))
+      })
+      geometry = buildSweepGeometry(unitCircle, obj.rail!, t => r0 + (r1 - r0) * t)
+    } else {
+      geometry = buildSweepGeometry(pts, obj.rail!)
+    }
     geometry.translate(obj.offsetMm.x, obj.offsetMm.y, obj.offsetMm.z)
-    return { geometry: toCreasedNormals(geometry, Math.PI / 5) }
+    // A pipe is a genuinely smooth tube — creasing it at the same angle as
+    // a drawn profile's corners would facet the round section.
+    return { geometry: obj.op === 'pipe' ? (geometry.computeVertexNormals(), geometry) : toCreasedNormals(geometry, Math.PI / 5) }
   }
   if (obj.op === 'extrude') {
     if (!(obj.heightMm > 0)) return { error: 'Extrude height must be greater than 0.' }
@@ -802,14 +834,28 @@ export function buildGhostMeshes(objects: ModelObject[], bandRadiusMm = DEFAULT_
   return meshes
 }
 
+/** The curve drawn in the sketch, as a pipe's rail: a polyline/spline is
+ *  taken as drawn, and a rectangle/circle (which the sketch stores as two
+ *  defining points) is expanded into the closed loop it represents. */
+function pipeRailPoints(profile: ModelProfile): Point2[] {
+  if (profile.kind === 'polyline' || profile.kind === 'spline') return profile.points
+  const sampled = sampleProfile(profile)
+  return sampled.length >= 3 ? sampled.map(q => ({ x: q.x, y: q.y })) : profile.points
+}
+
 export function newModelObject(profile: ModelProfile, op: ModelOp, index: number): ModelObject {
   return {
     id: `m${Date.now().toString(36)}${index}`,
-    name: `${op === 'extrude' ? 'Extrusion' : op === 'revolve' ? 'Revolution' : op === 'loft' ? 'Loft' : 'Sweep'} ${index + 1}`,
+    name: `${op === 'extrude' ? 'Extrusion' : op === 'revolve' ? 'Revolution' : op === 'loft' ? 'Loft' : op === 'pipe' ? 'Pipe' : 'Sweep'} ${index + 1}`,
     op, profile, plane: 'front', offsetMm: { x: 0, y: 0, z: 0 }, heightMm: 3,
     // Sweeps start with a gentle example rail on the Top plane to edit.
     // Lofts start as a taper to 60% so the result is visibly not a prism.
     ...(op === 'loft' ? { topProfile: scaleProfile(profile, 0.6), twistDeg: 0 } : {}),
     ...(op === 'sweep' ? { rail: { plane: 'top' as ModelPlane, closed: false, points: [{ x: -8, y: 0 }, { x: 0, y: 4 }, { x: 8, y: 0 }] } } : {}),
+    // A pipe's rail is the curve the user just drew — that IS the pipe —
+    // and its gauge starts at a typical 1 mm wire.
+    ...(op === 'pipe'
+      ? { pipe: { startRadiusMm: 0.5, endRadiusMm: 0.5 }, rail: { plane: 'front' as ModelPlane, closed: profile.kind === 'circle' || profile.kind === 'rectangle', points: pipeRailPoints(profile) } }
+      : {}),
   }
 }

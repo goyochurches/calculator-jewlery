@@ -68,7 +68,8 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect, bandRad
     setDraft([]); setTool(null)
   }
 
-  const editingRail = selected?.op === 'sweep' && editTarget === 'rail' && !!selected.rail
+  // A pipe IS its rail — there's no drawn profile to switch back to.
+  const editingRail = !!selected?.rail && (selected.op === 'pipe' || (selected.op === 'sweep' && editTarget === 'rail'))
   const editingTop = selected?.op === 'loft' && editTarget === 'top' && !!selected.topProfile
   const moveHandle = (index: number, clientX: number, clientY: number) => {
     if (!selected) return
@@ -88,7 +89,8 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect, bandRad
   const outline = selected ? sampleProfile(selected.profile) : []
   const flow = selected?.flow ? flowArcMm(selected, bandRadiusMm) : null
   const deform = selected?.deform ?? { axis: 'y' as const, endScale: 1, twistDeg: 0 }
-  const selectedError = selected ? (profileError(selected.profile, selected.op) ?? (selected.op === 'sweep' ? railError(selected) : selected.op === 'loft' && selected.topProfile ? profileError(selected.topProfile, 'loft') : null)) : null
+  const pipe = selected?.pipe ?? null
+  const selectedError = selected ? (profileError(selected.profile, selected.op) ?? (selected.op === 'sweep' || selected.op === 'pipe' ? railError(selected) : selected.op === 'loft' && selected.topProfile ? profileError(selected.topProfile, 'loft') : null)) : null
   const numInput = 'w-full rounded-lg border border-slate-200 px-2 py-1 text-xs'
 
   return (
@@ -153,6 +155,9 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect, bandRad
           <button type="button" disabled={!!profileError(draftProfile, 'extrude')} onClick={() => { create('sweep'); setEditTarget('rail') }}
             title="Sweeps this shape along a rail curve you then shape (Rhino's Sweep 1 Rail)."
             className="flex-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Sweep</button>
+          <button type="button" disabled={draft.length < 2} onClick={() => { create('pipe'); setEditTarget('rail') }}
+            title="Runs a round tube of the gauge you set along the curve you just drew (Rhino/Matrix Pipe) — wire, filigree, gallery work."
+            className="flex-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Pipe</button>
           <button type="button" disabled={!!profileError(draftProfile, 'extrude')} onClick={() => { create('loft'); setEditTarget('top') }}
             title="Lofts this base shape to a second shape (starts as a 60% taper) that you then reshape."
             className="flex-1 rounded-xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Loft</button>
@@ -191,11 +196,15 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect, bandRad
             <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-500">Operation</label>
             <select className={numInput} value={selected.op} onChange={e => {
               const op = e.target.value as ModelOp
-              update(selected.id, op === 'sweep' && !selected.rail ? { op, rail: newModelObject(selected.profile, 'sweep', 0).rail } : op === 'loft' && !selected.topProfile ? { op, topProfile: newModelObject(selected.profile, 'loft', 0).topProfile, twistDeg: 0 } : { op })
+              const fresh = newModelObject(selected.profile, op, 0)
+              update(selected.id, op === 'sweep' && !selected.rail ? { op, rail: fresh.rail }
+                : op === 'pipe' ? { op, pipe: selected.pipe ?? fresh.pipe, rail: selected.rail ?? fresh.rail }
+                  : op === 'loft' && !selected.topProfile ? { op, topProfile: fresh.topProfile, twistDeg: 0 } : { op })
             }}>
               <option value="extrude">Extrude</option>
               <option value="revolve">Revolve</option>
               <option value="sweep">Sweep along rail</option>
+              <option value="pipe">Pipe (round tube along a curve)</option>
               <option value="loft">Loft (2 sections)</option>
             </select>
           </div>
@@ -230,9 +239,27 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect, bandRad
               </div>
             )}
           </div>
-          {selected.op === 'sweep' && selected.rail && (
+          {selected.op === 'pipe' && pipe && (
+            <div className="col-span-2 space-y-2 rounded-xl border border-amber-200 bg-amber-50/50 p-2.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-amber-700">Pipe gauge</span>
+              {([['startRadiusMm', 'Start radius'], ['endRadiusMm', 'End radius']] as const).map(([key, label]) => (
+                <div key={key}>
+                  <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">
+                    {label} ({pipe[key].toFixed(2)} mm — Ø {(pipe[key] * 2).toFixed(2)} mm)
+                  </label>
+                  <input type="range" min={0.1} max={4} step={0.05} value={pipe[key]} className="w-full"
+                    onChange={e => update(selected.id, { pipe: { ...pipe, [key]: Number(e.target.value) } })} />
+                </div>
+              ))}
+              <p className="text-[10px] text-slate-500">
+                The curve you drew is the pipe itself — drag its handles to reshape it. Set both radii the same for
+                plain wire, or different for a tapered one. Closed loops make a ring of wire.
+              </p>
+            </div>
+          )}
+          {(selected.op === 'sweep' || selected.op === 'pipe') && selected.rail && (
             <div className="col-span-2 space-y-2 rounded-xl border border-teal-200 bg-teal-50/50 p-2.5">
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className={`grid gap-1.5 ${selected.op === 'pipe' ? 'hidden' : 'grid-cols-2'}`}>
                 {(['profile', 'rail'] as const).map(t => (
                   <button key={t} type="button" onClick={() => setEditTarget(t)}
                     className={`rounded-lg border px-2 py-1.5 text-[11px] font-semibold ${editTarget === t ? 'border-teal-700 bg-teal-700 text-white' : 'border-slate-200 bg-white text-slate-600'}`}>
