@@ -129,6 +129,12 @@ interface ModelViewer3DProps {
   gem?: { color: string; ior: number }
   /** Reports the accumulated sample count while path tracing. */
   onPathTraceSamples?: (samples: number) => void
+  /** Section view — Matrix's own Clipping Plane: everything on the far
+   *  side of the plane through `offsetMm` on `axis` is hidden, so the
+   *  inside of the piece (stone seats, hollows, how thick a wall really
+   *  is) can be looked at directly. Applies to the working and Render
+   *  views; the path tracer renders its own scene and ignores it. */
+  sectionPlane?: { axis: 'x' | 'y' | 'z'; offsetMm: number } | null
 }
 
 /**
@@ -139,7 +145,7 @@ interface ModelViewer3DProps {
  * file's mesh, not just the parametric ring band.
  */
 export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>(function ModelViewer3D(
-  { object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className, onSelectPart, onMove, autoRotate = false, wireframe = false, renderMode = false, pathTrace = false, onPathTraceSamples, gem = DIAMOND_LOOK },
+  { object, color = '#d4af37', metalness = 0.85, roughness = 0.28, className, onSelectPart, onMove, autoRotate = false, wireframe = false, renderMode = false, pathTrace = false, onPathTraceSamples, gem = DIAMOND_LOOK, sectionPlane = null },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -547,6 +553,32 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     if (material) material.wireframe = wireframe
     if (stoneMaterial) stoneMaterial.wireframe = wireframe
   }, [wireframe])
+
+  // Section view (Matrix's Clipping Plane). Uses the renderer's GLOBAL
+  // clipping planes, so it covers every material at once — metal, stones,
+  // highlights and cutter ghosts alike — rather than having to be wired
+  // into each one. The cut faces are open (a clipped mesh is genuinely cut
+  // away, not re-capped), so the materials switch to DoubleSide while a
+  // section is on: what you see across the cut is then the inside wall of
+  // the far side, which reads as solid rather than as a hole.
+  useEffect(() => {
+    const renderer = rendererRef.current
+    if (!renderer) return
+    const materials = [materialRef.current, stoneMaterialRef.current, highlightMaterialRef.current,
+      ghostMaterialRef.current, ghostIntersectMaterialRef.current]
+    if (!sectionPlane) {
+      renderer.clippingPlanes = []
+      for (const m of materials) if (m) { m.side = THREE.FrontSide; m.needsUpdate = true }
+      return
+    }
+    const normal = new THREE.Vector3(
+      sectionPlane.axis === 'x' ? -1 : 0,
+      sectionPlane.axis === 'y' ? -1 : 0,
+      sectionPlane.axis === 'z' ? -1 : 0,
+    )
+    renderer.clippingPlanes = [new THREE.Plane(normal, sectionPlane.offsetMm)]
+    for (const m of materials) if (m) { m.side = THREE.DoubleSide; m.needsUpdate = true }
+  }, [sectionPlane])
 
   // Render mode: swap the flat working look for a presentation look.
   // Working view keeps scene.environment null + cheap lights; Render mode

@@ -193,7 +193,7 @@ const PART_TAB: Record<string, Tab> = {
   'Modeled solid': 'model',
   'Merged solid': 'surface', Imported: 'production', 'Matching band': 'surface',
 }
-import { Download, RotateCw, Scale, MousePointerClick, Circle, Gem, Layers, Factory, Camera, Sparkles, Maximize2, Minimize2, Undo2, Redo2, PenTool, Aperture } from 'lucide-react'
+import { Download, RotateCw, Scale, MousePointerClick, Circle, Gem, Layers, Factory, Camera, Sparkles, Maximize2, Minimize2, Undo2, Redo2, PenTool, Aperture, Scissors } from 'lucide-react'
 
 // Approximate render colors per metal — cosmetic only, doesn't drive
 // pricing (that still comes from Master Tables / config.metalPriceMap
@@ -380,6 +380,13 @@ export function CadDesignPage() {
   const [sidePanelAngle1Deg, setSidePanelAngle1Deg] = useState(270)
   const [autoRotate, setAutoRotate] = useState(false)
   const [wireframe, setWireframe] = useState(false)
+  // Section view (Matrix's Clipping Plane) — viewer-only, so it never
+  // touches the geometry the weight, the checks or an export are read
+  // from. Z by default: that's the plane that cuts a ring across the
+  // finger, through the head and the stone seats under it.
+  const [sectionOn, setSectionOn] = useState(false)
+  const [sectionAxis, setSectionAxis] = useState<'x' | 'y' | 'z'>('z')
+  const [sectionOffsetMm, setSectionOffsetMm] = useState(0)
   // Render mode (Matrix's "Render"): photoreal presentation look — see
   // ModelViewer3D's renderMode prop.
   const [renderMode, setRenderMode] = useState(false)
@@ -930,6 +937,9 @@ export function CadDesignPage() {
   const cutterMeshes = useMemo(() => buildCutterMeshes(modelObjects, outerRadiusMm), [modelObjects, outerRadiusMm])
   // Ghosts show EVERY cutter (also the ones aimed at one specific object).
   const ghostMeshes = useMemo(() => buildGhostMeshes(modelObjects, outerRadiusMm), [modelObjects, outerRadiusMm])
+  // One object identity per real setting, so the viewer's own clipping
+  // effect only re-runs when the section actually changes.
+  const sectionPlane = useMemo(() => (sectionOn ? { axis: sectionAxis, offsetMm: sectionOffsetMm } : null), [sectionOn, sectionAxis, sectionOffsetMm])
   // Stone seats (Matrix's Cutters): read off the gems in the finished
   // model, so every setting type is covered without knowing about them.
   const seatCutters = useMemo(() => (cutStoneSeats ? buildStoneSeatCutters(model) : []), [cutStoneSeats, model])
@@ -1272,7 +1282,7 @@ export function CadDesignPage() {
     setPaveSettingType(type)
     setActiveTab('gems')
   }
-  const COMMAND_HELP = 'front · top · side · perspective · undo · redo · wireframe · render · raytrace · fullscreen · turntable · ringrail · gems · surface · model · production · prong · bezel · cluster · tension · illusion · halo · pave · channel · flush · bar · invisible · milgrain · rope · flutes · pattern · mirror · plain · tapered · twisted · split · cathedral · bypass · export · help'
+  const COMMAND_HELP = 'front · top · side · perspective · undo · redo · wireframe · section · render · raytrace · fullscreen · turntable · ringrail · gems · surface · model · production · prong · bezel · cluster · tension · illusion · halo · pave · channel · flush · bar · invisible · milgrain · rope · flutes · pattern · mirror · plain · tapered · twisted · split · cathedral · bypass · export · help'
   const runCommand = (raw: string) => {
     const cmd = raw.trim().toLowerCase()
     if (!cmd) return
@@ -1281,6 +1291,7 @@ export function CadDesignPage() {
       case 'front': case 'top': case 'side': case 'perspective':
         viewerRef.current?.setView(cmd); result = `View set to ${cmd}.`; break
       case 'wireframe': setWireframe(v => !v); result = 'Wireframe toggled.'; break
+      case 'section': case 'clip': setSectionOn(v => !v); result = 'Section view toggled.'; break
       case 'fullscreen': case 'full': toggleFullscreen(); result = 'Full screen toggled.'; break
       case 'undo': result = stepHistory(-1) ? 'Undone.' : 'Nothing to undo.'; break
       case 'redo': result = stepHistory(1) ? 'Redone.' : 'Nothing to redo.'; break
@@ -2806,6 +2817,7 @@ export function CadDesignPage() {
                   }
                 }
               }}
+              sectionPlane={sectionPlane}
               autoRotate={autoRotate} wireframe={wireframe} renderMode={renderMode} pathTrace={pathTrace && renderMode} gem={GEM_LOOKS[gemLookKey] ?? DIAMOND_LOOK} onPathTraceSamples={n => samplesSetterRef.current?.(n)} className={fullscreen ? 'h-[calc(100vh-8rem)] min-h-[360px] w-full' : 'h-[420px] w-full sm:h-[520px]'} />
             <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2 text-xs text-white shadow-sm backdrop-blur">
               <MousePointerClick className="h-3.5 w-3.5 shrink-0 text-amber-300" />
@@ -2855,6 +2867,10 @@ export function CadDesignPage() {
                 className={`rounded-xl px-3 py-2 text-xs font-semibold shadow-sm backdrop-blur transition ${wireframe ? 'bg-amber-400 text-slate-900' : 'bg-slate-900/80 text-white hover:bg-slate-900'}`}>
                 Wireframe
               </button>
+              <button type="button" onClick={() => setSectionOn(v => !v)} title="Matrix's Clipping Plane — cut the view open to look inside (stone seats, wall thickness)"
+                className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold shadow-sm backdrop-blur transition ${sectionOn ? 'bg-amber-400 text-slate-900' : 'bg-slate-900/80 text-white hover:bg-slate-900'}`}>
+                <Scissors className="h-3.5 w-3.5 shrink-0" /> Section
+              </button>
               <button type="button" onClick={() => setAutoRotate(v => !v)}
                 className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold shadow-sm backdrop-blur transition ${autoRotate ? 'bg-amber-400 text-slate-900' : 'bg-slate-900/80 text-white hover:bg-slate-900'}`}>
                 <RotateCw className={`h-3.5 w-3.5 shrink-0 ${autoRotate ? 'animate-spin' : ''}`} /> Turntable
@@ -2867,6 +2883,21 @@ export function CadDesignPage() {
                     className={`h-5 w-5 rounded-full border-2 transition ${gemLookKey === key ? 'border-amber-300 scale-110' : 'border-white/30'}`}
                     style={{ background: key === 'diamond' ? 'linear-gradient(135deg,#fff,#cfe6ff)' : g.color }} />
                 ))}
+              </div>
+            )}
+            {sectionOn && (
+              <div className="absolute bottom-14 left-3 right-3 flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2 backdrop-blur sm:right-auto sm:w-80">
+                <div className="flex gap-1">
+                  {(['x', 'y', 'z'] as const).map(axis => (
+                    <button key={axis} type="button" onClick={() => setSectionAxis(axis)}
+                      className={`rounded-lg px-2 py-1 text-[11px] font-semibold uppercase transition ${sectionAxis === axis ? 'bg-amber-400 text-slate-900' : 'bg-white/10 text-white hover:bg-white/20'}`}>
+                      {axis}
+                    </button>
+                  ))}
+                </div>
+                <input type="range" min={-20} max={20} step={0.1} value={sectionOffsetMm} className="flex-1"
+                  onChange={e => setSectionOffsetMm(Number(e.target.value))} />
+                <span className="w-14 shrink-0 text-right font-mono text-[11px] text-white">{sectionOffsetMm.toFixed(1)}mm</span>
               </div>
             )}
             <div className="absolute bottom-3 left-3 flex items-center gap-1.5">
