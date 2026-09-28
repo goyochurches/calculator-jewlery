@@ -466,12 +466,12 @@ export function StockBuilderPage() {
       }
       if (stone.stoneType === 'lab-grown' && stone.shape === 'Round' && config.roundMeleePrices.length > 0) {
         const { sizeKey: baseKey, growth, clarity } = unpackRoundSizeKey(stone.sizeKey)
-        const roundRow = baseKey ? config.roundMeleePriceFor(baseKey) : undefined
-        if (roundRow && growth && clarity) {
+        const roundSize = baseKey ? config.roundMeleeSizeFor(baseKey) : undefined
+        if (roundSize && growth && clarity) {
           return {
-            pricePerCarat: roundMeleePriceValue(roundRow, growth, clarity),
-            ctPerStone: roundRow.ctPerStone,
-            label: `${roundRow.sizeKey}${roundRow.pointerLabel ? ` · ${roundRow.pointerLabel}` : ''} · ${growth}/${clarity}`,
+            pricePerCarat: roundMeleePriceValue(roundSize.row, growth, clarity),
+            ctPerStone: roundSize.ctPerStone,
+            label: `${roundSize.sizeKey}${roundSize.pointerLabel ? ` · ${roundSize.pointerLabel}` : ''} · ${growth}/${clarity}`,
             fancy: true as const,
           }
         }
@@ -1302,9 +1302,9 @@ export function StockBuilderPage() {
                       </option>
                     ))
                   : isRoundMelee
-                  ? config.roundMeleePrices.map(p => (
-                      <option key={p.id} value={p.sizeKey}>
-                        {p.sizeKey}{p.pointerLabel ? ` — ${p.pointerLabel}` : ''} · ${roundMeleePriceValue(p, roundSelection?.growth || 'HPHT', roundSelection?.clarity || 'VVS')}/ct
+                  ? config.roundMeleeSizes.map(o => (
+                      <option key={o.sizeKey} value={o.sizeKey}>
+                        {o.sizeKey}{o.pointerLabel ? ` — ${o.pointerLabel}` : ''} · ${roundMeleePriceValue(o.row, roundSelection?.growth || 'HPHT', roundSelection?.clarity || 'VVS')}/ct
                       </option>
                     ))
                   : sizes.map(d => (

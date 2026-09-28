@@ -29,9 +29,9 @@ export function stoneCostSplit(stone: StockStone, config: QuoteConfig): StoneCos
   let roundPrice: { pricePerCarat: number; ctPerStone: number } | undefined
   if (!fancyRow && stone.stoneType === 'lab-grown' && stone.shape === 'Round' && config.roundMeleePrices.length > 0) {
     const { sizeKey: baseKey, growth, clarity } = unpackRoundSizeKey(stone.sizeKey)
-    const roundRow = baseKey ? config.roundMeleePriceFor(baseKey) : undefined
-    if (roundRow && growth && clarity) {
-      roundPrice = { pricePerCarat: roundMeleePriceValue(roundRow, growth, clarity), ctPerStone: roundRow.ctPerStone }
+    const roundSize = baseKey ? config.roundMeleeSizeFor(baseKey) : undefined
+    if (roundSize && growth && clarity) {
+      roundPrice = { pricePerCarat: roundMeleePriceValue(roundSize.row, growth, clarity), ctPerStone: roundSize.ctPerStone }
     }
   }
   const pricePerCarat = fancyRow?.pricePerCarat ?? roundPrice?.pricePerCarat ?? config.diamondSizeFor(stone.stoneType, stone.sizeKey)?.basePrice ?? 0

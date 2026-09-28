@@ -69,6 +69,83 @@ export function roundMeleePriceValue(row: RoundMeleePrice, growth: RoundGrowthMe
   return clarity === 'VVS' ? row.cvdVvsPrice : row.cvdVsPrice
 }
 
+/** One individually selectable Round-melee size. The price sheet stores some
+ *  rows as a span of mm sizes that share a price ("3.3-3.6 - 14-17-PT"), and
+ *  the Size dropdown used to offer that row verbatim - so there was no way to
+ *  quote a plain 3.3mm stone. Spans are expanded into one option per mm here,
+ *  in the app layer only: each option still points back at its sheet row for
+ *  the 4 prices, so neither the sheet nor already-saved sizeKeys change. */
+export interface RoundMeleeSizeOption {
+  /** The size key stored on the stone, e.g. "3.4". */
+  sizeKey: string
+  /** Pointer label for this one size ("15-PT") when the row's label spans as
+   *  many pointer weights as it does mm sizes, else the row's label as-is. */
+  pointerLabel: string | null
+  /** Carat weight of a single stone of this size. */
+  ctPerStone: number
+  /** The price-sheet row this size is priced from. */
+  row: RoundMeleePrice
+}
+
+const MM_SPAN = /^(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)$/
+const PT_SPAN = /^(\d+)\s*-\s*(\d+)\s*-?\s*PT$/i
+
+function wholeRowOption(row: RoundMeleePrice): RoundMeleeSizeOption {
+  return { sizeKey: row.sizeKey, pointerLabel: row.pointerLabel ?? null, ctPerStone: row.ctPerStone, row }
+}
+
+/** Expands one price-sheet row into its individual mm sizes. A row whose
+ *  sizeKey is already a single size - the common case - comes back as a
+ *  one-entry list, untouched. */
+export function expandRoundMeleeRow(row: RoundMeleePrice): RoundMeleeSizeOption[] {
+  const span = MM_SPAN.exec(row.sizeKey.trim())
+  if (!span) return [wholeRowOption(row)]
+
+  // Step in whole tenths of a mm: 3.3 + 0.1 in binary floating point is
+  // 3.4000000000000004, which would produce unusable size keys. Anything
+  // that isn't a sane, short, ascending span is left as the sheet wrote it
+  // rather than guessed at.
+  const from = Math.round(Number(span[1]) * 10)
+  const to = Math.round(Number(span[2]) * 10)
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to < from || to - from > 40) return [wholeRowOption(row)]
+
+  const sizes: string[] = []
+  for (let tenths = from; tenths <= to; tenths++) sizes.push(String(tenths / 10))
+
+  // "3.3-3.6 - 14-17-PT" carries a per-size carat weight: four mm sizes, four
+  // pointer weights, in order. Only trust that when the two spans line up - a
+  // row like "3.9-4.1 - 25-PT" quotes one weight for the whole span, so there
+  // every size keeps the row's own ctPerStone.
+  const pt = PT_SPAN.exec((row.pointerLabel ?? '').trim())
+  const firstPt = pt && Number(pt[2]) - Number(pt[1]) + 1 === sizes.length ? Number(pt[1]) : null
+
+  return sizes.map((sizeKey, i) => firstPt == null
+    ? { ...wholeRowOption(row), sizeKey }
+    : { sizeKey, pointerLabel: `${firstPt + i}-PT`, ctPerStone: (firstPt + i) / 100, row })
+}
+
+/** Turns the Round-melee price sheet into the flat list of individual sizes
+ *  the Size dropdown offers, plus the index those sizes are looked up by. */
+export function buildRoundMeleeIndex(rows: RoundMeleePrice[]): {
+  sizes: RoundMeleeSizeOption[]
+  byKey: Record<string, RoundMeleeSizeOption>
+} {
+  const sizes = rows.flatMap(expandRoundMeleeRow)
+  const byKey: Record<string, RoundMeleeSizeOption> = {}
+  const put = (o: RoundMeleeSizeOption) => { byKey[normalizeSizeKey(o.sizeKey).toLowerCase()] = o }
+  // Sizes conjured out of a span go in first, so a row that really is that
+  // single size always wins the key if the sheet happens to have both.
+  sizes.filter(o => o.sizeKey !== o.row.sizeKey).forEach(put)
+  sizes.filter(o => o.sizeKey === o.row.sizeKey).forEach(put)
+  // Finally the span keys themselves ("3.3-3.6"), which no expansion claims -
+  // stones saved against one before the split still price.
+  rows.forEach(row => {
+    const key = normalizeSizeKey(row.sizeKey).toLowerCase()
+    if (!(key in byKey)) byKey[key] = wholeRowOption(row)
+  })
+  return { sizes, byKey }
+}
+
 export interface QuoteConfig {
   diamondSizes: DiamondSizeConfig[]
   fancyMeleePrices: FancyMeleePrice[]
@@ -91,8 +168,16 @@ export interface QuoteConfig {
   /** Look up a fancy-shape price row for a (shape, sizeKey) pair. */
   fancyMeleePriceFor: (shape: string | undefined | null, sizeKey: string | undefined | null) => FancyMeleePrice | undefined
   /** Look up a round-melee price-sheet row by its plain size key (e.g. "1.3",
-   *  "3.3-3.6") - not the packed "size::growth::clarity" stone sizeKey. */
+   *  "3.4") - not the packed "size::growth::clarity" stone sizeKey. Legacy
+   *  span keys ("3.3-3.6") still resolve, so stones saved before the sizes
+   *  were split keep pricing. */
   roundMeleePriceFor: (sizeKey: string | undefined | null) => RoundMeleePrice | undefined
+  /** Every Round-melee size a stone can be given, one entry per mm, in sheet
+   *  order - see expandRoundMeleeRow. This is what the Size dropdown lists. */
+  roundMeleeSizes: RoundMeleeSizeOption[]
+  /** Like roundMeleePriceFor, but also carries the carat weight of that one
+   *  size - which for an expanded span differs from the row's ctPerStone. */
+  roundMeleeSizeFor: (sizeKey: string | undefined | null) => RoundMeleeSizeOption | undefined
   fingerSizeMap: Record<number, FingerSizeConfig>
   cadMap: Record<string, PricingTier>
   ringLaborMap: Record<string, PricingTier>
@@ -117,6 +202,8 @@ const EMPTY: QuoteConfig = {
   fancyShapes: [],
   fancyMeleePriceFor: () => undefined,
   roundMeleePriceFor: () => undefined,
+  roundMeleeSizes: [],
+  roundMeleeSizeFor: () => undefined,
   fingerSizeMap: {}, cadMap: {}, ringLaborMap: {}, setterMap: {},
   metalPriceMap: STATIC_METAL_PRICES,
   loading: true,
@@ -156,9 +243,9 @@ export function useQuoteConfig(): QuoteConfig {
         const byShapeAndSize: Record<string, FancyMeleePrice> = Object.fromEntries(
           fancyMeleePrices.map(p => [`${p.shape.toLowerCase()}|${p.sizeKey.toLowerCase()}`, p])
         )
-        const byRoundSize: Record<string, RoundMeleePrice> = Object.fromEntries(
-          roundMeleePrices.map(p => [p.sizeKey.toLowerCase(), p])
-        )
+        // One entry per individual mm size, so the Size dropdown can offer
+        // 3.3 / 3.4 / 3.5 / 3.6 instead of the sheet's "3.3-3.6" span.
+        const { sizes: roundMeleeSizes, byKey: byRoundSize } = buildRoundMeleeIndex(roundMeleePrices)
         // Order shapes by how many sizes they have (most first) — matches the
         // order the price sheet listed them, and surfaces the common shapes
         // first in the picker.
@@ -202,7 +289,10 @@ export function useQuoteConfig(): QuoteConfig {
           fancyMeleePriceFor: (shape, sizeKey) =>
             shape && sizeKey ? byShapeAndSize[`${shape.toLowerCase()}|${sizeKey.toLowerCase()}`] : undefined,
           roundMeleePriceFor: (sizeKey) =>
-            sizeKey ? byRoundSize[sizeKey.toLowerCase()] : undefined,
+            sizeKey ? byRoundSize[normalizeSizeKey(sizeKey).toLowerCase()]?.row : undefined,
+          roundMeleeSizes,
+          roundMeleeSizeFor: (sizeKey) =>
+            sizeKey ? byRoundSize[normalizeSizeKey(sizeKey).toLowerCase()] : undefined,
           fingerSizeMap: Object.fromEntries(fingerSizes.map(f => [f.size, f])),
           cadMap: Object.fromEntries(cadTiers.map(t => [t.tierKey, t])),
           ringLaborMap: Object.fromEntries(ringLaborTiers.map(t => [t.tierKey, t])),
