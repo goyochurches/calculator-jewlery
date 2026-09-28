@@ -24,6 +24,7 @@ import { canSeePayments } from '@/lib/paymentsAccess'
 import { displayStatusFor } from '@/lib/quoteStatusDisplay'
 import { computeCustomerPrice } from '@/lib/quotePricing'
 import { formatDateTime } from '@/lib/formatDate'
+import { quoteStoneCostSplit, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
 import { labReportVerifyUrl } from '@/hooks/useQuoteBuilder'
 import { quotesService } from '@/services/quotesService'
 import type { QuoteStone, SavedQuote } from '@/types'
@@ -55,6 +56,12 @@ const JEWELRY_TYPE_LABELS: Record<string, string> = {
   ring: 'Ring', rn: 'RN ring', pendant: 'Pendant', necklace: 'Necklace',
   bracelet: 'Bracelet', earrings: 'Earrings', cufflinks: 'Cufflinks',
   brooch: 'Brooch', anklet: 'Anklet', other: 'Other',
+}
+
+// Same group heading the Stock detail page's cost breakdown uses, so a
+// quote and a stock item read the same way.
+function CostGroupLabel({ children }: { children: React.ReactNode }) {
+  return <p className="mb-1 mt-4 px-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 first:mt-0">{children}</p>
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -297,17 +304,15 @@ export default function QuoteDetailPage() {
     ? rnBlock?.rest ?? null
     : (quote.internalNotes?.trim() || null)
 
-  const stoneTotals = stones.reduce((acc, s) => {
-    const sizeCfg = config.diamondSizeFor(s.stoneType, s.sizeKey)
-    const mult = DIAMOND_TYPE_OPTIONS[s.stoneType as keyof typeof DIAMOND_TYPE_OPTIONS]?.multiplier ?? 1
-    const pricePerCarat = (sizeCfg?.basePrice ?? 0) * mult
-    const ct = sizeCfg?.ctPerStone ?? 0
-    const amount = ct > 0 ? Math.round((s.carats ?? 0) / ct) : 0
-    const stoneCost = s.manualPrice != null ? s.manualPrice : (s.carats ?? 0) * pricePerCarat
-    acc.cost += stoneCost
-    acc.labor += amount * (s.setterFeeOverride ?? config.setterMap[s.setterType]?.fee ?? 0)
-    acc.carats += s.carats ?? 0
-    acc.amount += amount
+  // One line per stone, same shape the Stock detail page's breakdown uses —
+  // and the totals below are the sum of exactly these lines, so the rows a
+  // reader adds up always match the figure printed beside them.
+  const stoneLines = stones.map(s => ({ stone: s, ...quoteStoneCostSplit(s, config) }))
+  const stoneTotals = stoneLines.reduce((acc, l) => {
+    acc.cost += l.cost
+    acc.labor += l.labor
+    acc.carats += l.stone.carats ?? 0
+    acc.amount += l.count
     return acc
   }, { cost: 0, labor: 0, carats: 0, amount: 0 })
 
@@ -494,6 +499,34 @@ export default function QuoteDetailPage() {
               {(quote.extraCosts ?? 0) > 0 && (
                 <CostRow icon={Layers} tint="bg-slate-100 text-slate-500" label="Extra costs"
                   value={`$${quote.extraCosts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+              )}
+
+              {/* Every stone on its own line — the same breakdown the Stock
+                  detail page shows, so "Stones $2,400" is never just one
+                  opaque figure you have to open the stone cards to explain. */}
+              {stoneLines.length > 0 && (
+                <>
+                  <CostGroupLabel>Stones</CostGroupLabel>
+                  {stoneLines.map((l, i) => {
+                    const roleLabel = l.stone.role.charAt(0) + l.stone.role.slice(1).toLowerCase()
+                    const setting = l.labor > 0
+                      ? `setting $${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                      : ''
+                    return (
+                      <CostRow key={`s${i}`} icon={Gem} tint="bg-sky-50 text-sky-600"
+                        label={`${roleLabel}: ${stoneLineLabel(l.stone, l.count) || 'Stone'}`}
+                        sub={[stoneSpecLine(l.stone), setting].filter(Boolean).join(' · ')}
+                        value={l.cost > 0
+                          ? `$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                          : 'Not priced'} />
+                    )
+                  })}
+                  {stoneTotals.labor > 0 && (
+                    <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600" label="Labor to set"
+                      sub={stoneTotals.amount > 0 ? `${stoneTotals.amount} stone${stoneTotals.amount === 1 ? '' : 's'}` : undefined}
+                      value={`$${stoneTotals.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                  )}
+                </>
               )}
             </div>
           </Card>

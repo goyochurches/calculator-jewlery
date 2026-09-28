@@ -1,4 +1,4 @@
-import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
+import { DIAMOND_TYPE_OPTIONS, JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import { sizeKeyDisplay, unpackRoundSizeKey, type QuoteConfig } from '@/hooks/useQuoteConfig'
 import { JEWELRY_TYPE_OPTIONS } from '@/hooks/useQuoteBuilder'
 import type { QuoteEmkayStone, StockItem, StockStone } from '@/types'
@@ -18,6 +18,40 @@ export interface StoneCostSplit {
   /** Number of individual pieces this carat total represents (best-effort;
    *  falls back to 1 when the size chart has no per-stone carat weight). */
   count: number
+}
+
+/** The fields these helpers actually read off a stone. StockStone and
+ *  QuoteStone both satisfy it structurally — the two are the same shape for
+ *  everything below — so the Quote detail page can render its stones with
+ *  the same lines the Stock detail page uses instead of growing a second,
+ *  drifting copy of them. */
+export type PricedStone = Pick<StockStone,
+  'role' | 'stoneType' | 'stoneCategory' | 'gemstoneName' | 'sizeKey' | 'carats' |
+  'setterType' | 'setterFeeOverride' | 'shape' | 'color' | 'cut' | 'clarity' |
+  'labReport' | 'manualPrice' | 'contribution'>
+
+/** Per-stone cost/labor the way a QUOTE computes it: setting labor is the
+ *  setter's fee times how many stones the carat total works out to, rather
+ *  than whatever is left over from a saved `contribution` (which is what
+ *  stoneCostSplit does for a stock item). Kept here beside its sibling so
+ *  the Quote detail page's per-stone rows and its stone totals come from
+ *  one place and can't disagree with each other.
+ *
+ *  Deliberately NOT routed through the fancy melee sheet, because the quote
+ *  totals this replaces never were — adding it here would silently restate
+ *  the cost of every already-saved quote that has a fancy-shape stone. */
+export function quoteStoneCostSplit(stone: PricedStone, config: QuoteConfig): StoneCostSplit {
+  const sizeCfg = config.diamondSizeFor(stone.stoneType, stone.sizeKey)
+  const mult = DIAMOND_TYPE_OPTIONS[stone.stoneType]?.multiplier ?? 1
+  const pricePerCarat = (sizeCfg?.basePrice ?? 0) * mult
+  const ctPerStone = sizeCfg?.ctPerStone ?? 0
+  const carats = stone.carats ?? 0
+  const count = ctPerStone > 0 ? Math.round(carats / ctPerStone) : 0
+  return {
+    cost: stone.manualPrice != null ? stone.manualPrice : carats * pricePerCarat,
+    labor: count * (stone.setterFeeOverride ?? config.setterMap[stone.setterType]?.fee ?? 0),
+    count,
+  }
 }
 
 export function stoneCostSplit(stone: StockStone, config: QuoteConfig): StoneCostSplit {
@@ -41,7 +75,7 @@ export function stoneCostSplit(stone: StockStone, config: QuoteConfig): StoneCos
 }
 
 /** Human line for a stone/group: "5 Round lab 1.5 0.07ct". */
-export function stoneLineLabel(stone: StockStone, count: number): string {
+export function stoneLineLabel(stone: PricedStone, count: number): string {
   const typeLabel = stone.stoneType === 'lab-grown' ? 'lab' : 'natural'
   const carats = stone.carats ?? 0
   return [
@@ -56,7 +90,7 @@ export function stoneLineLabel(stone: StockStone, count: number): string {
 /** Secondary spec line for a stone row — whatever grading/catalog detail is
  *  actually set (gemstone name, color, clarity, cut, lab report). Empty
  *  string when the stone has nothing beyond its main line. */
-export function stoneSpecLine(stone: StockStone): string {
+export function stoneSpecLine(stone: PricedStone): string {
   const parts: string[] = []
   if (stone.stoneCategory === 'GEMSTONE' && stone.gemstoneName) parts.push(stone.gemstoneName)
   if (stone.color) parts.push(`Color ${stone.color}`)
