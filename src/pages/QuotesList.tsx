@@ -655,6 +655,7 @@ function QuoteRow({
   const [actionsOpen, setActionsOpen] = useState(false)
   const [actionsPos, setActionsPos] = useState<{ top: number; right: number } | null>(null)
   const [copiedLink, setCopiedLink] = useState(false)
+  const madeInWizard = (quote.pieceDescription ?? '').trim() !== ''
   const actionsBtnRef = useRef<HTMLButtonElement>(null)
   const actionsMenuRef = useRef<HTMLDivElement>(null)
 
@@ -780,6 +781,25 @@ function QuoteRow({
           <span className={`font-semibold ${isSelected ? 'text-white' : isChild ? 'text-slate-700' : 'text-slate-900'}`}>
             {quote.title}
           </span>
+          {/* Which builder made this quote. There is no field that records
+              it, so this leans on a side effect: the wizard's save path
+              (useQuoteBuilder.ts) always writes a pieceDescription and the
+              classic builder never does. That makes it a hint, not a fact —
+              it reads blank for anything quoted before pieceDescription
+              existed (2026-09-10), and it would quietly start calling
+              classic quotes "Wizard" if the classic builder ever began
+              writing one too. A real created_with column on the backend is
+              what would make it trustworthy. */}
+          {madeInWizard && (
+            <span title="Created in the Quote wizard (beta). Inferred from the auto-generated piece description — quotes made before 2026-09-10 can't be told apart."
+              className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                isSelected
+                  ? 'bg-white/20 text-white ring-1 ring-white/40'
+                  : 'bg-sky-100 text-sky-700 ring-1 ring-sky-300'
+              }`}>
+              Wizard
+            </span>
+          )}
           {!isChild && childCount != null && childCount > 0 && (
             <button
               type="button"
