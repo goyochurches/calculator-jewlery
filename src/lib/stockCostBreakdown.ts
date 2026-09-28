@@ -1,5 +1,5 @@
 import { JEWELRY_METAL_OPTIONS } from '@/constants/config'
-import { roundMeleePriceValue, sizeKeyDisplay, unpackRoundSizeKey, type QuoteConfig } from '@/hooks/useQuoteConfig'
+import { sizeKeyDisplay, unpackRoundSizeKey, type QuoteConfig } from '@/hooks/useQuoteConfig'
 import { JEWELRY_TYPE_OPTIONS } from '@/hooks/useQuoteBuilder'
 import type { QuoteEmkayStone, StockItem, StockStone } from '@/types'
 
@@ -23,19 +23,15 @@ export interface StoneCostSplit {
 export function stoneCostSplit(stone: StockStone, config: QuoteConfig): StoneCostSplit {
   const carats = stone.carats ?? 0
   const fancyRow = stone.shape ? config.fancyMeleePriceFor(stone.shape, stone.sizeKey) : undefined
-  // Lab-grown Round prices from the round melee sheet, with growth/clarity
-  // packed into sizeKey ("2::HPHT::VVS") — same branch as the builder's
-  // sizePricingFor.
-  let roundPrice: { pricePerCarat: number; ctPerStone: number } | undefined
-  if (!fancyRow && stone.stoneType === 'lab-grown' && stone.shape === 'Round' && config.roundMeleePrices.length > 0) {
-    const { sizeKey: baseKey, growth, clarity } = unpackRoundSizeKey(stone.sizeKey)
-    const roundSize = baseKey ? config.roundMeleeSizeFor(baseKey) : undefined
-    if (roundSize && growth && clarity) {
-      roundPrice = { pricePerCarat: roundMeleePriceValue(roundSize.row, growth, clarity), ctPerStone: roundSize.ctPerStone }
-    }
-  }
-  const pricePerCarat = fancyRow?.pricePerCarat ?? roundPrice?.pricePerCarat ?? config.diamondSizeFor(stone.stoneType, stone.sizeKey)?.basePrice ?? 0
-  const ctPerStone = fancyRow?.ctPerStone ?? roundPrice?.ctPerStone ?? config.diamondSizeFor(stone.stoneType, stone.sizeKey)?.ctPerStone ?? 0
+  // Round is priced generically from the Diamond Sizes master table, like
+  // any other non-fancy shape — same branch as the builder's sizePricingFor.
+  // An item saved while Round priced from the round melee sheet carries a
+  // packed "3.4::HPHT::VVS" key, so read the mm back out of it rather than
+  // letting those items fall to $0.
+  const genericKey = unpackRoundSizeKey(stone.sizeKey).sizeKey || stone.sizeKey
+  const sizeCfg = config.diamondSizeFor(stone.stoneType, genericKey)
+  const pricePerCarat = fancyRow?.pricePerCarat ?? sizeCfg?.basePrice ?? 0
+  const ctPerStone = fancyRow?.ctPerStone ?? sizeCfg?.ctPerStone ?? 0
 
   const cost = stone.manualPrice != null ? stone.manualPrice : carats * pricePerCarat
   const count = ctPerStone > 0 ? Math.max(1, Math.round(carats / ctPerStone)) : 1

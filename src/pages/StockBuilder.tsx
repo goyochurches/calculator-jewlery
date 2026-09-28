@@ -3,7 +3,7 @@ import { DIAMOND_TYPE_OPTIONS, JEWELRY_METAL_OPTIONS } from '@/constants/config'
 import { useAuth } from '@/context/AuthContext'
 import {
   useQuoteConfig, normalizeSizeKey,
-  packRoundSizeKey, unpackRoundSizeKey, roundMeleePriceValue, sizeKeyDisplay,
+  unpackRoundSizeKey, sizeKeyDisplay,
 } from '@/hooks/useQuoteConfig'
 import { METAL_GROUPS } from '@/hooks/useQuoteBuilder'
 import { computeRnBreakdown, type RnStoneType } from '@/lib/rnPricing'
@@ -448,11 +448,11 @@ export function StockBuilderPage() {
   // melee price-sheet entry (Oval, Princess, Baguette, ...) prices from that
   // table instead of the generic diamond_size_config lookup — the fancy
   // sheet has no Natural/Lab split, so it applies regardless of stoneType.
-  // Lab-grown Round stones price from the round melee sheet (split by
-  // growth method x clarity tier, packed into sizeKey — see
-  // packRoundSizeKey); Round stays lab-grown-only. Everything else falls
-  // back to the original per-mm behavior unchanged. Mirrors QuoteBuilder.tsx's
-  // sizePricingFor.
+  // Round is NOT routed to a special sheet — Round pricing always comes from
+  // the Diamond Sizes master table (generic per-mm lookup), same as any
+  // other non-fancy shape. Mirrors QuoteBuilder.tsx's sizePricingFor, which
+  // is the reference behavior: the two builders have to show the jeweler the
+  // same information for the same stone.
   const sizePricingFor = (stone: Pick<StoneRowState, 'stoneType' | 'shape' | 'sizeKey'>) => {
     if (stone.shape && stone.sizeKey) {
       const fancyRow = config.fancyMeleePriceFor(stone.shape, stone.sizeKey)
@@ -464,21 +464,12 @@ export function StockBuilderPage() {
           fancy: true as const,
         }
       }
-      if (stone.stoneType === 'lab-grown' && stone.shape === 'Round' && config.roundMeleePrices.length > 0) {
-        const { sizeKey: baseKey, growth, clarity } = unpackRoundSizeKey(stone.sizeKey)
-        const roundSize = baseKey ? config.roundMeleeSizeFor(baseKey) : undefined
-        if (roundSize && growth && clarity) {
-          return {
-            pricePerCarat: roundMeleePriceValue(roundSize.row, growth, clarity),
-            ctPerStone: roundSize.ctPerStone,
-            label: `${roundSize.sizeKey}${roundSize.pointerLabel ? ` · ${roundSize.pointerLabel}` : ''} · ${growth}/${clarity}`,
-            fancy: true as const,
-          }
-        }
-        return { pricePerCarat: 0, ctPerStone: 0, label: 'Choose growth & clarity', fancy: true as const }
-      }
     }
-    const sizeCfg = config.diamondSizeFor(stone.stoneType, stone.sizeKey)
+    // A stock item saved while Round priced from the round melee sheet
+    // carries a packed "3.4::HPHT::VVS" sizeKey. Read the mm back out of it
+    // so those items still resolve against the Diamond Sizes table instead
+    // of silently pricing at $0 — nothing writes a packed key any more.
+    const sizeCfg = config.diamondSizeFor(stone.stoneType, unpackRoundSizeKey(stone.sizeKey).sizeKey || stone.sizeKey)
     const mult = DIAMOND_TYPE_OPTIONS[stone.stoneType]?.multiplier ?? 1
     return {
       pricePerCarat: (sizeCfg?.basePrice ?? 0) * mult,
@@ -488,11 +479,12 @@ export function StockBuilderPage() {
     }
   }
 
-  // Shape picker options, grouped so Round (its own melee sheet) is never
-  // shown as if it were one more fancy shape — see QuoteBuilder.tsx.
+  // Shape picker options — Round is priced generically (Diamond Sizes master
+  // table) like any other non-fancy shape, so it sits in "Other" with the
+  // rest. Same split as QuoteBuilder.tsx.
   const fancyShapeOptions = config.fancyShapes
   const otherShapeOptions = useMemo(
-    () => STONE_SHAPES.filter(sh => sh !== 'Round' && !config.fancyShapes.includes(sh)),
+    () => STONE_SHAPES.filter(sh => !config.fancyShapes.includes(sh)),
     [config.fancyShapes],
   )
 
@@ -1055,8 +1047,6 @@ export function StockBuilderPage() {
   const renderStoneRow = (stone: StoneRowState, index: number) => {
     const isFancyShape = config.fancyShapes.includes(stone.shape)
     const fancySizes = isFancyShape ? config.fancyMeleePrices.filter(p => p.shape === stone.shape) : []
-    const isRoundMelee = stone.stoneType === 'lab-grown' && stone.shape === 'Round' && config.roundMeleePrices.length > 0
-    const roundSelection = isRoundMelee ? unpackRoundSizeKey(stone.sizeKey) : null
     const sizes = stone.stoneType === 'natural' ? sizesByStoneType.NATURAL : sizesByStoneType.LAB
     const customSize = stone.sizeKey === ''
     const { pricePerCarat, label: sizeLabel } = sizePricingFor(stone)
@@ -1215,8 +1205,9 @@ export function StockBuilderPage() {
           {/* Shape comes right before Size — picking a fancy shape (Oval,
               Princess, ...) changes which sizes/prices the Size dropdown
               below offers. The fancy melee sheet has no Natural/Lab split,
-              so it's offered for both — Round stays a Lab-only standalone
-              option since round melee pricing is Lab-grown only. */}
+              so it's offered for both. Round has no special sheet — it's
+              priced generically (Diamond Sizes master table) like any other
+              non-fancy shape, so it stays in "Other". */}
           <div className="space-y-1">
             <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Shape <span className="font-normal normal-case text-slate-400">(optional)</span>
@@ -1225,86 +1216,28 @@ export function StockBuilderPage() {
               onChange={e => patchStone(stone.uid, { shape: e.target.value })}
               className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
               <option value="">—</option>
-              {stone.stoneType === 'lab-grown' && <option value="Round">Round</option>}
               <optgroup label="Fancy shapes (melee sheet)">
                 {fancyShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
               </optgroup>
-              {stone.stoneType === 'lab-grown' ? (
-                otherShapeOptions.length > 0 && (
-                  <optgroup label="Other">
-                    {otherShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
-                  </optgroup>
-                )
-              ) : (
+              {otherShapeOptions.length > 0 && (
                 <optgroup label="Other">
-                  {STONE_SHAPES.filter(sh => !fancyShapeOptions.includes(sh)).map(sh => <option key={sh} value={sh}>{sh}</option>)}
+                  {otherShapeOptions.map(sh => <option key={sh} value={sh}>{sh}</option>)}
                 </optgroup>
               )}
             </select>
           </div>
 
-          {stone.role !== 'MAIN' && isRoundMelee && (
-            <div className="space-y-1 md:col-span-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Growth method &amp; clarity</label>
-              <div className="grid grid-cols-2 gap-2">
-                {(['HPHT', 'CVD'] as const).map(g => (
-                  <button key={g} type="button"
-                    onClick={() => patchStone(stone.uid, {
-                      sizeKey: packRoundSizeKey(roundSelection?.sizeKey ?? '', g, roundSelection?.clarity || 'VVS'),
-                    })}
-                    className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-                      roundSelection?.growth === g
-                        ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                    }`}>
-                    {g}
-                  </button>
-                ))}
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {(['VVS', 'VS'] as const).map(c => (
-                  <button key={c} type="button"
-                    onClick={() => patchStone(stone.uid, {
-                      sizeKey: packRoundSizeKey(roundSelection?.sizeKey ?? '', roundSelection?.growth || 'HPHT', c),
-                    })}
-                    className={`rounded-xl border px-3 py-2 text-sm font-semibold transition ${
-                      roundSelection?.clarity === c
-                        ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
-                    }`}>
-                    {c}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {stone.role !== 'MAIN' && (
             <div className="space-y-1">
               <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Size</label>
-              <select value={isRoundMelee ? (roundSelection?.sizeKey ?? '') : stone.sizeKey}
-                onChange={e => {
-                  const v = e.target.value
-                  if (isRoundMelee) {
-                    patchStone(stone.uid, {
-                      sizeKey: v === '' ? '' : packRoundSizeKey(v, roundSelection?.growth || 'HPHT', roundSelection?.clarity || 'VVS'),
-                    })
-                  } else {
-                    patchStone(stone.uid, { sizeKey: v })
-                  }
-                }}
+              <select value={stone.sizeKey}
+                onChange={e => patchStone(stone.uid, { sizeKey: e.target.value })}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400">
                 <option value="">Custom — enter carats &amp; price</option>
                 {isFancyShape
                   ? fancySizes.map(p => (
                       <option key={p.id} value={p.sizeKey}>
                         {p.sizeKey}{p.pointerLabel ? ` — ${p.pointerLabel}` : ''} · ${p.pricePerCarat}/ct
-                      </option>
-                    ))
-                  : isRoundMelee
-                  ? config.roundMeleeSizes.map(o => (
-                      <option key={o.sizeKey} value={o.sizeKey}>
-                        {o.sizeKey}{o.pointerLabel ? ` — ${o.pointerLabel}` : ''} · ${roundMeleePriceValue(o.row, roundSelection?.growth || 'HPHT', roundSelection?.clarity || 'VVS')}/ct
                       </option>
                     ))
                   : sizes.map(d => (
@@ -1320,15 +1253,13 @@ export function StockBuilderPage() {
               {isFancyShape && (
                 <p className="text-[10px] text-slate-400">Priced from the {stone.shape} melee sheet.</p>
               )}
-              {isRoundMelee && (
-                <p className="text-[10px] text-slate-400">Priced from the Round melee sheet ({roundSelection?.growth || 'HPHT'}/{roundSelection?.clarity || 'VVS'}).</p>
-              )}
             </div>
           )}
 
-          {/* Natural vs Lab — hidden for fancy-shape and round-melee sizes:
-              both sheets are Lab-only, so there's no equivalent Natural price. */}
-          {!isFancyShape && !isRoundMelee && (
+          {/* Natural vs Lab — popup comparing the same stone priced both ways.
+              Hidden for fancy-shape sizes: the fancy sheet is Lab-only, so
+              there's no equivalent Natural price to compare against. */}
+          {!isFancyShape && (
           <div className="md:col-span-2">
             <button type="button" onClick={() => setCompareUid(stone.uid)}
               className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50">
