@@ -2370,7 +2370,65 @@ export function buildStoneSeatCutters(object: THREE.Object3D, options: StoneSeat
   return cutters
 }
 
-// ── Channel setting ───────────────────────────────────────────────────────────
+// ── Hollowing the shank (weight reduction) ───────────────────────────
+// What a bench actually does to take weight (and cost) out of a wide or
+// heavy band: scoop a channel out of the INSIDE of the shank, leaving a
+// rail of metal at each edge so the ring keeps its strength and its
+// comfort against the finger. Matrix exposes this in its weight-reduction
+// tools; here it is a cutter, so it goes through the same boolean pass the
+// stone seats and the modeled cutters already use, and the weight and
+// price below it fall by exactly what it removes.
+//
+// Deliberately NOT a general mesh "shell" (offset every surface inward by
+// a wall thickness): on a real ring that produces a sealed void with no
+// way to drain wax or investment, which is uncastable. A scoop open to
+// the inside of the finger is what's genuinely made.
+
+export interface HollowShankParams {
+  /** The band's inside radius, mm — the surface the scoop starts from. */
+  innerRadiusMm: number
+  /** How deep into the metal it goes, mm. */
+  depthMm: number
+  /** How wide across the band, mm — always less than the band's own
+   *  width, since the rails left on either side are the point. */
+  widthMm: number
+}
+
+/** The scoop, as a cutter ready for `unionMetalParts`. A solid of
+ *  revolution about the ring's own axis (Y), with its corners chamfered:
+ *  a sharp internal corner is both a stress riser on a worn ring and a
+ *  place investment doesn't flow into cleanly.
+ *
+ *  It reaches 0.2 mm INSIDE the band's inner surface on purpose — a cutter
+ *  that stops exactly on a surface leaves a zero-thickness face, which is
+ *  what makes a boolean fail or leave slivers. */
+export function buildHollowShankCutter(params: HollowShankParams): THREE.Mesh {
+  const { innerRadiusMm, depthMm, widthMm } = params
+  const halfWidth = Math.max(0.05, widthMm / 2)
+  const chamfer = Math.min(depthMm * 0.4, halfWidth * 0.4)
+  const rInner = innerRadiusMm - 0.2
+  const rOuter = innerRadiusMm + Math.max(0.05, depthMm)
+  // (radius, axial) profile, revolved about Y: starts on the axis-facing
+  // side, out to the scoop's floor, chamfered where the floor meets each
+  // wall so nothing is left as a knife edge.
+  const profile = [
+    new THREE.Vector2(rInner, -halfWidth),
+    new THREE.Vector2(rOuter - chamfer, -halfWidth),
+    new THREE.Vector2(rOuter, -halfWidth + chamfer),
+    new THREE.Vector2(rOuter, halfWidth - chamfer),
+    new THREE.Vector2(rOuter - chamfer, halfWidth),
+    new THREE.Vector2(rInner, halfWidth),
+  ]
+  // Closed loop (the last point repeated) — same convention the band's own
+  // lathe uses, and what keeps the cutter a watertight solid.
+  const geometry = new THREE.LatheGeometry([...profile, profile[0].clone()], 96)
+  const mesh = new THREE.Mesh(toCreasedNormals(geometry, Math.PI / 5))
+  mesh.userData.partName = 'Hollow scoop'
+  mesh.userData.cutMode = 'subtract'
+  return mesh
+}
+
+// ── Channel setting ────────────────────────────────────────────────────────────
 // Alternative to pavé for side stones — the stones sit flush between two
 // raised metal rails running along the shank, instead of resting on top
 // held by beads. Same "split evenly on both sides of the head, with a gap"
