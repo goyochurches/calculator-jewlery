@@ -82,6 +82,9 @@ export interface CadDesignParams {
   sidePanelAngle0Deg?: number
   sidePanelAngle1Deg?: number
   cutStoneSeats?: boolean
+  hollowShank?: boolean
+  hollowDepthMm?: number
+  hollowWidthMm?: number
 }
 
 export interface SavedCadPreset {

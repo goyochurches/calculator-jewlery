@@ -29,6 +29,7 @@ import {
   buildPatternMotifs, type PatternMotif,
   buildLogoGroup,
   unionMetalParts, extractStoneMeshes, checkWatertightness, buildStoneSeatCutters,
+  buildHollowShankCutter,
   checkMinimumWallThickness, defaultProngDiameterMm, defaultGalleryTubeMm, RECOMMENDED_MIN_WALL_MM,
   checkProngClearance,
   scaleForCastingShrinkage, CASTING_SHRINKAGE_PERCENT,
@@ -325,6 +326,13 @@ export function CadDesignPage() {
   // buildStoneSeatCutters. Off by default: it's a boolean pass per stone,
   // so a pavé-heavy design takes a moment.
   const [cutStoneSeats, setCutStoneSeats] = useState(false)
+  // Weight reduction (Matrix's own hollowing tools) — scoop a channel out
+  // of the INSIDE of the shank, leaving a rail at each edge. Like the seat
+  // cutters above it rides the boolean pass, so the weight and the price
+  // below fall by exactly what it removes. See buildHollowShankCutter.
+  const [hollowShank, setHollowShank] = useState(false)
+  const [hollowDepthMm, setHollowDepthMm] = useState(0.5)
+  const [hollowWidthMm, setHollowWidthMm] = useState(1.6)
   // Matching Jewelry (module 14) — Matrix's own "Matching Band Rail": a
   // plain companion band, same finger size and metal, shown sitting right
   // next to the main design like a wedding band would sit against this
@@ -479,7 +487,7 @@ export function CadDesignPage() {
     includeFlutes, fluteCount, pointDirection, includeGalleryWire, galleryWireCount,
     includeBandText, bandText, bandTextBold, includePattern, patternMotif,
     includeSidePanels, sidePanelShape, sidePanelWidthMm, sidePanelLengthMm, sidePanelText, sidePanelAngle0Deg, sidePanelAngle1Deg,
-    cutStoneSeats,
+    cutStoneSeats, hollowShank, hollowDepthMm, hollowWidthMm,
   })
 
   // Pure parameter setters — shared by preset loading AND undo/redo. Undo
@@ -541,6 +549,9 @@ export function CadDesignPage() {
     setSidePanelAngle1Deg(p.sidePanelAngle1Deg ?? 270)
     setPointDirection((p.pointDirection as 'up' | 'down') ?? 'up')
     setCutStoneSeats(p.cutStoneSeats ?? false)
+    setHollowShank(p.hollowShank ?? false)
+    setHollowDepthMm(p.hollowDepthMm ?? 0.5)
+    setHollowWidthMm(p.hollowWidthMm ?? 1.6)
   }
   const applyPreset = (p: CadDesignParams) => {
     applyParams(p)
@@ -946,6 +957,22 @@ export function CadDesignPage() {
   // Stone seats (Matrix's Cutters): read off the gems in the finished
   // model, so every setting type is covered without knowing about them.
   const seatCutters = useMemo(() => (cutStoneSeats ? buildStoneSeatCutters(model) : []), [cutStoneSeats, model])
+  // The scoop is clamped against the band it's cutting into, not taken at
+  // face value: 0.5mm of metal has to stay over the floor or the ring is
+  // cut through, and 0.4mm of rail has to stay at each edge or there's
+  // nothing left to give it strength. A band too thin or too narrow to
+  // hold both yields no cutter at all rather than a ruined ring.
+  const hollowMaxDepthMm = Math.max(0, thicknessMm - 0.5)
+  const hollowMaxWidthMm = Math.max(0, widthMm - 0.8)
+  const hollowFits = hollowMaxDepthMm > 0.05 && hollowMaxWidthMm > 0.05
+  const hollowCutters = useMemo(() => {
+    if (!hollowShank || !hollowFits) return []
+    return [buildHollowShankCutter({
+      innerRadiusMm: innerDiameterMm / 2,
+      depthMm: Math.min(hollowDepthMm, hollowMaxDepthMm),
+      widthMm: Math.min(hollowWidthMm, hollowMaxWidthMm),
+    })]
+  }, [hollowShank, hollowFits, innerDiameterMm, hollowDepthMm, hollowWidthMm, hollowMaxDepthMm, hollowMaxWidthMm])
   // Optional boolean-union pass — MatrixGold's own "Parametric Boolean"
   // tool. Folds every metal mesh into one real watertight solid; gems stay
   // separate (see ringGeometry.ts). Beta: three-bvh-csg can throw on a
@@ -964,9 +991,9 @@ export function CadDesignPage() {
   // pass either way.
   // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const { displayModel, mergeError } = useMemo(() => {
-    if (!mergeSolid && cutterMeshes.length === 0 && seatCutters.length === 0) return { displayModel: model, mergeError: null }
+    if (!mergeSolid && cutterMeshes.length === 0 && seatCutters.length === 0 && hollowCutters.length === 0) return { displayModel: model, mergeError: null }
     try {
-      const unioned = unionMetalParts(model, [...cutterMeshes, ...seatCutters])
+      const unioned = unionMetalParts(model, [...cutterMeshes, ...seatCutters, ...hollowCutters])
       if (!unioned) return { displayModel: model, mergeError: null }
       const merged = new THREE.Group()
       const solid = new THREE.Mesh(unioned)
@@ -977,7 +1004,7 @@ export function CadDesignPage() {
     } catch (err) {
       return { displayModel: model, mergeError: err instanceof Error ? err.message : 'Boolean union failed on this geometry.' }
     }
-  }, [model, mergeSolid, cutterMeshes, seatCutters])
+  }, [model, mergeSolid, cutterMeshes, seatCutters, hollowCutters])
 
   // Ring Re-Sizer — Matrix's own named tool, scoped here to an IMPORTED
   // file (the parametric design already has its own real fingerSize
@@ -2306,6 +2333,49 @@ export function CadDesignPage() {
                     forces the merge pass, and the metal it removes comes off the weight and the cost below.
                     {seatCutters.length > 0 && ` Cutting ${seatCutters.length} ${seatCutters.length === 1 ? 'seat' : 'seats'}.`}
                   </p>
+                </div>
+
+                <div className="space-y-2 border-t border-slate-200 pt-3">
+                  <label className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold text-slate-900">Hollow the shank</span>
+                    <input type="checkbox" checked={hollowShank} onChange={e => setHollowShank(e.target.checked)}
+                      disabled={!hollowFits}
+                      className="h-5 w-5 shrink-0 cursor-pointer rounded border-slate-300 disabled:cursor-not-allowed disabled:opacity-40" />
+                  </label>
+                  <p className="text-[11px] text-slate-400">
+                    Matrix's weight-reduction tool: scoops a channel out of the inside of the band, leaving a rail of
+                    metal at each edge so the ring keeps its strength and stays comfortable on the finger. Not a shell —
+                    a sealed void can't drain wax or investment and won't cast. It forces the merge pass, and the metal
+                    it removes comes off the weight and the cost below.
+                  </p>
+                  {!hollowFits ? (
+                    <p className="rounded-xl bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-700">
+                      This band is too small to hollow — it needs more than 0.5mm of thickness and 0.8mm of width to
+                      leave a floor and a rail on each side.
+                    </p>
+                  ) : hollowShank && (
+                    <>
+                      <label className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-slate-600">Depth (mm)</span>
+                        <input type="number" step="0.1" min="0.1" max={hollowMaxDepthMm} value={hollowDepthMm}
+                          onChange={e => setHollowDepthMm(+e.target.value)}
+                          className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-right text-xs" />
+                      </label>
+                      <label className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-slate-600">Width (mm)</span>
+                        <input type="number" step="0.1" min="0.1" max={hollowMaxWidthMm} value={hollowWidthMm}
+                          onChange={e => setHollowWidthMm(+e.target.value)}
+                          className="w-24 rounded-lg border border-slate-300 px-2 py-1 text-right text-xs" />
+                      </label>
+                      {(hollowDepthMm > hollowMaxDepthMm || hollowWidthMm > hollowMaxWidthMm) && (
+                        <p className="text-[11px] font-medium text-amber-700">
+                          Capped to {Math.min(hollowDepthMm, hollowMaxDepthMm).toFixed(1)}mm deep ×{' '}
+                          {Math.min(hollowWidthMm, hollowMaxWidthMm).toFixed(1)}mm wide — any more would cut through
+                          this band or leave it without rails.
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 <div className="space-y-2 border-t border-slate-200 pt-3">
