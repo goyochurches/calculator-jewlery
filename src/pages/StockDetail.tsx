@@ -6,9 +6,9 @@ import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { useInternalPreview } from '@/lib/internalPreview'
 import { copyToClipboard } from '@/lib/share'
 import { JEWELRY_TYPE_OPTIONS } from '@/hooks/useQuoteBuilder'
-import { CostGroup, CostGroupLabel, CostRow } from '@/components/CostBreakdown'
+import { CostGroup, CostGroupLabel, CostRow, SetterChip } from '@/components/CostBreakdown'
 import { toggleInSet } from '@/lib/setToggle'
-import { emkaySpecLine, formatStockItemText, gemMathLine, settingMathLine, rnCastingFeeFromNotes, stoneCostSplit, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
+import { emkaySpecLine, formatStockItemText, gemMathLine, settingCountLine, rnCastingFeeFromNotes, stoneCostSplit, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
 import { stockService } from '@/services/stockService'
 import type { StockItem, StockStatus } from '@/types'
 import { ArrowLeft, Check, ClipboardCopy, Copy, Gem, Hourglass, ImageOff, Layers, Scale, Sparkles, Trash2, Wrench } from 'lucide-react'
@@ -303,8 +303,8 @@ export default function StockDetailPage() {
                             behind it — not a note tucked under the stone. */}
                         {l.labor > 0 && (
                           <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600"
-                            label={<span className="pl-3 text-slate-500">↳ Setting</span>}
-                            sub={settingMathLine(l)}
+                            label={<span className="pl-3 text-slate-500">↳ Setting<SetterChip label={l.setterLabel} /></span>}
+                            sub={settingCountLine(l)}
                             value={`$${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                         )}
                       </Fragment>
@@ -317,8 +317,7 @@ export default function StockDetailPage() {
                         value={`$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                       {l.labor > 0 && (
                         <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600"
-                          label={<span className="pl-3 text-slate-500">↳ Setting</span>}
-                          sub={config.setterMap[l.stone.setterType ?? '']?.label ?? ''}
+                          label={<span className="pl-3 text-slate-500">↳ Setting<SetterChip label={config.setterMap[l.stone.setterType ?? '']?.label ?? ''} /></span>}
                           value={`$${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                       )}
                     </Fragment>

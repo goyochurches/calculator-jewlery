@@ -91,3 +91,33 @@ export function CostGroup({
     </>
   )
 }
+
+// A stable colour per setting type, so "bezel" is the same shade on every
+// row of every quote and the eye can group them without reading. Picked by
+// hashing the name rather than from a hand-written map: the setter types
+// come from a master table the shop edits, so any fixed map would go blank
+// the moment someone adds one.
+const CHIP_TINTS = [
+  'bg-violet-50 text-violet-700 ring-violet-200',
+  'bg-amber-50 text-amber-700 ring-amber-200',
+  'bg-teal-50 text-teal-700 ring-teal-200',
+  'bg-rose-50 text-rose-700 ring-rose-200',
+  'bg-indigo-50 text-indigo-700 ring-indigo-200',
+  'bg-lime-50 text-lime-700 ring-lime-200',
+]
+
+/** The setting type, as a coloured pill. Deliberately text and not an icon:
+ *  the icon set this app uses has nothing for pavé, bezel or channel, so any
+ *  icon would be a shape assigned by guesswork — decoration that reads like
+ *  information. The name is unambiguous; the colour does the grouping. */
+export function SetterChip({ label }: { label: string }) {
+  if (!label) return null
+  let hash = 0
+  for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) >>> 0
+  const tint = CHIP_TINTS[hash % CHIP_TINTS.length]
+  return (
+    <span className={`ml-1.5 inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ring-1 ${tint}`}>
+      {label}
+    </span>
+  )
+}

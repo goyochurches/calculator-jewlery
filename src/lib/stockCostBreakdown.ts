@@ -247,13 +247,11 @@ export function gemMathLine(stone: PricedStone, split: StoneCostSplit): string {
   return `${carats} ct × ${money(split.pricePerCarat)}/ct`
 }
 
-/** "Pavé · 8 × $6.00" — how the setting labor for a stone was reached.
- *  Falls back to just the setter's name when the per-stone fee doesn't
- *  reconcile to the total (see stoneCostSplit), so the line never shows a
- *  sum that disagrees with the figure beside it. */
-export function settingMathLine(split: StoneCostSplit): string {
-  const sum = split.feePerStone != null && split.count > 0
-    ? `${split.count} × ${money(split.feePerStone)}`
-    : ''
-  return [split.setterLabel, sum].filter(Boolean).join(' · ')
+
+/** Just the count × fee half of a setting line ("8 × $6.00"), for rows that
+ *  show the setter's name separately as a chip. Empty when the fee doesn't
+ *  reconcile to the total (see stoneCostSplit). */
+export function settingCountLine(split: StoneCostSplit): string {
+  if (split.feePerStone == null || split.count <= 0) return ''
+  return `${split.count} × ${money(split.feePerStone)}`
 }

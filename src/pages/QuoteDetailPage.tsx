@@ -24,9 +24,9 @@ import { canSeePayments } from '@/lib/paymentsAccess'
 import { displayStatusFor } from '@/lib/quoteStatusDisplay'
 import { computeCustomerPrice } from '@/lib/quotePricing'
 import { formatDateTime } from '@/lib/formatDate'
-import { CostGroup, CostRow } from '@/components/CostBreakdown'
+import { CostGroup, CostRow, SetterChip } from '@/components/CostBreakdown'
 import { toggleInSet } from '@/lib/setToggle'
-import { emkaySpecLine, gemMathLine, quoteStoneCostSplit, settingMathLine, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
+import { emkaySpecLine, gemMathLine, quoteStoneCostSplit, settingCountLine, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
 import { labReportVerifyUrl } from '@/hooks/useQuoteBuilder'
 import { quotesService } from '@/services/quotesService'
 import type { QuoteStone, SavedQuote } from '@/types'
@@ -976,8 +976,8 @@ export default function QuoteDetailPage() {
                         : 'Not priced'} />
                     {l.labor > 0 && (
                       <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600"
-                        label={<span className="pl-8 text-slate-400">Setting</span>}
-                        sub={settingMathLine(l)}
+                        label={<span className="pl-8 text-slate-400">Setting<SetterChip label={l.setterLabel} /></span>}
+                        sub={settingCountLine(l)}
                         value={`$${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                     )}
                   </Fragment>
@@ -1012,8 +1012,8 @@ export default function QuoteDetailPage() {
                     value={`$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                   {l.labor > 0 && (
                     <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600"
-                      label={<span className="pl-8 text-slate-400">Setting</span>}
-                      sub={[config.setterMap[l.stone.setterType ?? '']?.label ?? '', `${l.count} × $${(l.labor / l.count).toLocaleString('en-US', { minimumFractionDigits: 2 })}`].filter(Boolean).join(' · ')}
+                      label={<span className="pl-8 text-slate-400">Setting<SetterChip label={config.setterMap[l.stone.setterType ?? '']?.label ?? ''} /></span>}
+                      sub={`${l.count} × $${(l.labor / l.count).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                       value={`$${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                   )}
                 </Fragment>
