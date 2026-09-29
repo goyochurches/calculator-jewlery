@@ -6,6 +6,8 @@ import { useQuoteConfig } from '@/hooks/useQuoteConfig'
 import { useInternalPreview } from '@/lib/internalPreview'
 import { copyToClipboard } from '@/lib/share'
 import { JEWELRY_TYPE_OPTIONS } from '@/hooks/useQuoteBuilder'
+import { CostGroup, CostGroupLabel, CostRow } from '@/components/CostBreakdown'
+import { toggleInSet } from '@/lib/setToggle'
 import { emkaySpecLine, formatStockItemText, gemMathLine, settingMathLine, rnCastingFeeFromNotes, stoneCostSplit, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
 import { stockService } from '@/services/stockService'
 import type { StockItem, StockStatus } from '@/types'
@@ -53,24 +55,6 @@ function LineItem({ label, value }: { label: string; value: React.ReactNode }) {
 // materials/stones/labor read apart from each other at a glance. `sub` is an
 // optional second line for the grading/catalog specifics (color, clarity,
 // cut, lab report, $/g, …) — same detail that goes into the clipboard copy.
-function CostRow({ icon: Icon, label, sub, value, tint }: { icon: React.ElementType; label: React.ReactNode; sub?: string; value: string; tint: string }) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl px-2.5 py-2 transition hover:bg-slate-50">
-      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${tint}`}>
-        <Icon className="h-3.5 w-3.5" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm text-slate-600">{label}</span>
-        {sub && <span className="block truncate text-[11px] text-slate-400">{sub}</span>}
-      </span>
-      <span className="shrink-0 tabular-nums text-sm font-semibold text-slate-900">{value}</span>
-    </div>
-  )
-}
-
-function CostGroupLabel({ children }: { children: React.ReactNode }) {
-  return <p className="mb-1 mt-4 px-2.5 text-[10px] font-bold uppercase tracking-widest text-slate-400 first:mt-0">{children}</p>
-}
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/)
@@ -100,6 +84,11 @@ export default function StockDetailPage() {
 
   const [item, setItem] = useState<StockItem | null>(null)
   const [loading, setLoading] = useState(true)
+  // Which cost groups the reader has FOLDED AWAY. Tracking the closed ones
+  // rather than the open ones is what makes "open" the default without
+  // having to seed the set with every group's id up front.
+  const [closedCostGroups, setClosedCostGroups] = useState<Set<string>>(new Set())
+  const toggleCostGroup = (key: string) => setClosedCostGroups(prev => toggleInSet(prev, key))
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
@@ -191,6 +180,15 @@ export default function StockDetailPage() {
     return { stone: es, cost, labor: qty * setterFee }
   })
   const laborToSet = stoneLines.reduce((s, b) => s + b.labor, 0) + emkayLines.reduce((s, b) => s + b.labor, 0)
+  // Header figures for the gems fold: how many stones it covers, what they
+  // come to with their settings, and how many rows are behind it. An EMKAY
+  // stone with no cost isn't shown, so it isn't counted either.
+  const pricedEmkay = emkayLines.filter(l => l.cost > 0)
+  const gemsGroup = {
+    count: stoneLines.reduce((s, l) => s + l.count, 0) + pricedEmkay.length,
+    total: [...stoneLines, ...pricedEmkay].reduce((s, l) => s + l.cost + l.labor, 0),
+    rows: stoneLines.length + pricedEmkay.length,
+  }
 
   return (
     <div className="space-y-6">
@@ -284,6 +282,12 @@ export default function StockDetailPage() {
               <>
                 <CostGroupLabel>Cost breakdown — supplied gems &amp; settings</CostGroupLabel>
                 <div className="-mx-2.5">
+                  <CostGroup icon={Gem} tint="bg-sky-50 text-sky-600"
+                    label="Supplied gems & settings"
+                    sub={`${gemsGroup.count} stone${gemsGroup.count === 1 ? '' : 's'}`}
+                    value={`$${gemsGroup.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                    detailCount={gemsGroup.rows}
+                    open={!closedCostGroups.has('gems')} onToggle={() => toggleCostGroup('gems')}>
                   {stoneLines.map((l, i) => {
                     const roleLabel = l.stone.role.charAt(0) + l.stone.role.slice(1).toLowerCase()
                     return (
@@ -319,6 +323,7 @@ export default function StockDetailPage() {
                       )}
                     </Fragment>
                   ))}
+                  </CostGroup>
                 </div>
               </>
             )}

@@ -24,6 +24,8 @@ import { canSeePayments } from '@/lib/paymentsAccess'
 import { displayStatusFor } from '@/lib/quoteStatusDisplay'
 import { computeCustomerPrice } from '@/lib/quotePricing'
 import { formatDateTime } from '@/lib/formatDate'
+import { CostGroup, CostRow } from '@/components/CostBreakdown'
+import { toggleInSet } from '@/lib/setToggle'
 import { emkaySpecLine, gemMathLine, quoteStoneCostSplit, settingMathLine, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
 import { labReportVerifyUrl } from '@/hooks/useQuoteBuilder'
 import { quotesService } from '@/services/quotesService'
@@ -58,46 +60,6 @@ const JEWELRY_TYPE_LABELS: Record<string, string> = {
   brooch: 'Brooch', anklet: 'Anklet', other: 'Other',
 }
 
-// A cost line that opens to show what it is made of. The breakdown used to
-// render every stone inline, which on a piece with seventy of them buried
-// the four figures the card exists to show. Closed, the card reads as those
-// figures again; the detail is one click away, and sits in a rail of its own
-// so it can't be mistaken for another top-level cost.
-function CostGroup({
-  icon: Icon, label, sub, value, tint, detailCount, open, onToggle, children,
-}: {
-  icon: React.ElementType; label: string; sub?: string; value: string; tint: string
-  detailCount: number; open: boolean; onToggle: () => void; children: React.ReactNode
-}) {
-  if (detailCount === 0) {
-    return <CostRow icon={Icon} label={label} sub={sub} value={value} tint={tint} />
-  }
-  return (
-    <>
-      <button type="button" onClick={onToggle}
-        className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition hover:bg-slate-50">
-        <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${tint}`}>
-          <Icon className="h-3.5 w-3.5" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-1.5 text-sm text-slate-600">
-            <span className="truncate">{label}</span>
-            {open ? <ChevronUp className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                  : <ChevronDown className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
-          </span>
-          {sub && <span className="block truncate text-[11px] text-slate-400">{sub}</span>}
-        </span>
-        <span className="shrink-0 tabular-nums text-sm font-semibold text-slate-900">{value}</span>
-      </button>
-      {open && (
-        <div className="my-1 ml-6 border-l-2 border-slate-200 pl-2">
-          {children}
-        </div>
-      )}
-    </>
-  )
-}
-
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-slate-400">
@@ -114,23 +76,6 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
   )
 }
 
-// Same icon-badge row as the Stock detail page's cost breakdown, so the two
-// "what did this cost" cards read as one system across Quotes and Stock.
-// `sub` is an optional second line for extra context (tier, $/g, …).
-function CostRow({ icon: Icon, label, sub, value, tint }: { icon: React.ElementType; label: React.ReactNode; sub?: string; value: string; tint: string }) {
-  return (
-    <div className="flex items-center gap-3 rounded-xl px-2.5 py-2 transition hover:bg-slate-50">
-      <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${tint}`}>
-        <Icon className="h-3.5 w-3.5" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm text-slate-600">{label}</span>
-        {sub && <span className="block truncate text-[11px] text-slate-400">{sub}</span>}
-      </span>
-      <span className="shrink-0 tabular-nums text-sm font-semibold text-slate-900">{value}</span>
-    </div>
-  )
-}
 
 // ── Page skeleton ────────────────────────────────────────────────────────────
 function PageSkeleton() {
@@ -181,14 +126,11 @@ export default function QuoteDetailPage() {
   const [sendingLink, setSendingLink] = useState<'idle' | 'sending' | 'sent'>('idle')
   const [statusLoading, setStatusLoading] = useState(false)
   const [expandedStones, setExpandedStones] = useState<Set<string>>(new Set())
-  // Which cost groups are showing their stones. Closed by default so the
-  // card opens as the handful of figures it is meant to summarise.
-  const [openCostGroups, setOpenCostGroups] = useState<Set<string>>(new Set())
-  const toggleCostGroup = (key: string) => setOpenCostGroups(prev => {
-    const next = new Set(prev)
-    if (next.has(key)) next.delete(key); else next.add(key)
-    return next
-  })
+  // Which cost groups the reader has FOLDED AWAY. Tracking the closed ones
+  // rather than the open ones is what makes "open" the default without
+  // having to seed the set with every group's id up front.
+  const [closedCostGroups, setClosedCostGroups] = useState<Set<string>>(new Set())
+  const toggleCostGroup = (key: string) => setClosedCostGroups(prev => toggleInSet(prev, key))
 
   // Fetch
   useEffect(() => {
@@ -1021,7 +963,7 @@ export default function QuoteDetailPage() {
                 sub={`${stoneTotals.amount} stone${stoneTotals.amount === 1 ? '' : 's'} · ${Math.round(stoneTotals.carats * 10000) / 10000} ct`}
                 value={`$${(stoneTotals.cost + stoneTotals.labor).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                 detailCount={stoneLines.length}
-                open={openCostGroups.has('supplied')} onToggle={() => toggleCostGroup('supplied')}>
+                open={!closedCostGroups.has('supplied')} onToggle={() => toggleCostGroup('supplied')}>
               {stoneLines.map((l, i) => {
                 const roleLabel = l.stone.role.charAt(0) + l.stone.role.slice(1).toLowerCase()
                 return (
@@ -1047,7 +989,7 @@ export default function QuoteDetailPage() {
                   sub={`${customerStoneQty} stone${customerStoneQty === 1 ? '' : 's'}`}
                   value={`$${customerStoneFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                   detailCount={customerStoneLines.length}
-                  open={openCostGroups.has('customer')} onToggle={() => toggleCostGroup('customer')}>
+                  open={!closedCostGroups.has('customer')} onToggle={() => toggleCostGroup('customer')}>
               {customerStoneLines.map((l, i) => (
                 <CostRow key={`c${i}`} icon={Wrench} tint="bg-emerald-50 text-emerald-600"
                   label={<span className="text-slate-500">{l.count > 1 ? `${l.count} × ` : ''}{l.stone.gemstoneName || 'Customer stone'}</span>}
@@ -1061,7 +1003,7 @@ export default function QuoteDetailPage() {
                   sub={`${emkayStoneQty} stone${emkayStoneQty === 1 ? '' : 's'}`}
                   value={`$${emkayStoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                   detailCount={emkayLines.length}
-                  open={openCostGroups.has('emkay')} onToggle={() => toggleCostGroup('emkay')}>
+                  open={!closedCostGroups.has('emkay')} onToggle={() => toggleCostGroup('emkay')}>
               {emkayLines.map((l, i) => (
                 <Fragment key={`e${i}`}>
                   <CostRow icon={Gem} tint="bg-sky-50/60 text-sky-500"
