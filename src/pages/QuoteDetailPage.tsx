@@ -959,8 +959,8 @@ export default function QuoteDetailPage() {
                   under the figure it explains — not as a second breakdown
                   somewhere else on the page saying the same thing twice. */}
               <CostGroup icon={Gem} tint="bg-sky-50 text-sky-600"
-                label="Setting supplied diamonds"
-                sub={`${stoneTotals.amount} stone${stoneTotals.amount === 1 ? '' : 's'} · ${Math.round(stoneTotals.carats * 10000) / 10000} ct`}
+                label="Supplied diamonds"
+                sub={`${stoneTotals.amount} stone${stoneTotals.amount === 1 ? '' : 's'} · ${Math.round(stoneTotals.carats * 10000) / 10000} ct · with settings`}
                 value={`$${(stoneTotals.cost + stoneTotals.labor).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                 detailCount={stoneLines.length}
                 open={!closedCostGroups.has('supplied')} onToggle={() => toggleCostGroup('supplied')}>
@@ -985,8 +985,11 @@ export default function QuoteDetailPage() {
               })}
               </CostGroup>
               {(quote.customerStones?.length ?? 0) > 0 && (
-                <CostGroup icon={Gem} tint="bg-sky-50 text-sky-600" label="Setting customer diamonds"
-                  sub={`${customerStoneQty} stone${customerStoneQty === 1 ? '' : 's'}`}
+                {/* The client supplies these, so the figure is the setting
+                    labour alone — said in the subtitle now that the label
+                    no longer carries it. */}
+                <CostGroup icon={Gem} tint="bg-sky-50 text-sky-600" label="Customer diamonds"
+                  sub={`${customerStoneQty} stone${customerStoneQty === 1 ? '' : 's'} · setting only`}
                   value={`$${customerStoneFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                   detailCount={customerStoneLines.length}
                   open={!closedCostGroups.has('customer')} onToggle={() => toggleCostGroup('customer')}>
