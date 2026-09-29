@@ -253,7 +253,7 @@ export default function StockDetailPage() {
                   {metalRows.map((r, i) => {
                     const pricePerGram = config.metalPriceMap[r.metalKey] ?? 0
                     return (
-                      <CostRow key={`m${i}`} icon={Scale} tint="bg-amber-50 text-amber-600"
+                      <CostRow inset key={`m${i}`} icon={Scale} tint="bg-amber-50 text-amber-600"
                         label={`${r.weightGrams}g ${JEWELRY_METAL_OPTIONS[r.metalKey]?.label ?? r.metalKey}`}
                         sub={`$${pricePerGram.toLocaleString('en-US', { minimumFractionDigits: 2 })}/g`}
                         value={`$${(pricePerGram * r.weightGrams).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
@@ -266,11 +266,11 @@ export default function StockDetailPage() {
                       value={`$${ringLaborFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                   )}
                   {rnCastingFee != null && (
-                    <CostRow icon={Wrench} tint="bg-slate-100 text-slate-500" label="Casting labor"
+                    <CostRow inset icon={Wrench} tint="bg-slate-100 text-slate-500" label="Casting labor"
                       value={`$${rnCastingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                   )}
                   {!!item.laborHours && (
-                    <CostRow icon={Wrench} tint="bg-slate-100 text-slate-500" label="Bench labor"
+                    <CostRow inset icon={Wrench} tint="bg-slate-100 text-slate-500" label="Bench labor"
                       sub={`${item.laborHours}h × $${item.hourlyRate ?? 0}/h`}
                       value={`$${((item.laborHours ?? 0) * (item.hourlyRate ?? 0)).toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                   )}
@@ -333,15 +333,15 @@ export default function StockDetailPage() {
                 <CostGroupLabel>Labor & fees</CostGroupLabel>
                 <div className="-mx-2.5">
                   {laborToSet > 0 && (
-                    <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600" label="Labor to set"
+                    <CostRow inset icon={Wrench} tint="bg-emerald-50 text-emerald-600" label="Labor to set"
                       value={`$${laborToSet.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                   )}
                   {!!item.engravingFee && (
-                    <CostRow icon={Sparkles} tint="bg-violet-50 text-violet-600" label="Engraving"
+                    <CostRow inset icon={Sparkles} tint="bg-violet-50 text-violet-600" label="Engraving"
                       value={`$${item.engravingFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                   )}
                   {!!item.extraCosts && (
-                    <CostRow icon={Layers} tint="bg-slate-100 text-slate-500" label="Extra costs"
+                    <CostRow inset icon={Layers} tint="bg-slate-100 text-slate-500" label="Extra costs"
                       value={`$${item.extraCosts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                   )}
                 </div>

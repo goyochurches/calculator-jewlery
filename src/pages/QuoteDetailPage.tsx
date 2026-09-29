@@ -1024,17 +1024,17 @@ export default function QuoteDetailPage() {
                   cost" — every stone the bench touches, supplied, customer
                   and EMKAY alike, not just the diamond rows. */}
               {allSettingLabor > 0 && (
-                <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600" label="Labor to set — all stones"
+                <CostRow inset icon={Wrench} tint="bg-emerald-50 text-emerald-600" label="Labor to set — all stones"
                   sub={`${allStonesToSet} stone${allStonesToSet === 1 ? '' : 's'}`}
                   value={`$${allSettingLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
               )}
-              <CostRow icon={Sparkles} tint="bg-violet-50 text-violet-600" label="Hand engraving (milgrain)" value={engravingFeeLabel} />
+              <CostRow inset icon={Sparkles} tint="bg-violet-50 text-violet-600" label="Hand engraving (milgrain)" value={engravingFeeLabel} />
               {(quote.extraCosts ?? 0) > 0 && (
-                <CostRow icon={Layers} tint="bg-slate-100 text-slate-500" label="Extra costs"
+                <CostRow inset icon={Layers} tint="bg-slate-100 text-slate-500" label="Extra costs"
                   value={`$${quote.extraCosts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
               )}
               {applyTaxes && (
-                <CostRow icon={Percent} tint="bg-emerald-50 text-emerald-600" label="Sales tax (7.75%)"
+                <CostRow inset icon={Percent} tint="bg-emerald-50 text-emerald-600" label="Sales tax (7.75%)"
                   sub="Added to customer total"
                   value={`$${taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
               )}
