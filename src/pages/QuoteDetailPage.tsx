@@ -969,14 +969,14 @@ export default function QuoteDetailPage() {
                 return (
                   <Fragment key={`s${i}`}>
                     <CostRow icon={Gem} tint="bg-sky-50/60 text-sky-500"
-                      label={<span className="pl-3 text-slate-500">↳ {roleLabel}: {stoneLineLabel(l.stone, l.count) || 'Stone'}</span>}
+                      label={<span className="text-slate-500">{roleLabel}: {stoneLineLabel(l.stone, l.count) || 'Stone'}</span>}
                       sub={[gemMathLine(l.stone, l), stoneSpecLine(l.stone)].filter(Boolean).join(' · ')}
                       value={l.cost > 0
                         ? `$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
                         : 'Not priced'} />
                     {l.labor > 0 && (
                       <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600"
-                        label={<span className="pl-8 text-slate-400">Setting<SetterChip label={l.setterLabel} /></span>}
+                        label={<span className="pl-4 text-slate-400">Setting<SetterChip label={l.setterLabel} /></span>}
                         sub={settingCountLine(l)}
                         value={`$${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                     )}
@@ -1010,12 +1010,12 @@ export default function QuoteDetailPage() {
               {emkayLines.map((l, i) => (
                 <Fragment key={`e${i}`}>
                   <CostRow icon={Gem} tint="bg-sky-50/60 text-sky-500"
-                    label={<span className="pl-3 text-slate-500">↳ {l.count > 1 ? `${l.count} × ` : ''}{l.stone.name}</span>}
+                    label={<span className="text-slate-500">{l.count > 1 ? `${l.count} × ` : ''}{l.stone.name}</span>}
                     sub={emkaySpecLine(l.stone)}
                     value={`$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                   {l.labor > 0 && (
                     <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600"
-                      label={<span className="pl-8 text-slate-400">Setting<SetterChip label={config.setterMap[l.stone.setterType ?? '']?.label ?? ''} /></span>}
+                      label={<span className="pl-4 text-slate-400">Setting<SetterChip label={config.setterMap[l.stone.setterType ?? '']?.label ?? ''} /></span>}
                       sub={`${l.count} × $${(l.labor / l.count).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                       value={`$${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                   )}
