@@ -331,15 +331,9 @@ export default function QuoteDetailPage() {
     + emkayLines.reduce((s, l) => s + l.labor, 0)
     + customerStoneLines.reduce((s, l) => s + l.labor, 0)
 
-  const customerStoneFee = (quote.customerStones ?? []).reduce((acc, cs) => {
-    const qty = Math.max(1, cs.quantity ?? 1)
-    return acc + qty * (cs.setterFeeOverride ?? config.setterMap[cs.setterType]?.fee ?? 0)
-  }, 0)
+
   const customerStoneQty = (quote.customerStones ?? []).reduce(
     (acc, cs) => acc + Math.max(1, cs.quantity ?? 1), 0)
-
-  const emkayStoneCost = (quote.emkayStones ?? []).reduce(
-    (acc, es) => acc + Math.max(1, es.quantity ?? 1) * (es.priceUsd + (es.setterFeeOverride ?? config.setterMap[es.setterType ?? '']?.fee ?? 0)), 0)
   const emkayStoneQty = (quote.emkayStones ?? []).reduce(
     (acc, es) => acc + Math.max(1, es.quantity ?? 1), 0)
 
@@ -960,8 +954,8 @@ export default function QuoteDetailPage() {
                   somewhere else on the page saying the same thing twice. */}
               <CostGroup icon={Gem} tint="bg-sky-50 text-sky-600"
                 label="Supplied diamonds"
-                sub={`${stoneTotals.amount} stone${stoneTotals.amount === 1 ? '' : 's'} · ${Math.round(stoneTotals.carats * 10000) / 10000} ct · with settings`}
-                value={`$${(stoneTotals.cost + stoneTotals.labor).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                sub={`${stoneTotals.amount} stone${stoneTotals.amount === 1 ? '' : 's'} · ${Math.round(stoneTotals.carats * 10000) / 10000} ct`}
+                value={`$${stoneTotals.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                 detailCount={stoneLines.length}
                 open={!closedCostGroups.has('supplied')} onToggle={() => toggleCostGroup('supplied')}>
               {stoneLines.map((l, i) => {
@@ -989,8 +983,8 @@ export default function QuoteDetailPage() {
                   longer carries it. */}
               {(quote.customerStones?.length ?? 0) > 0 && (
                 <CostGroup icon={Gem} tint="bg-sky-50 text-sky-600" label="Customer diamonds"
-                  sub={`${customerStoneQty} stone${customerStoneQty === 1 ? '' : 's'} · setting only`}
-                  value={`$${customerStoneFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                  sub={`${customerStoneQty} stone${customerStoneQty === 1 ? '' : 's'}`}
+                  value="Client's own"
                   detailCount={customerStoneLines.length}
                   open={!closedCostGroups.has('customer')} onToggle={() => toggleCostGroup('customer')}>
               {customerStoneLines.map((l, i) => (
@@ -1004,7 +998,7 @@ export default function QuoteDetailPage() {
               {(quote.emkayStones?.length ?? 0) > 0 && (
                 <CostGroup icon={Gem} tint="bg-sky-50 text-sky-600" label="EMKAY stones"
                   sub={`${emkayStoneQty} stone${emkayStoneQty === 1 ? '' : 's'}`}
-                  value={`$${emkayStoneCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+                  value={`$${emkayLines.reduce((t, l) => t + l.cost, 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
                   detailCount={emkayLines.length}
                   open={!closedCostGroups.has('emkay')} onToggle={() => toggleCostGroup('emkay')}>
               {emkayLines.map((l, i) => (

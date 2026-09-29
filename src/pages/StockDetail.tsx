@@ -180,13 +180,16 @@ export default function StockDetailPage() {
     return { stone: es, cost, labor: qty * setterFee }
   })
   const laborToSet = stoneLines.reduce((s, b) => s + b.labor, 0) + emkayLines.reduce((s, b) => s + b.labor, 0)
-  // Header figures for the gems fold: how many stones it covers, what they
-  // come to with their settings, and how many rows are behind it. An EMKAY
-  // stone with no cost isn't shown, so it isn't counted either.
+  // Header figures for the gems fold: how many stones it covers, what the
+  // GEMS come to, and how many rows are behind it. Deliberately not counting
+  // the settings: those are totalled once, by the "Labor to set" line below,
+  // and adding them here too would have the card charge for them twice on
+  // the way down. An EMKAY stone with no cost isn't shown, so it isn't
+  // counted either.
   const pricedEmkay = emkayLines.filter(l => l.cost > 0)
   const gemsGroup = {
     count: stoneLines.reduce((s, l) => s + l.count, 0) + pricedEmkay.length,
-    total: [...stoneLines, ...pricedEmkay].reduce((s, l) => s + l.cost + l.labor, 0),
+    total: [...stoneLines, ...pricedEmkay].reduce((s, l) => s + l.cost, 0),
     rows: stoneLines.length + pricedEmkay.length,
   }
 
