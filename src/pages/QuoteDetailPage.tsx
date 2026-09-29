@@ -24,7 +24,7 @@ import { canSeePayments } from '@/lib/paymentsAccess'
 import { displayStatusFor } from '@/lib/quoteStatusDisplay'
 import { computeCustomerPrice } from '@/lib/quotePricing'
 import { formatDateTime } from '@/lib/formatDate'
-import { emkaySpecLine, quoteStoneCostSplit, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
+import { emkaySpecLine, gemMathLine, quoteStoneCostSplit, settingMathLine, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
 import { labReportVerifyUrl } from '@/hooks/useQuoteBuilder'
 import { quotesService } from '@/services/quotesService'
 import type { QuoteStone, SavedQuote } from '@/types'
@@ -49,7 +49,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { MarketComparisonPanel } from '@/components/MarketComparisonPanel'
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 const JEWELRY_TYPE_LABELS: Record<string, string> = {
@@ -537,34 +537,58 @@ export default function QuoteDetailPage() {
                   opaque figure you have to open the stone cards to explain. */}
               {(stoneLines.length > 0 || emkayLines.length > 0 || customerStoneLines.length > 0) && (
                 <>
-                  <CostGroupLabel>Stones</CostGroupLabel>
+                  <CostGroupLabel>Cost breakdown — supplied gems &amp; settings</CostGroupLabel>
                   {stoneLines.map((l, i) => {
                     const roleLabel = l.stone.role.charAt(0) + l.stone.role.slice(1).toLowerCase()
-                    const setting = l.labor > 0
-                      ? `setting $${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-                      : ''
                     return (
-                      <CostRow key={`s${i}`} icon={Gem} tint="bg-sky-50 text-sky-600"
-                        label={`${roleLabel}: ${stoneLineLabel(l.stone, l.count) || 'Stone'}`}
-                        sub={[stoneSpecLine(l.stone), setting].filter(Boolean).join(' · ')}
-                        value={l.cost > 0
-                          ? `$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-                          : 'Not priced'} />
+                      <Fragment key={`s${i}`}>
+                        <CostRow icon={Gem} tint="bg-sky-50 text-sky-600"
+                          label={`${roleLabel}: ${stoneLineLabel(l.stone, l.count) || 'Stone'}`}
+                          sub={[gemMathLine(l.stone, l), stoneSpecLine(l.stone)].filter(Boolean).join(' · ')}
+                          value={l.cost > 0
+                            ? `$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                            : 'Not priced'} />
+                        {/* The setting gets its own line rather than a note
+                            tucked under the gem: it is a separate charge,
+                            and the jeweler needs to see the rate and the
+                            count that produced it. */}
+                        {l.labor > 0 && (
+                          <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600"
+                            label={<span className="pl-3 text-slate-500">↳ Setting</span>}
+                            sub={settingMathLine(l)}
+                            value={`$${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                        )}
+                      </Fragment>
                     )
                   })}
                   {emkayLines.map((l, i) => (
-                    <CostRow key={`e${i}`} icon={Gem} tint="bg-sky-50 text-sky-600"
-                      label={`${l.count > 1 ? `${l.count} × ` : ''}${l.stone.name}`}
-                      sub={[emkaySpecLine(l.stone), l.labor > 0 ? `setting $${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '']
-                        .filter(Boolean).join(' · ')}
-                      value={`$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                    <Fragment key={`e${i}`}>
+                      <CostRow icon={Gem} tint="bg-sky-50 text-sky-600"
+                        label={`${l.count > 1 ? `${l.count} × ` : ''}${l.stone.name}`}
+                        sub={[l.count > 1 ? `${l.count} × $${l.stone.priceUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '', emkaySpecLine(l.stone)]
+                          .filter(Boolean).join(' · ')}
+                        value={`$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                      {l.labor > 0 && (
+                        <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600"
+                          label={<span className="pl-3 text-slate-500">↳ Setting</span>}
+                          sub={[config.setterMap[l.stone.setterType ?? '']?.label ?? '', `${l.count} × $${(l.labor / l.count).toLocaleString('en-US', { minimumFractionDigits: 2 })}`].filter(Boolean).join(' · ')}
+                          value={`$${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                      )}
+                    </Fragment>
                   ))}
                   {customerStoneLines.map((l, i) => (
-                    <CostRow key={`c${i}`} icon={Gem} tint="bg-slate-100 text-slate-500"
-                      label={`${l.count > 1 ? `${l.count} × ` : ''}${l.stone.gemstoneName || 'Customer stone'}`}
-                      sub={[l.stone.sizeText || '', l.labor > 0 ? `setting $${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '']
-                        .filter(Boolean).join(' · ')}
-                      value="Client's own" />
+                    <Fragment key={`c${i}`}>
+                      <CostRow icon={Gem} tint="bg-slate-100 text-slate-500"
+                        label={`${l.count > 1 ? `${l.count} × ` : ''}${l.stone.gemstoneName || 'Customer stone'}`}
+                        sub={l.stone.sizeText || ''}
+                        value="Client's own" />
+                      {l.labor > 0 && (
+                        <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600"
+                          label={<span className="pl-3 text-slate-500">↳ Setting</span>}
+                          sub={[config.setterMap[l.stone.setterType]?.label ?? '', `${l.count} × $${(l.labor / l.count).toLocaleString('en-US', { minimumFractionDigits: 2 })}`].filter(Boolean).join(' · ')}
+                          value={`$${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                      )}
+                    </Fragment>
                   ))}
                   {allSettingLabor > 0 && (
                     <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600" label="Labor to set"

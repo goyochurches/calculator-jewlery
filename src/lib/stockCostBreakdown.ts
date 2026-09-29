@@ -18,6 +18,23 @@ export interface StoneCostSplit {
   /** Number of individual pieces this carat total represents (best-effort;
    *  falls back to 1 when the size chart has no per-stone carat weight). */
   count: number
+  /** $/ct the gem cost came from. 0 when the stone was priced by hand
+   *  (manualPrice), since there is no rate behind that figure to show. */
+  pricePerCarat: number
+  /** What setting ONE of these stones costs — but only when `labor` really
+   *  is count × this. Null otherwise, so the breakdown never prints a
+   *  multiplication that doesn't come out to the total beside it. */
+  feePerStone: number | null
+  /** The setter type's human label ("Pavé", "Bezel", …), '' if unset. */
+  setterLabel: string
+}
+
+/** Resolves a stone's setter into the label + per-stone fee the breakdown
+ *  shows. A per-stone override on the stone wins over the type's own fee,
+ *  same as the builders' pricing does. */
+function setterFor(stone: PricedStone, config: QuoteConfig): { label: string; fee: number } {
+  const cfg = config.setterMap[stone.setterType]
+  return { label: cfg?.label ?? '', fee: stone.setterFeeOverride ?? cfg?.fee ?? 0 }
 }
 
 /** The fields these helpers actually read off a stone. StockStone and
@@ -47,10 +64,17 @@ export function quoteStoneCostSplit(stone: PricedStone, config: QuoteConfig): St
   const ctPerStone = sizeCfg?.ctPerStone ?? 0
   const carats = stone.carats ?? 0
   const count = ctPerStone > 0 ? Math.round(carats / ctPerStone) : 0
+  const setter = setterFor(stone, config)
   return {
     cost: stone.manualPrice != null ? stone.manualPrice : carats * pricePerCarat,
-    labor: count * (stone.setterFeeOverride ?? config.setterMap[stone.setterType]?.fee ?? 0),
+    labor: count * setter.fee,
     count,
+    // A hand-priced stone has no rate behind it — showing one would invent
+    // a $/ct the jeweler never entered.
+    pricePerCarat: stone.manualPrice != null ? 0 : pricePerCarat,
+    // Labor here is count × fee by construction, so the sum always shows.
+    feePerStone: setter.fee,
+    setterLabel: setter.label,
   }
 }
 
@@ -71,7 +95,18 @@ export function stoneCostSplit(stone: StockStone, config: QuoteConfig): StoneCos
   const count = ctPerStone > 0 ? Math.max(1, Math.round(carats / ctPerStone)) : 1
   const contribution = stone.contribution ?? cost
   const labor = Math.max(0, contribution - cost)
-  return { cost, labor, count }
+  const setter = setterFor(stone, config)
+  // A stock item's labor is whatever is left of the price it was SAVED at,
+  // not a live lookup — so the setter's current fee may no longer explain
+  // it (the fee changed since, or the item was priced by hand). Only offer
+  // the "count × fee" breakdown when it still reconciles to the cent.
+  const reconciles = Math.abs(count * setter.fee - labor) < 0.005
+  return {
+    cost, labor, count,
+    pricePerCarat: stone.manualPrice != null ? 0 : pricePerCarat,
+    feePerStone: reconciles ? setter.fee : null,
+    setterLabel: setter.label,
+  }
 }
 
 /** Human line for a stone/group: "5 Round lab 1.5 0.07ct". */
@@ -202,4 +237,23 @@ export function formatStockItemText(item: StockItem, config: QuoteConfig): strin
   if (item.internalNotes) { lines.push(''); lines.push(item.internalNotes) }
 
   return lines.join('\n')
+}
+
+/** "0.32 ct × $100.00/ct" — how a gem's cost was reached. Empty string when
+ *  the stone was priced by hand, since there is no rate to show. */
+export function gemMathLine(stone: PricedStone, split: StoneCostSplit): string {
+  const carats = stone.carats ?? 0
+  if (split.pricePerCarat <= 0 || carats <= 0) return ''
+  return `${carats} ct × ${money(split.pricePerCarat)}/ct`
+}
+
+/** "Pavé · 8 × $6.00" — how the setting labor for a stone was reached.
+ *  Falls back to just the setter's name when the per-stone fee doesn't
+ *  reconcile to the total (see stoneCostSplit), so the line never shows a
+ *  sum that disagrees with the figure beside it. */
+export function settingMathLine(split: StoneCostSplit): string {
+  const sum = split.feePerStone != null && split.count > 0
+    ? `${split.count} × ${money(split.feePerStone)}`
+    : ''
+  return [split.setterLabel, sum].filter(Boolean).join(' · ')
 }
