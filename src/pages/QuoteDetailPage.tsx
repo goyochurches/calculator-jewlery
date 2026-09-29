@@ -24,7 +24,7 @@ import { canSeePayments } from '@/lib/paymentsAccess'
 import { displayStatusFor } from '@/lib/quoteStatusDisplay'
 import { computeCustomerPrice } from '@/lib/quotePricing'
 import { formatDateTime } from '@/lib/formatDate'
-import { quoteStoneCostSplit, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
+import { emkaySpecLine, quoteStoneCostSplit, stoneLineLabel, stoneSpecLine } from '@/lib/stockCostBreakdown'
 import { labReportVerifyUrl } from '@/hooks/useQuoteBuilder'
 import { quotesService } from '@/services/quotesService'
 import type { QuoteStone, SavedQuote } from '@/types'
@@ -316,6 +316,37 @@ export default function QuoteDetailPage() {
     return acc
   }, { cost: 0, labor: 0, carats: 0, amount: 0 })
 
+  // EMKAY catalog stones and the client's own stones are just as much
+  // "stones on this quote" as the diamond rows are — they were left out of
+  // the breakdown at first, which made a quote with 70 stones in it read as
+  // though it had 8. Both still have to be set, so both carry setting labor;
+  // a customer stone has no cost, because the client supplies it.
+  const emkayLines = (quote.emkayStones ?? []).map(es => {
+    const qty = Math.max(1, es.quantity ?? 1)
+    return {
+      stone: es,
+      cost: qty * es.priceUsd,
+      labor: qty * (es.setterFeeOverride ?? config.setterMap[es.setterType ?? '']?.fee ?? 0),
+      count: qty,
+    }
+  })
+  const customerStoneLines = (quote.customerStones ?? []).map(cs => {
+    const qty = Math.max(1, cs.quantity ?? 1)
+    return {
+      stone: cs,
+      labor: qty * (cs.setterFeeOverride ?? config.setterMap[cs.setterType]?.fee ?? 0),
+      count: qty,
+    }
+  })
+  // What the "Labor to set / N stones" line reports: every stone the bench
+  // actually has to set, not just the diamond rows.
+  const allStonesToSet = stoneTotals.amount
+    + emkayLines.reduce((s, l) => s + l.count, 0)
+    + customerStoneLines.reduce((s, l) => s + l.count, 0)
+  const allSettingLabor = stoneTotals.labor
+    + emkayLines.reduce((s, l) => s + l.labor, 0)
+    + customerStoneLines.reduce((s, l) => s + l.labor, 0)
+
   const customerStoneFee = (quote.customerStones ?? []).reduce((acc, cs) => {
     const qty = Math.max(1, cs.quantity ?? 1)
     return acc + qty * (cs.setterFeeOverride ?? config.setterMap[cs.setterType]?.fee ?? 0)
@@ -504,7 +535,7 @@ export default function QuoteDetailPage() {
               {/* Every stone on its own line — the same breakdown the Stock
                   detail page shows, so "Stones $2,400" is never just one
                   opaque figure you have to open the stone cards to explain. */}
-              {stoneLines.length > 0 && (
+              {(stoneLines.length > 0 || emkayLines.length > 0 || customerStoneLines.length > 0) && (
                 <>
                   <CostGroupLabel>Stones</CostGroupLabel>
                   {stoneLines.map((l, i) => {
@@ -521,10 +552,24 @@ export default function QuoteDetailPage() {
                           : 'Not priced'} />
                     )
                   })}
-                  {stoneTotals.labor > 0 && (
+                  {emkayLines.map((l, i) => (
+                    <CostRow key={`e${i}`} icon={Gem} tint="bg-sky-50 text-sky-600"
+                      label={`${l.count > 1 ? `${l.count} × ` : ''}${l.stone.name}`}
+                      sub={[emkaySpecLine(l.stone), l.labor > 0 ? `setting $${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '']
+                        .filter(Boolean).join(' · ')}
+                      value={`$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                  ))}
+                  {customerStoneLines.map((l, i) => (
+                    <CostRow key={`c${i}`} icon={Gem} tint="bg-slate-100 text-slate-500"
+                      label={`${l.count > 1 ? `${l.count} × ` : ''}${l.stone.gemstoneName || 'Customer stone'}`}
+                      sub={[l.stone.sizeText || '', l.labor > 0 ? `setting $${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '']
+                        .filter(Boolean).join(' · ')}
+                      value="Client's own" />
+                  ))}
+                  {allSettingLabor > 0 && (
                     <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600" label="Labor to set"
-                      sub={stoneTotals.amount > 0 ? `${stoneTotals.amount} stone${stoneTotals.amount === 1 ? '' : 's'}` : undefined}
-                      value={`$${stoneTotals.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
+                      sub={allStonesToSet > 0 ? `${allStonesToSet} stone${allStonesToSet === 1 ? '' : 's'}` : undefined}
+                      value={`$${allSettingLabor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                   )}
                 </>
               )}
