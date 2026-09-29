@@ -984,10 +984,10 @@ export default function QuoteDetailPage() {
                 )
               })}
               </CostGroup>
+              {/* The client supplies these, so the figure is the setting
+                  labour alone — said in the subtitle now that the label no
+                  longer carries it. */}
               {(quote.customerStones?.length ?? 0) > 0 && (
-                {/* The client supplies these, so the figure is the setting
-                    labour alone — said in the subtitle now that the label
-                    no longer carries it. */}
                 <CostGroup icon={Gem} tint="bg-sky-50 text-sky-600" label="Customer diamonds"
                   sub={`${customerStoneQty} stone${customerStoneQty === 1 ? '' : 's'} · setting only`}
                   value={`$${customerStoneFee.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
