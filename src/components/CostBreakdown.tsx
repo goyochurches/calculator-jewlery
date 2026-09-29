@@ -6,9 +6,15 @@ import { ChevronDown, ChevronUp } from 'lucide-react'
  *
  *  Lived as an identical private copy in QuoteDetailPage and StockDetail
  *  until the breakdown grew folds and the two started to drift. */
-export function CostRow({ icon: Icon, label, sub, value, tint, inset }: {
+export function CostRow({ icon: Icon, label, chip, sub, value, tint, inset }: {
   icon: React.ElementType
   label: React.ReactNode
+  /** A tag that belongs to the label but must not be truncated with it — the
+   *  setting type, for instance. It can't just be rendered inside `label`:
+   *  that line is `truncate`, i.e. overflow:hidden, which clips a pill's
+   *  rounded edge and its ring. Kept as its own flex child so the text
+   *  truncates and the tag stays whole. */
+  chip?: React.ReactNode
   sub?: string
   value: string
   tint: string
@@ -24,7 +30,10 @@ export function CostRow({ icon: Icon, label, sub, value, tint, inset }: {
         <Icon className="h-3.5 w-3.5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm text-slate-600">{label}</span>
+        <span className="flex min-w-0 items-center gap-1.5 text-sm text-slate-600">
+          <span className="truncate">{label}</span>
+          {chip}
+        </span>
         {sub && <span className="block truncate text-[11px] text-slate-400">{sub}</span>}
       </span>
       <span className="shrink-0 tabular-nums text-sm font-semibold text-slate-900">{value}</span>
@@ -116,7 +125,7 @@ export function SetterChip({ label }: { label: string }) {
   for (let i = 0; i < label.length; i++) hash = (hash * 31 + label.charCodeAt(i)) >>> 0
   const tint = CHIP_TINTS[hash % CHIP_TINTS.length]
   return (
-    <span className={`ml-1.5 inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ring-1 ${tint}`}>
+    <span className={`inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ring-1 ${tint}`}>
       {label}
     </span>
   )

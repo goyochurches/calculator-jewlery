@@ -303,7 +303,7 @@ export default function StockDetailPage() {
                             behind it — not a note tucked under the stone. */}
                         {l.labor > 0 && (
                           <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600"
-                            label={<span className="text-slate-500">Setting<SetterChip label={l.setterLabel} /></span>}
+                            label={<span className="pl-4 text-slate-400">Setting</span>} chip={<SetterChip label={l.setterLabel} />}
                             sub={settingCountLine(l)}
                             value={`$${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                         )}
@@ -317,7 +317,7 @@ export default function StockDetailPage() {
                         value={`$${l.cost.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                       {l.labor > 0 && (
                         <CostRow icon={Wrench} tint="bg-emerald-50 text-emerald-600"
-                          label={<span className="text-slate-500">Setting<SetterChip label={config.setterMap[l.stone.setterType ?? '']?.label ?? ''} /></span>}
+                          label={<span className="pl-4 text-slate-400">Setting</span>} chip={<SetterChip label={config.setterMap[l.stone.setterType ?? '']?.label ?? ''} />}
                           value={`$${l.labor.toLocaleString('en-US', { minimumFractionDigits: 2 })}`} />
                       )}
                     </Fragment>
