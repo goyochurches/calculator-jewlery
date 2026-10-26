@@ -3132,71 +3132,217 @@ function buildFacetedFrustum(topRadius: number, bottomRadius: number, height: nu
   return geometry
 }
 
-// ── Real faceted round stone — replaces the octahedron placeholder ─────────
-// Every "stoneProxy" elsewhere in this file has been a plain octahedron
-// since the very first CAD commit — an explicitly-disclosed placeholder,
-// not real gem geometry. This is the first real upgrade: an actual faceted
-// crown+pavilion, not a smooth/generic silhouette. Reuses
-// buildFacetedFrustum for both halves (a frustum for the crown — table at
-// top, girdle at bottom — and a degenerate frustum/cone for the pavilion —
-// girdle at top, tapering to a point at the culet — both already verified
-// watertight/correctly-wound above, including the bottomRadius=0 cone case
-// this pavilion needs).
-//
-// Facet count defaults to 8, matching a genuine simplified/"single cut"
-// round diamond's real facet arrangement (8 crown + 8 pavilion + table) —
-// small stones ARE actually cut this way in the real world, so this isn't
-// an arbitrary simplification dressed up as something it's not. It is
-// still simpler than a full 57-facet "round brilliant" (no separate star/
-// bezel/upper- and lower-girdle facet families) — disclosed honestly.
+// ── Round brilliant — the real facet arrangement ─────────────────────────
+// This replaced a pair of eight-sided frustums (crown cone + pavilion cone,
+// a "single cut"). Small melee genuinely IS cut that way, so the old shape
+// was not dishonest — but it was being used for the CENTRE stone too, and
+// at that size it reads as moulded glass however good the material and
+// lighting are. The reason is not resolution, it is optics: a diamond looks
+// like a diamond because light entering the table is turned back out of the
+// crown by total internal reflection off the pavilion mains, and because
+// dozens of small facets at differing angles split that returned light into
+// separate flashes as the stone moves. Sixteen large facets give broad,
+// flat, near-identical reflections instead. The facet ARRANGEMENT is what
+// does the work, so it is modelled rather than approximated.
 
 export interface FacetedRoundStoneParams {
   diameterMm: number
-  /** 8 = a real "single cut" facet count. Higher counts still read as a
-   *  faceted stone, just with more (smaller) facets per crown/pavilion —
-   *  not historically standard, but a reasonable stylistic choice. */
-  facetCount?: number
-  /** Table width as a fraction of the full diameter — real stones run
-   *  roughly 0.54–0.60 for a round brilliant; defaults to a typical 0.56. */
+  /** Table width as a fraction of the girdle diameter — real stones run
+   *  roughly 0.53–0.58; defaults to a typical 0.56. */
   tableRatio?: number
-  /** Crown height and pavilion depth as fractions of the full diameter —
-   *  defaults approximate real "ideal cut" proportions (crown ≈0.15,
-   *  pavilion ≈0.43 of diameter). */
-  crownHeightRatio?: number
-  pavilionDepthRatio?: number
+  /** Crown angle, degrees up from the girdle plane. 34.5° is the Tolkowsky
+   *  ideal. Crown HEIGHT is deliberately not a separate input — see below. */
+  crownAngleDeg?: number
+  /** Pavilion angle, degrees down from the girdle plane. 40.75° is the
+   *  ideal, and it is the angle that returns light through the crown
+   *  instead of leaking it out of the back of the stone. */
+  pavilionAngleDeg?: number
+  /** Girdle thickness as a fraction of the diameter; ~0.03 is a medium
+   *  girdle. Centred on y=0, so the girdle's mid-plane stays exactly where
+   *  every head, halo and seat cutter in this file expects to find it. */
+  girdleRatio?: number
+  /** How far the star facets reach from the table edge towards the girdle,
+   *  0–1. 0.55 is typical; longer stars make the kites narrower. */
+  starLength?: number
+  /** How far the lower-girdle facets reach from the girdle towards the
+   *  culet, 0–1. 0.77 is typical, and it is why a real pavilion reads as
+   *  eight NARROW kites between long lower halves rather than eight broad
+   *  triangles. */
+  lowerHalfLength?: number
+  /** Culet size as a fraction of the diameter. 0 (the default) closes the
+   *  pavilion to a point — the modern 57-facet cut. Any positive value
+   *  truncates the mains into pentagons and adds the small eighth facet of
+   *  the older 58-facet count. */
+  culetRatio?: number
+  /** @deprecated Ignored. A brilliant's facet arrangement is fixed at 33
+   *  crown + 24 pavilion, so there is no count to choose. Kept in the type
+   *  so older call sites still compile rather than breaking on an argument
+   *  that no longer means anything. */
+  facetCount?: number
 }
 
-/** A real faceted stone (crown + pavilion meeting at a girdle), built with
- *  its girdle plane at local y=0 and the table facing +Y (culet at −Y) —
- *  same "+Y up" convention as every head in this file, so it drops straight
- *  into any of them in place of the octahedron placeholder. Tagged
- *  isStone; NOT tagged with a specific partName here — callers set that
- *  (e.g. 'Center stone') since the same primitive serves several settings. */
+/** The facet counts this builds, for anything that needs to state them and
+ *  for the verification to assert against so the cut cannot quietly drift.
+ *  The girdle band is excluded, exactly as it is in the trade's own 57/58
+ *  count. */
+export const ROUND_BRILLIANT_FACETS = {
+  table: 1, stars: 8, kites: 8, upperGirdles: 16,
+  pavilionMains: 8, lowerGirdles: 16, girdleBand: 16,
+  get crown() { return this.table + this.stars + this.kites + this.upperGirdles },
+  get pavilion() { return this.pavilionMains + this.lowerGirdles },
+  /** 57 — the culet facet would make it the older 58. */
+  get total() { return this.crown + this.pavilion },
+} as const
+
+/** A real round brilliant: 33 crown facets (table, 8 kites, 8 stars, 16
+ *  upper girdle halves), a girdle band, and 24 pavilion facets (8 mains, 16
+ *  lower girdle halves) meeting at the culet — 57 in the trade's count, 58
+ *  with a culet facet.
+ *
+ *  Proportions are real and INTERLOCKING, not independent dials. Crown
+ *  height follows from the crown angle and the table size,
+ *  `ch = (R − Rt)·tan(crown)`, and pavilion depth from the pavilion angle,
+ *  `pd = R·tan(pavilion)`. Both are derived here rather than accepted as
+ *  separate inputs, because a stone whose depth disagrees with its angles
+ *  cannot be cut — and because deriving them is what makes the defaults
+ *  come out at a 61.2% total depth and 1.00 ct at 6.5 mm, which is what the
+ *  trade's diameter-to-carat rule says and what `roundDiameterMmFromCarat`
+ *  already assumed. Checked numerically against that rule, not eyeballed.
+ *
+ *  Built with its girdle mid-plane at local y=0 and the table facing +Y —
+ *  the same convention the previous construction used, so every head, halo,
+ *  seat cutter and curve-placed gem keeps working untouched. Tagged
+ *  isStone; NOT tagged with a specific partName here, since the same
+ *  primitive serves the centre stone, halo, melee and cluster petals. */
 export function buildFacetedRoundStone(params: FacetedRoundStoneParams): THREE.Group {
   const {
-    diameterMm, facetCount = 8,
-    tableRatio = 0.56, crownHeightRatio = 0.15, pavilionDepthRatio = 0.43,
+    diameterMm,
+    tableRatio = 0.56,
+    crownAngleDeg = 34.5,
+    pavilionAngleDeg = 40.75,
+    girdleRatio = 0.03,
+    starLength = 0.55,
+    lowerHalfLength = 0.77,
+    culetRatio = 0,
   } = params
-  const girdleRadius = diameterMm / 2
-  const tableRadius = girdleRadius * tableRatio
-  const crownHeight = diameterMm * crownHeightRatio
-  const pavilionDepth = diameterMm * pavilionDepthRatio
+
+  const R = Math.max(1e-4, diameterMm / 2)
+  const Rt = R * Math.min(0.95, Math.max(0.2, tableRatio))
+  const crown = (Math.min(45, Math.max(20, crownAngleDeg)) * Math.PI) / 180
+  const pavilion = (Math.min(50, Math.max(30, pavilionAngleDeg)) * Math.PI) / 180
+  const gyTop = R * Math.max(0, girdleRatio)
+  const gyBot = -gyTop
+
+  // Eight-fold symmetry sampled at sixteen azimuths. The EVEN ones carry the
+  // table corners, the crown kites and the pavilion's lower-girdle
+  // junctions; the ODD ones carry the star points and the pavilion mains.
+  // That 22.5° offset between crown and pavilion is the cut's defining
+  // feature — it is what puts a main under a star rather than under a kite.
+  const AZ = (k: number) => (k * Math.PI * 2) / 16
+  const at = (radius: number, k: number, y: number) =>
+    new THREE.Vector3(Math.cos(AZ(k)) * radius, y, Math.sin(AZ(k)) * radius)
+
+  // A facet family's plane, evaluated at an azimuth offset from its own.
+  // Used so the star points and lower-girdle junctions land EXACTLY on the
+  // kite and main planes, which keeps those quads planar — a non-planar
+  // kite triangulates into two slightly different planes and the facet
+  // visibly breaks in half, which is precisely the kind of flaw that reads
+  // as "fake" at close range.
+  const COS22 = Math.cos(AZ(1))
+  const crownY = (radius: number, cosOffset: number) => gyTop + (R - radius * cosOffset) * Math.tan(crown)
+  const pavilionY = (radius: number, cosOffset: number) => gyBot - (R - radius * cosOffset) * Math.tan(pavilion)
+
+  const tableEdgeRadius = Rt * COS22
+  const starRadius = tableEdgeRadius + Math.min(0.95, Math.max(0.05, starLength)) * (R - tableEdgeRadius)
+  const lowerRadius = R * (1 - Math.min(0.95, Math.max(0.05, lowerHalfLength)))
+  const culetRadius = Math.min(0.3, Math.max(0, culetRatio)) * R
+
+  const T = Array.from({ length: 8 }, (_, i) => at(Rt, i * 2, crownY(Rt, 1)))
+  const P = Array.from({ length: 8 }, (_, j) => at(starRadius, j * 2 + 1, crownY(starRadius, COS22)))
+  const Gt = Array.from({ length: 16 }, (_, k) => at(R, k, gyTop))
+  const Gb = Array.from({ length: 16 }, (_, k) => at(R, k, gyBot))
+  const L = Array.from({ length: 8 }, (_, i) => at(lowerRadius, i * 2, pavilionY(lowerRadius, COS22)))
+  // A culet facet is an octagon whose EDGES face the mains, so its vertices
+  // sit on the even azimuths alongside the lower-girdle junctions. Putting
+  // them on the odd ones would leave a culet corner under each main instead
+  // of an edge, and the mains would not close.
+  const culet = culetRadius > 0
+    ? Array.from({ length: 8 }, (_, i) => at(culetRadius, i * 2, pavilionY(culetRadius, COS22)))
+    : null
+  const apex = new THREE.Vector3(0, pavilionY(0, 1), 0)
+
+  const wrap8 = (i: number) => (i + 8) % 8
+  const wrap16 = (k: number) => (k + 16) % 16
+
+  // One entry per FACET, as a polygon rather than triangles, so the winding
+  // fix below runs per facet and so the facet count is something the
+  // verification can assert directly.
+  const facets: THREE.Vector3[][] = []
+
+  facets.push(T.slice())
+  for (let j = 0; j < 8; j++) facets.push([T[j], T[wrap8(j + 1)], P[j]])
+  for (let i = 0; i < 8; i++) facets.push([T[i], P[i], Gt[i * 2], P[wrap8(i - 1)]])
+  for (let j = 0; j < 8; j++) {
+    facets.push([P[j], Gt[j * 2], Gt[j * 2 + 1]])
+    facets.push([P[j], Gt[j * 2 + 1], Gt[wrap16(j * 2 + 2)]])
+  }
+  for (let k = 0; k < 16; k++) facets.push([Gt[k], Gt[wrap16(k + 1)], Gb[wrap16(k + 1)], Gb[k]])
+  for (let i = 0; i < 8; i++) {
+    facets.push([L[i], Gb[wrap16(i * 2 - 1)], Gb[i * 2]])
+    facets.push([L[i], Gb[i * 2], Gb[wrap16(i * 2 + 1)]])
+  }
+  for (let j = 0; j < 8; j++) {
+    // Going round the main: girdle (outer), one junction, the culet edge or
+    // the point, then the other junction. A truncated main is a pentagon,
+    // which is what a 58-facet stone actually has.
+    facets.push(culet
+      ? [Gb[j * 2 + 1], L[j], culet[j], culet[wrap8(j + 1)], L[wrap8(j + 1)]]
+      : [Gb[j * 2 + 1], L[j], apex, L[wrap8(j + 1)]])
+  }
+  if (culet) facets.push(culet.slice())
+
+  // The solid is convex, so "outward" at any facet is simply away from the
+  // centroid. Winding is fixed against that rather than reasoned out family
+  // by family — seven facet families across two azimuth offsets is exactly
+  // where a hand-checked winding gets one of them backwards and leaves a
+  // black hole in the render that only shows up from one angle.
+  const centre = new THREE.Vector3()
+  let sampled = 0
+  for (const facet of facets) for (const v of facet) { centre.add(v); sampled++ }
+  centre.divideScalar(Math.max(1, sampled))
+
+  const positions: number[] = []
+  const edge1 = new THREE.Vector3(), edge2 = new THREE.Vector3(), normal = new THREE.Vector3()
+  const outward = new THREE.Vector3(), facetCentre = new THREE.Vector3()
+  for (const facet of facets) {
+    if (facet.length < 3) continue
+    facetCentre.set(0, 0, 0)
+    for (const v of facet) facetCentre.add(v)
+    facetCentre.divideScalar(facet.length)
+    edge1.subVectors(facet[1], facet[0])
+    edge2.subVectors(facet[2], facet[0])
+    normal.crossVectors(edge1, edge2)
+    outward.subVectors(facetCentre, centre)
+    const ordered = normal.dot(outward) < 0 ? facet.slice().reverse() : facet
+    // Fanned from the first vertex — every facet here is convex, so a fan is
+    // a valid triangulation. NON-indexed on purpose: triangles that share no
+    // vertices give computeVertexNormals a flat normal per facet, which is
+    // what keeps the facet edges crisp. Indexing them would average the
+    // normals at shared vertices and smooth the stone into a dome, which
+    // would undo the whole point of cutting it.
+    for (let i = 1; i < ordered.length - 1; i++) {
+      for (const v of [ordered[0], ordered[i], ordered[i + 1]]) positions.push(v.x, v.y, v.z)
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
+  geometry.computeVertexNormals()
 
   const group = new THREE.Group()
-
-  const crown = new THREE.Mesh(buildFacetedFrustum(tableRadius, girdleRadius, crownHeight, facetCount))
-  crown.position.y = crownHeight / 2
-  crown.userData.isStone = true
-  group.add(crown)
-
-  const pavilion = new THREE.Mesh(buildFacetedFrustum(girdleRadius, 0, pavilionDepth, facetCount))
-  pavilion.position.y = -pavilionDepth / 2
-  pavilion.userData.isStone = true
-  group.add(pavilion)
-
-  group.traverse(obj => {
-    if (obj instanceof THREE.Mesh) obj.geometry.computeVertexNormals()
-  })
+  const mesh = new THREE.Mesh(geometry)
+  mesh.userData.isStone = true
+  group.add(mesh)
   return group
 }
 
