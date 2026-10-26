@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import {
-  flowArcMm, newModelObject, profileError, railError, sampleProfile, sampleRail2D,
+  flowArcMm, newModelObject, profileError, railError, railGemCount, sampleProfile, sampleRail2D,
   type ModelObject, type ModelMode, type ModelOp, type ModelPlane, type Point2, type ProfileKind,
 } from '@/lib/modeling'
 
@@ -267,12 +267,40 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect, bandRad
               </label>
               {gems && (
                 <>
+                  {/* Count or spacing — the same row either way. A bench
+                      jeweller sizes a melee row by the gap between stones,
+                      not by how many fit, so both are offered rather than
+                      making the mm case arithmetic the user does by hand. */}
+                  <div className="flex gap-1">
+                    {([['count', 'Set a count'], ['spacing', 'Set a spacing']] as const).map(([mode, label]) => {
+                      const active = mode === 'spacing' ? !!gems.spacingMm : !gems.spacingMm
+                      return (
+                        <button key={mode} type="button"
+                          onClick={() => update(selected.id, {
+                            gems: mode === 'spacing'
+                              ? { ...gems, spacingMm: gems.spacingMm ?? Math.round(gems.diameterMm * 1.25 * 10) / 10 }
+                              : { count: gems.count, diameterMm: gems.diameterMm },
+                          })}
+                          className={`flex-1 rounded-lg border px-2 py-1 text-[10px] font-semibold transition ${active ? 'border-slate-900 bg-slate-900 text-white shadow-sm' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'}`}>
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Stones</label>
-                      <input type="number" min={1} max={120} step={1} className={numInput} value={gems.count}
-                        onChange={e => update(selected.id, { gems: { ...gems, count: Math.max(1, Math.min(120, Math.round(Number(e.target.value) || 1))) } })} />
-                    </div>
+                    {gems.spacingMm ? (
+                      <div>
+                        <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Gap (mm)</label>
+                        <input type="number" min={0.5} max={10} step={0.1} className={numInput} value={gems.spacingMm}
+                          onChange={e => update(selected.id, { gems: { ...gems, spacingMm: Math.max(0.3, Math.min(20, Number(e.target.value) || 1)) } })} />
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Stones</label>
+                        <input type="number" min={1} max={120} step={1} className={numInput} value={gems.count}
+                          onChange={e => update(selected.id, { gems: { ...gems, count: Math.max(1, Math.min(120, Math.round(Number(e.target.value) || 1))) } })} />
+                      </div>
+                    )}
                     <div>
                       <label className="mb-0.5 block text-[10px] font-semibold text-slate-500">Ø (mm)</label>
                       <input type="number" min={0.8} max={4} step={0.1} className={numInput} value={gems.diameterMm}
@@ -280,8 +308,10 @@ export function ModelingPanel({ objects, onChange, selectedId, onSelect, bandRad
                     </div>
                   </div>
                   <p className="text-[10px] text-slate-500">
-                    Set evenly along the curve, table facing outwards, girdle resting on it. They count as real gems:
-                    priced with the rest of the melee, and "Cut the stone seats" cuts their seats too.
+                    {gems.spacingMm
+                      ? `${gems.spacingMm}mm centre to centre along the curve — ${railGemCount(selected)} stones at this rail's length, capped at 120.`
+                      : 'Set evenly along the curve, table facing outwards, girdle resting on it.'}
+                    {' '}They count as real gems: priced with the rest of the melee, and "Cut the stone seats" cuts their seats too.
                   </p>
                 </>
               )}

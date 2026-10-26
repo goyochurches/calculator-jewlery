@@ -6,7 +6,7 @@ import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { Card, CardContent } from '@/components/ui/card'
 import { EMPTY_HISTORY, recordSnapshot, stepHistory as stepHistoryState, canUndoHistory, canRedoHistory, type HistoryState } from '@/lib/historyStack'
 import { ModelingPanel } from '@/components/ModelingPanel'
-import { buildModelObjects, buildCutterMeshes, buildGhostMeshes, buildRailGemMeshes, type ModelObject } from '@/lib/modeling'
+import { buildModelObjects, buildCutterMeshes, buildGhostMeshes, buildRailGemMeshes, railGemCount, type ModelObject } from '@/lib/modeling'
 import { ProfileEditor } from '@/components/ProfileEditor'
 import { PlanShapePicker } from '@/components/PlanShapePicker'
 import { GEM_LOOKS, DIAMOND_LOOK } from '@/lib/gemLooks'
@@ -1166,7 +1166,9 @@ export function CadDesignPage() {
     // else here, by their own diameter.
     for (const obj of modelObjects) {
       if (!obj.gems) continue
-      total += nearestDiamondPrice(caratFromRoundDiameterMm(obj.gems.diameterMm), diamondType) * obj.gems.count
+      // railGemCount, not gems.count — with a spacing-driven row the typed
+      // count is not what the model built (see ModelObject.gems).
+      total += nearestDiamondPrice(caratFromRoundDiameterMm(obj.gems.diameterMm), diamondType) * railGemCount(obj)
     }
     if (stoneShape === 'round' && settingType === 'cluster') {
       // Priced stone-by-stone now too (same fix already applied to
@@ -1196,7 +1198,7 @@ export function CadDesignPage() {
     if (includePave) count += Math.max(0, paveCount - excludedPaveIndices.length)
     if (sideStoneCount > 0 && stoneShape === 'round' && settingType === 'prong' && !tensionActive) count += sideStoneCount
     if (stoneShape === 'round' && settingType === 'cluster') count += Math.max(0, clusterPetalCount - excludedClusterIndices.length)
-    for (const obj of modelObjects) if (obj.gems) count += obj.gems.count
+    for (const obj of modelObjects) if (obj.gems) count += railGemCount(obj)
     return count
     // eslint-disable-next-line react-hooks/exhaustive-deps -- same reasoning as estimatedMeleeCost above: excludedHaloKey/excludedPaveKey/excludedClusterKey (joined-string stand-ins) are what's actually listed, not the arrays themselves — see where they're defined for why.
   }, [includeStone, includeSignetTop, haloEligible, haloCount, haloRingCount, excludedHaloKey, includePave, paveCount, excludedPaveKey, sideStoneCount, stoneShape, settingType, tensionActive, clusterPetalCount, excludedClusterKey, modelObjects])

@@ -1526,6 +1526,48 @@ export interface CurveFramesOptions {
    *  wanders, wrong for anything that curls around on itself (use `axis`).
    *  Ignored when `axis` is given. */
   up?: THREE.Vector3
+  /** When the reference direction (`axis` or `up`) is NOT perpendicular to
+   *  the path, something has to give — a frame cannot keep both exactly.
+   *  'tangent' (the default) keeps the path direction exact and swings the
+   *  normal off the reference to stay square to it; 'normal' keeps the
+   *  reference direction exact and squares the tangent up against it
+   *  instead, so the path only decides the remaining spin.
+   *
+   *  Which one you want is a domain question, not a maths one. A swept
+   *  profile must follow the path, so 'tangent'. A gem's table must face
+   *  where the setter cut for it, so 'normal' — on a rail lying flat in
+   *  the plane perpendicular to the finger, the radial direction runs
+   *  almost ALONG the path, and letting the tangent win there tips the
+   *  table by up to 63° (measured on this file's own default sweep rail).
+   *  Both agree exactly when the reference is already perpendicular to the
+   *  path, as it is everywhere on a plain ring rail. */
+  prefer?: 'normal' | 'tangent'
+}
+
+/** How many samples realize a given centre-to-centre spacing along a path.
+ *  Exported because a caller that needs the count for anything OTHER than
+ *  building geometry — pricing a melee row, say — must get the same number
+ *  the geometry used, and the off-by-one below is exactly the kind of thing
+ *  two copies of this formula would disagree about.
+ *
+ *  A closed loop has as many gaps as samples, since the last wraps back
+ *  onto the first. An open span has one FEWER gap than samples, so it needs
+ *  one more sample to realize the same spacing — without that, an open rail
+ *  comes out ~9% over the requested gap at a dozen stones (measured). */
+export function curveSampleCountForSpacing(
+  curve: THREE.Curve<THREE.Vector3>,
+  spacingMm: number,
+  options: { closed?: boolean; startT?: number; endT?: number } = {},
+): number {
+  if (!(spacingMm > 0)) return 0
+  const closed = options.closed ?? false
+  const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
+  const startT = closed ? 0 : clamp01(options.startT ?? 0)
+  const endT = closed ? 1 : Math.max(startT, clamp01(options.endT ?? 1))
+  const spanMm = curve.getLength() * (endT - startT)
+  if (!(spanMm > 0)) return 0
+  const gaps = Math.round(spanMm / spacingMm)
+  return closed ? Math.max(1, gaps) : Math.max(2, gaps + 1)
 }
 
 /** Some unit vector perpendicular to `v`, chosen off whichever world axis
@@ -1603,8 +1645,7 @@ export function sampleCurveFrames(
 
   let count = Math.floor(options.count ?? 0)
   if (count <= 0 && options.spacingMm && options.spacingMm > 0) {
-    const spanMm = curve.getLength() * (endT - startT)
-    count = Math.round(spanMm / options.spacingMm)
+    count = curveSampleCountForSpacing(curve, options.spacingMm, { closed, startT, endT })
   }
   if (count <= 0) return []
 
@@ -1633,8 +1674,9 @@ export function sampleCurveFrames(
       // Then square it up against the tangent. A no-op for a plain circular
       // rail (radial is already perpendicular there), but it keeps the frame
       // orthonormal on a path that climbs or flares as it winds — a
-      // cathedral rail or a tapered bangle.
-      radial.addScaledVector(tangents[i], -radial.dot(tangents[i]))
+      // cathedral rail or a tapered bangle. Skipped under `prefer: 'normal'`,
+      // where the tangent gets squared up against this instead.
+      if (options.prefer !== 'normal') radial.addScaledVector(tangents[i], -radial.dot(tangents[i]))
       if (radial.lengthSq() < 1e-12) {
         // The sample sits ON the axis (or its radial direction collapsed
         // into the tangent), so "away from the axis" has no answer here.
@@ -1649,7 +1691,7 @@ export function sampleCurveFrames(
     const up = options.up.clone().normalize()
     let last: THREE.Vector3 | null = null
     for (const tan of tangents) {
-      const n = up.clone().addScaledVector(tan, -up.dot(tan))
+      const n = options.prefer === 'normal' ? up.clone() : up.clone().addScaledVector(tan, -up.dot(tan))
       if (n.lengthSq() < 1e-12) {
         // Tangent runs (anti)parallel to `up`, so the projection collapses
         // and there is genuinely no "this way is outward" answer here.
@@ -1698,6 +1740,20 @@ export function sampleCurveFrames(
           normals[i].applyAxisAngle(tangents[i], (-drift * i) / normals.length)
         }
       }
+    }
+  }
+
+  // Under `prefer: 'normal'` the reference direction was kept exact above,
+  // so the tangents are what get squared up — the opposite of the default.
+  // Transport mode needs none of this: it derives its normals FROM the
+  // tangents, so the two are already perpendicular by construction.
+  if (options.prefer === 'normal' && (options.axis || options.up)) {
+    for (let i = 0; i < tangents.length; i++) {
+      const squared = tangents[i].clone().addScaledVector(normals[i], -tangents[i].dot(normals[i]))
+      // The path runs straight through the face direction, so there is no
+      // spin left for it to define. An arbitrary perpendicular beats a zero
+      // vector, which would make the whole frame degenerate.
+      tangents[i] = squared.lengthSq() < 1e-12 ? someNormalTo(normals[i]) : squared.normalize()
     }
   }
 

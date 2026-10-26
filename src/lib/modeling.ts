@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { Brush, Evaluator, ADDITION, SUBTRACTION, INTERSECTION } from 'three-bvh-csg'
 import { toCreasedNormals, mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
-import { buildFacetedRoundStone } from './ringGeometry'
+import { buildFacetedRoundStone, sampleCurveFrames, curveFrameQuaternion, curveSampleCountForSpacing } from './ringGeometry'
 
 // Rhino-style general modeling core (first slice): draw a curve on a
 // construction plane, then turn it into a solid with Extrude or Revolve.
@@ -65,8 +65,12 @@ export interface ModelObject {
   twistDeg?: number
   /** Matrix's "Gems on Curve": melee set evenly along this object's rail
    *  (sweep or pipe). They are real gems — they show as gems, they get
-   *  their own seat cut, and they are priced with the rest of the melee. */
-  gems?: { count: number; diameterMm: number }
+   *  their own seat cut, and they are priced with the rest of the melee.
+   *  `spacingMm` is the alternative a bench jeweller actually thinks in
+   *  ("1.5 mm between stones", not "17 stones"): when set, it derives the
+   *  count from the rail's own arc length and `count` is ignored. Either
+   *  way the result is capped at MAX_RAIL_GEMS. */
+  gems?: { count: number; diameterMm: number; spacingMm?: number }
   /** Pipe only (Rhino/Matrix Pipe): a round tube along `rail`, tapering
    *  from `startRadiusMm` at its beginning to `endRadiusMm` at its end —
    *  wire, filigree and gallery work, where the section is always a circle
@@ -850,12 +854,49 @@ function pipeRailPoints(profile: ModelProfile): Point2[] {
   return sampled.length >= 3 ? sampled.map(q => ({ x: q.x, y: q.y })) : profile.points
 }
 
+/** The rail a gem row actually sits on: the drawn rail shifted by the
+ *  object's own offset. Shared by the placement and the count so the two
+ *  can never read a different curve. */
+function railGemCurve(obj: ModelObject, rail: NonNullable<ModelObject['rail']>): THREE.CatmullRomCurve3 {
+  const offset = new THREE.Vector3(obj.offsetMm.x, obj.offsetMm.y, obj.offsetMm.z)
+  return new THREE.CatmullRomCurve3(
+    rail.points.map(p => planePoint(rail.plane, p).add(offset)), rail.closed, 'centripetal')
+}
+
+/** How many gems `buildRailGemMeshes` will actually place on one object.
+ *  The single source of truth for the geometry AND the price: with
+ *  `gems.spacingMm` the count is derived from the rail's arc length rather
+ *  than typed in, so reading `gems.count` for pricing would charge for a
+ *  number of stones the model never built. */
+export function railGemCount(obj: ModelObject): number {
+  const gems = obj.gems
+  const rail = obj.rail
+  if (!gems || !(gems.diameterMm > 0) || !rail || rail.points.length < 2) return 0
+  if (obj.op !== 'sweep' && obj.op !== 'pipe') return 0
+  const requested = gems.spacingMm && gems.spacingMm > 0
+    ? curveSampleCountForSpacing(railGemCurve(obj, rail), gems.spacingMm, { closed: rail.closed })
+    : Math.floor(gems.count)
+  return Math.max(1, Math.min(requested, MAX_RAIL_GEMS))
+}
+
 /** Matrix's "Gems on Curve": the object's melee, placed evenly along its
  *  rail with each stone's girdle sitting ON the curve (lifted by the
  *  pipe's own radius where there is one, so a stone set on wire rests on
  *  the wire rather than inside it) and its table facing outwards, away
  *  from the finger — the same "outwards" the seat cutters read, so a gem
  *  placed here gets its seat cut for free.
+ *
+ *  Placement goes through ringGeometry's `sampleCurveFrames` in `axis`
+ *  mode, which is where "evenly spaced" and "radially outward" now live
+ *  for every on-curve tool in the app. Two things came out of sharing it
+ *  rather than keeping the local version: spacing can be given in mm (see
+ *  `ModelObject.gems`), and each stone now gets a full frame including the
+ *  rail's TANGENT, so its spin about its own table axis is defined by the
+ *  curve instead of being whatever the shortest +Y→outward rotation
+ *  happened to leave. That is invisible for round melee beyond a tidier
+ *  facet pattern along the row, and it is the prerequisite for ever
+ *  setting oriented (marquise/pear) melee along a rail, which the old
+ *  tangent-less placement could not express at all.
  *
  *  Returned as stone-tagged meshes: the boolean union skips them, the gem
  *  material picks them up, and `extractStoneMeshes` keeps them separate
@@ -864,25 +905,37 @@ export function buildRailGemMeshes(objects: ModelObject[]): THREE.Mesh[] {
   const meshes: THREE.Mesh[] = []
   objects.forEach((obj, index) => {
     const gems = obj.gems
-    if (!gems || gems.count < 1 || !(gems.diameterMm > 0) || !obj.rail || obj.rail.points.length < 2) return
+    const rail = obj.rail
+    if (!gems || !(gems.diameterMm > 0) || !rail || rail.points.length < 2) return
     if (obj.op !== 'sweep' && obj.op !== 'pipe') return
-    const curve = railCurve(obj.rail)
+    // The rail shifted by the object's own offset, so "radially outward" is
+    // read from where the gems ACTUALLY end up: an offset can move a rail
+    // well off the ring's axis, and taking the radial direction before
+    // applying it would tilt every table by that much.
+    const curve = railGemCurve(obj, rail)
+    const count = railGemCount(obj)
+    if (count < 1) return
+    // A single stone on an OPEN rail goes at the middle, not at one end —
+    // preserved from the hand-rolled version this replaced.
+    const span = !rail.closed && count === 1 ? { startT: 0.5, endT: 0.5 } : {}
+    const frames = sampleCurveFrames(curve, {
+      count, closed: rail.closed, axis: new THREE.Vector3(0, 1, 0),
+      // The table faces exactly outward, as this tool always has; the rail
+      // only decides the spin about that axis. Letting the tangent win
+      // instead would tip tables by up to 63 degrees on a rail lying flat
+      // across the ring (this file's own default sweep rail does), which
+      // would silently restyle every design already saved with one.
+      prefer: 'normal', ...span,
+    })
     const lift = obj.op === 'pipe' && obj.pipe ? (obj.pipe.startRadiusMm + obj.pipe.endRadiusMm) / 2 : 0
-    const count = Math.min(Math.floor(gems.count), MAX_RAIL_GEMS)
     const stone = buildFacetedRoundStone({ diameterMm: gems.diameterMm })
-    for (let i = 0; i < count; i++) {
-      const t = obj.rail.closed ? i / count : count === 1 ? 0.5 : i / (count - 1)
-      const point = curve.getPointAt(t).add(new THREE.Vector3(obj.offsetMm.x, obj.offsetMm.y, obj.offsetMm.z))
-      // Outwards = radially away from the ring's own axis (Y). A point
-      // sitting exactly on that axis has no radial direction, so fall
-      // back to +X, the side the head is on.
-      const radial = new THREE.Vector3(point.x, 0, point.z)
-      const up = radial.lengthSq() > 1e-12 ? radial.normalize() : new THREE.Vector3(1, 0, 0)
+    for (const frame of frames) {
+      const orientation = curveFrameQuaternion(frame)
       for (const child of stone.children) {
         if (!(child instanceof THREE.Mesh)) continue
         const mesh = new THREE.Mesh(child.geometry.clone())
-        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), up)
-        mesh.position.copy(point).addScaledVector(up, lift)
+        mesh.quaternion.copy(orientation)
+        mesh.position.copy(frame.position).addScaledVector(frame.normal, lift)
         mesh.userData.isStone = true
         mesh.userData.partName = 'Curve gem'
         mesh.userData.instanceIndex = index
