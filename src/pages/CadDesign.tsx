@@ -4,9 +4,10 @@ import { STLExporter } from 'three/examples/jsm/exporters/STLExporter.js'
 import { OBJExporter } from 'three/examples/jsm/exporters/OBJExporter.js'
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js'
 import { Card, CardContent } from '@/components/ui/card'
-import { EMPTY_HISTORY, recordSnapshot, stepHistory as stepHistoryState, canUndoHistory, canRedoHistory, type HistoryState } from '@/lib/historyStack'
+import { EMPTY_HISTORY, recordSnapshot, stepHistory as stepHistoryState, jumpToSnapshot, summarizeHistory, canUndoHistory, canRedoHistory, type HistoryState } from '@/lib/historyStack'
 import { ModelingPanel } from '@/components/ModelingPanel'
 import { buildModelObjects, buildCutterMeshes, buildGhostMeshes, buildRailGemMeshes, railGemCount, type ModelObject } from '@/lib/modeling'
+import { HistoryPanel } from '@/components/HistoryPanel'
 import { ProfileEditor } from '@/components/ProfileEditor'
 import { PlanShapePicker } from '@/components/PlanShapePicker'
 import { GEM_LOOKS, DIAMOND_LOOK } from '@/lib/gemLooks'
@@ -194,7 +195,7 @@ const PART_TAB: Record<string, Tab> = {
   'Modeled solid': 'model',
   'Merged solid': 'surface', Imported: 'production', 'Matching band': 'surface',
 }
-import { Download, RotateCw, Scale, MousePointerClick, Circle, Gem, Layers, Factory, Camera, Sparkles, Maximize2, Minimize2, Undo2, Redo2, PenTool, Aperture, Scissors } from 'lucide-react'
+import { Download, RotateCw, Scale, MousePointerClick, Circle, Gem, Layers, Factory, Camera, Sparkles, Maximize2, Minimize2, Undo2, Redo2, PenTool, Aperture, Scissors, History } from 'lucide-react'
 
 // Approximate render colors per metal — cosmetic only, doesn't drive
 // pricing (that still comes from Master Tables / config.metalPriceMap
@@ -1232,6 +1233,7 @@ export function CadDesignPage() {
   // disclosed: things that aren't part of the saved parameter set —
   // imported files, the uploaded logo, and per-instance overrides.
   const [history, setHistory] = useState<HistoryState>(EMPTY_HISTORY)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const skipRecordRef = useRef(false)
   const paramsKey = JSON.stringify(currentParams())
   useEffect(() => {
@@ -1249,6 +1251,17 @@ export function CadDesignPage() {
     applyParams(JSON.parse(snapshot) as CadDesignParams)
     return true
   }
+  // Matrix's parametric history: click any step instead of tapping undo
+  // until you reach it. Same skipRecord dance as stepHistory — applying a
+  // snapshot must not be recorded as a brand-new step of its own.
+  const jumpHistory = (index: number) => {
+    const { history: next, snapshot } = jumpToSnapshot(history, paramsKey, index)
+    setHistory(next)
+    if (snapshot === null) return
+    if (snapshot !== paramsKey) skipRecordRef.current = true
+    applyParams(JSON.parse(snapshot) as CadDesignParams)
+  }
+  const historySteps = useMemo(() => summarizeHistory(history), [history])
   const canUndo = canUndoHistory(history, paramsKey)
   const canRedo = canRedoHistory(history)
   useEffect(() => {
@@ -2914,7 +2927,16 @@ export function CadDesignPage() {
                 <span className="text-slate-300">Click a part of the model to select it</span>
               )}
             </div>
+            {historyOpen && (
+              <HistoryPanel steps={historySteps} currentIndex={history.index}
+                onJump={jumpHistory} onClose={() => setHistoryOpen(false)} />
+            )}
             <div className="absolute right-3 top-3 flex items-center gap-1.5">
+              <button type="button" onClick={() => setHistoryOpen(v => !v)}
+                title={`Design history — ${historySteps.length} step${historySteps.length === 1 ? '' : 's'}`}
+                className={`rounded-xl px-2.5 py-2 shadow-sm backdrop-blur transition ${historyOpen ? 'bg-amber-400 text-slate-900' : 'bg-slate-900/80 text-white hover:bg-slate-900'}`}>
+                <History className="h-3.5 w-3.5" />
+              </button>
               <button type="button" onClick={() => stepHistory(-1)} disabled={!canUndo} title="Undo (Ctrl+Z)"
                 className="rounded-xl bg-slate-900/80 px-2.5 py-2 text-white shadow-sm backdrop-blur transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-40">
                 <Undo2 className="h-3.5 w-3.5" />
