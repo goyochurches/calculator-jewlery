@@ -1459,6 +1459,365 @@ export function polarArrayAngles(count: number, startDeg = 0): number[] {
   return angles
 }
 
+// ── Along-curve framing — the shared primitive under Matrix's whole
+//    "on curve" / "on surface" tool family ─────────────────────────────────
+// Matrix's Gems group (Gems on Ring Rail, Gems on Curve, Gem List on Curve,
+// Gem Between 2 Curves, Gem on Surface) and half its Solid/Surface group
+// (Objects on Curve, Objects on Surface, Profile Sweep, Sweep 1, Sweep 2)
+// are ten separate toolbar buttons resting on ONE question: given a path,
+// WHERE along it does each thing sit, and WHICH WAY does it face. Five
+// places in this file already answer that ad-hoc, each with its own local
+// CatmullRomCurve3 plus inline math (buildBypassBandGeometry,
+// buildChannelSetting's seat arc, buildRopeEdge, buildFluteRibs,
+// buildGalleryWireGroup) — this pulls the answer out once, the same way
+// polarArrayAngles above pulled out "N things evenly around a circle".
+
+/** One sample along a path: where it is, plus an orthonormal frame saying
+ *  which way "forward", "outward" and "sideways" point there. */
+export interface CurveFrame {
+  position: THREE.Vector3
+  /** Unit vector along the path, in increasing-`t` direction. */
+  tangent: THREE.Vector3
+  /** Unit vector perpendicular to the path — the "outward"/"up" face
+   *  direction a gem table or a swept profile gets oriented against. */
+  normal: THREE.Vector3
+  /** tangent × normal (the standard sign), completing a right-handed
+   *  frame. `curveFrameQuaternion` is what turns this into an
+   *  orientation; callers should not rebuild the basis themselves. */
+  binormal: THREE.Vector3
+  /** Normalized ARC LENGTH at this sample, 0..1 — not the curve's raw
+   *  parameter. See `sampleCurveFrames` on why that distinction matters. */
+  t: number
+}
+
+export interface CurveFramesOptions {
+  /** How many samples. For a closed path these are the N distinct points
+   *  at i/N (the endpoint is NOT duplicated, since it coincides with the
+   *  start); for an open path they span [startT, endT] inclusive. */
+  count?: number
+  /** Alternative to `count`: target centre-to-centre spacing in mm along
+   *  the path, converted to a count via the path's own arc length. The
+   *  realized spacing is the closest whole number of samples that fits,
+   *  so it lands near but rarely exactly on the request — `count` wins if
+   *  both are given. */
+  spacingMm?: number
+  /** Treat the path as a closed loop. Affects both the sample positions
+   *  (see `count`) and the seam/twist correction below. */
+  closed?: boolean
+  /** Sub-range to sample, as normalized arc length; defaults to the whole
+   *  path. Ignored when `closed` is true (a loop has no ends to trim). */
+  startT?: number
+  endT?: number
+  /** "The path winds AROUND this axis; make every normal point radially
+   *  away from it." The one that matters for jewelry: a ring rail, a
+   *  bangle, an eternity band all wind around the finger/wrist axis, and
+   *  "outward" means away from that axis, which is a DIFFERENT direction at
+   *  every sample and so cannot be expressed as `up`. Takes precedence over
+   *  both `up` and transport. Pair with `center` if the path does not wind
+   *  around the world origin. */
+  axis?: THREE.Vector3
+  /** A point on `axis`; defaults to the origin (where this file's bands
+   *  live). Ignored unless `axis` is given. */
+  center?: THREE.Vector3
+  /** Reference "outward" direction, as one CONSTANT world vector. Each
+   *  normal is this projected perpendicular to the local tangent, so every
+   *  frame faces a consistent way in world space — right for a flat row of
+   *  gems that must all face the same direction regardless of how the path
+   *  wanders, wrong for anything that curls around on itself (use `axis`).
+   *  Ignored when `axis` is given. */
+  up?: THREE.Vector3
+}
+
+/** Some unit vector perpendicular to `v`, chosen off whichever world axis
+ *  `v` leans on least (the standard trick — picking a fixed axis instead
+ *  blows up whenever `v` happens to be parallel to it). */
+function someNormalTo(v: THREE.Vector3): THREE.Vector3 {
+  const ax = Math.abs(v.x), ay = Math.abs(v.y), az = Math.abs(v.z)
+  const axis = ax <= ay && ax <= az
+    ? new THREE.Vector3(1, 0, 0)
+    : ay <= az
+      ? new THREE.Vector3(0, 1, 0)
+      : new THREE.Vector3(0, 0, 1)
+  return axis.addScaledVector(v, -axis.dot(v)).normalize()
+}
+
+/** Sample an orthonormal frame at evenly-spaced points along a path.
+ *
+ *  Two things here are easy to get wrong, and both were checked
+ *  numerically rather than assumed:
+ *
+ *  1. ARC LENGTH, not raw parameter. `curve.getPoint(t)` walks the curve's
+ *     own parameter, which for a CatmullRomCurve3 bunches samples up
+ *     wherever its control points happen to sit densely — gems laid out
+ *     that way come out visibly unevenly spaced even though the maths
+ *     looks right. The `-At` variants (`getPointAt`/`getTangentAt`) re-map
+ *     through the curve's arc-length table first. Even spacing IS the
+ *     feature here, so only the `-At` form is used.
+ *
+ *  2. ROTATION-MINIMIZING frames, not raw Frenet. The textbook Frenet
+ *     normal points along the curvature vector, which hits two failure
+ *     modes a real rail runs into constantly: it is UNDEFINED where
+ *     curvature is zero (any straight stretch — 0/0, i.e. a NaN frame),
+ *     and it FLIPS 180° through an inflection point, which would silently
+ *     turn a row of gems upside down partway along. Instead the first
+ *     normal is chosen once and then parallel-transported: each step
+ *     rotates the previous normal by the same rotation that carries the
+ *     previous tangent onto the current one. Well-defined everywhere, and
+ *     it never flips.
+ *
+ *  For a closed path the transported normal generally does NOT land back
+ *  on the starting one after a full loop (the path's own holonomy), which
+ *  would leave a visible seam where the last sample meets the first. That
+ *  residual angle is measured and spread evenly across the samples
+ *  (measured at 3.5° on a two-turn helix, and exactly 0° on a planar loop,
+ *  so it only earns its keep on paths that genuinely twist out of plane).
+ *
+ *  The catch, and the reason `axis` exists: transport PRESERVES whatever
+ *  normal it starts from, and with no hint there is nothing to pick that
+ *  first normal by except an arbitrary world axis. On a PLANAR path that
+ *  arbitrary choice decides everything — start in the plane and the normal
+ *  stays in-plane (radial, what a gem wants); start along the plane's own
+ *  axis and transport rotates about that same axis, leaving the normal
+ *  pinned there for the whole path (every gem facing sideways along the
+ *  finger). Both are valid rotation-minimizing frames; only one is useful.
+ *  This is not hypothetical — the first cut of this function did exactly
+ *  the second thing on a plain ring rail (every normal 90° off, verified),
+ *  because THREE.Curve's default `getTangent` is a finite difference whose
+ *  ~3e-4 numerical wobble was enough to flip which world axis came out
+ *  "least aligned". `RingRailCurve` now overrides `getTangent` analytically,
+ *  so that particular trigger is gone and transport happens to give a
+ *  radial normal on a rail today — but only by luck of which axis the
+ *  tie-break lands on, which is exactly the kind of thing to not build on.
+ *  So: pass `axis` for anything that winds around a finger or wrist, `up`
+ *  for a flat run, and leave both off only for genuinely free-form 3D
+ *  paths, where any consistent frame will do.
+ */
+export function sampleCurveFrames(
+  curve: THREE.Curve<THREE.Vector3>,
+  options: CurveFramesOptions = {},
+): CurveFrame[] {
+  const closed = options.closed ?? false
+  const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
+  const startT = closed ? 0 : clamp01(options.startT ?? 0)
+  const endT = closed ? 1 : Math.max(startT, clamp01(options.endT ?? 1))
+
+  let count = Math.floor(options.count ?? 0)
+  if (count <= 0 && options.spacingMm && options.spacingMm > 0) {
+    const spanMm = curve.getLength() * (endT - startT)
+    count = Math.round(spanMm / options.spacingMm)
+  }
+  if (count <= 0) return []
+
+  // Sample parameters. A closed loop omits the duplicate endpoint; an open
+  // span includes both ends, and a single-sample open span just takes its
+  // start (rather than quietly becoming two samples).
+  const ts: number[] = []
+  if (closed) for (let i = 0; i < count; i++) ts.push(i / count)
+  else if (count === 1) ts.push(startT)
+  else for (let i = 0; i < count; i++) ts.push(startT + ((endT - startT) * i) / (count - 1))
+
+  const positions = ts.map(t => curve.getPointAt(t, new THREE.Vector3()))
+  const tangents = ts.map(t => curve.getTangentAt(t, new THREE.Vector3()).normalize())
+
+  const normals: THREE.Vector3[] = []
+  if (options.axis) {
+    // Radial-from-axis. Per-sample and self-correcting — no transport, so
+    // no dependence on an arbitrary starting pick, and no accumulated
+    // drift over a long path.
+    const axis = options.axis.clone().normalize()
+    const center = options.center ?? new THREE.Vector3(0, 0, 0)
+    let last: THREE.Vector3 | null = null
+    for (let i = 0; i < tangents.length; i++) {
+      const radial = positions[i].clone().sub(center)
+      radial.addScaledVector(axis, -radial.dot(axis))
+      // Then square it up against the tangent. A no-op for a plain circular
+      // rail (radial is already perpendicular there), but it keeps the frame
+      // orthonormal on a path that climbs or flares as it winds — a
+      // cathedral rail or a tapered bangle.
+      radial.addScaledVector(tangents[i], -radial.dot(tangents[i]))
+      if (radial.lengthSq() < 1e-12) {
+        // The sample sits ON the axis (or its radial direction collapsed
+        // into the tangent), so "away from the axis" has no answer here.
+        // Same disclosed fallback as the degenerate `up` case below.
+        normals.push(last ? last.clone() : someNormalTo(tangents[i]))
+      } else {
+        normals.push(radial.normalize())
+        last = normals[normals.length - 1]
+      }
+    }
+  } else if (options.up) {
+    const up = options.up.clone().normalize()
+    let last: THREE.Vector3 | null = null
+    for (const tan of tangents) {
+      const n = up.clone().addScaledVector(tan, -up.dot(tan))
+      if (n.lengthSq() < 1e-12) {
+        // Tangent runs (anti)parallel to `up`, so the projection collapses
+        // and there is genuinely no "this way is outward" answer here.
+        // Reuse the last well-defined normal instead of emitting a NaN
+        // frame — disclosed rather than silently wrong; with no previous
+        // sample to reuse, fall back to an arbitrary perpendicular.
+        normals.push(last ? last.clone() : someNormalTo(tan))
+      } else {
+        normals.push(n.normalize())
+        last = normals[normals.length - 1]
+      }
+    }
+  } else {
+    let normal = someNormalTo(tangents[0])
+    normals.push(normal.clone())
+    for (let i = 1; i < tangents.length; i++) {
+      const prev = tangents[i - 1], cur = tangents[i]
+      const axis = new THREE.Vector3().crossVectors(prev, cur)
+      const sin = axis.length()
+      if (sin > 1e-10) {
+        normal = normal.clone().applyAxisAngle(axis.divideScalar(sin), Math.atan2(sin, prev.dot(cur)))
+        // Re-project against accumulated floating-point drift, so the frame
+        // stays orthonormal over long paths instead of slowly shearing.
+        normal.addScaledVector(cur, -normal.dot(cur)).normalize()
+      }
+      normals.push(normal.clone())
+    }
+
+    if (closed && normals.length > 2) {
+      // Transport one more step — from the last sample back onto the first
+      // — and measure how far the normal has drifted from where it began.
+      const prev = tangents[tangents.length - 1], first = tangents[0]
+      const wrapped = normals[normals.length - 1].clone()
+      const axis = new THREE.Vector3().crossVectors(prev, first)
+      const sin = axis.length()
+      if (sin > 1e-10) {
+        wrapped.applyAxisAngle(axis.divideScalar(sin), Math.atan2(sin, prev.dot(first)))
+        wrapped.addScaledVector(first, -wrapped.dot(first)).normalize()
+      }
+      // Signed drift, measured in the first sample's own frame.
+      const ref = normals[0]
+      const side = new THREE.Vector3().crossVectors(first, ref)
+      const drift = Math.atan2(wrapped.dot(side), wrapped.dot(ref))
+      if (Math.abs(drift) > 1e-9) {
+        for (let i = 0; i < normals.length; i++) {
+          normals[i].applyAxisAngle(tangents[i], (-drift * i) / normals.length)
+        }
+      }
+    }
+  }
+
+  return ts.map((t, i) => ({
+    position: positions[i],
+    tangent: tangents[i],
+    normal: normals[i],
+    binormal: new THREE.Vector3().crossVectors(tangents[i], normals[i]),
+    t,
+  }))
+}
+
+/** Orientation mapping an object built in this file's own local "+Y is
+ *  outward/up" space onto one curve frame — the SAME +Y-outward convention
+ *  `attachHeadToBand` already establishes for heads on a band, and the one
+ *  `buildFacetedRoundStone` already builds its table against, so a head or
+ *  stone made for either path works here with no second set of rules.
+ *  Local +Z ends up along the path (forward). */
+export function curveFrameQuaternion(frame: CurveFrame): THREE.Quaternion {
+  // X = Y × Z = normal × tangent, which is MINUS the standard binormal
+  // (tangent × normal) stored on the frame. Spelled out rather than left
+  // implicit because getting this sign wrong mirrors every placed object
+  // — a mistake that looks plausible in a screenshot and only shows up as
+  // backwards pear/marquise stones.
+  const x = new THREE.Vector3().crossVectors(frame.normal, frame.tangent)
+  const basis = new THREE.Matrix4().makeBasis(x, frame.normal, frame.tangent)
+  return new THREE.Quaternion().setFromRotationMatrix(basis)
+}
+
+/** Matrix's "Objects on Curve" / "Gems on Curve" as one function: call
+ *  `make` once per sample and drop each result at that frame, oriented by
+ *  `curveFrameQuaternion`. Returning null from `make` skips that sample,
+ *  which is how per-instance removal already works for pavé rows
+ *  (`PaveRowParams.excludeIndices`) — same pattern, no special-casing. */
+export function distributeOnCurve(
+  curve: THREE.Curve<THREE.Vector3>,
+  options: CurveFramesOptions,
+  make: (frame: CurveFrame, index: number, total: number) => THREE.Object3D | null,
+): THREE.Group {
+  const group = new THREE.Group()
+  const frames = sampleCurveFrames(curve, options)
+  frames.forEach((frame, i) => {
+    const obj = make(frame, i, frames.length)
+    if (!obj) return
+    obj.position.copy(frame.position)
+    obj.quaternion.copy(curveFrameQuaternion(frame))
+    group.add(obj)
+  })
+  return group
+}
+
+/** The ring rail itself, as an exact circle rather than a spline through
+ *  sampled points — so arc length is uniform in `t`, `getPointAt` needs no
+ *  arc-length table, and the radius is exact everywhere instead of
+ *  scalloping slightly between control points. Matches the band's own
+ *  XZ-plane / +Y-axis convention (the one `attachHeadToBand`'s position
+ *  maths establishes), which makes Matrix's "Gems on Ring Rail" simply
+ *  `distributeOnCurve` over this. */
+class RingRailCurve extends THREE.Curve<THREE.Vector3> {
+  // Declared and assigned separately rather than as a constructor parameter
+  // property — this project builds with `erasableSyntaxOnly`, which rejects
+  // the shorthand (it is the one TS syntax here that would emit runtime code
+  // rather than being purely erased).
+  private readonly radiusMm: number
+
+  constructor(radiusMm: number) {
+    super()
+    this.radiusMm = radiusMm
+  }
+
+  override getPoint(t: number, target = new THREE.Vector3()): THREE.Vector3 {
+    const a = t * Math.PI * 2
+    return target.set(Math.cos(a) * this.radiusMm, 0, Math.sin(a) * this.radiusMm)
+  }
+
+  /** Analytic tangent, overriding THREE.Curve's finite-difference default
+   *  (which samples getPoint at t ± 1e-4 and so returns a tangent off by
+   *  ~3e-4 rad — measured, not guessed). Exact here because a circle's
+   *  derivative is closed-form, and worth overriding because the rail is
+   *  the most-used path in this file: that wobble otherwise propagates into
+   *  every frame's normal through the tangent re-projection, and it was
+   *  what made the first cut of `sampleCurveFrames` pick the wrong starting
+   *  axis on a plain rail in the first place. */
+  override getTangent(t: number, target = new THREE.Vector3()): THREE.Vector3 {
+    const a = t * Math.PI * 2
+    return target.set(-Math.sin(a), 0, Math.cos(a))
+  }
+}
+
+/** `radiusOffsetMm` moves the rail off the band's outer surface: negative
+ *  sinks it in (a gem seat), positive floats it out. Prefer
+ *  `distributeOnRingRail` over driving this through `distributeOnCurve`
+ *  directly — it supplies the `axis` that makes the normals come out
+ *  radial. */
+export function makeRingRailCurve(band: RingBandParams, radiusOffsetMm = 0): THREE.Curve<THREE.Vector3> {
+  const outerRadius = usSizeToDiameterMm(band.fingerSize) / 2 + band.thicknessMm
+  return new RingRailCurve(Math.max(0.01, outerRadius + radiusOffsetMm))
+}
+
+/** Matrix's "Gems on Ring Rail" (and "Objects on Ring Rail"): distribute
+ *  around the band's own rail with the finger axis already supplied, so
+ *  gem tables face outward without every caller having to know that — the
+ *  exact mistake `sampleCurveFrames`'s own note describes, made unmakeable
+ *  here rather than just documented. A full rail is a closed loop; passing
+ *  `startT`/`endT` asks for an arc instead (the front of the ring only,
+ *  say) and is treated as an open path. */
+export function distributeOnRingRail(
+  band: RingBandParams,
+  options: Omit<CurveFramesOptions, 'axis' | 'center'> & { radiusOffsetMm?: number },
+  make: (frame: CurveFrame, index: number, total: number) => THREE.Object3D | null,
+): THREE.Group {
+  const { radiusOffsetMm = 0, ...frameOptions } = options
+  const partial = frameOptions.startT !== undefined || frameOptions.endT !== undefined
+  return distributeOnCurve(
+    makeRingRailCurve(band, radiusOffsetMm),
+    { closed: !partial, ...frameOptions, axis: new THREE.Vector3(0, 1, 0) },
+    make,
+  )
+}
+
 /** Closed footprint outline (as seen from above) for one fancy shape, in
  *  local (u, v) = (width-axis, length-axis) mm, centered on the origin.
  *  Oval/cushion/princess/marquise/emerald/asscher/radiant/hexagon/lozenge
