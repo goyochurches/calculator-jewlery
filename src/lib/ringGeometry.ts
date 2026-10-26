@@ -1103,6 +1103,36 @@ export function haloOrbitRadiusMm(stoneDiameterMm: number, haloStoneDiameterMm?:
  *  stone's girdle, built in the SAME local "+Y up" space as the head —
  *  call `attachHeadToBand` on this group too (with the same band params)
  *  so it lines up with the head it surrounds. */
+/** One melee stone, as a real brilliant rather than the sphere these
+ *  setting builders used to drop in.
+ *
+ *  The spheres were defended as "too small to read as anything but tiny
+ *  round beads at this scale", and for a 1.2 mm stone alone that is nearly
+ *  true. It stopped being true in aggregate: a double-halo design puts
+ *  fifty-six of them on screen at once, and fifty-six matte spheres beside
+ *  one faceted centre stone is the single thing that makes a render read as
+ *  costume jewellery. A brilliant is 110 triangles, so even a full eternity
+ *  band of melee costs a few thousand — nothing at these counts.
+ *
+ *  `tableDirection` is which way the table faces in the coordinate space
+ *  the caller is building in. Omit it inside a head group, where the stone
+ *  is already built facing the head's own +Y; pass the outward radial
+ *  direction for anything sitting on the band's surface, where +Y is the
+ *  finger axis and a table pointing that way would lie on its side.
+ *
+ *  Returns the Mesh, not the Group, so the call sites keep their existing
+ *  `stone.position.set(...)` and their own seat maths untouched. */
+function meleeStone(diameterMm: number, partName: string, index: number, tableDirection?: THREE.Vector3): THREE.Mesh {
+  const mesh = buildFacetedRoundStone({ diameterMm }).children[0] as THREE.Mesh
+  if (tableDirection) {
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tableDirection.clone().normalize())
+  }
+  mesh.userData.isStone = true
+  mesh.userData.partName = partName
+  mesh.userData.instanceIndex = index
+  return mesh
+}
+
 export function buildHaloGroup(params: HaloParams): THREE.Group {
   const { stoneDiameterMm, haloCount } = params
   const haloStoneRadius = (params.haloStoneDiameterMm ?? Math.max(0.8, stoneDiameterMm * 0.18)) / 2
@@ -1113,11 +1143,8 @@ export function buildHaloGroup(params: HaloParams): THREE.Group {
     if (params.excludeIndices?.includes(i)) continue
     const angle = (i / haloCount) * Math.PI * 2
     const thisRadius = (params.stoneDiameterOverridesMm?.[i] ?? params.haloStoneDiameterMm ?? haloStoneRadius * 2) / 2
-    const stone = new THREE.Mesh(new THREE.SphereGeometry(thisRadius, 14, 10))
+    const stone = meleeStone(thisRadius * 2, 'Halo stone', i)
     stone.position.set(Math.cos(angle) * orbitRadius, 0, Math.sin(angle) * orbitRadius)
-    stone.userData.isStone = true
-    stone.userData.partName = 'Halo stone'
-    stone.userData.instanceIndex = i
     group.add(stone)
   }
   group.traverse(obj => {
@@ -2465,11 +2492,8 @@ export function buildPaveRow(params: PaveRowParams, band: RingBandParams): THREE
       const angleDeg = side * (gapDeg + t * Math.max(0, spreadDeg - gapDeg))
       const angle = (angleDeg * Math.PI) / 180
       const thisRadius = (stoneDiameterOverridesMm?.[thisIndex] ?? stoneDiameterMm) / 2
-      const stone = new THREE.Mesh(new THREE.SphereGeometry(thisRadius, 16, 12))
+      const stone = meleeStone(thisRadius * 2, 'Pavé stone', thisIndex, new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)))
       stone.position.set(Math.cos(angle) * seatRadius, 0, Math.sin(angle) * seatRadius)
-      stone.userData.isStone = true
-      stone.userData.partName = 'Pavé stone'
-      stone.userData.instanceIndex = thisIndex
       group.add(stone)
     }
   }
@@ -2531,11 +2555,8 @@ export function buildFlushSetting(params: FlushSettingParams, band: RingBandPara
       const thisRadius = (stoneDiameterOverridesMm?.[thisIndex] ?? stoneDiameterMm) / 2
       const rimTube = Math.max(0.25, thisRadius * 0.18)
 
-      const stone = new THREE.Mesh(new THREE.SphereGeometry(thisRadius, 16, 12))
+      const stone = meleeStone(thisRadius * 2, 'Flush stone', thisIndex, new THREE.Vector3(cos, 0, sin))
       stone.position.set(cos * seatRadius, 0, sin * seatRadius)
-      stone.userData.isStone = true
-      stone.userData.partName = 'Flush stone'
-      stone.userData.instanceIndex = thisIndex
       group.add(stone)
 
       // The burnished collar — a small torus lying flat against the band's
@@ -2907,11 +2928,8 @@ export function buildChannelSetting(params: ChannelSettingParams, band: RingBand
       const deg = side * (gapDeg + t * Math.max(0, spreadDeg - gapDeg))
       const rad = (deg * Math.PI) / 180
       const thisRadius = (stoneDiameterOverridesMm?.[thisIndex] ?? stoneDiameterMm) / 2
-      const stone = new THREE.Mesh(new THREE.SphereGeometry(thisRadius, 16, 12))
+      const stone = meleeStone(thisRadius * 2, 'Channel stone', thisIndex, new THREE.Vector3(Math.cos(rad), 0, Math.sin(rad)))
       stone.position.set(Math.cos(rad) * seatRadius, wallHeightMm * 0.3, Math.sin(rad) * seatRadius)
-      stone.userData.isStone = true
-      stone.userData.partName = 'Channel stone'
-      stone.userData.instanceIndex = thisIndex
       group.add(stone)
     }
   }
@@ -4097,11 +4115,8 @@ export function buildBarSetting(params: BarSettingParams, band: RingBandParams):
       if (excludeIndices?.includes(thisIndex)) continue
       const rad = (angleDeg * Math.PI) / 180
       const thisRadius = (stoneDiameterOverridesMm?.[thisIndex] ?? stoneDiameterMm) / 2
-      const stone = new THREE.Mesh(new THREE.SphereGeometry(thisRadius, 16, 12))
+      const stone = meleeStone(thisRadius * 2, 'Bar stone', thisIndex, new THREE.Vector3(Math.cos(rad), 0, Math.sin(rad)))
       stone.position.set(Math.cos(rad) * seatRadius, barHeightMm * 0.2, Math.sin(rad) * seatRadius)
-      stone.userData.isStone = true
-      stone.userData.partName = 'Bar stone'
-      stone.userData.instanceIndex = thisIndex
       group.add(stone)
     }
 
@@ -4187,11 +4202,8 @@ export function buildInvisibleSetting(params: InvisibleSettingParams, band: Ring
       if (excludeIndices?.includes(thisIndex)) continue
       const rad = (angleDeg * Math.PI) / 180
       const thisRadius = (stoneDiameterOverridesMm?.[thisIndex] ?? stoneDiameterMm) / 2
-      const stone = new THREE.Mesh(new THREE.SphereGeometry(thisRadius, 16, 12))
+      const stone = meleeStone(thisRadius * 2, 'Invisible-set stone', thisIndex, new THREE.Vector3(Math.cos(rad), 0, Math.sin(rad)))
       stone.position.set(Math.cos(rad) * seatRadius, 0, Math.sin(rad) * seatRadius)
-      stone.userData.isStone = true
-      stone.userData.partName = 'Invisible-set stone'
-      stone.userData.instanceIndex = thisIndex
       group.add(stone)
     }
   }

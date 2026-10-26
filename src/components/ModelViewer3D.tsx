@@ -580,12 +580,20 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     for (const m of materials) if (m) { m.side = THREE.DoubleSide; m.needsUpdate = true }
   }, [sectionPlane])
 
-  // Render mode: swap the flat working look for a presentation look.
-  // Working view keeps scene.environment null + cheap lights; Render mode
-  // turns on image-based lighting, ACES tone mapping, shadows, refraction
-  // on gems and a clear-coated metal, and drops a shadow-catching ground
-  // under the ring. Re-runs when the displayed object changes so the
-  // ground follows the model's lowest point.
+  // Render mode: swap the working look for a presentation look.
+  //
+  // BOTH modes now get image-based lighting. The working view used to run
+  // with scene.environment = null, and polished metal with nothing to
+  // reflect does not read as metal at all — it reads as glossy plastic,
+  // because a mirror finish is ENTIRELY reflections of its surroundings.
+  // That was the single biggest reason the working view looked fake, and
+  // it is the view the design is actually done in. The environment is one
+  // small procedurally generated PMREM cube that is already built on
+  // startup for render mode, so using it here costs nothing extra; render
+  // mode still layers on ACES tone mapping, shadows, refraction on the
+  // gems, a clear coat on the metal and a shadow-catching ground.
+  // Re-runs when the displayed object changes so the ground follows the
+  // model's lowest point.
   useEffect(() => {
     const renderer = rendererRef.current, scene = sceneRef.current
     const material = materialRef.current, stone = stoneMaterialRef.current
@@ -596,26 +604,39 @@ export const ModelViewer3D = forwardRef<ModelViewer3DHandle, ModelViewer3DProps>
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     renderer.toneMapping = renderMode ? THREE.ACESFilmicToneMapping : THREE.NoToneMapping
     renderer.toneMappingExposure = 1.05
-    scene.environment = renderMode ? envTextureRef.current : null
+    scene.environment = envTextureRef.current
+    // Dimmer in the working view so the environment reads as lighting
+    // rather than taking over the flat, legible look that makes the shape
+    // easy to judge while editing.
+    scene.environmentIntensity = renderMode ? 1 : 0.55
     scene.background = renderMode ? backdropRef.current : new THREE.Color('#0f172a')
     key.castShadow = renderMode
-    material.envMapIntensity = renderMode ? 1.15 : 1
-    material.roughness = renderMode ? 0.16 : 0.28
+    material.envMapIntensity = renderMode ? 1.15 : 0.9
+    material.roughness = renderMode ? 0.16 : 0.22
     // Refraction: diamond-like IOR, transmissive, thin — replaces the
     // working view's flat translucent look.
     stone.transmission = renderMode ? 1 : 0
-    stone.ior = renderMode ? gem.ior : 1.5
+    // The real IOR in both modes. Without transmission it cannot refract
+    // in the working view, but IOR still drives the Fresnel term, which is
+    // what gives a gem its bright rim and dark centre at grazing angles —
+    // free contrast that 1.5 (window glass) was throwing away.
+    stone.ior = gem.ior
     stone.thickness = renderMode ? 1.6 : 0
     // Colored gems absorb along the light path (Beer-Lambert-style).
     stone.attenuationColor.set(gem.color)
     stone.attenuationDistance = gem.color.toLowerCase() === '#ffffff' ? Infinity : 6
-    stone.roughness = renderMode ? 0 : 0.05
-    stone.opacity = renderMode ? 1 : 0.85
+    stone.roughness = 0
+    stone.opacity = renderMode ? 1 : 0.72
     stone.transparent = !renderMode
-    stone.envMapIntensity = renderMode ? 4 : 1
+    // The working view has an environment now, so the gem can reflect it
+    // instead of sitting there as a milky solid. Pushed well above 1
+    // because a polished gem IS mostly reflection — at 1 it still read as
+    // frosted plastic next to metal that had just started looking like
+    // metal.
+    stone.envMapIntensity = renderMode ? 4 : 2.6
     stone.dispersion = renderMode ? 0.5 : 0 // fire (rainbow splitting)
     stone.clearcoat = renderMode ? 1 : 0
-    stone.specularIntensity = renderMode ? 1 : 0.5
+    stone.specularIntensity = 1
     stone.color.set(renderMode ? gem.color : '#eaf6ff')
     stone.needsUpdate = true
     material.needsUpdate = true
