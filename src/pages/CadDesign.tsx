@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { EMPTY_HISTORY, recordSnapshot, stepHistory as stepHistoryState, jumpToSnapshot, summarizeHistory, canUndoHistory, canRedoHistory, type HistoryState } from '@/lib/historyStack'
 import { ModelingPanel } from '@/components/ModelingPanel'
 import { buildModelObjects, buildCutterMeshes, buildGhostMeshes, buildRailGemMeshes, railGemCount, type ModelObject } from '@/lib/modeling'
+import { CadExamplePicker } from '@/components/CadExamplePicker'
 import { HistoryPanel } from '@/components/HistoryPanel'
 import { ProfileEditor } from '@/components/ProfileEditor'
 import { PlanShapePicker } from '@/components/PlanShapePicker'
@@ -1420,6 +1421,11 @@ export function CadDesignPage() {
       <section className={fullscreen ? 'grid gap-3 lg:h-[calc(100vh-1.5rem)] lg:grid-cols-[minmax(340px,440px)_1fr]' : 'grid gap-4 lg:grid-cols-[1fr_1.3fr]'}>
         <Card className={`rounded-[30px] border border-white/80 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.08)] ${fullscreen ? 'lg:h-full lg:overflow-y-auto' : ''}`}>
           <CardContent className="space-y-5 p-6 sm:p-7">
+            <CadExamplePicker onLoad={example => {
+              applyPreset(example.params)
+              setPresetMessage('Loaded "' + example.name + '". Edit it, then Save to keep your version.')
+            }} />
+
             <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
               <span className="text-sm font-semibold text-slate-900">Presets</span>
               <p className="text-[11px] text-slate-400">
