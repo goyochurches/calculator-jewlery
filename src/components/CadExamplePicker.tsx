@@ -24,7 +24,7 @@ export function CadExamplePicker({ onLoad }: CadExamplePickerProps) {
   const shown = openFamily ? CAD_EXAMPLES.filter(e => e.family === openFamily) : []
 
   return (
-    <div className="col-span-full space-y-2 rounded-2xl border border-amber-200 bg-amber-50/50 p-3">
+    <div className="order-last shrink-0 space-y-2 rounded-2xl border border-amber-200 bg-amber-50/50 p-3">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
           <Sparkles className="h-3.5 w-3.5 shrink-0 text-amber-500" />
@@ -51,7 +51,7 @@ export function CadExamplePicker({ onLoad }: CadExamplePickerProps) {
         </span>
       </div>
       {shown.length > 0 && (
-        <ul className="grid gap-1.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <ul className="grid max-h-56 gap-1.5 overflow-y-auto">
           {shown.map(example => (
             <li key={example.id}>
               <button type="button" onClick={() => onLoad(example)}

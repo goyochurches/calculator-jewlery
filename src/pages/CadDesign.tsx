@@ -1451,20 +1451,27 @@ export function CadDesignPage() {
           ribbon for the same reason — a ring is wider than it is tall, so
           a full-width viewport shows far more of it, and the controls stop
           being a single tall column you scroll through. */}
-      <section className="flex min-h-0 flex-1 flex-col gap-3">
-        <Card className="shrink-0 rounded-[24px] border border-white/80 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+      {/* A tool panel beside the viewport, not above it. The ribbon was
+          tried first and the arithmetic killed it: the Gems tab alone has
+          26 control groups, which is seven rows in a four-column band —
+          roughly 600px against the ~250px a top strip can take without
+          eating the viewer. A full-height column shows eight to ten groups
+          at once, and scrolling a tall panel is a normal thing to do,
+          unlike hunting inside a short horizontal band. */}
+      <section className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
+        <Card className="flex min-h-0 flex-col overflow-hidden rounded-[24px] border border-white/80 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.08)] lg:w-[360px] lg:shrink-0 xl:w-[400px]">
           {/* Each control group is a direct child here, so turning this
               from a vertical stack into a responsive grid spreads them
               across the ribbon with no change to any group itself. Capped
               in height with its own scroll so the ribbon can never push
               the viewer off the screen. */}
-          <CardContent className="grid max-h-[34vh] grid-cols-1 items-start gap-3 overflow-y-auto p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <CardContent className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden p-3">
             <CadExamplePicker onLoad={example => {
               applyPreset(example.params)
               setPresetMessage('Loaded "' + example.name + '". Edit it, then Save to keep your version.')
             }} />
 
-            <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
+            <div className="order-last space-y-2 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
               <span className="text-sm font-semibold text-slate-900">Presets</span>
               <p className="text-[11px] text-slate-400">
                 Save/reuse the whole design as a named preset instead of re-entering every number — saved to THIS
@@ -1501,7 +1508,7 @@ export function CadDesignPage() {
                 than a plain text-button row, following the same real
                 Matrix reference the user shared (icon-first, dense
                 groups) rather than this app's earlier plain pill tabs. */}
-            <div className="sticky top-0 z-10 order-first col-span-full grid grid-cols-5 gap-1 rounded-2xl bg-slate-100 p-1 shadow-[0_6px_10px_-8px_rgba(15,23,42,0.5)]">
+            <div className="sticky top-0 z-10 order-first grid shrink-0 grid-cols-1 gap-0.5 rounded-xl border border-slate-200 bg-white/95 p-1 backdrop-blur">
               {([
                 ['ringrail', 'Ring Rail', Circle],
                 ['gems', 'Gems', Gem],
@@ -1510,8 +1517,8 @@ export function CadDesignPage() {
                 ['production', 'Production', Factory],
               ] as const).map(([tab, label, Icon]) => (
                 <button key={tab} type="button" onClick={() => setActiveTab(tab)}
-                  className={`flex flex-col items-center gap-0.5 rounded-xl px-2 py-1.5 text-[10px] font-semibold transition ${activeTab === tab ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                  <Icon className="h-4 w-4" />
+                  className={`flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-semibold transition ${activeTab === tab ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}>
+                  <Icon className="h-4 w-4 shrink-0" />
                   {label}
                 </button>
               ))}
@@ -1727,7 +1734,7 @@ export function CadDesignPage() {
             )}
 
             {activeTab === 'ringrail' && (
-              <div className="contents">
+              <div className="space-y-4">
                 <div>
                   <label className={labelCls}>Ring size</label>
                   <select value={fingerSize} onChange={e => setFingerSize(Number(e.target.value))} className={inputCls}>
@@ -1870,7 +1877,7 @@ export function CadDesignPage() {
             )}
 
             {activeTab === 'surface' && (
-              <div className="contents">
+              <div className="space-y-4">
                 <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
                   <span>
                     <span className="text-sm font-semibold text-slate-900">Milgrain edging</span>
