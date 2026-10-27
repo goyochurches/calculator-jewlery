@@ -1235,6 +1235,10 @@ export function CadDesignPage() {
   // imported files, the uploaded logo, and per-instance overrides.
   const [history, setHistory] = useState<HistoryState>(EMPTY_HISTORY)
   const [historyOpen, setHistoryOpen] = useState(false)
+  // The intro paragraph is a page of text. Collapsed by default: on a CAD
+  // page the model has to be on screen, and a wall of prose above the
+  // controls pushed it below the fold on every laptop.
+  const [introOpen, setIntroOpen] = useState(false)
   const skipRecordRef = useRef(false)
   const paramsKey = JSON.stringify(currentParams())
   useEffect(() => {
@@ -1382,17 +1386,36 @@ export function CadDesignPage() {
     setCommandInput('')
   }
 
+  // The page OWNS the viewport height and never scrolls as a page. A CAD
+  // tool where changing a slider means scrolling to see what it did is not
+  // usable, and that is what the stacked layout produced: the model sat
+  // below the fold the whole time. Everything that is not the viewer is
+  // fixed height now, and the viewer takes the rest, so the two are always
+  // on screen together.
   return (
-    <div className={fullscreen ? 'fixed inset-0 z-[200] space-y-3 overflow-y-auto bg-slate-100 p-3' : 'space-y-6'}>
+    <div className={fullscreen
+      ? 'fixed inset-0 z-[200] flex flex-col gap-3 bg-slate-100 p-3'
+      // 9.5rem is the app shell above this page: the workspace label, the
+      // page title and the content padding, measured rather than guessed.
+      // Too small and the viewer wastes space; too large and the command
+      // bar falls off the bottom with no page scroll to reach it.
+      : 'flex h-[calc(100vh-9.5rem)] min-h-[520px] flex-col gap-3'}>
       {!fullscreen && (
       <Card className="overflow-hidden rounded-[30px] border-0 text-white shadow-[0_30px_80px_rgba(15,23,42,0.24)]" style={{ backgroundColor: 'var(--theme-primary)' }}>
-        <CardContent className="relative p-6 sm:p-8">
+        <CardContent className="relative shrink-0 p-4 sm:p-5">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-amber-300">
             <RotateCw className="h-4 w-4" /> CAD Design
             <span className="rounded-full bg-amber-400/90 px-2 py-0.5 text-[9px] font-bold text-slate-900">Early preview</span>
           </div>
-          <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Parametric solitaire ring</h2>
-          <p className="mt-2 max-w-2xl text-sm text-slate-300">
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">Parametric solitaire ring</h2>
+            <button type="button" onClick={() => setIntroOpen(v => !v)} aria-expanded={introOpen}
+              className="rounded-full border border-white/30 px-2.5 py-0.5 text-[11px] font-semibold text-slate-200 transition hover:bg-white/10">
+              {introOpen ? 'Hide details' : 'What can it do?'}
+            </button>
+          </div>
+          {introOpen && (
+          <p className="mt-2 max-h-40 max-w-3xl overflow-y-auto text-sm text-slate-300">
             Band (plain, tapered, twisted-ribbon, split-shank, cathedral or bypass/crossover), ring type (solitaire, three-stone,
             five-stone or signet — no stone),
             center stone (round — custom 3-8 prongs, bezel,
@@ -1410,17 +1433,32 @@ export function CadDesignPage() {
             Click any part of the model in the viewer to select and identify it — click a single prong and you can
             edit its height on its own, a first real per-instance edit, not just a global slider. Import an existing
             STL/OBJ/3MF or .3dm file (Production tab) to view it right here too — the other half of the original ask. The center
-            stone (every shape) is now a real faceted crown+pavilion, not a placeholder — a simplified "single cut"
-            facet count, not full ideal-cut precision. This is not a Matrix/RhinoGold replacement yet — melee (pavé/
-            halo/channel/etc.) and cluster petals still use simple bead proxies. Building toward full parity step by step.
+            stone, when it is round, is a real 57-facet brilliant cut to ideal proportions — table 56%, crown 34.5°,
+            pavilion 40.75°, 61.2% total depth — and its volume gives the right carat weight to within 2% of the
+            trade's own diameter rule. Melee (pavé, halo, channel, bar, flush, invisible) are faceted brilliants too,
+            no longer bead proxies. Still simplified: the fancy cuts (oval, marquise, pear, emerald and the rest) use
+            the older crown+pavilion construction, and cluster petals remain proxies. This is not a Matrix/RhinoGold
+            replacement — it is a mesh modeller, not a NURBS one. Building toward parity step by step.
           </p>
+          )}
         </CardContent>
       </Card>
       )}
 
-      <section className={fullscreen ? 'grid gap-3 lg:h-[calc(100vh-1.5rem)] lg:grid-cols-[minmax(340px,440px)_1fr]' : 'grid gap-4 lg:grid-cols-[1fr_1.3fr]'}>
-        <Card className={`rounded-[30px] border border-white/80 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.08)] ${fullscreen ? 'lg:h-full lg:overflow-y-auto' : ''}`}>
-          <CardContent className="space-y-5 p-6 sm:p-7">
+      {/* Ribbon layout: the controls sit ACROSS THE TOP and the viewer
+          takes the full width underneath, rather than the controls living
+          in a narrow left column. Matrix puts its tools in a horizontal
+          ribbon for the same reason — a ring is wider than it is tall, so
+          a full-width viewport shows far more of it, and the controls stop
+          being a single tall column you scroll through. */}
+      <section className="flex min-h-0 flex-1 flex-col gap-3">
+        <Card className="shrink-0 rounded-[24px] border border-white/80 bg-white/95 shadow-[0_20px_60px_rgba(15,23,42,0.08)]">
+          {/* Each control group is a direct child here, so turning this
+              from a vertical stack into a responsive grid spreads them
+              across the ribbon with no change to any group itself. Capped
+              in height with its own scroll so the ribbon can never push
+              the viewer off the screen. */}
+          <CardContent className="grid max-h-[34vh] grid-cols-1 items-start gap-3 overflow-y-auto p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             <CadExamplePicker onLoad={example => {
               applyPreset(example.params)
               setPresetMessage('Loaded "' + example.name + '". Edit it, then Save to keep your version.')
@@ -1463,7 +1501,7 @@ export function CadDesignPage() {
                 than a plain text-button row, following the same real
                 Matrix reference the user shared (icon-first, dense
                 groups) rather than this app's earlier plain pill tabs. */}
-            <div className="grid grid-cols-5 gap-1 rounded-2xl bg-slate-100 p-1">
+            <div className="sticky top-0 z-10 order-first col-span-full grid grid-cols-5 gap-1 rounded-2xl bg-slate-100 p-1 shadow-[0_6px_10px_-8px_rgba(15,23,42,0.5)]">
               {([
                 ['ringrail', 'Ring Rail', Circle],
                 ['gems', 'Gems', Gem],
@@ -1689,7 +1727,7 @@ export function CadDesignPage() {
             )}
 
             {activeTab === 'ringrail' && (
-              <div className="space-y-5">
+              <div className="contents">
                 <div>
                   <label className={labelCls}>Ring size</label>
                   <select value={fingerSize} onChange={e => setFingerSize(Number(e.target.value))} className={inputCls}>
@@ -1832,7 +1870,7 @@ export function CadDesignPage() {
             )}
 
             {activeTab === 'surface' && (
-              <div className="space-y-5">
+              <div className="contents">
                 <label className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50/60 p-3">
                   <span>
                     <span className="text-sm font-semibold text-slate-900">Milgrain edging</span>
@@ -2896,8 +2934,11 @@ export function CadDesignPage() {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden rounded-[30px] border border-slate-200 shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
-          <div className="relative">
+        {/* Takes whatever height the ribbon leaves. In full screen that is
+            a flex child rather than a fixed calc(), so the viewer stays
+            correct however tall the ribbon grows. */}
+        <Card className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[24px] border border-slate-200 shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
+          <div className="relative min-h-0 w-full flex-1">
             <ModelViewer3D ref={viewerRef} object={viewerObject} color={METAL_COLORS[metal]} onSelectPart={handleSelectPart}
               onMove={(partName, pos) => {
                 // Band-attached parts are positioned by an ANGLE around the
@@ -2919,7 +2960,7 @@ export function CadDesignPage() {
                 }
               }}
               sectionPlane={sectionPlane}
-              autoRotate={autoRotate} wireframe={wireframe} renderMode={renderMode} pathTrace={pathTrace && renderMode} gem={GEM_LOOKS[gemLookKey] ?? DIAMOND_LOOK} onPathTraceSamples={n => samplesSetterRef.current?.(n)} className={fullscreen ? 'h-[calc(100vh-8rem)] min-h-[360px] w-full' : 'h-[420px] w-full sm:h-[520px]'} />
+              autoRotate={autoRotate} wireframe={wireframe} renderMode={renderMode} pathTrace={pathTrace && renderMode} gem={GEM_LOOKS[gemLookKey] ?? DIAMOND_LOOK} onPathTraceSamples={n => samplesSetterRef.current?.(n)} className="h-full w-full" />
             <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-xl bg-slate-900/80 px-3 py-2 text-xs text-white shadow-sm backdrop-blur">
               <MousePointerClick className="h-3.5 w-3.5 shrink-0 text-amber-300" />
               {selectedPart ? (
